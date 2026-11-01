@@ -25,7 +25,7 @@ export class HomeIntroPanel extends ViewPU {
 test('compiled checker executes all paginated introduction content and native Text creation',()=>{
   const result=checkHomeIntroCompiled(compiled);
   assert.deepEqual(result.pages.map(page=>page.id),HOME_INTRO_PAGES.map(page=>page.id));
-  assert.equal(result.pages.length,3);
+  assert.equal(result.pages.length,6);
   assert.equal(result.pages.some(page=>page.id==='study'),false,'the in-study guide page must not return');
 });
 test('compiled checker rejects untransformed inline Text chains',()=>{

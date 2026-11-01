@@ -2940,6 +2940,7 @@
     {"name": "intro_start_create_hint", "value": "打开新建牌组，先给你的内容起个名字。"},
     {"name": "intro_start_sync", "value": "连接 AnkiWeb"},
     {"name": "intro_start_sync_hint", "value": "打开同步面板，连接已有的 AnkiWeb 账号。"},
-    {"name": "intro_keep_appearance", "value": "保持当前外观"}
+    {"name": "intro_keep_appearance", "value": "保持当前外观"},
+    {"name": "intro_novice_daily", "value": "先回忆，再看答案，按真实记忆情况评分。\n\n每天打开牌组，先完成到期复习，再按精力学习新卡。下次复习时间会根据你的评分安排，不必自己计算。\n\n要查找或修改内容，打开“浏览”；想查看学习记录，进入“更多 → 统计”。刚开始保留默认设置，先养成每天复习的习惯。"}
   ]
 }

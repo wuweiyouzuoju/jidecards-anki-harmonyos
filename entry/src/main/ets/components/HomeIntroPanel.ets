@@ -15,7 +15,7 @@ import { completeGlassSuggestion } from '../utils/SurfaceMaterialStore';
 import { 保存简洁模式 } from '../model/简洁模式存储';
 import { 颜色键 } from '../model/颜色主题';
 import { HomeIntroPage, HomeIntroBlock, HomeIntroAction, HOME_INTRO_PAGES, HOME_INTRO_ACTIONS,
-  homeIntroPageIndex, homeIntroActionVisible } from '../model/HomeIntro';
+  homeIntroPageIndex, homeIntroActionVisible, homeIntroBlocks, homeIntroTarget } from '../model/HomeIntro';
 import { AppInterfaceControl } from '../model/AppInterface';
 import { appInterface } from '../backend/AppInterfaceService';
 import { namedResourceText, resourceText, showToastSafely } from '../utils/UiFeedback';
@@ -49,9 +49,10 @@ export struct HomeIntroPanel {
   private selectAction(id: string): void {
     if (!this.isActive || this.savingMode || !homeIntroActionVisible(id, this.pageIndex, this.experienced)) return;
     if (id === 'used_anki' || id === 'new_anki') this.chooseExperience(id === 'used_anki');
-    else if (id === 'start_import' || id === 'start_create' || id === 'start_sync') { this.selectedStart = id; this.movePage(2); }
+    else if (id === 'start_import' || id === 'start_create' || id === 'start_sync') { this.selectedStart = id; this.movePage(homeIntroTarget(this.pageIndex, true, this.experienced)); }
     else if (id === 'glass' || id === 'keep_material') this.chooseMaterial(id === 'glass');
-    else if (id === 'previous') this.movePage(this.pageIndex - 1);
+    else if (id === 'previous') this.movePage(homeIntroTarget(this.pageIndex, false, this.experienced));
+    else if (id === 'next') this.movePage(homeIntroTarget(this.pageIndex, true, this.experienced));
     else if (id === 'finish') this.onClose();
     else if (id === 'later') this.onDismiss();
   }
@@ -120,9 +121,9 @@ export struct HomeIntroPanel {
         AppearanceReveal({ label: $r('app.string.surface_material_glass'), colors: ['#8893A3', '#8893A3', '#8893A3'] })
       }
       Column({ space: 10 }) {
-        Text(this.text(page.titleKey)).fontSize(28).fontWeight(FontWeight.Bold)
+        Text(this.text(homeIntroBlocks(this.pageIndex, this.selectedStart)[0].titleKey)).fontSize(28).fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary')).width('100%')
-        Text(this.text(page.blocks[0].bodyKey)).fontSize(15).lineHeight(23)
+        Text(this.text(homeIntroBlocks(this.pageIndex, this.selectedStart)[0].bodyKey)).fontSize(15).lineHeight(23)
           .fontColor($r('app.color.text_secondary')).width('100%')
       }.alignItems(HorizontalAlign.Start).width('100%')
       if (page.id === 'experience') {
@@ -138,13 +139,15 @@ export struct HomeIntroPanel {
         }.width('100%').constraintSize({ minHeight: 44 }).backgroundColor(Color.Transparent)
           .border({ width: 0 }).enabled(!this.savingMode).attributeModifier(new PressFeedback()).stateEffect(false)
           .onClick((): void => { this.selectAction('keep_material'); })
-      } else {
+      } else if (page.id === 'start') {
         if (this.experienced) {
           this.choice('start_sync', 'intro_start_sync', 'intro_start_sync_hint', $r('app.media.ic_home_sync'))
         }
         this.choice('start_import', 'intro_start_import', 'intro_start_import_hint', $r('app.media.ic_home_import'))
         this.choice('start_create', 'intro_start_create', 'intro_start_create_hint', $r('app.media.ic_home_create_deck'))
       }
+
+
     }.width('100%').alignItems(HorizontalAlign.Start).padding({ top: 8, bottom: 8 })
   }
   @Builder
@@ -168,7 +171,10 @@ export struct HomeIntroPanel {
       Row({ space: 12 }) {
         按下态按钮({ 文案: $r('app.string.home_intro_previous'), 是否启用: !this.savingMode,
           点击回调: (): void => { this.selectAction('previous'); } })
-
+        if (homeIntroActionVisible('next', this.pageIndex, this.experienced)) {
+          PrimaryActionButton({ label: $r('app.string.home_intro_next'),
+            onAction: (): void => { this.selectAction('next'); } }).layoutWeight(1)
+        }
       }.width('100%')
     }
   }

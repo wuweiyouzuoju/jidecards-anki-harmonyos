@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import vm from 'node:vm';
-import { HOME_INTRO_PAGES, HOME_INTRO_ACTIONS, homeIntroPageIndex, homeIntroActionVisible } from '../entry/src/main/ets/model/HomeIntro.ts';
+import { HOME_INTRO_PAGES, HOME_INTRO_ACTIONS, homeIntroPageIndex, homeIntroActionVisible, homeIntroBlocks, homeIntroTarget } from '../entry/src/main/ets/model/HomeIntro.ts';
 
 /** Execute every compiled page and BuilderParam; this checks rendering, not native layout or device compatibility. */
 export function checkHomeIntroCompiled(source) {
@@ -32,7 +32,7 @@ export function checkHomeIntroCompiled(source) {
     const element = () => undefined;
     for (const attribute of ['fontSize','fontWeight','fontColor','textAlign','width','height','alignItems',
       'padding','backgroundColor','borderRadius','lineHeight','copyOption','onClick','pop','scrollBar',
-      'layoutWeight','accessibilityLevel','align','transition','animation','height','flexShrink','fillColor','enabled','attributeModifier','border','margin','createWithChild','clip','maxLines','constraintSize','clipShape']) element[attribute] = () => {};
+      'layoutWeight','accessibilityLevel','align','transition','animation','height','flexShrink','fillColor','enabled','attributeModifier','border','margin','createWithChild','clip','maxLines','constraintSize','stateEffect','clipShape']) element[attribute] = () => {};
     element.create = value => { if (name === 'Text') seen.texts.push(value); };
     return element;
   }
@@ -50,7 +50,7 @@ export function checkHomeIntroCompiled(source) {
     Button:nativeElement('Button'), Image:nativeElement('Image'), Text:nativeElement('Text'), Column:nativeElement('Column'), Span:nativeElement('Span'),
     Row:nativeElement('Row'), Scroll:nativeElement('Scroll'), ForEach:nativeElement('ForEach'), If:nativeElement('If'),
     __Common__:nativeElement('__Common__'),
-    HOME_INTRO_PAGES, HOME_INTRO_ACTIONS, homeIntroPageIndex, homeIntroActionVisible,
+    HOME_INTRO_PAGES, HOME_INTRO_ACTIONS, homeIntroPageIndex, homeIntroActionVisible, homeIntroBlocks, homeIntroTarget,
     namedResourceText:(_context,key)=>key, resourceText:()=> 'page', 颜色键:{动作主色:'primary'},
     prefersReducedMotion:()=>false, GLASS_HOME_SOURCE:"home",
     Color:{Transparent:0}, ButtonType:{Normal:0}, VerticalAlign:{Top:0},

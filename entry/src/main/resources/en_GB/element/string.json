@@ -2940,6 +2940,7 @@
     {"name": "intro_start_create_hint", "value": "Open New Deck and give your content a name."},
     {"name": "intro_start_sync", "value": "Connect AnkiWeb"},
     {"name": "intro_start_sync_hint", "value": "Open Sync to connect your existing AnkiWeb account."},
-    {"name": "intro_keep_appearance", "value": "Keep current appearance"}
+    {"name": "intro_keep_appearance", "value": "Keep current appearance"},
+    {"name": "intro_novice_daily", "value": "Recall first, reveal the answer, and rate how well you remembered it.\n\nOpen a deck each day, finish due reviews, then learn new cards as time allows. Your ratings determine when cards return.\n\nUse Browse to find or edit content, and More → Statistics to see your study history. Keep the default settings while building a daily review habit."}
   ]
 }

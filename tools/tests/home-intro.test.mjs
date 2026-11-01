@@ -72,7 +72,7 @@ async function panelHarness() {
   const saved=[], materials=[], views=[], failures=[];
   const state={fail:false};
   const methods=['currentPage','movePage','selectAction','chooseExperience','chooseMaterial','publishInterface'].map(method).join('\n');
-  const names=['homeIntroPageIndex','homeIntroActionVisible','HOME_INTRO_PAGES','HOME_INTRO_ACTIONS'];
+  const names=['homeIntroPageIndex','homeIntroActionVisible','homeIntroBlocks','homeIntroTarget','HOME_INTRO_PAGES','HOME_INTRO_ACTIONS'];
   const Panel=new Function(...names,'保存简洁模式','completeGlassSuggestion','showToastSafely','$r','appInterface',
     stripTypeScriptTypes(`class Panel { ${methods} }`,{mode:'transform'})+';return Panel;')(
       ...names.map(name=>model[name]),async value=>{saved.push(value);if(state.fail)throw Error('disk');},
@@ -86,7 +86,8 @@ test('all choices finish before the selected real action starts',async()=>{
   for(const used of [false,true])for(const action of used?['start_sync','start_import','start_create']:['start_import','start_create']) {
     const {instance,saved,materials}=await panelHarness();
     await instance.chooseExperience(used);assert.deepEqual(saved,[!used]);
-    instance.selectAction(action);assert.equal(instance.pageIndex,2);assert.equal(instance.started,undefined);
+    instance.selectAction(action);assert.equal(instance.pageIndex,used?5:2);assert.equal(instance.started,undefined);
+    if(!used){for(const expected of [3,4,5]){instance.selectAction('next');assert.equal(instance.pageIndex,expected);assert.equal(instance.started,undefined);}}
     assert.equal(instance.selectedStart,action);
     await instance.chooseMaterial(false);assert.deepEqual(materials,[false]);assert.equal(instance.started,action);
   }
@@ -98,9 +99,10 @@ test('save failure stays retryable, hidden sync is rejected, and returning prese
   state.fail=false;await instance.chooseExperience(false);
   instance.selectAction('start_sync');assert.equal(instance.pageIndex,1);
   instance.selectAction('start_create');assert.equal(instance.pageIndex,2);
-  state.fail=true;await instance.chooseMaterial(true);assert.equal(instance.started,undefined);assert.equal(instance.pageIndex,2);
-  state.fail=false;instance.selectAction('previous');assert.equal(instance.pageIndex,1);assert.equal(instance.selectedStart,'start_create');
-  instance.selectAction('start_import');await instance.chooseMaterial(true);assert.equal(instance.started,'start_import');
+  for(let i=0;i<3;i++)instance.selectAction('next');
+  state.fail=true;await instance.chooseMaterial(true);assert.equal(instance.started,undefined);assert.equal(instance.pageIndex,5);
+  state.fail=false;for(let i=0;i<4;i++)instance.selectAction('previous');assert.equal(instance.pageIndex,1);assert.equal(instance.selectedStart,'start_create');
+  instance.selectAction('start_import');for(let i=0;i<3;i++)instance.selectAction('next');await instance.chooseMaterial(true);assert.equal(instance.started,'start_import');
   instance.isActive=false;instance.started='';await instance.chooseMaterial(false);assert.equal(instance.started,'');
 });
 test('closing the integrated introduction suppresses a second glass recommendation without changing material',async()=>{
@@ -139,4 +141,15 @@ test('home launches the selected domain only after completion has persisted',asy
     instance.closeHomeIntro(action);await new Promise(setImmediate);assert.deepEqual(launched,[]);assert.equal(instance.显示欢迎弹窗,true);
     finish();await new Promise(setImmediate);assert.deepEqual(launched,[action]);assert.equal(instance.显示欢迎弹窗,false);
   }
+});
+
+test('novices reuse practical original copy while experienced users skip teaching in both directions',async()=>{
+  const {homeIntroBlocks,homeIntroTarget,homeIntroActionVisible}=await import('../../entry/src/main/ets/model/HomeIntro.ts');
+  assert.equal(homeIntroBlocks(2,'start_create')[0].bodyKey,'home_intro_flashcards_body');
+  assert.equal(homeIntroBlocks(3,'start_create')[0].bodyKey,'home_intro_manual_body');
+  assert.equal(homeIntroBlocks(3,'start_import')[0].bodyKey,'home_intro_apkg_body');
+  assert.equal(homeIntroBlocks(4,'start_create')[0].bodyKey,'intro_novice_daily');
+  assert.equal(homeIntroTarget(1,true,true),5);assert.equal(homeIntroTarget(5,false,true),1);
+  assert.equal(homeIntroTarget(1,true,false),2);assert.equal(homeIntroTarget(5,false,false),4);
+  assert.equal(homeIntroActionVisible('next',3,false),true);assert.equal(homeIntroActionVisible('next',3,true),false);
 });
