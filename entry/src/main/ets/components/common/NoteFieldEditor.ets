@@ -1000,6 +1000,7 @@ export struct NoteFieldEditor {
           .textAlign(TextAlign.Start)
           .fontColor($r('app.color.text_primary')).placeholderColor($r('app.color.text_tertiary'))
           .backgroundColor(Color.Transparent)
+          .border(SurfaceBorder.materialOptions(this.fieldMaterial, SeriesVisual.isDark(this.fieldMode, this.fieldSystemDark)))
           .borderRadius(应用尺寸.圆角_面板).padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10,
             top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 }).enabled(!this.disabled)
           .defaultFocus(this.sourceToolFocus)
@@ -1013,6 +1014,7 @@ export struct NoteFieldEditor {
           .direction(this.fieldConfig?.rtl === true ? Direction.Rtl : Direction.Ltr)
           .width('100%').height(this.expanded ? '100%' : noteEditorHeight(false)).placeholder(this.placeholderText(), { fontColor: $r('app.color.text_tertiary') })
           .backgroundColor(Color.Transparent)
+          .border(SurfaceBorder.materialOptions(this.fieldMaterial, SeriesVisual.isDark(this.fieldMode, this.fieldSystemDark)))
           .borderRadius(应用尺寸.圆角_面板).padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10,
             top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 }).enabled(!this.disabled)
           .defaultFocus(this.sourceToolFocus)
@@ -1050,14 +1052,6 @@ export struct NoteFieldEditor {
   @Builder
   private expandedContent() {
     Column({ space: 应用尺寸.间距_8 }) {
-      Row({ space: 应用尺寸.间距_8 }) {
-        按下态按钮({ 文案: $r('app.string.' + noteFieldModeTool('visual').titleKey),
-          是否启用: !this.disabled, selectable: true, selected: !this.sourceMode, fillWidth: true,
-          点击回调: (): void => { this.requestMode(false); } })
-        按下态按钮({ 文案: $r('app.string.' + noteFieldModeTool('source_edit').titleKey),
-          是否启用: !this.disabled, selectable: true, selected: this.sourceMode, fillWidth: true,
-          点击回调: (): void => { this.requestMode(true); } })
-      }.width('100%')
       Column() { this.inputContent() }.width('100%').layoutWeight(1)
     }.width('100%').height('100%')
       .onKeyPreIme((event: KeyEvent): boolean => this.handleFieldShortcut(event))
