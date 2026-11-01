@@ -404,3 +404,8 @@ export function 构建完整色阶(种子hex: string, 是否深色: boolean): �
     }
   };
 }
+
+/** 实色按钮沿用公共对比度计算，自动选择黑字或白字。 */
+export function themeSolidTextColor(background: string): string {
+  return 对比度('#000000', background) >= 对比度('#FFFFFF', background) ? '#000000' : '#FFFFFF';
+}

@@ -5,7 +5,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { THEME_CATALOG, availableThemes, isThemeAvailable, themeDefinition, themeForContent, themePrimaryGlass } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import { isSupportedContent } from '../../entry/src/main/ets/model/Redemption.ts';
 import { 解析主题色板 } from '../../entry/src/main/ets/model/颜色主题.ets';
-import { 对比度 } from '../../entry/src/main/ets/model/色阶生成.ets';
+import { 对比度, themeSolidTextColor } from '../../entry/src/main/ets/model/色阶生成.ets';
 
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
 
@@ -128,4 +128,15 @@ test('navigation owns one persistent background outside route content', () => {
     }
   }
   assert.doesNotMatch(read('entry/src/main/ets/components/设置面板.ets'), /(?:Iridescent|Theme)Background\(/);
+});
+
+test('solid theme mode buttons choose readable black or white text in every theme', () => {
+  assert.equal(themeSolidTextColor('#FFFFFF'), '#000000');
+  assert.equal(themeSolidTextColor('#000000'), '#FFFFFF');
+  for (const theme of THEME_CATALOG) for (const dark of [false, true]) {
+    const background = 解析主题色板(theme.id, dark).动作主色;
+    const text = themeSolidTextColor(background);
+    assert.ok(['#000000', '#FFFFFF'].includes(text));
+    assert.ok(对比度(text, background) >= 4.5, `${theme.id} dark=${dark}`);
+  }
 });

@@ -1,3 +1,4 @@
+import { themeSolidTextColor } from '../../model/色阶生成';
 import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
@@ -258,9 +259,9 @@ export struct NoteFieldCard {
           if (!this.collapsed) {
             Button($r('app.string.' + noteFieldModeTool(this.modeSources.length > 0 ? 'source_edit' : 'visual').titleKey))
               .id('note-field-mode-' + this.fieldIndex)
-              .fontSize(应用尺寸.字号_正文_小).fontColor(this.accent)
+              .fontSize(应用尺寸.字号_正文_小).fontColor(themeSolidTextColor(this.accent))
               .height(32).padding({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8 })
-              .backgroundColor($r('app.color.surface_selected')).borderRadius(9).flexShrink(0)
+              .backgroundColor(this.accent).borderRadius(9).flexShrink(0)
               .enabled(!this.disabled).attributeModifier(new PressFeedback()).stateEffect(false)
               .onClick((): void => { this.toggleMode(); })
           }

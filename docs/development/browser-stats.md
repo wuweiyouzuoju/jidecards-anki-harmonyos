@@ -446,7 +446,7 @@ NOTE_FIELD_STICKY_CONTROL向UI与JIDE提供名称、两态图标及位置，add_
 
 编辑器表层分组对照iOS：EditorSectionCard统一牌组/笔记类型、常显标签与关联入口的内边距和主题表面；新增页两项选择同卡、细线分隔，原DirectorySelect及模板/帮助入口保留。已有笔记不伪造未读取的牌组/类型名称，原移动/转换/模板动作同卡排列。NoteEditorHeader显式actionIcon切换预览草稿为眼睛按钮，翻面等其他文字操作不变。标签块使用NoteTagsField可删除标签块、输入和添加按钮，既有层级TagPicker仍可用；未确认的输入立即回写原宿主草稿，父级回声不打断输入，提交按原parseNoteTags去重，不复制iOS业务。关联入口保留实际数量、原NoteLinksDraftPanel及引用原子保存/冲突保护。共同能力说明与AppInterface同步常显标签及预览/关联图标。
 
-字段模式按钮现在位于NoteFieldCard标题行，显示当前“可视编辑/源码编辑”，点击统一请求该字段各文本段转换。NoteFieldEditor仍拥有实际转换和复杂HTML拒绝逻辑，并回报真实模式；只有首文本段恢复焦点，其他段不会抢焦点。非笔记富文本输入保留原本地模式控件。牌组/笔记类型及设置枚举通过SelectionValueButton共用透明无框的当前值+箭头入口；DirectorySelect与SurfaceSelect继续分别拥有目录窗口与枚举菜单，主题材质只作用于所属卡片和弹层，不再叠一层选择框。
+字段模式按钮使用实时主题色实底，文字由 色阶生成.themeSolidTextColor 按实际底色对比度选择纯黑或纯白；切换模式、主题及明暗时同步更新。字段模式按钮现在位于NoteFieldCard标题行，显示当前“可视编辑/源码编辑”，点击统一请求该字段各文本段转换。NoteFieldEditor仍拥有实际转换和复杂HTML拒绝逻辑，并回报真实模式；只有首文本段恢复焦点，其他段不会抢焦点。非笔记富文本输入保留原本地模式控件。牌组/笔记类型及设置枚举通过SelectionValueButton共用透明无框的当前值+箭头入口；DirectorySelect与SurfaceSelect继续分别拥有目录窗口与枚举菜单，主题材质只作用于所属卡片和弹层，不再叠一层选择框。
 
 本轮验收：247项相关Node回归通过，devecocli增量签名HAP构建通过；iPhone 18 Pro独立测试库的testNoteEditorSurfaceAndContinuation通过，仅用作表层视觉参考。Palace_Performance（127.0.0.1:5555）覆盖安装，实际确认图钉两态、标题行模式切换至源码、标签输入与添加为块、关联卡片打开原草稿面板、设置选择入口打开原菜单。居中修正后笔记类型标题与问答题值的文字边界均为558–611px；设置外观主题与跟随系统均为664–717px。保留Core保存和草稿语义，未执行真实账号同步。宽屏、全部语言/大字体及所有笔记类型组合未逐项设备验收。
 
@@ -457,6 +457,8 @@ NOTE_FIELD_STICKY_CONTROL向UI与JIDE提供名称、两态图标及位置，add_
 浏览筛选侧面板玻璃接入：浏览侧边栏以GlassPanel承载原80%宽、全高内容，明确panelHeight使滚动区有界；普通弹窗仍按固有高度测量。玻璃层和正文复用公共准备/250ms锁定降级与弹出动效，原遮罩只淡入淡出；分组在玻璃档透明以透出同一采样，扁平档保留原卡片底色。牌组、标签、已保存搜索的树、加载/错误/折叠、关闭和选择回调保持。
 
 ## 当前字段展开规则
+
+输入区域在可视与源码模式、页内与展开窗口均使用 `SurfaceBorder.materialOptions` 的完整轮廓；内嵌玻璃仍保持透明，不以模块的无框规则覆盖输入边界。展开窗口沿用打开时的字段模式，不额外插入“可视编辑／源码编辑”按钮；模式切换仍由页内既有入口负责。 已在 MatePad 11.5 S（7JDUN26418G04789）深色玻璃模式检查页内与展开窗口：输入轮廓完整，展开窗口不再新增模式按钮，键盘出现后仍有可用输入区域。62项编辑相关回归与增量签名HAP通过；浅色、窄屏和源码模式未逐项设备验收。
 
 NoteFieldEditor 的展开入口打开 NoteFieldExpandedDialog，只承载当前字段；页内输入先卸载并保留112vp占位，其他字段保持原布局。弹窗复用同一字段值、模式、RichEditor/TextArea控制器和更新回调，关闭、遮罩与返回保留实时草稿，不提交整张笔记。输入节点就绪后恢复焦点；离页、禁用或进入后台关闭弹窗并拒绝迟到打开。DialogFrame独占安全区、键盘避让、16vp内边距和12vp标题间隔，正文填满剩余高度，输入框取工具行之外的可用空间；最大宽960vp，窄屏沿用公共弹窗宽度。NoteFieldEditing.expandPresentation与AppInterface的input_expansion_presentation同步向JIDE说明交互，input_expanded仍发布真实状态。回归note-rich-editor覆盖单窗口、共享草稿、关闭保留与迟到打开；真实输入法、富文本切换和键盘避让需设备验收。
 
