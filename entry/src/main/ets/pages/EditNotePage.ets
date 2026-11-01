@@ -1,3 +1,4 @@
+import { pageMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
 import { 浏览编辑区 } from '../components/browser/浏览编辑区';
@@ -25,6 +26,7 @@ import { NoteDraftPreviewPageParams } from '../model/navigation/PageParams';
 /** 导航只传 ID；此页持有读取会话和写入保护，来源页面仅刷新返回结果。 */
 @Component
 export struct EditNotePage {
+  @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   targetId: number = 0;
@@ -147,7 +149,7 @@ export struct EditNotePage {
             .stateEffect(false)
             .onClick((): void => { this.load(); })
           }
-        }.width('100%').height('100%').backgroundColor(this.surface)
+        }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial))
       }
     }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
       .translate({ x: this.navigationOffset })

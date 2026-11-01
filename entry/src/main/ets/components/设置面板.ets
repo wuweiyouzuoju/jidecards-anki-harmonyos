@@ -1,3 +1,4 @@
+import { pageMaterialFill } from '../utils/GlassMaterial';
 import { EditorSettings } from './settings/EditorSettings';
 import { GlassSource } from './common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -478,7 +479,7 @@ Column() {
           top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
           bottom: 0
         })
-        .backgroundColor(this.页面底色微染值)
+        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial))
         .alignContent(Alignment.Center)
 
         // 搜索框属于设置面板公共壳，进入二级/三级设置仍保持在顶栏下方。
@@ -684,7 +685,7 @@ Column() {
           top: 0,
           bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout) + this.导航条高度
         })
-        .backgroundColor(this.页面底色微染值)
+        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial))
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
         .alignListItem(ListItemAlign.Center)
@@ -693,7 +694,7 @@ Column() {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(this.页面底色微染值)
+      .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial))
       }
       
 

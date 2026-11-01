@@ -1,3 +1,4 @@
+import { pageMaterialFill } from '../../utils/GlassMaterial';
 import { GlassSource } from '../common/GlassSource';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { EditorSectionCard } from '../common/EditorSectionCard';
@@ -58,6 +59,7 @@ import { 颜色键 } from '../../model/颜色主题';
 
 @Component
 export struct 浏览编辑区 {
+  @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @Prop ownGlassSource: boolean = true;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
@@ -518,7 +520,7 @@ Column() {
         top: 应用尺寸.操作区顶部间距(this.narrow),
         bottom: 应用尺寸.操作区底部间距(this.narrow, this.navigationBarHeight) })
       }
-    }.width('100%').height('100%').backgroundColor(this.pageSurface)
+    }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial))
       }
       
       if (this.propertyMode === 'deck') {

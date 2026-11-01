@@ -1,3 +1,4 @@
+import { pageMaterialFill } from '../../utils/GlassMaterial';
 import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { GlassSource } from '../common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -105,6 +106,7 @@ type 预览面 = 'question' | 'answer';
 
 @Component
 export struct 卡片预览页 {
+  @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @State private currentMarking: CardMarkingState | null = null;
   @State private flagLabels: FlagLabels = {};
@@ -819,7 +821,7 @@ export struct 卡片预览页 {
       right: 应用尺寸.页面内边距_水平,
       bottom: 应用尺寸.间距_8
     })
-    .backgroundColor(this.pageSurface)
+    .backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial))
   }
 
   @Builder
@@ -870,7 +872,7 @@ export struct 卡片预览页 {
 CardViewport({ content: () => { this.cardViewportContent(); } })
       .width('100%')
       .height('100%')
-      .backgroundColor(this.pageSurface)
+      .backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial))
       }
       if (this.noteLinksOpen) {
         NoteLinksPanel({ noteId: this.noteLinksNoteId, readOnly: this.linksReadOnly, backRequest: this.noteLinksBack, onClose: (): void => {

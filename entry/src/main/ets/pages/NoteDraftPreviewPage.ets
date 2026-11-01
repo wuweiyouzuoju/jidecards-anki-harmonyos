@@ -1,3 +1,4 @@
+import { pageMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteDraftPreview } from '../components/common/NoteDraftPreview';
 import { NoteDraftPreviewInput } from '../model/NoteDraftPreview';
@@ -9,6 +10,7 @@ import { navigationEnterOffset } from '../utils/AppMotion';
 /** 页面只承载冻结的草稿，渲染与临时媒体收尾仍由已有预览会话负责。 */
 @Component
 export struct NoteDraftPreviewPage {
+  @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @Prop input: NoteDraftPreviewInput;
   pathStack: NavPathStack = new NavPathStack();
   @StorageLink('themeMode') private theme: 主题模式 = 'system';
@@ -41,7 +43,7 @@ export struct NoteDraftPreviewPage {
         NoteDraftPreview({ input: this.input, isDark: 解析是否深色(this.theme, this.systemDark),
           fullScreen: true, isVisible: this.visible, onClose: (): void => { this.close(); },
           onBackHandlerChange: (handler: (() => boolean) | null): void => { this.previewBack = handler; } })
-      }.width('100%').height('100%').backgroundColor(this.surface)
+      }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial))
     }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
       .translate({ x: this.navigationOffset })
       .onShown((): void => { this.visible = true; })

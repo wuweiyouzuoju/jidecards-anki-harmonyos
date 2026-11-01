@@ -27,3 +27,8 @@ export function themedGlassFill(fill: string, dark: boolean, accent: string = Ap
 export function insetMaterialFill(color: ResourceColor, material: string = AppStorage.get<string>('surface_material') ?? 'flat'): ResourceColor {
   return usesGlassMaterial(material) ? translucentGlassFill(color) : color;
 }
+
+/** 页面壳透出根背景；卡片正文、画布和输入表面不使用此规则。 */
+export function pageMaterialFill(flatFill: ResourceColor, material: string): ResourceColor {
+  return usesGlassMaterial(material) ? Color.Transparent : flatFill;
+}

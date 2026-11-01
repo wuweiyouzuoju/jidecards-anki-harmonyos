@@ -408,3 +408,13 @@ test('theme and material transitions clear old module outlines on the same actua
   if(!dark||nested)assert.equal(state.border.width,0);
  }
 });
+
+test('page shells clear their fill in glass and restore the exact flat fill', () => {
+ const api = loadPlatformModule('utils/GlassMaterial.ets', '({pageMaterialFill})', {
+  Color: {Transparent: 'transparent'}, tintGlassFill
+ });
+ for (const fill of ['#FFFFFF', '#1C1C1E', '#F5F7FA']) {
+  assert.equal(api.pageMaterialFill(fill, 'glass'), 'transparent');
+  assert.equal(api.pageMaterialFill(fill, 'flat'), fill);
+ }
+});

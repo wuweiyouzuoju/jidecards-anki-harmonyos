@@ -1,3 +1,4 @@
+import { pageMaterialFill } from '../utils/GlassMaterial';
 import { GlassSource } from '../components/common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteLinksPanel } from '../components/links/NoteLinksPanel';
@@ -165,6 +166,7 @@ class StudyGestureProxy {
 
 @Component
 export struct 学习页 {
+  @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @State private currentMarking: CardMarkingState | null = null;
   @State private flagLabels: FlagLabels = {};
@@ -2328,7 +2330,7 @@ export struct 学习页 {
       top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
-    .backgroundColor(this.页面底色微染值)
+    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
   }
 
   @Builder
@@ -2447,7 +2449,7 @@ export struct 学习页 {
         .height('100%')
         .justifyContent(FlexAlign.Center)
         .padding(应用尺寸.卡片内边距)
-        .backgroundColor(this.页面底色微染值)
+        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
       }
 
       if (this.阶段 === 'done') {
@@ -2504,7 +2506,7 @@ export struct 学习页 {
         .height('100%')
         .justifyContent(FlexAlign.Center)
         .padding(应用尺寸.卡片内边距)
-        .backgroundColor(this.页面底色微染值)
+        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
       }
       if (this.tapZonesGuideVisible) {
         StudyTapZonesGuide({ onConfirm: (): void => { this.closeTapZonesGuide(true); } })
@@ -2590,7 +2592,7 @@ export struct 学习页 {
       bottom: this.isFloatingStudyLayout() ? 应用尺寸.页面分组间距(this.narrowDeckLayout) : 0
     })
     // 幻彩时 PAGE_SURFACE_KEY 为透明，让卡片四周显示已有根背景。
-    .backgroundColor(this.页面底色微染值)
+    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
   }
 
   @Builder
@@ -2616,7 +2618,7 @@ export struct 学习页 {
       // 抬高避让手势导航条（AppGallery 导航栏适配要求）
       bottom: 应用尺寸.操作区底部间距(this.narrowDeckLayout, this.导航条高度)
     })
-    .backgroundColor(this.页面底色微染值)
+    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
   }
 
   @Builder
