@@ -33,8 +33,8 @@
       ],
       "platform": "HarmonyOS NEXT",
       "license": "AGPL-3.0-or-later",
-      "sourceVersion": "26.11.09.8",
-      "sourceVersionCode": 3148,
+      "sourceVersion": "26.11.09.9",
+      "sourceVersionCode": 3149,
       "sourceUpdate": {
         "updatedAt": "2026-11-08",
         "changes": [
@@ -375,11 +375,11 @@
         }
       ],
       "sourcePackage": {
-        "tag": "v3.0.20",
-        "fileName": "jidecards-v3.0.20-signed.hap",
-        "releaseUrl": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20",
-        "downloadUrl": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/jidecards-v3.0.20-signed.hap",
-        "checksumsUrl": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/SHA256SUMS.txt",
+        "tag": "v26.11.09.9",
+        "fileName": "jidecards-v26.11.09.9-signed.hap",
+        "releaseUrl": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v26.11.09.9",
+        "downloadUrl": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/jidecards-v26.11.09.9-signed.hap",
+        "checksumsUrl": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/SHA256SUMS.txt",
         "buildMode": "debug",
         "installNote": "签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。"
       }

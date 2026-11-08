@@ -4,13 +4,13 @@
 
 记得闪卡是一款面向鸿蒙 HarmonyOS NEXT 的原生开源学习应用，让知识的整理、回忆与复习融入日常。以 Anki 内核为基础，将主动回忆与间隔复习结合，帮助你把学过的内容转化为长久的记忆。
 
-- 当前源码版本：26.11.09.8（构建编号 3148）
+- 当前源码版本：26.11.09.9（构建编号 3149）
 - 华为应用市场版本以下载页面为准。
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)
 - 下载：[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
-- 签名 HAP 开发包：[jidecards-v3.0.20-signed.hap](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/jidecards-v3.0.20-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/SHA256SUMS.txt) · [构建说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20)
+- 签名 HAP 开发包：[jidecards-v26.11.09.9-signed.hap](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/jidecards-v26.11.09.9-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/SHA256SUMS.txt) · [构建说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v26.11.09.9)
 - 开发包安装：签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。
 - 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
 - 更新日期：2026-11-08
@@ -206,7 +206,7 @@ APKG 用于牌组交换，COLPKG 用于完整集合的备份与恢复。恢复�
 
 实验性设备直连分别提供同源卡库的学习记录合并，以及整套卡库与媒体同步，均需双方独立授权。来源或结构不兼容时，接收设备须确认替换并先备份；保留 AnkiWeb，真实两机与账号行为仍待设备验收。
 
-## 26.11.09.8 源码更新说明
+## 26.11.09.9 源码更新说明
 
 1. 自定义壁纸支持裁剪、透明度与深浅色遮罩；自定义主题色支持 RGB／HEX 输入、明暗适配和实时预览。
 2. 玻璃与扁平材质可分别调整模块、按钮和弹窗的底色不透明度。统一菜单和弹窗的公共呈现。

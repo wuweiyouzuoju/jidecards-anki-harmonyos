@@ -1,4 +1,4 @@
-# 记得闪卡 26.11.09.8 源码更新说明
+# 记得闪卡 26.11.09.9 源码更新说明
 
 原文：https://jidecards.com/releases/
 更新日期：2026-11-08。
@@ -10,13 +10,13 @@
 5. 首次安装时可在配额范围内选择并导入在线牌组；首页帮助集中提供学习指南和社区入口。
 6. JIDE 入口默认开放。包含 AI 生成或改写内容的文件导出会被阻止。
 
-- 当前源码版本：26.11.09.8（构建编号 3148）
+- 当前源码版本：26.11.09.9（构建编号 3149）
 - 华为应用市场版本以下载页面为准。
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)
 - 下载：[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
-- 签名 HAP 开发包：[jidecards-v3.0.20-signed.hap](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/jidecards-v3.0.20-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v3.0.20/SHA256SUMS.txt) · [构建说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v3.0.20)
+- 签名 HAP 开发包：[jidecards-v26.11.09.9-signed.hap](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/jidecards-v26.11.09.9-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/SHA256SUMS.txt) · [构建说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v26.11.09.9)
 - 开发包安装：签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。
 - 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
 - 更新日期：2026-11-08

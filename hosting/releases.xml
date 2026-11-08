@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>记得闪卡版本更新</title><id>https://jidecards.com/releases.xml</id><link href="https://jidecards.com/releases.xml" rel="self"/><link href="https://jidecards.com/releases/"/><updated>2026-11-08T00:00:00+08:00</updated><author><name>可塑性天赋</name></author><entry><title>记得闪卡 26.11.09.8 源码更新</title><id>https://jidecards.com/releases/#release-26-11-09-8</id><link href="https://jidecards.com/releases/#release-26-11-09-8"/><updated>2026-11-08T00:00:00+08:00</updated><content type="text">1. 自定义壁纸支持裁剪、透明度与深浅色遮罩；自定义主题色支持 RGB／HEX 输入、明暗适配和实时预览。
+<feed xmlns="http://www.w3.org/2005/Atom"><title>记得闪卡版本更新</title><id>https://jidecards.com/releases.xml</id><link href="https://jidecards.com/releases.xml" rel="self"/><link href="https://jidecards.com/releases/"/><updated>2026-11-08T00:00:00+08:00</updated><author><name>可塑性天赋</name></author><entry><title>记得闪卡 26.11.09.9 源码更新</title><id>https://jidecards.com/releases/#release-26-11-09-9</id><link href="https://jidecards.com/releases/#release-26-11-09-9"/><updated>2026-11-08T00:00:00+08:00</updated><content type="text">1. 自定义壁纸支持裁剪、透明度与深浅色遮罩；自定义主题色支持 RGB／HEX 输入、明暗适配和实时预览。
 2. 玻璃与扁平材质可分别调整模块、按钮和弹窗的底色不透明度。统一菜单和弹窗的公共呈现。
 3. 宽屏浏览选中卡片后可直接编辑；字段源码模式可编辑包括媒体引用在内的完整字段。卡片脚本错误通过原生弹窗查看详情。
 4. 跟随系统在全屏、分屏和悬浮窗口间切换，保留对应的窗口安全区。

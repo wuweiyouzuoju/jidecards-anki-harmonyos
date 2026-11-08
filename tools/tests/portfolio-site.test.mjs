@@ -75,7 +75,7 @@ test('source updates match application metadata and remain separate from marketp
 
 test('published HAP links match their release metadata across public download entry points', async () => {
   const sourcePackage = work.sourcePackage;
-  const packageVersion = sourcePackage.tag.match(/^v(\d+\.\d+\.\d+)$/)?.[1];
+  const packageVersion = sourcePackage.tag.match(/^v(\d+\.\d+\.\d+(?:\.\d+)?)$/)?.[1];
   assert.ok(packageVersion);
   assert.equal(sourcePackage.fileName, `jidecards-v${packageVersion}-signed.hap`);
   assert.equal(sourcePackage.releaseUrl, `${work.repository}/releases/tag/${sourcePackage.tag}`);

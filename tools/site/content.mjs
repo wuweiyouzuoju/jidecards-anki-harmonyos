@@ -12,7 +12,7 @@ export async function loadContent(root) {
   const work = data.works[0];
   work.sourceVersion = app.versionName;
   work.sourceVersionCode = app.versionCode;
-  const packageVersion = work.sourcePackage?.tag?.match(/^v(\d+\.\d+\.\d+)$/)?.[1];
+  const packageVersion = work.sourcePackage?.tag?.match(/^v(\d+\.\d+\.\d+(?:\.\d+)?)$/)?.[1];
   // 已发布下载包有独立事实来源；源码升版不能编造尚未发布的下载链接。
   if (!packageVersion || work.sourcePackage.fileName !== `jidecards-v${packageVersion}-signed.hap`) {
     throw new Error('Published HAP filename must match its own release tag.');
