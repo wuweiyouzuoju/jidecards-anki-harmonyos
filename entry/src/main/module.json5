@@ -23,6 +23,8 @@
         startWindowBackground: '$color:start_window_background',
         exported: true,
         launchType: 'singleton',
+        supportWindowMode: ['fullscreen', 'split', 'floating'],
+        preferMultiWindowOrientation: 'default',
         skills: [
           {
             entities: ['entity.system.home'],

@@ -39,6 +39,27 @@ const DOMAIN: number = 0x4342;
 export default class EntryAbility extends UIAbility {
   /** 主窗口引用：规避区高度同步用（onWindowStageCreate 时赋值） */
   private 主窗口?: window.Window;
+  private windowLayoutTail: Promise<void> = Promise.resolve();
+  private readonly windowStatusChanged: (status: window.WindowStatusType) => void = (status: window.WindowStatusType): void => {
+    hilog.info(DOMAIN, 'jidecards', 'Window status changed: %{public}d', status);
+    this.syncWindowLayout();
+  };
+
+  /** 只跟随系统窗口模式调整内容布局，不调用最大化、最小化或窗口模式切换。 */
+  private syncWindowLayout(): void {
+    const target: window.Window | undefined = this.主窗口;
+    if (target === undefined) return;
+    this.windowLayoutTail = this.windowLayoutTail.then(async (): Promise<void> => {
+      if (target !== this.主窗口) return;
+      const status: window.WindowStatusType = target.getWindowStatus();
+      if (status === window.WindowStatusType.UNDEFINED || status === window.WindowStatusType.MINIMIZE) return;
+      // 半屏/悬浮窗保留系统标题栏与手势边界，不能沿用整屏启动时的沉浸布局。
+      await target.setWindowLayoutFullScreen(status === window.WindowStatusType.FULL_SCREEN);
+      if (target === this.主窗口) this.同步规避区高度();
+    }).catch((error: Error): void => {
+      hilog.warn(DOMAIN, 'jidecards', 'Window layout sync failed: %{public}s', error.message);
+    });
+  }
 
   private publishSystemDarkMode(isDark: boolean): void {
     AppStorage.setOrCreate<boolean>('systemDarkMode', isDark);
@@ -174,13 +195,15 @@ export default class EntryAbility extends UIAbility {
         this.retryLoadContent(windowStage, 1);
         return;
       }
-      // 开启沉浸式全屏布局：让应用内容延伸到状态栏/导航栏区域，
+      // 全屏时采用沉浸布局；半屏/悬浮窗跟随系统边界，不主动恢复全屏。
+      // 全屏布局让应用内容延伸到状态栏/导航栏区域，
       // 配合各弹层的 expandSafeArea 实现磨砂遮罩覆盖状态栏（设置面板/字段帮助面板等）。
       // 普通页面顶部条通过 paddingTop（状态栏高度）避免内容被状态栏遮挡；
       // 底部固定控件/滚动列表通过 paddingBottom（导航条高度）避免被手势导航条遮挡。
       try {
         this.主窗口 = windowStage.getMainWindowSync();
-        this.主窗口.setWindowLayoutFullScreen(true);
+        this.主窗口.on('windowStatusChange', this.windowStatusChanged);
+        this.syncWindowLayout();
         this.同步规避区高度();
         // 折叠屏展开/折叠、旋转等场景规避区尺寸会变化，必须动态监听更新，
         // 否则高度只在启动时取一次，Mate X7 展开后顶部条/底部控件避让全部错位。
@@ -234,6 +257,9 @@ export default class EntryAbility extends UIAbility {
   }
 
   onWindowStageDestroy(): void {
+    try { this.主窗口?.off('windowStatusChange', this.windowStatusChanged); }
+    catch (error) { hilog.warn(DOMAIN, 'jidecards', 'Window status listener release failed'); }
+    this.主窗口 = undefined;
     hilog.info(DOMAIN, 'jidecards', 'Window stage destroyed');
   }
 
@@ -241,7 +267,8 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate<boolean>(APP_FOREGROUND_KEY, true);
     this.refreshSystemDarkMode();
     this.refreshThemeColors();
-    // 回前台时重同步规避区（分屏/折叠/悬浮窗等场景规避区可能已变化且事件未送达）
+    // 回前台重读真实窗口模式，修复后台期间可能漏送的分屏/悬浮窗变化。
+    this.syncWindowLayout();
     this.同步规避区高度();
   }
 
