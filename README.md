@@ -1,6 +1,6 @@
 # jidecards（记得闪卡）
 
-[![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
+[![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 [![Source 26.11.09.9](https://img.shields.io/badge/source-26.11.09.9-6750a4.svg)](AppScope/app.json5)
 [![AppGallery](https://img.shields.io/badge/AppGallery-Download-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
