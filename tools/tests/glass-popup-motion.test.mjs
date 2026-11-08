@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
+import {loadSharedMenu} from './shared-menu-harness.mjs';
+
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { surfaceMotionApi } from './motion-harness.mjs';
@@ -15,7 +17,7 @@ test('glass menus, dialogs and drawers use distinct presentation geometry and ho
   assert.ok(surface.glassOffset(true)<0);
   for (const [menu,drawer] of [[true,false],[false,false],[false,true]]) {
    const enter=surface.glassEnterAnimation(menu,drawer);
-   assert.equal(enter.duration,200);
+   assert.equal(enter.duration,menu?160:200);
    assert.equal(Boolean(enter.curve.spring),style==='lively');
    const exit=surface.glassExit(menu,drawer,'25%','100%');
    assert.equal(exit.value,0);
@@ -26,7 +28,7 @@ test('glass menus, dialogs and drawers use distinct presentation geometry and ho
 });
 
 test('bubble scale origin follows each actual arrow and remains clamped after edge avoidance',()=>{
- const Bubble=loadComponentLogic('components/common/GlassBubblePanel.ets','GlassBubblePanel',{
+ const Bubble=loadSharedMenu('MenuBubble.ets','SharedGlassBubblePanel',{
   ActionMenuPointerSide, 应用尺寸:{compactMenuWidth:160}
  });
  const panel=new Bubble();panel.panelWidth=160;panel.panelHeight=240;panel.pointerCenter=60;
@@ -52,36 +54,6 @@ test('selects project trigger center onto the actual popup after native placemen
  select.popupArea(area(-20,180));assert.equal(select.motionCenterX,'100%');
 });
 
-test('a shared fusion owns the entrance without a second GlassPanel scale animation',()=>{
- const Panel=loadComponentLogic('components/common/GlassPanel.ets','GlassPanel',{
-  takePopupTrigger:()=>undefined,
-  hilog:{info(){}},supportsGlassBackdrop:()=>true,currentGlassSource:()=> 'home',retainGlassPanel(){},releaseGlassPanel(){},
-  SurfaceTransition:surfaceMotionApi().SurfaceTransition
- });
- const panel=new Panel();let animations=0,prepared=0;
- panel.getUniqueId=()=>1;panel.getUIContext=()=>({animateTo(){animations++;}});
- panel.material='glass';panel.foreground=true;panel.externalEntrance=true;panel.onPrepared=()=>prepared++;
- panel.aboutToAppear();assert.equal(panel.panelScale,1);panel.finish();panel.finish();
- assert.equal(animations,0);assert.equal(prepared,1);assert.equal(panel.panelOpacity,1);
-});
-test('only menus with a real button anchor fuse; ordinary menus retain normal entrance',()=>{
- const Menu=loadComponentLogic('components/common/AnchoredMenu.ets','AnchoredMenu',{
-  takePopupTrigger:()=>undefined,
-  MenuSlideScope:class{},Scroller:class{},menuSlideSession:{attach(){},detach(){}},supportsGlassBackdrop:()=>true,
-  应用尺寸:{compactMenuWidth:168,radiusLg:16}
- });
- for(const setting of ['glass','flat','background','no_anchor']) {
-  const menu=new Menu();menu.material=setting==='flat'?'flat':'glass';menu.foreground=setting!=='background';
-  if(setting!=='no_anchor')menu.fusionAnchor={x:20,y:40,width:44,height:44,radius:22};
-  menu.aboutToAppear();assert.equal(menu.fusionPending,setting==='glass');
-  if(setting==='glass') {
-   menu.fusionTarget={x:20,y:90,width:168,height:220,radius:16};menu.panelPrepared();assert.equal(menu.fusionPlaying,true);
-   const region=menu.fusionRegion();assert.ok(region.left<20&&region.top<40&&region.height>270);
-   menu.foreground=false;menu.foregroundChanged();assert.equal(menu.fusionPending,false);assert.equal(menu.fusionPlaying,false);
-  }
- }
-});
-
 test('switching a prepared panel to content-only keeps its original capture lease balanced',()=>{
  let retained=0,released=0;
  const Panel=loadComponentLogic('components/common/GlassPanel.ets','GlassPanel',{
@@ -104,32 +76,14 @@ test('menu trigger feedback retains brightness and geometry while ordinary butto
  }
 });
 
-test('button closure runs the inverse shared shape; outside/back are idempotent and final completion owns removal',()=>{
- const Menu=loadComponentLogic('components/common/AnchoredMenu.ets','AnchoredMenu',{
-  takePopupTrigger:()=>undefined,
-  MenuSlideScope:class{},Scroller:class{},menuSlideSession:{attach(){},detach(){}},supportsGlassBackdrop:()=>true,
-  Curve:{EaseOut:'ease-out'},应用尺寸:{compactMenuWidth:168,radiusLg:16}
- });
- const menu=new Menu();let closes=0;
- menu.onClose=()=>closes++;menu.getUIContext=()=>({animateTo(_options,update){update();}});
- menu.fusionPlaying=true;menu.fusionPending=false;
- menu.buttonOrigin={x:20,y:30,width:44,height:44,radius:16};
- menu.backgroundClicked({windowX:40,windowY:40});assert.equal(menu.fusionExpanded,false);assert.equal(closes,0);
- menu.requestClose();assert.equal(menu.fusionExpanded,false,'back again does not reopen');
- menu.backgroundClicked({windowX:40,windowY:40});assert.equal(menu.fusionExpanded,true,'same trigger reverses a running return');
- menu.requestClose();menu.finishFusion('finished');assert.equal(closes,1);
- const flat=new Menu();flat.onClose=()=>closes++;flat.requestClose();assert.equal(closes,2);
-});
-
-
-test('ordinary glass dialogs and selectors prepare with their normal surface transition',()=>{
- const Panel=loadComponentLogic('components/common/GlassPanel.ets','GlassPanel',{
-  takePopupTrigger:()=>undefined,
+test('glass menus and dialogs fade in together when reduced motion suppresses the trigger morph',()=>{
+ const Panel=loadSharedMenu('PopupPanel.ets','SharedGlassPanel',{
+  takePopupTrigger:()=>({x:20,y:40,width:180,height:44,radius:16}),prefersReducedMotion:()=>true,
   hilog:{info(){}},Curve:{EaseOut:'ease-out'},supportsGlassBackdrop:()=>true,currentGlassSource:()=> 'page',
   retainGlassPanel(){},releaseGlassPanel(){},SurfaceTransition:surfaceMotionApi().SurfaceTransition
  });
  for(const role of ['menu','dialog','preview']) {
-  const p=new Panel();p.material='glass';p.foreground=true;p.role=role;p.getUniqueId=()=>1;
+  const p=new Panel();Object.assign(p.theme,{material:'glass',foreground:true,supported:true,reducedMotion:true});p.source='page';p.trigger={x:20,y:40,width:180,height:44,radius:16};p.role=role;p.getUniqueId=()=>1;
   let animations=0,prepared=0;
   p.onPrepared=()=>prepared++;
   p.getUIContext=()=>({animateTo(_options,update){animations++;update();}});
@@ -150,23 +104,11 @@ test('a content-only shell clears old highlights as well as fill and border befo
  assert.deepEqual(state.linearGradient.colors,[['transparent',0],['transparent',1]]);
 });
 
-test('button-triggered panels use the measured origin and include both bounds in the optical region',()=>{
- const origin={x:720,y:40,width:44,height:44,radius:16};
- const Panel=loadComponentLogic('components/common/GlassPanel.ets','GlassPanel',{
-  takePopupTrigger:()=>origin,hilog:{info(){}},supportsGlassBackdrop:()=>true,currentGlassSource:()=> 'page',
-  retainGlassPanel(){},releaseGlassPanel(){},SurfaceTransition:surfaceMotionApi().SurfaceTransition
- });
- const p=new Panel();p.material='glass';p.getUniqueId=()=>1;p.getUIContext=()=>({});p.aboutToAppear();
- p.region={left:200,top:300,width:320,height:480};assert.equal(p.ownsFusion(),true);
- assert.deepEqual(p.fusionGeometry().source,origin);
- const r=p.fusionRegion();assert.ok(r.left<=200&&r.top<=40);
- assert.ok(r.left+r.width>=764&&r.top+r.height>=780);
-});
-
 test('popup trigger snapshots expire and can only be consumed once',()=>{
  const source=readFileSync(new URL('../../entry/src/main/ets/utils/PopupTrigger.ets',import.meta.url),'utf8')+'\nexport const triggerApi = { rememberPopupTrigger, takePopupTrigger };';
  let now=100;
- const api=loadPlatformSource(source,'triggerApi',{Date:{now:()=>now},Math,Number});
+ const {glassPopupTriggerRect}=loadPlatformSource(readFileSync(new URL('../../../记得系列基础/src/core/GlassFusion.ts',import.meta.url),'utf8'),'({glassPopupTriggerRect})',{});
+ const api=loadPlatformSource(source,'triggerApi',{Date:{now:()=>now},Math,Number,glassPopupTriggerRect});
  api.rememberPopupTrigger({width:80,height:44,globalPosition:{x:300,y:40}});
  assert.deepEqual(api.takePopupTrigger(),{x:300,y:40,width:80,height:44,radius:16});
  assert.equal(api.takePopupTrigger(),undefined);
@@ -190,45 +132,23 @@ test('stable popup buttons keep the same fill, gradient, opacity and scale on pr
 });
 
 
-test('menus without a button use the same lightweight glass at rest without inventing an origin',()=>{
- const Panel=loadComponentLogic('components/common/GlassPanel.ets','GlassPanel',{
-  takePopupTrigger:()=>undefined,hilog:{info(){}},supportsGlassBackdrop:()=>true,currentGlassSource:()=> 'page',
-  retainGlassPanel(){},releaseGlassPanel(){},SurfaceTransition:surfaceMotionApi().SurfaceTransition
+test('toolbar popup handoff uses its actual outline radius for click and hold, matching home anchors',()=>{
+ const calls=[];
+ const Button=loadComponentLogic('components/common/IconActionButton.ets','IconActionButton',{
+  Color:{Transparent:'transparent'},应用尺寸:{按钮高度:44,圆角_卡片:22},MenuHoldController:class{},rememberPopupTrigger:(area,radius)=>calls.push({area,radius})
  });
- const p=new Panel();p.material='glass';p.role='menu';p.getUniqueId=()=>1;p.getUIContext=()=>({});p.aboutToAppear();
- p.region={left:200,top:300,width:280,height:617};assert.equal(p.ownsFusion(),true);assert.equal(p.origin,undefined);
- assert.deepEqual(p.fusionGeometry().source,p.fusionGeometry().target);
- assert.deepEqual(p.fusionRegion(),p.region);
+ const b=new Button();b.toolbarStyle=true;b.triggerArea={width:44,height:44};
+ b.rememberTrigger();assert.equal(calls[0].radius,22);
+ b.toolbarStyle=false;b.controlSize=36;b.rememberTrigger();assert.equal(calls[1].radius,18);
 });
 
-
-test('composite toolbar menus retain their measured button and give primary fusion to the shared owner',()=>{
- const origin={x:700,y:30,width:44,height:44,radius:16};
- const Card=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
-  takePopupTrigger:()=>origin, supportsGlassBackdrop:()=>true, Scroller:class{},MenuSlideScope:class{},
-  应用尺寸:{compactMenuWidth:168},warmGlassSource(){}
+test('anchored menu delegates back directly to the owner of the top layer', () => {
+ const Menu=loadSharedMenu('AnchoredMenu.ets','SharedAnchoredMenu',{
+  MenuSlideScope:class{},Scroller:class{},应用尺寸:{compactMenuWidth:168,radiusLg:16}
  });
- const card=new Card();card.getUniqueId=()=>1;card.material='glass';card.foreground=true;card.aboutToAppear();
- assert.equal(card.toolbarOrigin,origin);assert.equal(card.usesToolbarFusion(),true);
- card.anchor={left:10,top:50,width:40,height:44};assert.equal(card.usesToolbarFusion(),false);
- const Menu=loadComponentLogic('components/common/AnchoredMenu.ets','AnchoredMenu',{
-  takePopupTrigger:()=>undefined,MenuSlideScope:class{},Scroller:class{},menuSlideSession:{attach(){}},
-  supportsGlassBackdrop:()=>true,应用尺寸:{compactMenuWidth:168,radiusLg:16}
- });
- const menu=new Menu();menu.material='glass';menu.foreground=true;menu.surfaceVisible=false;
- menu.separateFusionSurface=true;menu.fusionAnchor=origin;menu.aboutToAppear();assert.equal(menu.fusionPending,true);
- assert.equal(menu.fusionPlaying,false);menu.panelPrepared();assert.equal(menu.fusionPending,true);menu.fusionPanelArea={x:500,y:90,width:168,height:400,radius:16};
- menu.fusionAreaChanged();assert.equal(menu.fusionPlaying,true);assert.deepEqual(menu.fusionGeometry(),{source:origin,target:menu.fusionPanelArea});
- menu.finishFusion('reduced_motion');assert.equal(menu.fusionPending,false);assert.equal(menu.fusionPlaying,true);
- let closed=0;menu.onClose=()=>closed++;menu.fusionExpanded=false;menu.finishFusion('finished');assert.equal(closed,1);
-});
-
-test('centered selectors discard button motion while retaining lightweight glass and normal geometry',()=>{
- const Panel=loadComponentLogic('components/common/GlassPanel.ets','GlassPanel',{
-  takePopupTrigger:()=>({x:20,y:40,width:180,height:44,radius:16}),hilog:{info(){}},supportsGlassBackdrop:()=>true,
-  currentGlassSource:()=> 'page',retainGlassPanel(){},releaseGlassPanel(){},SurfaceTransition:surfaceMotionApi().SurfaceTransition
- });
- const p=new Panel();p.material='glass';p.buttonFusion=false;p.getUniqueId=()=>1;p.getUIContext=()=>({});p.aboutToAppear();
- p.region={left:180,top:300,width:480,height:280};assert.equal(p.origin,undefined);assert.equal(p.ownsFusion(),true);
- assert.deepEqual(p.fusionRegion(),p.region);assert.deepEqual(p.fusionGeometry().source,p.fusionGeometry().target);
+ const menu=new Menu();
+ const layers=['root','child'];
+ menu.onClose=()=>layers.pop();
+ menu.closeRequested();assert.deepEqual(layers,['root']);
+ menu.closeRequested();assert.deepEqual(layers,[]);
 });

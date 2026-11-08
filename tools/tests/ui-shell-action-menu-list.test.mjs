@@ -1,3 +1,4 @@
+import {loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -6,11 +7,11 @@ import { loadComponentLogic } from './platform-module-harness.mjs';
 import { visibleInterfaceItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 const source = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
-const List = loadComponentLogic('components/common/ActionMenuList.ets', 'ActionMenuList', {TextAlign:{Start:'start',Center:'center'}});
+const List = loadSharedMenu('ActionMenuList.ets', 'SharedActionMenuList', {TextAlign:{Start:'start',Center:'center'}});
 const menus = [
   { path: 'components/home/主页更多面板.ets', name: '主页更多面板', surface: 'home_more',
     callbacks: { history:'onHistory', settings: '设置回调',
-      stats: '统计回调', reminders: '提醒回调', intro: 'onIntro' } },
+      stats: '统计回调', reminders: '提醒回调', software_help: 'onSoftwareHelp' } },
   { path: 'components/主页操作面板.ets', name: '主页操作面板', surface: 'home_create',
     callbacks: { create_deck: '创建牌组回调', import: '导入牌组回调', cloud_deck: '获取直链牌组回调',
       filtered_deck: 'onCreateFilteredDeck' } }
@@ -73,8 +74,9 @@ test('both home menus retain registry order, full localized labels, icons and ca
 });
 
 test('home lists delegate row geometry and theme tint to the existing public menu components', () => {
-  const shared = source('components/common/ActionMenuList.ets');
-  assert.match(shared, /AnchoredMenuItem\(/);
+  assert.match(source('components/common/ActionMenuList.ets'), /SharedActionMenuList\(/);
+  const shared = sharedSource('harmony/shared/ActionMenuList.ets');
+  assert.match(shared, /SharedMenuItem\(/);
   assert.match(shared, /icon:\s*item\.icon,\s*iconTint:\s*item\.iconTint/);
   assert.match(shared, /available:\s*item\.available !== false/);
   assert.match(shared, /selected:\s*item\.selected === true/);
@@ -91,6 +93,6 @@ test('home More and Create center their icon-label group without changing menu p
  for(const menu of menus) assert.match(source(menu.path),/labelAlignment: TextAlign.Center/);
  const page=source('pages/首页.ets');const home=page.slice(page.indexOf('private homeMenus()'));
  assert.doesNotMatch(home,/centered: true/);
- assert.match(home,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: false/);
- assert.match(home,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: true/);
+ assert.match(home,/toolbarBounds: this.homeActionAnchor, alignEnd: false/);
+ assert.match(home,/toolbarBounds: this.homeActionAnchor, alignEnd: true/);
 });

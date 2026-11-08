@@ -15,13 +15,13 @@ export struct CardMarkingBadge {
     Row({ space: 应用尺寸.间距_4 }) {
       if (this.marked) {
         Row() {
-          ActionIcon({ source: $r('app.media.ic_study_mark'), glyphSize: 14,
+          ActionIcon({ source: $r('app.media.ic_study_mark'), glyphSize: 14, preserveFill: true,
             tint: '#D97A1C', strokeColor: '#D97A1C' })
         }.accessibilityText($r('app.string.card_mark_marked')).accessibilityLevel('yes')
       }
       if (this.flag > 0 && this.flag < CARD_FLAGS.length) {
         Row() {
-          ActionIcon({ source: $r('app.media.ic_study_flag'), glyphSize: 14,
+          ActionIcon({ source: $r('app.media.ic_study_flag'), glyphSize: 14, preserveFill: true,
             tint: CARD_FLAGS[this.flag].color, strokeColor: CARD_FLAGS[this.flag].color })
         }.accessibilityText(customFlagLabel(this.labels, this.flag) ||
           localizedNamedResourceText(this.getUIContext(), this.uiLanguage, CARD_FLAGS[this.flag].labelKey))

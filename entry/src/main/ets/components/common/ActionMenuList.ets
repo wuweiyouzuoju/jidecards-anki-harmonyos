@@ -1,40 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { AnchoredMenuItem } from './MenuItem';
-import { MenuSlideScope } from '../../model/MenuSlideSession';
+import { SharedActionMenuList, SharedActionMenuListItem } from 'jide_foundation';
+import { productMenuTheme } from '../../utils/MenuTheme';
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
+import { currentMotionProfile } from '../../utils/AppMotion';
+import { MenuSlideScope, menuSlideSession } from '../../model/MenuSlideSession';
+export interface ActionMenuListItem extends SharedActionMenuListItem {}
 
-export interface ActionMenuListItem {
-  id: string;
-  label: ResourceStr;
-  icon?: ResourceStr;
-  iconTint?: ResourceColor;
-  available?: boolean;
-  selected?: boolean;
-  destructive?: boolean;
-}
-
-/** 平面动作菜单共用条目渲染；宿主提供唯一 ID、完整文案及业务回调。 */
+/** 完整菜单列表、分隔行、实时可用性及迟到点击守卫由公共基础统一执行。 */
 @Component
 export struct ActionMenuList {
+  @StorageProp('surface_material') private material: string = 'flat';
+  @StorageProp('themeMode') private mode: string = 'system';
+  @StorageProp('systemDarkMode') private systemDark: boolean = false;
+  @StorageProp('theme_color_action_primary') private accent: string = '#2F5FD0';
   slideScope: MenuSlideScope = new MenuSlideScope();
   @Prop items: ActionMenuListItem[] = [];
   @Prop labelAlignment: TextAlign = TextAlign.Center;
   onSelect: (id: string) => void = (_id: string): void => {};
-
-  private selectEntry(id: string): void {
-    // 按当前列表校验，显隐或禁用变化后的迟到点击不能执行旧动作。
-    const item: ActionMenuListItem | undefined = this.items.find((entry: ActionMenuListItem): boolean => entry.id === id);
-    if (item === undefined || item.available === false) return;
-    this.onSelect(item.id);
-  }
-
   build() {
-    Column() {
-      ForEach(this.items, (item: ActionMenuListItem, index: number) => {
-        AnchoredMenuItem({ label: item.label, labelAlignment: this.labelAlignment, icon: item.icon, iconTint: item.iconTint, slideScope: this.slideScope,
-          available: item.available !== false, selected: item.selected === true, divider: index > 0,
-          destructive: item.destructive === true,
-          onSelect: (): void => { this.selectEntry(item.id); } })
-      }, (item: ActionMenuListItem): string => item.id)
-    }.width('100%')
+    SharedActionMenuList({ theme: productMenuTheme(this.material, this.mode, this.systemDark, true, undefined, this.accent, this.getUIContext()),
+      items: this.items, labelAlignment: this.labelAlignment, slideScope: this.slideScope, menuRouter: menuSlideSession,
+      readPressScale: (): number => currentMotionProfile().pressScale, onTrigger: (area: Area): void => { rememberPopupTrigger(area); }, onSelect: this.onSelect })
   }
 }

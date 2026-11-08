@@ -1,35 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { popupAppearance, PopupAppearance } from './PopupAppearance';
-import { themedGlassFill } from '../../utils/GlassMaterial';
-import { SurfaceBorder } from '../../utils/SurfaceBorder';
+import { SharedPopupSurface } from 'jide_foundation';
 
-/** 弹窗与菜单的唯一材质入口；本体不叠模糊，页面遮罩独占背景效果。 */
-export class PopupSurface implements AttributeModifier<CommonAttribute> {
-  private material: string;
-  private dark: boolean;
-  private radius: number;
-  private role: string;
-  private visible: boolean;
-  private accent: string;
-  private opaque: boolean;
-  constructor(material: string, dark: boolean, radius: number, role: string = 'dialog', visible: boolean = true, accent: string = AppStorage.get<string>('theme_color_action_primary') ?? '', opaque: boolean = false) {
-    this.accent = accent; this.opaque = opaque;
-    this.material = material; this.dark = dark; this.radius = radius; this.role = role; this.visible = visible;
-  }
-  applyNormalAttribute(instance: CommonAttribute): void {
-    if (!this.visible) {
-      instance.backgroundColor(Color.Transparent).backgroundBlurStyle(BlurStyle.NONE).backdropBlur(0).border({ width: 0 })
-        .linearGradient({ angle: 135, colors: [[Color.Transparent, 0], [Color.Transparent, 1]] });
-      return;
-    }
-    const style: PopupAppearance = popupAppearance(this.material, this.dark, this.role, this.opaque);
-    instance.backgroundBlurStyle(BlurStyle.NONE)
-      .backdropBlur(0).backgroundColor(!this.opaque && this.material === 'glass' && this.role !== 'preview' ? themedGlassFill(style.fill, this.dark, this.accent) : style.fill)
-      .linearGradient({ angle: 135, colors: [[Color.Transparent, 0], [Color.Transparent, 1]] })
-      .border(SurfaceBorder.materialOptions(this.material, this.dark)).borderRadius(this.radius)
-      .shadow({ radius: 0, color: Color.Transparent, offsetX: 0, offsetY: 0 });
-    // 菜单的光学层已有真实透射与边缘变化，不再叠斜向白色反光。
-    if (!this.opaque && this.material === 'glass' && this.role !== 'menu') instance.linearGradient({ angle: 135,
-      colors: this.dark ? [['#0CFFFFFF',0],['#00FFFFFF',0.5],['#05FFFFFF',1]] : [['#30FFFFFF',0],['#00FFFFFF',0.5],['#12FFFFFF',1]] });
+/** 保留产品构造契约；中性弹窗材质与描边统一由系列基础渲染。 */
+export class PopupSurface extends SharedPopupSurface {
+  constructor(material: string, dark: boolean, radius: number, role: string = 'dialog', visible: boolean = true,
+    accent: string = '', opaque: boolean = false, panelOpacity?: number) {
+    super(material, dark, radius, role, visible, opaque, panelOpacity, $r('app.color.surface_border'));
   }
 }

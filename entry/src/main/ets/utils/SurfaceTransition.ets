@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GLASS_MENU_ENTER_MS, GLASS_POPUP_ENTER_MS, GlassExitMotion, glassExitMotion } from 'jide_foundation';
 import { curves } from '@kit.ArkUI';
 import { currentMotionProfile, navigationEnterOffset, materialPopupAnimation } from './AppMotion';
 import { 取全屏转场时长, 取全屏转场曲线 } from './转场时长';
 
 /** 界面转场的唯一效果入口；宿主只选择页面、覆盖预览或弹窗语义。 */
 export class SurfaceTransition {
-  static readonly popupEnterMs: number = 200;
+  static readonly popupEnterMs: number = GLASS_POPUP_ENTER_MS;
+  static readonly menuEnterMs: number = GLASS_MENU_ENTER_MS;
   static pageAnimation(): AnimateParam {
     return { duration: 取全屏转场时长(), curve: Curve.EaseOut,
       expectedFrameRateRange: { min: 60, max: 120, expected: 60 } };
@@ -43,17 +45,17 @@ export class SurfaceTransition {
 
   static glassEnterAnimation(menu: boolean, drawer: boolean): AnimateParam {
     const lively: boolean = currentMotionProfile().springFeedback;
-    return { duration: SurfaceTransition.popupEnterMs,
+    return { duration: menu ? SurfaceTransition.menuEnterMs : SurfaceTransition.popupEnterMs,
       curve: lively ? curves.interpolatingSpring(0, 1, 380, 38) : curves.cubicBezierCurve(0.16, 1, 0.3, 1),
       expectedFrameRateRange: { min: 60, max: 120, expected: 60 } };
   }
 
   static glassExit(menu: boolean, drawer: boolean, centerX: string, centerY: string): TransitionEffect {
+    const motion: GlassExitMotion = glassExitMotion(menu, drawer);
     return TransitionEffect.opacity(0)
-      .combine(TransitionEffect.scale({ x: drawer ? 1 : menu ? 0.72 : 0.86,
-        y: drawer ? 1 : menu ? 0.72 : 0.86, centerX: centerX, centerY: centerY }))
-      .combine(TransitionEffect.translate({ x: drawer ? -16 : 0 }))
-      .animation({ duration: drawer ? 180 : 190, curve: Curve.EaseIn });
+      .combine(TransitionEffect.scale({ x: motion.scale, y: motion.scale, centerX: centerX, centerY: centerY }))
+      .combine(TransitionEffect.translate({ x: motion.offsetX }))
+      .animation({ duration: motion.duration, curve: Curve.EaseIn });
   }
 
   static dialogEnterAnimation(): AnimateParam {

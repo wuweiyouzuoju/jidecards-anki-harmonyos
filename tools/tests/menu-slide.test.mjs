@@ -1,3 +1,4 @@
+import {menuPresentation,loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MenuSlideSession, MenuSlideScope } from '../../entry/src/main/ets/model/MenuSlideSession.ts';
@@ -53,18 +54,18 @@ test('reactive wrappers share the mounted scope identity for selection and detac
 });
 
 test('real flat and nested row builders pass the owning scope explicitly across builder boundaries',()=>{
-  const read=path=>readFileSync(new URL('../../entry/src/main/ets/'+path,import.meta.url),'utf8');
+  const read=path=>menuPresentation(path,readFileSync(new URL('../../entry/src/main/ets/'+path,import.meta.url),'utf8'));
   const scope=new MenuSlideScope(),selected=[];
-  const list=loadComponentLogic('components/common/ActionMenuList.ets','ActionMenuList',{TextAlign:{Center:0,Start:1}});
+  const list=loadSharedMenu('ActionMenuList.ets','SharedActionMenuList',{TextAlign:{Center:0,Start:1}});
   const host=Object.assign(new list(),{slideScope:scope,items:[{id:'leaf',label:'Leaf'}],onSelect:id=>selected.push(id)});
-  const options=read('components/common/ActionMenuList.ets').match(/AnchoredMenuItem\((\{[\s\S]*?\})\)/)[1];
+  const options=sharedSource('harmony/shared/ActionMenuList.ets').match(/SharedMenuItem\((\{[\s\S]*?\})\)/)[1];
   const props=new Function('item','index',stripTypeScriptTypes('const props='+options+';', {mode:'transform'})+'return props;').call(host,host.items[0],0);
   assert.equal(props.slideScope,scope);props.onSelect();assert.deepEqual(selected,['leaf']);
   host.items[0].available=false;props.onSelect();assert.deepEqual(selected,['leaf']);
   const source=read('components/common/CardActionMenu.ets'),start=source.indexOf('  private menuRow(');
   const method=source.slice(start,source.indexOf('\n  }',start)+4);let rowProps;
   const Rows=new Function('AnchoredMenuItem','TextAlign',stripTypeScriptTypes('class Rows {'+method+'};', {mode:'transform'})+'return Rows;')(props=>rowProps=props,{Start:0});
-  const rows=Object.assign(new Rows(),{slideScope:scope,expandedIds:[],rowItem:()=>({value:'Leaf'}),groupsOnRight:()=>false,selectEntry:row=>selected.push(row.node.id)});
+  const rows=Object.assign(new Rows(),{slideScope:scope,expandedIds:[],rowEnabled:row=>row.enabled,rowItem:()=>({value:'Leaf'}),groupsOnRight:()=>false,selectEntry:row=>selected.push(row.node.id)});
   rows.menuRow({depth:1,enabled:true,node:{id:'child'}},0);
   assert.equal(rowProps.slideScope,scope);assert.equal(rowProps.slideLayer,1);rowProps.onSelect();assert.deepEqual(selected,['leaf','child']);
 });

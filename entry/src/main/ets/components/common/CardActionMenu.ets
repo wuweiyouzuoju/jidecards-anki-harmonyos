@@ -1,9 +1,5 @@
-import { takePopupTrigger } from '../../utils/PopupTrigger';
-import { GlassFusionRect } from 'jide_foundation';
-import { supportsGlassBackdrop } from '../../utils/GlassBackdrop';
-import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { warmGlassSource } from '../../utils/GlassBackdrop';
+import { currentGlassSource } from '../../utils/GlassBackdrop';
 import { GlassPanel } from './GlassPanel';
 import { GlassBubblePanel } from './GlassBubblePanel';
 import { WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY, WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY,
@@ -39,26 +35,11 @@ export interface CardActionMenuEntry extends ActionMenuNode {
 /** 两个侧面板保持位置；深层列表朝主菜单方向覆盖，尖角对齐侧面板内的触发行。 */
 @Component
 export struct CardActionMenu {
-  @StorageProp('surface_material') private material: string = 'flat';
-  @StorageProp(APP_FOREGROUND_KEY) private foreground: boolean = false;
-  @State private fusionUnavailable: boolean = false;
-  private toolbarOrigin: GlassFusionRect | undefined = undefined;
-  @State private primaryArea: GlassFusionRect | undefined = undefined;
   @Prop closeRequest: number = 0;
-  private usesToolbarFusion(): boolean {
-    return this.anchor === undefined && this.toolbarOrigin !== undefined && this.material === 'glass' &&
-      this.foreground && !this.fusionUnavailable && supportsGlassBackdrop();
-  }
-  @State private layerSource: string = '';
+  @State private menuSource: string = '';
+  @State private primaryReady: boolean = false;
   aboutToAppear(): void {
-    this.layerSource = 'jide-menu-layer-' + this.getUniqueId();
-    this.toolbarOrigin = takePopupTrigger();
-  }
-  aboutToDisappear(): void {
-    warmGlassSource(this.getUIContext(), this.layerSource, false);
-  }
-  private warmLayers(): void {
-    if (this.layerSource !== '') warmGlassSource(this.getUIContext(), this.layerSource, true);
+    this.menuSource = currentGlassSource(this.getUIContext());
   }
   private readonly primaryScroller: Scroller = new Scroller();
   private readonly groupScrollers: Map<string, Scroller> = new Map<string, Scroller>();
@@ -83,6 +64,7 @@ export struct CardActionMenu {
   @Prop expandedIds: string[] = [];
   @Prop menuWidth: number = 应用尺寸.compactMenuWidth;
   @Prop toolbarRight: number | undefined = undefined;
+  @Prop toolbarBottom: number | undefined = undefined;
   @Prop topOffset: number | undefined = undefined;
   /** 列表等上下文菜单传宿主局部行矩形；省略时继续使用工具栏定位。 */
   @Prop anchor: ActionMenuAnchor | undefined = undefined;
@@ -133,6 +115,11 @@ export struct CardActionMenu {
   }
 
   private availableWidth(): number {
+    if (this.anchor === undefined && this.toolbarRight !== undefined) {
+      const left: number = Math.max(0, this.safeLeft - this.viewportLeft);
+      const right: number = Math.min(this.viewportWidth - this.safeRight, this.toolbarRight - this.viewportLeft);
+      return Math.max(0, Math.min(this.contentWidth - 24, right - left));
+    }
     return this.anchor === undefined ? this.contentWidth - 24 : Math.max(0,
       this.viewportWidth - Math.max(0, this.safeLeft - this.viewportLeft) - this.safeRight - 24);
   }
@@ -292,7 +279,8 @@ export struct CardActionMenu {
   }
 
   private menuTop(): number {
-    return this.anchoredPlacement()?.top ?? this.topOffset ??
+    return this.anchoredPlacement()?.top ?? (this.toolbarBottom === undefined ? this.topOffset :
+      this.toolbarBottom - this.viewportTop + 应用尺寸.间距_8) ??
       应用尺寸.pageContentTop(this.statusBarHeight, this.narrowDeckLayout, this.toolbarSafeTop);
   }
 
@@ -303,7 +291,7 @@ export struct CardActionMenu {
   }
 
   private recordRow(index: number, height: number): void {
-    if (height <= 0 || Math.abs((this.rowHeights[index] ?? 0) - height) < 0.5) return;
+    if (height <= 0 || Math.abs((this.rowHeights[index] ?? 应用尺寸.menuItemHeight) - height) < 0.5) return;
     const heights: number[] = this.rowHeights.slice();
     heights[index] = height;
     this.rowHeights = heights;
@@ -332,7 +320,7 @@ export struct CardActionMenu {
         ForEach(this.sideGroups(), (group: CardActionMenuEntry, groupIndex: number) => {
           Blank().height(this.groupGap(groupIndex))
           Column() {
-            MenuBubble({ panelWidth: this.groupWidth(), pointerCenter: this.placements()[groupIndex].pointerCenter,
+            MenuBubble({ source: this.menuSource, panelWidth: this.groupWidth(), pointerCenter: this.placements()[groupIndex].pointerCenter,
               pointerSide: this.groupsOnRight() ? ActionMenuPointerSide.Left : ActionMenuPointerSide.Right }) {
               Scroll(this.groupScroller(group.id ?? '')) {
               Column() {
@@ -355,10 +343,14 @@ export struct CardActionMenu {
   @Builder
   private primaryPanel() {
     if (this.anchor !== undefined && this.anchoredPlacement() !== undefined) {
-      GlassBubblePanel({ panelWidth: this.primaryWidth(), pointerCenter: this.anchoredPlacement()!.pointerCenter,
-        pointerSide: this.anchoredPlacement()!.pointerSide, onPrepared: (): void => { this.warmLayers(); }, content: (): void => { this.primaryScroll(); } })
+      GlassBubblePanel({ source: this.menuSource, showContourStroke: false, onPrepared: (): void => { this.primaryReady = true; },
+        panelWidth: this.primaryWidth(), pointerCenter: this.anchoredPlacement()!.pointerCenter,
+        pointerSide: this.anchoredPlacement()!.pointerSide, content: (): void => { this.primaryScroll(); } })
     } else {
-      GlassPanel({ role: 'menu', surfaceVisible: !this.usesToolbarFusion(), externalEntrance: this.usesToolbarFusion(), panelWidth: this.primaryWidth(), onPrepared: (): void => { this.warmLayers(); }, content: (): void => { this.primaryScroll(); } })
+      GlassPanel({ source: this.menuSource, role: 'menu', panelWidth: this.primaryWidth(),
+        centerX: '100%', centerY: '0%', animateExit: false,
+        fusionContentRevealMs: this.sideGroups().length > 0 ? 280 : 110,
+        onPrepared: (): void => { this.primaryReady = true; }, content: (): void => { this.primaryScroll(); } })
     }
   }
 
@@ -367,10 +359,7 @@ export struct CardActionMenu {
     Scroll(this.primaryScroller) { this.primaryRows() }.width(this.primaryWidth())
       .constraintSize({ maxHeight: this.availableMenuHeight() }).scrollBar(BarState.Auto)
       .onDidScroll((): void => { this.primaryScrollOffset = this.primaryScroller.currentOffset().yOffset; })
-      .onAreaChange((_old: Area, area: Area): void => { this.onPrimaryArea(area);
-        this.primaryArea = { x: Number(area.globalPosition.x), y: Number(area.globalPosition.y),
-          width: Number(area.width), height: Number(area.height), radius: 应用尺寸.radiusLg };
-      })
+      .onAreaChange((_old: Area, area: Area): void => { this.onPrimaryArea(area); })
   }
 
   @Builder
@@ -386,8 +375,7 @@ export struct CardActionMenu {
 
   build() {
     Stack() {
-      AnchoredMenu({ fusionAnchor: this.toolbarOrigin, separateFusionSurface: this.usesToolbarFusion(),
-        onFusionUnavailable: (): void => { this.fusionUnavailable = true; }, fusionPanelArea: this.primaryArea, closeRequest: this.closeRequest, menuWidth: this.totalWidth(), alignEnd: true, surfaceVisible: false, slideScope: this.slideScope,
+      AnchoredMenu({ refractionSource: this.menuSource, closeRequest: this.closeRequest, menuWidth: this.totalWidth(), alignEnd: true, surfaceVisible: false, slideScope: this.slideScope,
         contentMaxWidth: this.anchor === undefined && this.toolbarRight === undefined ? this.contentWidth : this.totalWidth(),
         contentLeft: this.anchoredPlacement()?.left ?? this.toolbarLeft(), topOffset: this.menuTop(),
         bubble: this.menuBubble(), maxHeight: this.anchoredPlacement()?.height,
@@ -397,17 +385,17 @@ export struct CardActionMenu {
           Stack({ alignContent: Alignment.TopStart }) {
             Column() { this.primaryPanel() }
               .position({ x: this.groupsOnRight() ? 0 : this.totalWidth() - this.primaryWidth(), y: 0 })
-            Column() { this.groupPanels() }
+            Column() { if (this.primaryReady) { this.groupPanels() } }
               .position({ x: this.groupsOnRight() ? this.primaryWidth() + MenuSurface.pointerDepth : 0, y: 0 })
             // 预留定位区不属于可见菜单；在此点击仍按外部点击关闭。
             Column().width(this.hasBranches() && this.sideGroups().length === 0 ? this.groupWidth() + 12 : 0)
               .height(this.baseHeight()).position({ x: this.groupsOnRight() ? this.primaryWidth() : 0, y: 0 })
 
           }.width(this.totalWidth()).height(this.baseHeight()).position({ x: 0, y: 0 })
-            .id(this.layerSource).onAreaChange((): void => { this.warmLayers(); })
-          if (this.popupPlacement() !== undefined) {
+
+          if (this.primaryReady && this.popupPlacement() !== undefined) {
             Column() {
-              MenuBubble({ source: this.layerSource, panelWidth: this.primaryWidth(), pointerCenter: this.popupPlacement()!.pointerCenter,
+              MenuBubble({ source: this.menuSource, panelWidth: this.primaryWidth(), pointerCenter: this.popupPlacement()!.pointerCenter,
                 pointerSide: this.popupPointerSide() }) {
                 Scroll() {
                 Column() {

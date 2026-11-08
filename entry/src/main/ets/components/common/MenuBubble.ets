@@ -16,7 +16,7 @@ export struct MenuBubble {
   private emptyContent(): void {}
 
   build() {
-    GlassBubblePanel({ source: this.source, panelWidth: this.panelWidth, pointerCenter: this.pointerCenter, pointerSide: this.pointerSide,
+    GlassBubblePanel({ source: this.source, showContourStroke: false, panelWidth: this.panelWidth, pointerCenter: this.pointerCenter, pointerSide: this.pointerSide,
       content: (): void => { this.content(); } })
   }
 }
