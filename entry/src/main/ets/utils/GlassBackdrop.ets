@@ -5,6 +5,7 @@ import { SharedGlassBackdrop, SharedGlassRegion, warmSharedGlassSource } from 'j
 import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
 export const GLASS_BACKGROUND_SOURCE: string = 'jide-glass-shared-background';
 export const GLASS_HOME_SOURCE: string = 'jide-glass-home-source';
+export const GLASS_DECK_DETAILS_SOURCE: string = 'jide-glass-deck-details-source';
 export interface GlassRegion extends SharedGlassRegion {}
 function captureAllowed(preview: boolean = false): boolean {
   return (preview || AppStorage.get<string>('surface_material') === 'glass') && (AppStorage.get<boolean>(APP_FOREGROUND_KEY) ?? false);
@@ -26,12 +27,12 @@ export struct GlassBackdrop {
   build() {
     SharedGlassBackdrop({ source: this.source, backgroundSource: GLASS_BACKGROUND_SOURCE, region: this.region, radius: this.radius, contourPath: this.contourPath, role: this.role === 'preview' ? 'menu' : this.role,
       active: (this.materialOverride || this.material) === 'glass' && this.foreground,
-      dark: this.mode === 'dark' || (this.mode !== 'light' && this.systemDark), captureAllowed: (): boolean => sourceCaptureAllowed(this.source),
+      dark: this.mode === 'dark' || (this.mode !== 'light' && this.systemDark), captureAllowed: (initialFrame: boolean = false): boolean => sourceCaptureAllowed(this.source, initialFrame),
       onReady: this.onReady })
   }
 }
 export function warmGlassSource(ui: UIContext, source: string, active: boolean, preview: boolean = false): void {
-  warmSharedGlassSource(ui, source, active, (): boolean => sourceCaptureAllowed(source) ||
+  warmSharedGlassSource(ui, source, active, (initialFrame: boolean = false): boolean => sourceCaptureAllowed(source, initialFrame) ||
     (preview && captureAllowed(true) && (sourcePanels.get(source) ?? 0) === 0), GLASS_BACKGROUND_SOURCE);
 }
 
@@ -84,8 +85,10 @@ export function releaseGlassPanel(source: string, preview: boolean = false): voi
   const count: number = sourcePanels.get(source) ?? 0;
   if (count <= 1) sourcePanels.delete(source); else sourcePanels.set(source, count - 1);
 }
-export function sourceCaptureAllowed(source: string): boolean {
+export function sourceCaptureAllowed(source: string, initialFrame: boolean = false): boolean {
   // 显式预览来自原生窗口，正文源不包含该窗口；扁平模式没有预热帧，允许首次真实采集。
   const preview: boolean = (previewPanels.get(source) ?? 0) > 0;
-  return !layoutSources.has(source) && !scrollingSources.has(source) && captureAllowed(preview) && (preview || !(frozenSources.has(source) && (sourcePanels.get(source) ?? 0) > 0));
+  // 首页和牌组详情的菜单均在正文源外；缺帧时允许首次采集，成功后继续冻结。
+  const needsExternalFrame: boolean = initialFrame && (source === GLASS_HOME_SOURCE || source === GLASS_DECK_DETAILS_SOURCE);
+  return !layoutSources.has(source) && !scrollingSources.has(source) && captureAllowed(preview) && (preview || needsExternalFrame || !(frozenSources.has(source) && (sourcePanels.get(source) ?? 0) > 0));
 }
