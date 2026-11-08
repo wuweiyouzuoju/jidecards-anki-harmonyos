@@ -6,7 +6,7 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 ## 内容与构建
 
-产品、作者、SEO、正式版本、功能、宣传词和图片元数据统一维护在 `hosting/data/works.json`。指南事实来源是 `hosting/data/harmonyos-anki-guide.json`。正式版本由作者确认并记录 `releaseVersionSource`；源码版本由生成器读取 `AppScope/app.json5`，分别输出 `sourceVersion` / `sourceVersionCode`，不能相互推断。作者于 2026-10-15 确认华为应用市场版本为 2.9.98，源码版本以 `AppScope/app.json5` 为准。官网主展示、源码更新、SoftwareSourceCode 和 Atom 使用应用配置派生的源码版本；下载入口与 SoftwareApplication 使用作者确认的市场版本。2.9.22 宣传图保留独立的历史版本标注和 SHA-256 校验，不要求截图版本等于当前市场版本，不把旧图片改标为当前截图。
+产品、作者、SEO、功能、宣传词和图片元数据统一维护在 `hosting/data/works.json`。指南事实来源是 `hosting/data/harmonyos-anki-guide.json`。官网不再维护或展示应用市场具体版本号；下载入口保留，版本与上架能力以应用市场页面为准。源码版本由生成器读取 `AppScope/app.json5`，输出 `sourceVersion` / `sourceVersionCode`，用于官网主展示、源码更新、SoftwareSourceCode 和 Atom。SoftwareApplication 不填写市场 softwareVersion。2.9.22 宣传图保留独立的历史版本标注和 SHA-256 校验，不要求截图版本等于当前市场版本，不把旧图片改标为当前截图。
 
 `tools/build-site.mjs` 只负责构建编排。修改入口按责任划分：
 
@@ -21,7 +21,7 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 执行 `node tools/build-site.mjs` 同时更新所有输出，避免逐页手改 HTML。样式、Logo 和图片脚本地址使用内容摘要缓存键。应用的 `announcement.json` 和 `cloud-decks.json` 独立维护，网站重构不改变其协议。
 
-源码主仓库和镜像统一维护 `repository` / `repositoryMirrors`，生成器同步导航、正文、结构化数据和文本链接。`sourcePackage` 记录对应源码版本的 GitHub Release、签名 HAP 与校验文件地址；生成器校验标签和文件名与应用版本一致，HTML 和机器可读入口同时展示开发包与签名/设备授权限制。精确 SHA-256、字节数及构建证据随 Release 附件发布；HAP 不进入源码 Git 历史。官网下载仍优先指向作者确认版本的应用市场页面。
+源码主仓库和镜像统一维护 `repository` / `repositoryMirrors`，生成器同步导航、正文、结构化数据和文本链接。`sourcePackage` 记录对应源码版本的 GitHub Release、签名 HAP 与校验文件地址；生成器校验标签和文件名与应用版本一致，HTML 和机器可读入口同时展示开发包与签名/设备授权限制。精确 SHA-256、字节数及构建证据随 Release 附件发布；HAP 不进入源码 Git 历史。官网下载仍优先指向应用市场页面，具体版本以该页面为准。
 
 官网可单独发布，不把尚未推送的本地发布文档或未上传的 Release 附件作为远端已存在的链接。发布新 HAP 时先验证源码并保存安装包，提交推送对应源码，再创建该提交的 Release、上传并核对附件，最后发布网站。
 
@@ -56,7 +56,7 @@ python -c 'from PIL import Image; from pathlib import Path; icon = Image.open("A
 
 独立开发声明统一维护在 `hosting/data/works.json` 的 `developmentStatement`，同步生成首页、产品页、开发页、关于页、Markdown 与 llms；README 保留同一声明。当前声明明确作者为可塑性天赋（wuweiyouzuoju），截至目前全程由本人独立开发与维护，不存在团队开发或他人带领团队完成开发的情况。
 
-页面使用真实 Person、CreativeWork、SoftwareApplication、SoftwareSourceCode、BreadcrumbList、FAQPage 与文章元数据。作者与发布者均指向独立开发者 Person；项目作为 CreativeWork 标识，不虚构团队或组织。功能可见状态与正式版本必须在 HTML、Markdown、JSON 和 llms 中一致，不虚构评分或评论。
+页面使用真实 Person、CreativeWork、SoftwareApplication、SoftwareSourceCode、BreadcrumbList、FAQPage 与文章元数据。作者与发布者均指向独立开发者 Person；项目作为 CreativeWork 标识，不虚构团队或组织。功能可见状态、源码版本与下载说明必须在 HTML、Markdown、JSON 和 llms 中一致，不虚构评分或评论。
 
 所有页面通过公共布局生成同一套项目身份图谱：作者 `/#author`、项目 `/#project`、应用 `/#app`、源码 `/#source` 和网站 `/#website` 使用主域名下的稳定 `@id`。各 WebPage 对应当前 canonical，并通过 `isPartOf` 关联网站、`about` 关联应用。应用的 `sameAs` 指向真实应用市场页面，`subjectOf` 关联源码；源码的 `targetProduct` 回指应用，`codeRepository` 来自既有仓库清单，镜像进入源码 `sameAs`。项目 `sameAs` 使用该项目的仓库，作者身份链接仍属于 Person。不要把文章、作者主页或不同产品混入应用身份，也不要为这些关联增加另一份手工维护的数据源。网站测试检查各页身份唯一、引用可解析及应用与源码的双向关系。
 
@@ -98,6 +98,6 @@ GPT 读取验收必须使用真实网页读取工具，确认当前版本与正�
 
 Google [地址更改工具](https://support.google.com/webmasters/answer/9370220)支持根级网址前缀资源，并说明请求会涉及源网站的所有协议。仍应保留旧域名 HTTP、HTTPS 和 www 的既有 301。Google 的迁移检查通过不代表 OpenAI 的网页读取已经恢复；真实 GPT 读取仍需单独验收。
 
-外部版本核对必须区分远端源码与官网正式版。未推送的本地 README 或应用配置不能当作远端仓库已经更新的证据；明确“不上传 Git”时只维护本地源码资料，记录远端差异，不通过网页编辑仓库绕过该要求。
+外部版本核对必须区分远端源码、官网源码版本和应用市场实际信息。未推送的本地 README 或应用配置不能当作远端仓库已经更新的证据；明确“不上传 Git”时只维护本地源码资料，记录远端差异，不通过网页编辑仓库绕过该要求。
 
 参考 [Cloudflare Wrangler deploy](https://developers.cloudflare.com/workers/wrangler/commands/#deploy)、[Cloudflare 静态资源](https://developers.cloudflare.com/workers/static-assets/)和 [Google 域名迁移说明](https://developers.google.com/search/docs/crawling-indexing/site-move-with-url-changes)。

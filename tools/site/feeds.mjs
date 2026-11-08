@@ -5,7 +5,7 @@ export function renderFeeds(content) {
   const { data, work, guide, origin, repositories } = content;
   const releaseNotes = work.sourceUpdate.changes.map((change, index) => `${index + 1}. ${change}`).join('\n');
   const facts = `- 当前源码版本：${work.sourceVersion}（构建编号 ${work.sourceVersionCode}）
-- 华为应用市场版本：${work.releaseVersion}
+- 华为应用市场版本以下载页面为准。
 - 平台：${work.platform}
 - 许可证：${work.license}
 - 作者：[${data.author.name}](${data.author.url})
@@ -113,7 +113,7 @@ ${work.promotion.title}：${work.promotion.description} ${work.promotion.details
     'llms.txt': llms, 'llms-full.txt': `${llms}\n${productText}\n${guideText}\n${developersText}\n${releaseText}\n`,
     'content/home.md': homeText, 'content/product.md': productText, 'content/harmonyos-anki-guide.md': guideText,
     'content/releases.md': releaseText, 'content/developers.md': developersText, 'content/about.md': aboutText,
-    'data/site-index.json': `${JSON.stringify({ schemaVersion: 1, updatedAt: data.updatedAt, origin, releaseVersion: work.releaseVersion, sourceVersion: work.sourceVersion, sourceVersionCode: work.sourceVersionCode, contentLanguage: 'zh-CN', product: `${origin}/data/works.json`, llms: `${origin}/llms.txt`, fullText: `${origin}/llms-full.txt`, releaseFeed: `${origin}/releases.xml`, pages }, null, 2)}\n`,
+    'data/site-index.json': `${JSON.stringify({ schemaVersion: 1, updatedAt: data.updatedAt, origin, sourceVersion: work.sourceVersion, sourceVersionCode: work.sourceVersionCode, contentLanguage: 'zh-CN', product: `${origin}/data/works.json`, llms: `${origin}/llms.txt`, fullText: `${origin}/llms-full.txt`, releaseFeed: `${origin}/releases.xml`, pages }, null, 2)}\n`,
     'sitemap.xml': sitemap, 'releases.xml': atom, 'robots.txt': `User-agent: *\nAllow: /\n\nSitemap: ${origin}/sitemap.xml\n`
   };
 }

@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>记得闪卡版本更新</title><id>https://jidecards.com/releases.xml</id><link href="https://jidecards.com/releases.xml" rel="self"/><link href="https://jidecards.com/releases/"/><updated>2026-11-01T00:00:00+08:00</updated><author><name>可塑性天赋</name></author><entry><title>记得闪卡 3.8.35 源码更新</title><id>https://jidecards.com/releases/#release-3-8-35</id><link href="https://jidecards.com/releases/#release-3-8-35"/><updated>2026-11-01T00:00:00+08:00</updated><content type="text">1. 完善字段展开窗口：保留当前字段草稿和编辑模式，补齐输入边界，移除展开窗口中重复的模式按钮。
-2. 统一页面玻璃背景：设置、学习、编辑、浏览、牌组选项和预览外层随材质切换，玻璃时透出根背景，扁平时保留原底色。
-3. 提高字段模式按钮文字对比度，依据实际主题实底选择黑色或白色文字。
-4. 首页入门按 Anki 经验分流，新用户增加闪卡、准备第一副牌组与日常复习教学；完成选择并保存后才进入导入、新建或同步。
-5. 完善浏览多选完整计数、牌组快捷操作及自定义学习数值记忆。
-6. 统一弹层融合、定位与关闭行为，修复主题色开关、深色轮廓和公共材质一致性。</content></entry></feed>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>记得闪卡版本更新</title><id>https://jidecards.com/releases.xml</id><link href="https://jidecards.com/releases.xml" rel="self"/><link href="https://jidecards.com/releases/"/><updated>2026-11-02T00:00:00+08:00</updated><author><name>可塑性天赋</name></author><entry><title>记得闪卡 26.11.03.1 源码更新</title><id>https://jidecards.com/releases/#release-26-11-03-1</id><link href="https://jidecards.com/releases/#release-26-11-03-1"/><updated>2026-11-02T00:00:00+08:00</updated><content type="text">1. 自定义主题色增加浅色、深色各自的明暗适配强度，可预览原始颜色与实际强调色，保存或取消预览。
+2. 统一宽屏、窄屏下通过更多按钮或长按打开牌组设置的效果：背景保留阴影并增加强模糊，菜单和牌组预览保持清晰。
+3. 卡片脚本异常改为独立的详情入口，复用已有弹窗查看错误信息，避免技术堆栈直接占据卡片正文。
+4. 补充半屏、悬浮和全屏切换时的内容布局适配；复查玻璃与扁平材质、主题色切换，以及八个首页摘要分页，未复现旧版白底残留，摘要与牌组列表左右边界保持对齐。
+5. 源码展示版本改用日期加递增序号：日期取发布操作当日的次日，最后一段为常规递增序号；本次为 26.11.03.1。
+6. 完善字段展开窗口：保留当前字段草稿和编辑模式，补齐输入边界，移除展开窗口中重复的模式按钮。
+7. 统一页面玻璃背景：设置、学习、编辑、浏览、牌组选项和预览外层随材质切换，玻璃时透出根背景，扁平时保留原底色。
+8. 提高字段模式按钮文字对比度，依据实际主题实底选择黑色或白色文字。
+9. 首页入门按 Anki 经验分流，新用户增加闪卡、准备第一副牌组与日常复习教学；完成选择并保存后才进入导入、新建或同步。
+10. 完善浏览多选完整计数、牌组快捷操作及自定义学习数值记忆。</content></entry></feed>

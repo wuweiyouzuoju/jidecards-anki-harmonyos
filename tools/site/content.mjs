@@ -17,8 +17,7 @@ export async function loadContent(root) {
   if (!packageVersion || work.sourcePackage.fileName !== `jidecards-v${packageVersion}-signed.hap`) {
     throw new Error('Published HAP filename must match its own release tag.');
   }
-  // 市场版本由作者确认，当前源码版本读取应用配置；截图保留各自的历史版本。
-  if (!work.releaseVersion || !work.releaseVersionSource) throw new Error('Author-confirmed website release is required.');
+  // 不维护市场版本号；源码版本读取应用配置，截图保留各自的历史版本。
   if (!work.screenshots.length) throw new Error('Current author-supplied product media is required.');
   for (const item of work.screenshots) {
     if (!item.releaseVersion || !item.path.includes(`-${item.releaseVersion}-`)) throw new Error(`Product media version does not match its provenance: ${item.path}`);

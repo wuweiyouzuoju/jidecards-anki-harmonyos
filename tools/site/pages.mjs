@@ -45,7 +45,7 @@ export function renderPages(content, layout) {
   const product = page({
     title: work.seo.productTitle, description: work.summary, pathname: '/works/jidecards/', breadcrumbTitle: '功能与下载', markdown: '/content/product.md',
     graph: [{ '@type': 'FAQPage', mainEntity: work.questions.map(item => ({ '@type': 'Question', name: item.name, acceptedAnswer: { '@type': 'Answer', text: item.description } })) }],
-    body: `${pageHeader('JideCards · HarmonyOS NEXT', '记得闪卡', work.summary)}<div class="product-intro"><div>${logo('product-logo', 96, '记得闪卡应用 Logo')}<p class="version-pill">源码 ${esc(work.sourceVersion)} · 应用市场 ${esc(work.releaseVersion)}</p></div><div id="download"><h2>开始使用记得闪卡</h2>${download}</div></div>
+    body: `${pageHeader('JideCards · HarmonyOS NEXT', '记得闪卡', work.summary)}<div class="product-intro"><div>${logo('product-logo', 96, '记得闪卡应用 Logo')}<p class="version-pill">源码 ${esc(work.sourceVersion)}</p></div><div id="download"><h2>开始使用记得闪卡</h2>${download}</div></div>
     ${developmentStatement}
     <nav class="page-toc" aria-label="功能目录"><a href="#features">功能概览</a><a href="#screenshots">历史界面示例</a><a href="#source-update">版本更新</a>${work.detailSections.map(section => `<a href="#${esc(section.id)}">${esc(section.title.split('：')[0])}</a>`).join('')}<a href="#questions">常见问题</a></nav>
     <section id="learning"><h2>在鸿蒙端用闪卡学习</h2>${featureList(work.useCases)}</section>
@@ -80,9 +80,9 @@ export function renderPages(content, layout) {
   });
 
   const release = page({
-    title: `${work.sourceVersion} 源码更新说明｜记得闪卡`, description: `记得闪卡 ${work.sourceVersion} 的编辑器、牌组、学习、白板、统计和 JIDE 更新说明。`, pathname: '/releases/', breadcrumbTitle: '更新说明', markdown: '/content/releases.md', ogType: 'article',
+    title: `${work.sourceVersion} 源码更新说明｜记得闪卡`, description: `记得闪卡 ${work.sourceVersion} 的主题外观、牌组菜单、卡片异常提示与窗口适配更新说明。`, pathname: '/releases/', breadcrumbTitle: '更新说明', markdown: '/content/releases.md', ogType: 'article',
     graph: [{ '@type': 'TechArticle', headline: `记得闪卡 ${work.sourceVersion} 源码更新说明`, dateModified: work.sourceUpdate.updatedAt, author: { '@id': `${origin}/#author` }, mainEntityOfPage: `${origin}/releases/` }],
-    body: `${pageHeader('版本更新', `${work.sourceVersion} 源码更新说明`, '设备直连、键盘与鼠标操作、笔记编辑及卡片兼容性。')}<p class="release-meta"><span class="version-pill">源码 ${esc(work.sourceVersion)}</span><time datetime="${work.sourceUpdate.updatedAt}">${work.sourceUpdate.updatedAt}</time><a href="/content/releases.md">Markdown</a><a href="/releases.xml">订阅更新</a></p><article class="release-article" id="release-${work.sourceVersion.replaceAll('.', '-')}">${changes}</article><section class="guide-entry"><h2>继续你的学习</h2>${download}<a href="/works/jidecards/">了解完整功能 <span aria-hidden="true">→</span></a></section>`
+    body: `${pageHeader('版本更新', `${work.sourceVersion} 源码更新说明`, '主题明暗适配、牌组菜单背景模糊、卡片异常提示与半屏窗口适配。')}<p class="release-meta"><span class="version-pill">源码 ${esc(work.sourceVersion)}</span><time datetime="${work.sourceUpdate.updatedAt}">${work.sourceUpdate.updatedAt}</time><a href="/content/releases.md">Markdown</a><a href="/releases.xml">订阅更新</a></p><article class="release-article" id="release-${work.sourceVersion.replaceAll('.', '-')}">${changes}</article><section class="guide-entry"><h2>继续你的学习</h2>${download}<a href="/works/jidecards/">了解完整功能 <span aria-hidden="true">→</span></a></section>`
   });
 
   const about = page({

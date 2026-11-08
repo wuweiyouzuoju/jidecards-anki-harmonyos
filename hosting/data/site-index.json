@@ -1,10 +1,9 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-01",
+  "updatedAt": "2026-11-02",
   "origin": "https://jidecards.com",
-  "releaseVersion": "3.8.1",
-  "sourceVersion": "3.8.35",
-  "sourceVersionCode": 3136,
+  "sourceVersion": "26.11.03.1",
+  "sourceVersionCode": 3140,
   "contentLanguage": "zh-CN",
   "product": "https://jidecards.com/data/works.json",
   "llms": "https://jidecards.com/llms.txt",
@@ -14,20 +13,20 @@
     {
       "path": "/",
       "title": "记得闪卡 JideCards",
-      "description": "记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出；当前源码还提供实验性个人设备直连卡库与媒体同步，以及键盘、鼠标操作。",
+      "description": "记得闪卡是一款面向鸿蒙 HarmonyOS NEXT 的原生开源学习应用，让知识的整理、回忆与复习融入日常。以 Anki 内核为基础，将主动回忆与间隔复习结合，帮助你把学过的内容转化为长久的记忆。",
       "markdown": "/content/home.md",
       "url": "https://jidecards.com/",
       "markdownUrl": "https://jidecards.com/content/home.md",
-      "updatedAt": "2026-11-01"
+      "updatedAt": "2026-11-02"
     },
     {
       "path": "/works/jidecards/",
       "title": "记得闪卡功能与下载",
-      "description": "记得闪卡是面向鸿蒙 HarmonyOS NEXT 的原生开源闪卡应用，基于 Anki 内核，用于背单词、记忆知识点与备考。支持 FSRS 间隔复习、AnkiWeb 同步与 APKG 导入导出；当前源码还提供实验性个人设备直连卡库与媒体同步，以及键盘、鼠标操作。",
+      "description": "记得闪卡是一款面向鸿蒙 HarmonyOS NEXT 的原生开源学习应用，让知识的整理、回忆与复习融入日常。以 Anki 内核为基础，将主动回忆与间隔复习结合，帮助你把学过的内容转化为长久的记忆。",
       "markdown": "/content/product.md",
       "url": "https://jidecards.com/works/jidecards/",
       "markdownUrl": "https://jidecards.com/content/product.md",
-      "updatedAt": "2026-11-01"
+      "updatedAt": "2026-11-02"
     },
     {
       "path": "/guides/harmonyos-anki/",
@@ -40,12 +39,12 @@
     },
     {
       "path": "/releases/",
-      "title": "3.8.35 源码更新说明",
+      "title": "26.11.03.1 源码更新说明",
       "description": "当前版本的完整编号更新说明。",
       "markdown": "/content/releases.md",
       "url": "https://jidecards.com/releases/",
       "markdownUrl": "https://jidecards.com/content/releases.md",
-      "updatedAt": "2026-11-01"
+      "updatedAt": "2026-11-02"
     },
     {
       "path": "/developers/",
@@ -54,7 +53,7 @@
       "markdown": "/content/developers.md",
       "url": "https://jidecards.com/developers/",
       "markdownUrl": "https://jidecards.com/content/developers.md",
-      "updatedAt": "2026-11-01"
+      "updatedAt": "2026-11-02"
     },
     {
       "path": "/about/",
@@ -63,7 +62,7 @@
       "markdown": "/content/about.md",
       "url": "https://jidecards.com/about/",
       "markdownUrl": "https://jidecards.com/content/about.md",
-      "updatedAt": "2026-11-01"
+      "updatedAt": "2026-11-02"
     }
   ]
 }

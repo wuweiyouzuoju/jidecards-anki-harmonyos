@@ -62,11 +62,11 @@ test('source updates match application metadata and remain separate from marketp
     assert.ok(fullText.includes(change));
   }
   const graph = JSON.parse(product.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])['@graph'];
-  assert.equal(graph.find(item => item['@type'] === 'SoftwareApplication').softwareVersion, work.releaseVersion);
+  assert.equal(graph.find(item => item['@type'] === 'SoftwareApplication').softwareVersion, undefined);
   assert.equal(graph.find(item => item['@type'] === 'SoftwareSourceCode').version, work.sourceVersion);
   assert.ok(product.includes(`源码 ${work.sourceVersion}`));
-  assert.ok(work.releaseVersionSource.includes('作者'));
-  assert.ok(product.includes(`应用市场 ${work.releaseVersion}`));
+  assert.equal(work.releaseVersion, undefined);
+  assert.ok(product.includes('下载版本以市场页面为准'));
   assert.ok(product.includes('历史宣传图'));
   assert.ok(product.includes(work.screenshots[0].releaseVersion));
   assert.ok((await read('releases/index.html')).includes(`${work.sourceVersion} 源码更新说明`));
@@ -195,7 +195,7 @@ test('every page resolves the same application, source, author and project ident
     assert.equal(app.name, work.name);
     assert.equal(app.alternateName, work.alternateName);
     assert.equal(app.url, work.url);
-    assert.equal(app.softwareVersion, work.releaseVersion);
+    assert.equal(app.softwareVersion, undefined);
     assert.deepEqual(app.sameAs, [work.marketplace.url]);
     assert.equal(app.subjectOf['@id'], source['@id']);
     assert.equal(source.targetProduct['@id'], app['@id']);
@@ -275,7 +275,7 @@ test('author-supplied media preserve version provenance and original bytes acros
 
 test('HTML, per-page Markdown, llms and JSON share complete crawlable content', async () => {
   const index = JSON.parse(await read('data/site-index.json'));
-  assert.equal(index.releaseVersion, work.releaseVersion);
+  assert.equal(index.releaseVersion, undefined);
   assert.equal(index.sourceVersion, work.sourceVersion);
   assert.equal(index.sourceVersionCode, work.sourceVersionCode);
   assert.equal(index.contentLanguage, 'zh-CN');
@@ -411,9 +411,9 @@ test('README source badge and marketplace facts match their configuration owners
   const readme = await readFile(path.join(root, 'README.md'), 'utf8');
   assert.ok(readme.includes(`source-${app.versionName}-`));
   assert.ok(readme.includes(`当前源码版本：${app.versionName}（versionCode ${app.versionCode}）`));
-  assert.ok(readme.includes(`AppGallery-${work.releaseVersion}-`));
-  assert.ok(readme.includes(`华为应用市场版本：${work.releaseVersion}`));
+  assert.ok(readme.includes('AppGallery-Download-'));
+  assert.ok(!/华为应用市场版本：[0-9]/.test(readme));
   const note = await readFile(path.join(root, `docs/releases/${app.versionName}.md`), 'utf8');
-  assert.ok(note.includes(work.releaseVersion));
+  assert.ok(note.includes('应用市场'));
   assert.ok(note.includes(String(app.versionCode)));
 });
