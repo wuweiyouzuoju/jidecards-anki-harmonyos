@@ -45,8 +45,6 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
       (failure.message ? '\n' + failure.message : '') + (failure.stack ? '\n' + failure.stack : '');
   }
   function showScriptDiagnostics(failEmpty) {
-    var previous = document.getElementById('jide-card-script-errors');
-    var expanded = previous && previous.open;
     clearScriptDiagnostics();
     if (!scriptFailures.length || !document.body) return;
     var label = document.querySelector('meta[name="jide-card-script-error"]');
@@ -57,19 +55,19 @@ export const CARD_REVIEWER_RUNTIME: string = String.raw`
         return element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden';
       });
     if (failEmpty && !hasContent) throw new Error(message + '\n' + sources);
-    var notice = document.createElement('details');
+    // 诊断只以轻提示留在卡片外缘；正文和作者样式不能接管原生错误弹窗。
+    var notice = document.createElement('button');
     notice.id = 'jide-card-script-errors';
-    notice.open = !!expanded;
-    notice.setAttribute('role', 'alert');
-    notice.style.cssText = 'margin:12px 0 0;padding:0;border:0;' +
-      'font:12px/1.5 sans-serif;text-align:start;color:CanvasText;background:Canvas;overflow-wrap:anywhere';
-    var summary = document.createElement('summary');
-    summary.textContent = message;
-    summary.style.cssText = 'cursor:pointer;padding:6px 0';
-    var detail = document.createElement('pre');
-    detail.style.cssText = 'white-space:pre-wrap;font:12px/1.5 monospace;margin:4px 0 0;max-height:40vh;overflow:auto';
-    detail.textContent = sources;
-    notice.appendChild(summary); notice.appendChild(detail);
+    notice.type = 'button';
+    notice.textContent = message;
+    notice.setAttribute('aria-label', message);
+    notice.style.cssText = 'all:initial;box-sizing:border-box;display:block;width:100%;margin:12px 0 0;' +
+      'padding:12px 14px;border-radius:10px;font:13px/1.5 sans-serif;text-align:start;cursor:pointer;' +
+      'color:var(--jide-card-text-color,CanvasText);background:color-mix(in srgb,CanvasText 6%,Canvas);';
+    notice.onclick = function (event) {
+      event.preventDefault(); event.stopPropagation();
+      window.alert('jide-card-script-diagnostics\n' + scriptFailures.map(failureText).join('\n\n'));
+    };
     document.body.appendChild(notice);
   }
   function recordScriptFailure(source, kind, message, line, column, stack) {

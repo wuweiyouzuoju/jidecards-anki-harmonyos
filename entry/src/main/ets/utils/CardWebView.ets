@@ -22,9 +22,29 @@ export function cardScriptDiagnosticLabels(context: UIContext): CardScriptDiagno
 
 /** 学习与所有卡片预览共用；保留作者 HTTP 脚本、嵌套授权请求和视频播放条件。 */
 export class CardWebAttributes implements AttributeModifier<WebAttribute> {
+  private context: UIContext | null;
+  constructor(context: UIContext | null = null) { this.context = context; }
   applyNormalAttribute(instance: WebAttribute): void {
     instance.mixedMode(CARD_RENDERING_SUPPORT.web.allowHttpResources ? MixedMode.All : MixedMode.None)
-      .mediaPlayGestureAccess(CARD_RENDERING_SUPPORT.web.mediaPlaybackRequiresGesture);
+      .mediaPlayGestureAccess(CARD_RENDERING_SUPPORT.web.mediaPlaybackRequiresGesture)
+      .onAlert((event: OnAlertEvent): boolean => {
+        const prefix: string = 'jide-card-script-diagnostics\n';
+        if (!event.message.startsWith(prefix) || this.context === null) return false;
+        const finish: () => void = (): void => { event.result.handleConfirm(); };
+        try {
+          // 沿用应用已有的原生提示弹窗，不在卡面展开堆栈或另建详情页。
+          this.context.showAlertDialog({
+            title: $r('app.string.card_script_load_error'),
+            message: event.message.slice(prefix.length),
+            cancel: finish,
+            confirm: { value: $r('app.string.close'), action: finish }
+          });
+        } catch (error) {
+          event.result.handleCancel();
+          console.warn(`Card diagnostics dialog unavailable: ${error}`);
+        }
+        return true;
+      });
   }
 }
 

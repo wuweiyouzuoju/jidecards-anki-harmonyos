@@ -367,13 +367,13 @@ test('all card hosts apply the same HTTP and autoplay compatibility declared to 
   });
   const actual = {};
   const web = {mixedMode(value) { actual.mixed = value; return this; },
-    mediaPlayGestureAccess(value) { actual.gesture = value; return this; }};
+    mediaPlayGestureAccess(value) { actual.gesture = value; return this; }, onAlert() { return this; }};
   new Attributes().applyNormalAttribute(web);
   assert.deepEqual(actual, {mixed: 'allow', gesture: false});
   for (const path of ['pages/学习页.ets', 'components/browser/卡片预览页.ets',
     'components/settings/NotetypeTemplatePreview.ets']) {
     const source = readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
-    assert.match(source, /\.attributeModifier\(new CardWebAttributes\(\)\)/, path);
+    assert.match(source, /\.attributeModifier\(new CardWebAttributes\(this\.getUIContext\(\)\)\)/, path);
     assert.doesNotMatch(source, /\.mixedMode\(|\.mediaPlayGestureAccess\(/, 'policy belongs to the shared modifier');
     assert.match(source, /app\.string\.card_script_load_error/, 'all hosts supply localized diagnostics');
   }
@@ -400,4 +400,26 @@ test('a script failure between the two paint frames cannot acknowledge an empty 
   assert.match(acknowledgements[0][2],/Localized script error[\s\S]*\nhttp:\/\/author\.invalid\/identify\.js/);
   assert.doesNotMatch(acknowledgements[0][2],/secret/);
   assert.equal(frames.length,0,'the error is reported rather than publishing a successful frame');
+});
+
+test('card diagnostics reuse the native alert and settle confirm, return and window failures', () => {
+  const Attributes = loadPlatformModule('utils/CardWebView.ets', 'CardWebAttributes', {
+    CARD_RENDERING_SUPPORT, MixedMode: {All: 'allow', None: 'deny'}, $r: value => value
+  });
+  let onAlert, options, confirms = 0, cancels = 0;
+  const web = {mixedMode() { return this; }, mediaPlayGestureAccess() { return this; },
+    onAlert(callback) { onAlert = callback; return this; }};
+  const context = {showAlertDialog(value) { options = value; }};
+  new Attributes(context).applyNormalAttribute(web);
+  const event = {message: 'jide-card-script-diagnostics\nScript execution failed\ninline:4:24',
+    result: {handleConfirm() { confirms++; }, handleCancel() { cancels++; }}};
+  assert.equal(onAlert({...event, message: 'author alert'}), false);
+  assert.equal(options, undefined);
+  assert.equal(onAlert(event), true);
+  assert.equal(options.message, 'Script execution failed\ninline:4:24');
+  assert.equal(options.confirm.value, 'app.string.close');
+  options.confirm.action(); assert.equal(confirms, 1);
+  onAlert(event); options.cancel(); assert.equal(confirms, 2);
+  context.showAlertDialog = () => { throw Error('detached'); };
+  assert.equal(onAlert(event), true); assert.equal(cancels, 1);
 });

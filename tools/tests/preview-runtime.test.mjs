@@ -32,7 +32,8 @@ test('preview overlay admits child input while keeping loading input blocked', (
 });
 const names = ['aboutToAppear', 'aboutToDisappear', 'updateActivity', 'stopAudio', 'playCurrentAudio',
   '预览刷新版本变化', '取当前卡片ID', '加载当前卡', '应用HTML', 'webFailed', 'installActionBridge', 'onControllerAttached回调',
-  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', 'selectPreviewAction', '预览更多菜单', 'focusPreviewCard', 'dismissMoreMenu', 'backNoteLink', 'pushLinkedPreview', 'previewCardShown', 'cardThemeChanged'];
+  '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', 'selectPreviewAction', '预览更多菜单', 'focusPreviewCard', 'dismissMoreMenu',
+  'requestMoreMenuClose', 'backNoteLink', 'pushLinkedPreview', 'previewCardShown', 'cardThemeChanged'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`^  (?:private )?(?:async )?${name}\\(`, 'm'));
   assert.ok(start >= 0, name);
@@ -156,7 +157,10 @@ test('both preview hosts dismiss the open menu before leaving preview and releas
     const host = Object.assign(new Host(), { deckMenuId: '', [visible]: true, previewBackHandler: handler,
       transfer: { phase: 'idle' }, displayDialog: '', inlineEditorId: 0, batchDialog: 'none', editor: { visible: false, busy: false } });
     page.moreMenuOpen = true;
+    page.moreMenuCloseRequest = 0;
     assert.equal(host.onBackPress(), true);
+    assert.equal(page.moreMenuCloseRequest, 1);
+    page.dismissMoreMenu();
     assert.equal(page.moreMenuOpen, false);
     assert.equal(host[visible], true, 'first back only closes the menu');
     assert.equal(host.onBackPress(), true);

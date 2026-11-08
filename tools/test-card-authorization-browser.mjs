@@ -79,7 +79,17 @@ async function createHarness({dark = false, width = 390, surface = 'study', fail
     if(expectFailure){assert.equal(failures.length,failureCount+1);assert.equal(renders.length,count-1);}
     else {assert.equal(failures.length,failureCount,failures.at(-1));assert.equal(renders.length,count);}
   }
-  return {context,page,session,show,failures,errors,requests,renders,
+  async function diagnostics() {
+    const waiting = page.waitForEvent('dialog');
+    const click = page.locator('#jide-card-script-errors').click();
+    const dialog = await waiting;
+    const message = dialog.message();
+    await dialog.accept(); await click;
+    assert.ok(message.startsWith('jide-card-script-diagnostics\n'));
+    assert.equal(await page.locator('#jide-card-script-errors pre').count(), 0);
+    return message.slice('jide-card-script-diagnostics\n'.length);
+  }
+  return {context,page,session,show,diagnostics,failures,errors,requests,renders,
     html:()=>currentHtml,close:()=>context.close()};
 }
 
@@ -101,10 +111,8 @@ try {
       await h.show(question,answer,{side:'answer'});
       await h.page.waitForFunction(()=>window.authorRuns===2);
       assert.equal(await h.page.locator('#author-form').isVisible(),true,'missing optional dependency does not suppress authorization');
-      assert.match(await h.page.locator('#jide-card-script-errors').textContent(),/_optional-slider\.js/);
-      assert.equal(await h.page.locator('#jide-card-script-errors summary').textContent(),label);
-      assert.equal(await h.page.locator('#jide-card-script-errors').evaluate(notice=>notice.open),false);
-      assert.match(await h.page.locator('#jide-card-script-errors pre').textContent(),/资源加载失败.*\n卡片本地资源: _optional-slider\.js/);
+      assert.equal(await h.page.locator('#jide-card-script-errors').textContent(),label);
+      assert.match(await h.diagnostics(),/资源加载失败.*\n卡片本地资源: _optional-slider\.js/);
       const snapshot=JSON.stringify(await h.page.evaluate(CARD_SESSION_STORAGE_SNAPSHOT));
       // Exercise the same migration function used between the native Web slots.
       const carried=carryCardSessionStorage(h.html(),snapshot);
@@ -146,8 +154,9 @@ try {
     await h.show('Useful card');
     await h.page.evaluate(src=>{const script=document.createElement('script');script.src=src;document.body.appendChild(script);},author+'late.js?user_id=secret');
     await h.page.waitForSelector('#jide-card-script-errors');
-    assert.match(await h.page.locator('#jide-card-script-errors').textContent(),/late\.js/);
-    assert.ok(!(await h.page.locator('#jide-card-script-errors').textContent()).includes('secret'));
+    const late = await h.diagnostics();
+    assert.match(late,/late\.js/);
+    assert.ok(!late.includes('secret'));
     assert.equal(await h.page.locator('#qa').innerText(),'Useful card');
     passed++;
   }finally{await h.close();}
@@ -158,24 +167,18 @@ try {
       await h.show(source,source,{expectFailure:!visible});
       assert.deepEqual(h.errors,['synthetic author exception']);
       if(visible){
-        const detail=await h.page.locator('#jide-card-script-errors pre').textContent();
+        const detail=await h.diagnostics();
         assert.match(detail,/脚本执行异常\n卡片内嵌脚本:\d+:\d+/);
         assert.match(detail,/synthetic author exception/);
         assert.ok(!detail.includes('jidecards-media.local'));
-        assert.equal(await h.page.locator('#jide-card-script-errors pre').isVisible(),false);
-        await h.page.locator('#jide-card-script-errors summary').click();
-        assert.equal(await h.page.locator('#jide-card-script-errors pre').isVisible(),true);
-        await h.page.locator('#jide-card-script-errors').evaluate(notice=>{notice.open=true;});
         await h.page.evaluate(()=>window.dispatchEvent(new ErrorEvent('error',{
           filename:location.href,message:'repeated author exception'})));
-        assert.equal(await h.page.locator('#jide-card-script-errors').evaluate(notice=>notice.open),true,
-          'new failures from the same source do not reset an expanded diagnostic');
-        assert.match(await h.page.locator('#jide-card-script-errors pre').textContent(),/repeated author exception/);
+        assert.match(await h.diagnostics(),/repeated author exception/);
         await h.page.evaluate(()=>window.dispatchEvent(new ErrorEvent('error',{
           filename:'https://user:password@author.invalid/example.js?token=secret#private',
           message:'Failure at https://user:password@author.invalid/example.js?token=secret#private',
           lineno:12,colno:4,error:new Error('https://jidecards-media.local/?token=secret')})));
-        const sanitized=await h.page.locator('#jide-card-script-errors pre').textContent();
+        const sanitized=await h.diagnostics();
         assert.match(sanitized,/https:\/\/author.invalid\/example.js:12:4/);
         assert.ok(!/secret|password|token=|jidecards-media\.local/.test(sanitized));
         await h.show(source,'Recovered answer',{side:'answer'});

@@ -27,7 +27,7 @@ test('home cancels pending preview across background/return, deck reselection, l
     const pending = deferred(), toasts = [];
     const page = new Page();
     Object.assign(page, {
-      deckMenuId: '', deckMenuBackRequest: 0, syncChoiceGeneration: 0, syncChoiceVisible: reason === 'background', syncChoiceChecking: reason === 'background',
+      getUIContext: () => ({getFrameNodeById:()=>null}), deckMenuId: '', deckMenuBackRequest: 0, syncChoiceGeneration: 0, syncChoiceVisible: reason === 'background', syncChoiceChecking: reason === 'background',
       deckPreviewSession: new DeckPreviewSession({ cardIds: () => pending.promise }),
       syncController: { foregroundChanged() {}, cancel() {} }, backupController: { schedule() {}, stop() {} },
       syncStatusController: new HomeSyncStatusController({ auth: () => null, canRead: () => false,
@@ -125,7 +125,10 @@ test('mobile preview opens directly at its toolbar anchor and closes before quer
   page.aboutToAppear();
   page.openPreviewMenu();
   assert.equal(page.previewMenuOpen, true);
-  assert.equal(page.consumeBack(), true); assert.equal(page.consumeBack(), false); assert.deepEqual(selections, []);
+  assert.equal(page.consumeBack(), true);
+  assert.equal(page.previewMenuCloseRequest, 1);
+  page.closePreviewMenu(); // AnchoredMenu receives the close request and calls onClose.
+  assert.equal(page.consumeBack(), false); assert.deepEqual(selections, []);
   for (const scope of scopes) { page.openPreviewMenu(); page.selectPreview(scope); }
   assert.deepEqual(selections, scopes); assert.equal(events.at(-1), false);
   page.previewBusy = true; page.openPreviewMenu(); assert.equal(page.previewMenuOpen, false);
@@ -133,22 +136,13 @@ test('mobile preview opens directly at its toolbar anchor and closes before quer
   assert.equal(page.consumeBack(), false);
 });
 
-test('menu anchors subtract the detail origin once and align the right edge after resize', () => {
+test('detail publishes the toolbar content bounds in window coordinates with one content gap', () => {
   const page = new (Details())();
-  page.detailsAreaChanged({ globalPosition: { x: 600, y: 180 }, width: 420, height: 700 });
-  page.actionAnchor = { left: 612, top: 236, width: 396 };
-  assert.deepEqual(page.menuAnchor(), { left: 12, top: 56, width: 396 });
-  const anchor = page.menuAnchor();
-  assert.equal(600 + anchor.left + anchor.width, 1008, 'right edge equals the measured wide toolbar/card edge');
-  page.detailsAreaChanged({ globalPosition: { x: 420, y: 100 }, width: 300, height: 520 });
-  page.actionAnchor = { left: 432, top: 152, width: 276 };
-  assert.deepEqual(page.menuAnchor(), { left: 12, top: 52, width: 276 });
-  page.detailsAreaChanged({ globalPosition: { x: 0, y: 0 }, width: 360, height: 800 });
-  page.compactAnchorChanged({ globalPosition: { x: 0, y: 0 }, width: 360, height: 76 });
-  assert.deepEqual(page.menuAnchor(), { left: 16, top: 88, width: 328 }, 'public content gap is added once');
+  page.compactAnchorChanged({ globalPosition: { x: 420, y: 100 }, width: 360, height: 76 });
+  assert.deepEqual(page.actionAnchor, { left: 436, top: 188, width: 328 });
   page.narrowDeckLayout = true;
-  page.compactAnchorChanged({ globalPosition: { x: 0, y: 0 }, width: 280, height: 70 });
-  assert.deepEqual(page.menuAnchor(), { left: 16, top: 78, width: 248 });
+  page.compactAnchorChanged({ globalPosition: { x: 420, y: 100 }, width: 280, height: 70 });
+  assert.deepEqual(page.actionAnchor, { left: 436, top: 178, width: 248 });
 });
 
 test('scope list shares actual choices with JIDE and rejects invalid or stale choices', () => {
@@ -178,18 +172,18 @@ test('JIDE sees the exposed icon toolbar and its real availability, and withdraw
   page.compact = true; page.deckId = '42'; page.aboutToAppear();
   const toolbar = () => deps.appInterface.snapshot().find(item => item.surface === 'deck_actions');
   assert.equal(toolbar().sectionId, 'toolbar_right');
-  assert.deepEqual(toolbar().items.map(item => item.id), ['add_note', 'preview']);
-  assert.deepEqual(toolbar().items.map(item => item.iconKey), ['ic_study_edit', 'ic_common_preview']);
+  assert.deepEqual(toolbar().items.map(item => item.id), ['add_note', 'preview', 'more']);
+  assert.deepEqual(toolbar().items.map(item => item.iconKey), ['ic_study_edit', 'ic_common_preview', 'ic_home_more']);
   page.agentEnabled = true; page.publishInterface();
-  assert.deepEqual(toolbar().items.map(item => item.id), ['add_note', 'agent', 'preview']);
+  assert.deepEqual(toolbar().items.map(item => item.id), ['add_note', 'agent', 'preview', 'more']);
   page.previewBusy = true; page.publishInterface();
   assert.equal(toolbar().items.find(item => item.id === 'preview').enabled, false);
   assert.equal(toolbar().items.find(item => item.id === 'add_note').enabled, true);
   page.previewBusy = false;
   page.openPreviewMenu(); page.publishInterface();
   assert.equal(deps.appInterface.snapshot().some(item => item.surface === 'deck_actions'), false);
-  page.consumeBack(); page.publishInterface();
-  assert.equal(toolbar().items.length, 3, 'dismissal reveals the toolbar again');
+  page.consumeBack(); page.closePreviewMenu();
+  assert.equal(toolbar().items.length, 4, 'dismissal reveals the toolbar again');
   page.deckId = ''; page.closePreviewMenu();
   assert.equal(toolbar().items.every(item => !item.enabled), true);
   page.compact = false; page.compactChanged();
