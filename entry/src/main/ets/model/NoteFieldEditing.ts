@@ -161,7 +161,7 @@ export function noteFieldMediaTool(id: string): NoteEditorTool {
 }
 export const NOTE_FIELD_MODE_TOOLS: NoteEditorTool[] = [
   { id: 'visual', titleKey: 'note_editor_visual', iconKey: 'ic_editor_source', editing: 'visual_mode_preserving_html' },
-  { id: 'source_edit', titleKey: 'note_editor_source_edit', iconKey: 'ic_editor_source', editing: 'source_mode_preserving_html' }
+  { id: 'source_edit', titleKey: 'note_editor_source_edit', iconKey: 'ic_editor_source', editing: 'whole_field_source_including_media_references_preserving_html' }
 ];
 export function noteFieldModeTool(id: string): NoteEditorTool {
   const tool: NoteEditorTool | undefined = NOTE_FIELD_MODE_TOOLS.find((item: NoteEditorTool): boolean => item.id === id);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { decodeNoteTextEntities } from './NoteRichText';
+import { decodeNoteTextEntities, parseNoteVisualText } from './NoteRichText';
 import { isNoteVideoFilename } from './NoteVideoMedia';
 
 export interface NoteMediaPart {
@@ -78,4 +78,12 @@ export function assertNoteMediaResolved(fields: string[]): void {
     part.kind !== 'text' && part.filename.startsWith('jidecards-draft:')))) {
     throw new Error('Unresolved note media draft');
   }
+}
+
+/** 源码模式必须展示整个字段；可视模式才拆分媒体，保持原始标签、属性和顺序。 */
+export function noteFieldDisplayParts(value: string, source: boolean): NoteMediaPart[] {
+  return source ? [{ start: 0, end: value.length, text: value, kind: 'text', filename: '' }] : noteMediaParts(value);
+}
+export function canShowNoteFieldVisually(value: string): boolean {
+  return noteMediaParts(value).every((part: NoteMediaPart): boolean => part.kind !== 'text' || parseNoteVisualText(part.text) !== null);
 }

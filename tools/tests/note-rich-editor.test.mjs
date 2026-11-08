@@ -971,3 +971,32 @@ test('expanded field uses one native dialog, edits the same draft and rejects la
   assert.equal(NOTE_FIELD_EDITING_SUPPORT.expandPresentation,
     'single_current_field_large_dialog_shared_draft_close_preserves_input');
 });
+
+test('explicit source initialization preserves complete media HTML; visual initialization can override the field default',()=>{
+ const raw='before<img src="xx.jpg">[sound:xx.mp3]after';
+ const h=editor(raw,null,null,123,{initialSourceMode:true});
+ assert.equal(h.instance.sourceMode,true);assert.equal(h.instance.value,raw);assert.deepEqual(h.changes,[]);
+ const visual=editor('plain',{plainText:true},null,124,{initialSourceMode:false});
+ assert.equal(visual.instance.sourceMode,false);assert.equal(visual.instance.value,'plain');
+});
+
+test('parent HTML echoes after middle deletion preserve the native caret and do not reload equal content',()=>{
+ const h=editor('甲乙丙丁');
+ h.instance.fieldFocus();
+ nativeTextEdit(h,1,2,'');
+ assert.equal(h.controller.getCaretOffset(),1);
+ const remove=h.controller.deleteSpans;
+ let reloads=0;
+ h.controller.deleteSpans=()=>{reloads++;remove();h.controller.setCaretOffset(999);};
+ h.instance.value='&#30002;丙丁';
+ const runs=rich.parseNoteVisualText(h.instance.value);
+ assert.ok(runs);
+ assert.equal(rich.serializeNoteRichText(runs),h.instance.lastSnapshot);
+ h.instance.receiveValue();
+ assert.equal(reloads,0);
+ assert.equal(h.controller.getCaretOffset(),1);
+ h.instance.value='甲丙丁戊';
+ h.instance.receiveValue();
+ assert.equal(reloads,1);
+ assert.equal(h.controller.getCaretOffset(),1);
+});

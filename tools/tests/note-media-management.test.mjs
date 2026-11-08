@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { NoteMediaSession } from '../../entry/src/main/ets/model/NoteMediaSession.ts';
 import { noteFieldMediaTool } from '../../entry/src/main/ets/model/NoteFieldEditing.ts';
-import { noteMediaParts, replaceNoteMediaPart, noteImagePreviewSource, assertNoteMediaResolved } from '../../entry/src/main/ets/model/NoteMediaParts.ts';
+import { noteMediaParts, noteFieldDisplayParts, canShowNoteFieldVisually, replaceNoteMediaPart, noteImagePreviewSource, assertNoteMediaResolved } from '../../entry/src/main/ets/model/NoteMediaParts.ts';
 import { prepareNoteImageFields } from '../../entry/src/main/ets/model/NoteImageDraft.ts';
 import { prepareNoteAudioFields, noteAudioParts } from '../../entry/src/main/ets/model/NoteAudioDraft.ts';
 import { loadComponentLogic } from './platform-module-harness.mjs';
@@ -21,7 +21,7 @@ const audio = (id, uri) => ({ id, fieldIndex: 0, uri, filename: '', label: uri, 
 function fieldManagerHarness(initial = {}, failOpen = false, deferClose = false) {
   const windows = [], events = [];
   const Field = loadComponentLogic('components/editor/NoteFieldCard.ets', 'NoteFieldCard', {
-    ...surfaceMotionApi(), noteMediaParts, replaceNoteMediaPart, noteImagePreviewSource,
+    ...surfaceMotionApi(), noteMediaParts, noteFieldDisplayParts, canShowNoteFieldVisually, replaceNoteMediaPart, noteImagePreviewSource,
     NoteAudioPreview: class { async stop() {} },
     showToastSafely: (_ctx, options) => events.push(['error', options.message]), $r: key => key,
     NoteMediaDialog: options => options,
@@ -246,7 +246,7 @@ test('disposed or disabled field cards reject late text, reverse and audio callb
 
 test('main field previews resolve existing and replacement images live and delete only the selected occurrence', () => {
   const Field = loadComponentLogic('components/editor/NoteFieldCard.ets', 'NoteFieldCard', {
-    NoteAudioPreview: class {}, noteMediaParts, replaceNoteMediaPart, noteImagePreviewSource
+    NoteAudioPreview: class {}, noteMediaParts, noteFieldDisplayParts, canShowNoteFieldVisually, replaceNoteMediaPart, noteImagePreviewSource
   });
   const field = new Field(); field.value = '<img src="one.png">X<img src="one.png">';
   field.getUIContext = () => ({ getHostContext: () => ({ filesDir: '/files' }) });
@@ -382,4 +382,50 @@ test('audio playback uses the common button with current filename, theme, and di
   state.disabled = false; state.working = true; remove(); assert.equal(events.length, 1);
   state.working = false; state.recording = true; remove(); assert.equal(events.length, 1);
   state.recording = false; remove(); assert.equal(events.at(-1), 'remove');
+});
+
+test('source projects one complete field including media filenames while visual parts keep media out of text inputs',()=>{
+ const html='前<b>文</b><img src="a&amp;b.jpg" alt="原图">中[sound:voice.mp3]<img src="same.jpg">后';
+ const visual=noteFieldDisplayParts(html,false),source=noteFieldDisplayParts(html,true);
+ assert.equal(source.length,1);assert.equal(source[0].text,html);assert.equal(source[0].kind,'text');
+ assert.deepEqual(visual.filter(p=>p.kind!=='text').map(p=>p.filename),['a&b.jpg','voice.mp3','same.jpg']);
+ assert.ok(visual.filter(p=>p.kind==='text').every(p=>!p.text.includes('.jpg')&&!p.text.includes('.mp3')));
+ assert.equal(visual.map(p=>p.text).join(''),html);assert.equal(canShowNoteFieldVisually(html),true);
+ assert.equal(canShowNoteFieldVisually('<table><tr><td>kept</td></tr></table><img src="a.jpg">'),false);
+});
+
+test('field source waits for all text blocks to flush, edits the whole field and returns without changing media references',()=>{
+ const Field=loadComponentLogic('components/editor/NoteFieldCard.ets','NoteFieldCard',{
+  NoteAudioPreview:class{},noteMediaParts,noteFieldDisplayParts,canShowNoteFieldVisually,replaceNoteMediaPart
+ });
+ const field=new Field();field.value='A<img src="one.jpg">B[sound:voice.mp3]C';
+ const changes=[];field.onChange=value=>{field.value=value;changes.push(value);};
+ field.toggleMode();assert.equal(field.fullSource,false);assert.equal(field.requestedSourceMode,true);
+ field.changeTextPart(0,'最新');field.recordMode(0,true);assert.equal(field.fullSource,false);
+ field.recordMode(2,true);assert.equal(field.fullSource,false);
+ field.recordMode(4,true);assert.equal(field.fullSource,true);
+ assert.equal(field.displayParts()[0].text,'最新<img src="one.jpg">B[sound:voice.mp3]C');
+ field.changeTextPart(0,'最新<img src="two.jpg">B[sound:voice.mp3]C');
+ field.toggleMode();assert.equal(field.fullSource,false);assert.equal(field.displayParts()[1].filename,'two.jpg');
+ assert.equal(field.value,'最新<img src="two.jpg">B[sound:voice.mp3]C');assert.equal(changes.length,2);
+ field.disabled=true;field.toggleMode();assert.equal(field.fullSource,false);
+});
+
+test('complex HTML remains intact in full source when visual conversion is unavailable',()=>{
+ const notices=[];
+ const Field=loadComponentLogic('components/editor/NoteFieldCard.ets','NoteFieldCard',{
+  NoteAudioPreview:class{},canShowNoteFieldVisually,showToastSafely:(_ui,options)=>notices.push(options),resourceText:(_ui,text)=>text,$r:key=>key
+ });
+ const field=new Field();field.fullSource=true;field.value='<table>raw</table><img src="x.jpg">';field.getUIContext=()=>({});
+ field.toggleMode();assert.equal(field.fullSource,true);assert.equal(field.value,'<table>raw</table><img src="x.jpg">');assert.equal(notices.length,1);
+});
+
+test('newly mounted text blocks honor an in-flight source request and cannot force unsupported HTML into rich text',()=>{
+ const Field=loadComponentLogic('components/editor/NoteFieldCard.ets','NoteFieldCard',{
+  NoteAudioPreview:class{},noteMediaParts,noteFieldDisplayParts,canShowNoteFieldVisually
+ });
+ const field=new Field();field.value='plain<img src="x.jpg">next';assert.equal(field.partStartsInSource(0),false);
+ field.requestedSourceMode=true;assert.equal(field.partStartsInSource(2),true);
+ field.requestedSourceMode=false;field.value='plain<img src="x.jpg"><table>kept</table>';
+ assert.equal(field.partStartsInSource(2),true);
 });

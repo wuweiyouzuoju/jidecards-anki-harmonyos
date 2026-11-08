@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 import { insetMaterialFill } from '../utils/GlassMaterial';
 import { GlassSource } from '../components/common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -167,7 +168,7 @@ import { AgentConversation, AgentHistoryAudit, AgentHistoryResult, deleteAgentCo
 import { AgentDisclosureCard } from '../components/agent/AgentDisclosureCard';
 import { AgentReasoning } from '../components/agent/AgentReasoning';
 import { ScrollTailFollower } from '../model/ScrollTailFollower';
-import { NoteFieldEditor } from '../components/common/NoteFieldEditor';
+import { NoteFieldCard } from '../components/editor/NoteFieldCard';
 import { NoteEditorWheelSession, NOTE_EDITOR_WHEEL_SESSION_KEY } from '../model/NoteEditorWheel';
 import { AgentSetupCard } from '../components/agent/AgentSetupCard';
 import { AgentClarificationCard } from '../components/agent/AgentClarificationCard';
@@ -226,6 +227,7 @@ class 页面Agent观察者 implements AgentRunObserver {
 @Component
 export struct AI制卡页 {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
@@ -274,11 +276,10 @@ export struct AI制卡页 {
   private 本地范围牌组IDs: number[] = [];
   private 本地范围笔记类型IDs: number[] = [];
   @State private moreVisible: boolean = false;
+  @State private moreCloseRequest: number = 0;
   @State private menuLeft: number = 0;
   @State private menuTop: number = 0;
   @State private menuContentWidth: number = 0;
-  @State private menuHostLeft: number = 0;
-  @State private menuHostTop: number = 0;
   @State private historyReading: boolean = false;
   private historyReadGeneration: number = 0;
   private historyToolsReady: boolean = false;
@@ -586,7 +587,9 @@ export struct AI制卡页 {
     } catch (error) {
       action.status = 'failed';
       resultJson = action.resultJson.length > 0 ? action.resultJson : '{"status":"failed"}';
-      this.错误信息 = this.取本地化文案($r('app.string.ai_agent_action_failed'));
+      this.错误信息 = error instanceof Error && error.message === 'transfer_ai_content_export_blocked'
+        ? this.取本地化文案($r('app.string.transfer_ai_content_export_blocked'))
+        : this.取本地化文案($r('app.string.ai_agent_action_failed'));
     } finally {
       this.更新消息(messageIndex, (message: 聊天消息): void => { message.action = action; });
       this.处理中 = false;
@@ -1043,6 +1046,7 @@ export struct AI制卡页 {
   }
 
   private 取Agent错误文案(错误: Error): string {
+    if (错误.message === 'transfer_ai_content_export_blocked') return this.取本地化文案($r('app.string.transfer_ai_content_export_blocked'));
     if (错误 instanceof AgentTransportError) {
       if (错误.kind === 'http') {
         if (错误.detailMessage.length > 0) {
@@ -1766,6 +1770,8 @@ export struct AI制卡页 {
     this.更新消息(messageIndex, (message: 聊天消息): void => {
       message.批次结果 = this.取本地化格式(
         $r('app.string.ai_agent_execution_result'), [result.succeeded, result.failed, result.status]);
+      if (result.items.some((item): boolean => item.errorCode === 'transfer_ai_content_export_blocked'))
+        message.批次结果 += '\n' + this.取本地化文案($r('app.string.transfer_ai_content_export_blocked'));
       const original: ChangeDraft = message.变更草稿列表[draftIndex];
       if (original.operations[0]?.kind === 'app_operation') {
         for (const item of result.items) if (item.resultJson !== undefined) {
@@ -1799,7 +1805,7 @@ export struct AI制卡页 {
 
   private 记录草稿错误(messageIndex: number, error: Object): void {
     this.更新消息(messageIndex, (message: 聊天消息): void => {
-      message.批次结果 = error instanceof Error ? error.message : `${error}`;
+      message.批次结果 = error instanceof Error ? this.取Agent错误文案(error) : `${error}`;
     });
   }
 
@@ -2255,9 +2261,8 @@ export struct AI制卡页 {
   }
   @Builder
   private moreMenu() {
-    AnchoredMenu({ menuWidth: Math.min(应用尺寸.compactMenuWidth, this.menuContentWidth),
-      topOffset: this.menuTop - this.menuHostTop, contentLeft: this.menuLeft - this.menuHostLeft,
-      contentMaxWidth: this.menuContentWidth, alignEnd: true, cornerRadius: 应用尺寸.圆角_卡片,
+    AnchoredMenu({ menuWidth: Math.min(应用尺寸.compactMenuWidth, this.menuContentWidth), closeRequest: this.moreCloseRequest,
+      toolbarBounds: { left: this.menuLeft, top: this.menuTop, width: this.menuContentWidth }, alignEnd: true,
       onClose: (): void => { this.closeMoreMenu(); } }) {
       ActionMenuList({ items: this.moreEntries(), onSelect: (id: string): void => { this.selectMore(id); } })
         .onAppear((): void => { appInterface.observe({ surface: 'agent_more', sectionId: '', selectedId: '',
@@ -2328,7 +2333,7 @@ export struct AI制卡页 {
   @Builder
   private 卡片项(ctx: AgentMessageViewContext) {
     AgentEditableCard({ card: ctx.message.卡片列表[ctx.itemIndex],
-      fieldNames: ctx.message.字段名列表, busy: ctx.message.批次保存中,
+      fieldNames: ctx.message.字段名列表, busy: ctx.message.批次保存中, isDark: this.seriesDark(),
       index: ctx.itemIndex, messageId: ctx.message.id,
       onSelected: (selected: boolean): void => { this.更新卡片选中(ctx.messageIndex, ctx.itemIndex, selected); },
       onField: (index: number, value: string): void => { this.更新卡片字段(ctx.messageIndex, ctx.itemIndex, index, value); }
@@ -2398,7 +2403,9 @@ export struct AI制卡页 {
                 .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
               if (operation.kind === 'update_field' &&
                 ctx.message.变更草稿列表[ctx.itemIndex].risk === 'write') {
-                NoteFieldEditor({ value: operation.after,
+                NoteFieldCard({ value: operation.after, fieldIndex: operation.fieldOrd,
+                  fieldName: ctx.message.字段名列表[operation.fieldOrd] ?? String(operation.fieldOrd + 1),
+                  mediaEditable: false, isDark: this.seriesDark(), accent: this.动作主色,
                   disabled: ctx.message.变更草稿列表[ctx.itemIndex].status !== 'pending',
                   onChange: (value: string): void => {
                     this.更新草稿操作(ctx.messageIndex, ctx.itemIndex, operationIndex, value);
@@ -2429,7 +2436,7 @@ export struct AI制卡页 {
     .width('100%').padding(应用尺寸.间距_10)
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
-    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色))
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色, '', undefined, this.moduleOpacity))
   }
 
   private notetypeRestoreLayout(operation: DraftOperation): string {
@@ -3002,7 +3009,7 @@ export struct AI制卡页 {
               .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 4, bottom: 4 })
               .backgroundColor($r('app.color.surface_card'))
               .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
-              .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色))
+              .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色, '', undefined, this.moduleOpacity))
             }, (file: AgentImportedFile): string => file.id)
           }
           .width('100%')
@@ -3143,9 +3150,7 @@ Column() {
       
       if (this.targetSelectionMessage >= 0) { this.createTargetDialog() }
       if (this.moreVisible && this.menuContentWidth > 0) { this.moreMenu() }
-      }.width('100%').height('100%').onAreaChange((_old: Area, area: Area): void => {
-        this.menuHostLeft = Number(area.globalPosition.x); this.menuHostTop = Number(area.globalPosition.y);
-      })
+      }.width('100%').height('100%')
     }
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
@@ -3154,7 +3159,7 @@ Column() {
     .opacity(this.转场透明度)
     .translate({ x: this.navigationOffset })
     .onBackPressed((): boolean => {
-      if (this.moreVisible) { this.closeMoreMenu(); return true; }
+      if (this.moreVisible) { this.moreCloseRequest++; return true; }
       if (this.memoryVisible) { this.memoryCloseRequest++; return true; }
       if (this.settingsVisible) { this.settingsCloseRequest++; return true; }
       if (this.显示历史区) { this.关闭历史区(); return true; }

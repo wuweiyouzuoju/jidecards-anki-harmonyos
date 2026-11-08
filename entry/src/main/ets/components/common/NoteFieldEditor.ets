@@ -74,7 +74,7 @@ export struct NoteFieldEditor {
   @Prop fieldConfig: NoteFieldEditingOptions | null = null;
   @Prop @Watch('editingAvailabilityChanged') disabled: boolean = false;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('editingAvailabilityChanged') private foreground: boolean = true;
-  @Prop clozeEnabled: boolean = false;
+  @Prop @Watch('updateWheel') clozeEnabled: boolean = false;
   @Prop allFields: string[] = [];
   @Prop referencesEnabled: boolean = false;
   @StorageProp(颜色键.主色容器) @Watch('referenceThemeChanged') private referenceSurface: string = '#E8EEFC';
@@ -85,6 +85,7 @@ export struct NoteFieldEditor {
   private richController: RichEditorController = new RichEditorController();
   @State @Watch('reportMode') private sourceMode: boolean = false;
   @Prop modeControlInHeader: boolean = false;
+  @Prop initialSourceMode: boolean | undefined = undefined;
   @Prop requestedSourceMode: boolean = false;
   @Prop modeRequestFocus: boolean = true;
   @Prop @Watch('headerModeRequested') modeRequest: number = 0;
@@ -142,7 +143,7 @@ export struct NoteFieldEditor {
     this.expandedDialog.activate();
     this.hintDialog.activate(); this.linkDialog.activate(); this.referenceDialog.activate(); this.formatDialog.activate();
     this.inputKey = 'note-editor-' + this.getUniqueId();
-    this.sourceMode = this.fieldConfig?.plainText === true || parseNoteVisualText(this.value) === null;
+    this.sourceMode = this.initialSourceMode ?? (this.fieldConfig?.plainText === true || parseNoteVisualText(this.value) === null);
     this.reportMode();
     this.wheelSession.register(this.inputKey, !this.disabled && this.foreground, (active: boolean): void => {
       this.wheelActive = active;
@@ -169,7 +170,16 @@ export struct NoteFieldEditor {
     if (this.disposed || this.applying || this.sourceMode || this.value === this.lastSnapshot) return;
     const runs: NoteTextRun[] | null = parseNoteVisualText(this.value);
     if (runs === null) { this.sourceMode = true; this.ready = false; }
-    else if (this.ready) this.loadRich(runs);
+    else if (this.ready) {
+      // 父层回传的等价 HTML 不重建原生输入，避免打断输入法删除和候选态。
+      if (serializeNoteRichText(runs) === this.lastSnapshot) return;
+      const caret: number = Math.max(0, this.richController.getCaretOffset());
+      this.loadRich(runs);
+      const length: number = runs.reduce((total: number, run: NoteTextRun): number => total + run.text.length, 0);
+      const restored: number = Math.min(caret, length);
+      this.richController.setCaretOffset(restored);
+      this.selectionStart = restored; this.selectionEnd = restored;
+    }
     this.updateWheel();
   }
 

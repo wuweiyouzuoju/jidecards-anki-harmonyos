@@ -2,7 +2,7 @@ import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
-import { NoteFieldEditor } from '../common/NoteFieldEditor';
+import { NoteFieldCard } from '../editor/NoteFieldCard';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
@@ -14,6 +14,7 @@ export struct AgentEditableCard {
   @Prop card: 卡片草稿 = { fields: [], 已选中: true, 状态: 'draft', 失败提示: '' };
   @Prop fieldNames: string[] = [];
   @Prop busy: boolean = false;
+  @Prop isDark: boolean = false;
   index: number = 0;
   messageId: number = 0;
   onSelected: (selected: boolean) => void = (): void => {};
@@ -76,20 +77,12 @@ export struct AgentEditableCard {
       // 字段编辑区：勾选才展开；已保存的卡展示为只读
       if (this.card.已选中) {
         ForEach(this.fieldNames, (字段名: string, 字段索引: number) => {
-          Column({ space: 应用尺寸.间距_5 }) {
-            Text(字段名)
-              .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
-              .width('100%')
-            NoteFieldEditor({
-              value: this.card.fields[字段索引], fieldName: 字段名,
-              allFields: this.card.fields, disabled: this.busy || this.card.状态 === 'saved',
-              onChange: (值: string): void => {
-                this.onField(字段索引, 值);
-              }
-            })
-          }
-          .width('100%')
+          NoteFieldCard({
+            fieldName: 字段名, fieldIndex: 字段索引, value: this.card.fields[字段索引],
+            allFields: this.card.fields, mediaEditable: false, isDark: this.isDark,
+            accent: this.动作主色, disabled: this.busy || this.card.状态 === 'saved',
+            onChange: (值: string): void => { this.onField(字段索引, 值); }
+          })
         }, (字段名: string, 字段索引: number): string =>
           `${this.messageId}-${this.index}-${字段索引}-${字段名}`)
       }
