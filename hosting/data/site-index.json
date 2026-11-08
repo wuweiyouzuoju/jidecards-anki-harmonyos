@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-02",
+  "updatedAt": "2026-11-08",
   "origin": "https://jidecards.com",
-  "sourceVersion": "26.11.03.1",
-  "sourceVersionCode": 3140,
+  "sourceVersion": "26.11.09.8",
+  "sourceVersionCode": 3148,
   "contentLanguage": "zh-CN",
   "product": "https://jidecards.com/data/works.json",
   "llms": "https://jidecards.com/llms.txt",
@@ -17,7 +17,7 @@
       "markdown": "/content/home.md",
       "url": "https://jidecards.com/",
       "markdownUrl": "https://jidecards.com/content/home.md",
-      "updatedAt": "2026-11-02"
+      "updatedAt": "2026-11-08"
     },
     {
       "path": "/works/jidecards/",
@@ -26,7 +26,7 @@
       "markdown": "/content/product.md",
       "url": "https://jidecards.com/works/jidecards/",
       "markdownUrl": "https://jidecards.com/content/product.md",
-      "updatedAt": "2026-11-02"
+      "updatedAt": "2026-11-08"
     },
     {
       "path": "/guides/harmonyos-anki/",
@@ -39,12 +39,12 @@
     },
     {
       "path": "/releases/",
-      "title": "26.11.03.1 源码更新说明",
+      "title": "26.11.09.8 源码更新说明",
       "description": "当前版本的完整编号更新说明。",
       "markdown": "/content/releases.md",
       "url": "https://jidecards.com/releases/",
       "markdownUrl": "https://jidecards.com/content/releases.md",
-      "updatedAt": "2026-11-02"
+      "updatedAt": "2026-11-08"
     },
     {
       "path": "/developers/",
@@ -53,7 +53,7 @@
       "markdown": "/content/developers.md",
       "url": "https://jidecards.com/developers/",
       "markdownUrl": "https://jidecards.com/content/developers.md",
-      "updatedAt": "2026-11-02"
+      "updatedAt": "2026-11-08"
     },
     {
       "path": "/about/",
@@ -62,7 +62,7 @@
       "markdown": "/content/about.md",
       "url": "https://jidecards.com/about/",
       "markdownUrl": "https://jidecards.com/content/about.md",
-      "updatedAt": "2026-11-02"
+      "updatedAt": "2026-11-08"
     }
   ]
 }

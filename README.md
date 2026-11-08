@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
-[![Source 26.11.03.1](https://img.shields.io/badge/source-26.11.03.1-6750a4.svg)](AppScope/app.json5)
+[![Source 26.11.09.8](https://img.shields.io/badge/source-26.11.09.8-6750a4.svg)](AppScope/app.json5)
 [![AppGallery](https://img.shields.io/badge/AppGallery-Download-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 [![HarmonyOS NEXT](https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0a59f7.svg)](https://www.harmonyos.com/)
 
 jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
 
-**当前源码版本：26.11.06.7（versionCode 3147）**
+**当前源码版本：26.11.09.8（versionCode 3148）**
 
 每天一点，把知识记牢。用闪卡整理知识，以间隔复习建立自己的学习节奏。
 
@@ -39,7 +39,7 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 - [版本与发布](#版本与发布)
 - [许可证与第三方声明](#许可证与第三方声明)
 
-当前源码恢复新安装用户的首批牌组直链引导。26.11.05.2 将菜单、玻璃弹层和中性表面呈现提取到系列基础，产品通过薄适配共同消费；保留半屏窗口生命周期适配和日期版本编号；3.8.37 开放自定义主色的浅色/深色明暗适配和实际强调色预览。此前 3.8.35 完善字段展开、页面玻璃背景、主题对比度和分流入门教学，并包含浏览计数、牌组快捷操作与自定义学习记忆改进。详见[3.8.35 源码更新说明](docs/releases/3.8.35.md)。应用市场版本以下载页面为准。
+当前源码加入自定义壁纸、主题色明暗适配与独立材质不透明度，完善宽屏编辑、半屏与悬浮窗口，以及新用户的首批牌组导入引导。详见 [26.11.09.8 源码更新说明](docs/releases/26.11.09.8.md)。应用市场版本以下载页面为准。
 
 ## 项目特点
 
