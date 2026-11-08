@@ -80,9 +80,9 @@ export function renderPages(content, layout) {
   });
 
   const release = page({
-    title: `${work.sourceVersion} 源码更新说明｜记得闪卡`, description: `记得闪卡 ${work.sourceVersion} 的主题外观、牌组菜单、卡片异常提示与窗口适配更新说明。`, pathname: '/releases/', breadcrumbTitle: '更新说明', markdown: '/content/releases.md', ogType: 'article',
+    title: `${work.sourceVersion} 源码更新说明｜记得闪卡`, description: `记得闪卡 ${work.sourceVersion} 的自定义壁纸、编辑、窗口适配与新手引导更新说明。`, pathname: '/releases/', breadcrumbTitle: '更新说明', markdown: '/content/releases.md', ogType: 'article',
     graph: [{ '@type': 'TechArticle', headline: `记得闪卡 ${work.sourceVersion} 源码更新说明`, dateModified: work.sourceUpdate.updatedAt, author: { '@id': `${origin}/#author` }, mainEntityOfPage: `${origin}/releases/` }],
-    body: `${pageHeader('版本更新', `${work.sourceVersion} 源码更新说明`, '主题明暗适配、牌组菜单背景模糊、卡片异常提示与半屏窗口适配。')}<p class="release-meta"><span class="version-pill">源码 ${esc(work.sourceVersion)}</span><time datetime="${work.sourceUpdate.updatedAt}">${work.sourceUpdate.updatedAt}</time><a href="/content/releases.md">Markdown</a><a href="/releases.xml">订阅更新</a></p><article class="release-article" id="release-${work.sourceVersion.replaceAll('.', '-')}">${changes}</article><section class="guide-entry"><h2>继续你的学习</h2>${download}<a href="/works/jidecards/">了解完整功能 <span aria-hidden="true">→</span></a></section>`
+    body: `${pageHeader('版本更新', `${work.sourceVersion} 源码更新说明`, '自定义壁纸和材质，完善宽屏编辑、窗口适配和首批牌组导入。')}<p class="release-meta"><span class="version-pill">源码 ${esc(work.sourceVersion)}</span><time datetime="${work.sourceUpdate.updatedAt}">${work.sourceUpdate.updatedAt}</time><a href="/content/releases.md">Markdown</a><a href="/releases.xml">订阅更新</a></p><article class="release-article" id="release-${work.sourceVersion.replaceAll('.', '-')}">${changes}</article><section class="guide-entry"><h2>继续你的学习</h2>${download}<a href="/works/jidecards/">了解完整功能 <span aria-hidden="true">→</span></a></section>`
   });
 
   const about = page({
