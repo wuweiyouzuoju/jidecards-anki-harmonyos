@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { OFFICIAL_HELP_LINKS } from './OfficialCommunity';
+import type { OfficialHelpLink } from './OfficialCommunity';
+import { APPEARANCE_CUSTOMIZATION_ITEMS } from './AppearanceCustomization';
 import { SETTINGS_ENTRIES, settingsEntryVisible } from './SettingsNavigation';
 import { REVIEW_AUDIO_PREFERENCES } from './ReviewAudioPreferences';
 
@@ -83,8 +86,12 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'appearance', sectionId: 'appearance', titleKey: 'settings_appearance_display', items: [
     { id: 'theme_mode', titleKey: 'appearance_theme', settingId: 'theme_mode' },
     { id: 'color_theme', titleKey: 'appearance_color_theme', settingId: 'color_theme' },
+    ...APPEARANCE_CUSTOMIZATION_ITEMS,
     { id: 'theme_motion', titleKey: 'iridescent_motion', settingId: 'theme_motion', condition: 'theme_has_textures' },
-    { id: 'surface_material', titleKey: 'surface_material', settingId: 'surface_material' },
+    { id: 'surface_material', titleKey: 'surface_material', settingId: 'surface_material', opens: 'surface_material_settings' },
+    { id: 'module_opacity', titleKey: 'module_opacity', opens: 'surface_material_settings' },
+    { id: 'button_opacity', titleKey: 'button_opacity', opens: 'surface_material_settings' },
+    { id: 'dialog_opacity', titleKey: 'dialog_opacity', opens: 'surface_material_settings' },
     { id: 'motion_style', titleKey: 'motion_style', settingId: 'motion_style' },
     { id: 'deck_list_style', titleKey: 'deck_width', settingId: 'deck_list_style' },
     { id: 'card_text_size', titleKey: 'card_text_size', settingId: 'card_text_size' }
@@ -148,22 +155,13 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'fingerprint_copy', titleKey: 'redemption_copy' },
     { id: 'redemption', titleKey: 'redemption_entry' }
   ] },
-  { id: 'about', sectionId: 'about', titleKey: 'settings_about', items: [
+  { id: 'about', sectionId: 'about', titleKey: 'study_more', items: [
     { id: 'app_information', titleKey: 'app_about_title' },
     { id: 'feedback', titleKey: 'feedback_title' },
     { id: 'rate', titleKey: 'about_rate_title' },
-    { id: 'ankiweb', titleKey: 'about_ankiweb_title' },
-    { id: 'community', titleKey: 'about_qq_group_title' },
-    { id: 'licenses', titleKey: 'licenses_title' },
-    { id: 'anki_documentation', titleKey: 'about_anki_docs_title' }
+    ...OFFICIAL_HELP_LINKS.map((link: OfficialHelpLink): SettingsItem => ({ id: link.id, titleKey: link.titleKey })),
+    { id: 'licenses', titleKey: 'licenses_title' }
   ] },
-  { id: 'advanced', sectionId: 'advanced', titleKey: 'settings_developer_debug_title', items: [
-    { id: 'agent_enabled', titleKey: 'settings_developer_debug_enabled', condition: 'agent_enabled' },
-    { id: 'developer_description', titleKey: 'settings_developer_debug_description', condition: 'agent_disabled' },
-    { id: 'developer_contact', titleKey: 'settings_developer_debug_qq_hint', condition: 'agent_disabled' },
-    { id: 'developer_key', titleKey: 'settings_developer_debug_key_placeholder', condition: 'agent_disabled', sensitive: true },
-    { id: 'developer_enable', titleKey: 'settings_developer_debug_enable', condition: 'agent_disabled' }
-  ] }
 ];
 
 export function visibleSettingsGroups(sectionId: string, simple: boolean, agent: boolean): SettingsGroup[] {
@@ -172,6 +170,15 @@ export function visibleSettingsGroups(sectionId: string, simple: boolean, agent:
   return SETTINGS_GROUPS.filter((group: SettingsGroup): boolean =>
     group.sectionId === sectionId && !(group.fullOnly && simple));
 }
+
+/** 首页弹窗与设置目录共享同一组可点击项。 */
+export const SOFTWARE_HELP_ITEMS: SettingsItem[] = SETTINGS_GROUPS
+  .filter((group: SettingsGroup): boolean => group.id === 'about')
+  .flatMap((group: SettingsGroup): SettingsItem[] => group.items)
+  .filter((item: SettingsItem): boolean => item.id !== 'app_information');
+
+export const INTRO_ABOUT_ITEMS: SettingsItem[] = SOFTWARE_HELP_ITEMS.filter((item: SettingsItem): boolean =>
+  item.id !== 'community' && item.id !== 'feedback' && item.id !== 'rate');
 
 export function settingsItemVisible(item: SettingsItem, simple: boolean, themeHasTextures: boolean): boolean {
   return !(item.fullOnly && simple) && !(item.condition === 'theme_has_textures' && !themeHasTextures);

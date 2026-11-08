@@ -1,3 +1,5 @@
+import { SURFACE_MATERIAL_ITEMS } from './SurfaceMaterial';
+import { APPEARANCE_CUSTOMIZATION_ITEMS } from './AppearanceCustomization';
 import { deckDetailShortcuts } from './DeckDetailShortcut';
 import { HOME_INTRO_ACTIONS } from './HomeIntro';
 import type { HomeIntroAction } from './HomeIntro';
@@ -12,7 +14,7 @@ import { IMPORT_RESULT_ACTIONS } from './ImportResults';
 import { REVIEW_AUDIO_PREFERENCES } from './ReviewAudioPreferences';
 import { STUDY_KEYBOARD_FIELDS } from './StudyKeyboard';
 import { STUDY_GESTURE_FIELDS } from './StudyGestureConfig';
-import { SETTINGS_GROUPS } from './SettingsStructure';
+import { SETTINGS_GROUPS, SOFTWARE_HELP_ITEMS, INTRO_ABOUT_ITEMS } from './SettingsStructure';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
 import type { NoteAudioStatus } from './NoteAudioDraft';
 import { DRAWING_COLORS, DRAWING_TEXT_HANDLES, DRAWING_TEXT_RESIZE_MODE, DRAWING_COLOR_PLACEMENT,
@@ -115,6 +117,8 @@ export const HOME_SYNC_CHOICES: AppInterfaceItem[] = [
 ];
 
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
+  { id: 'surface_material_settings', titleKey: 'surface_material', parent: 'settings', items: SURFACE_MATERIAL_ITEMS },
+  { id: 'appearance_customization', titleKey: 'settings_directory_appearance', parent: 'settings', items: APPEARANCE_CUSTOMIZATION_ITEMS },
   { id: 'home_sync_choice', titleKey: 'sync_choice_title', instructionsKey: 'sync_choice_hint', parent: 'home',
     items: HOME_SYNC_CHOICES.concat([{ id: 'close', titleKey: 'close' }]) },
   { id: 'keyboard_shortcuts', titleKey: 'glossary_shortcuts_label', instructionsKey: 'glossary_shortcuts_help',
@@ -193,10 +197,12 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'history', titleKey: 'collection_history_title', opens: 'collection_history' },
     { id: 'stats', titleKey: 'stats_page_title', opens: 'stats' },
     { id: 'reminders', titleKey: 'reminder_list_title', opens: 'reminders' },
-    { id: 'intro', titleKey: 'home_intro_menu_title', opens: 'intro' },
+    { id: 'software_help', titleKey: 'study_more', opens: 'software_help' },
   ] },
-  { id: 'intro', titleKey: 'home_intro_title', parent: 'home_more', items: HOME_INTRO_ACTIONS.map((action: HomeIntroAction): AppInterfaceItem =>
-    ({ id: action.id, titleKey: action.titleKey })) },
+  { id: 'software_help', titleKey: 'study_more', parent: 'home_more',
+    items: [...SOFTWARE_HELP_ITEMS, { id: 'close', titleKey: 'close' }] },
+  { id: 'intro', titleKey: 'home_intro_title', parent: 'home', items: [...HOME_INTRO_ACTIONS.map((action: HomeIntroAction): AppInterfaceItem =>
+    ({ id: action.id, titleKey: action.titleKey })), ...INTRO_ABOUT_ITEMS] },
   { id: 'home_search', titleKey: 'home_search_title', instructionsKey: 'home_search_instructions', parent: 'home', items: [
     { id: 'query', titleKey: 'home_search_placeholder' },
     { id: 'results', titleKey: 'home_interface_decks', opens: 'deck_details' },

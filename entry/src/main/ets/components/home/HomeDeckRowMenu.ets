@@ -2,6 +2,7 @@
 import { SelectionDialog } from '../common/SelectionDialog';
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { showToastSafely } from '../../utils/UiFeedback';
+import { FOCUSED_DIALOG_BACKDROP_BLUR } from '../common/PopupAppearance';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 import { AnchoredMenu } from '../common/AnchoredMenu';
 import { 牌组列表项 } from '../牌组列表项';
@@ -9,7 +10,7 @@ import { 牌组汇总, 空牌组汇总 } from '../../model/主页模型';
 import { deckMenuPlacement, centeredDeckMenuPlacement, DeckMenuPlacement } from '../../model/DeckMenuPresentation';
 import { WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY, WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY } from '../../model/WindowSafeLayout';
 import { deviceInfo } from '@kit.BasicServicesKit';
-import { GlassBackdrop, GlassRegion } from '../../utils/GlassBackdrop';
+import { GlassBackdrop, GlassRegion, currentGlassSource } from '../../utils/GlassBackdrop';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { AnchoredMenuItem } from '../common/MenuItem';
 import { ActionMenuListItem } from '../common/ActionMenuList';
@@ -30,12 +31,13 @@ export struct HomeDeckRowMenu {
   @StorageProp(简洁模式AppStorage键) @Watch('publishInterface') private simple: boolean = true;
   @Prop centered: boolean = false;
   @Prop refractionSource: string = '';
+  @State private sourceId: string = '';
   @Prop deck: 牌组汇总 = 空牌组汇总;
   @Prop liftAnchor: ActionMenuAnchor = { left: 16, top: 180, width: 320, height: 64 };
   @State private viewportHeight: number = 900;
   @State private viewportWidth: number = 420;
   @State private previewHeight: number = 64;
-  @State private menuContentHeight: number = 400;
+  @State private menuContentHeight: number = 0;
   @StorageProp('themeMode') private themeMode: string = 'system';
   @StorageProp('systemDarkMode') private systemDark: boolean = false;
   @State private liftX: number = 0;
@@ -93,6 +95,7 @@ export struct HomeDeckRowMenu {
   onToneChange: (deckId: string, tone: 牌组色调) => void = (): void => {};
 
   aboutToAppear(): void {
+    this.sourceId = this.refractionSource || currentGlassSource(this.getUIContext());
     this.mounted = true; this.previewHeight = Math.max(32, this.liftAnchor.height);
     this.toneDialog.activate(); this.publishInterface();
     this.previewReady = !this.usesGlass();
@@ -195,6 +198,7 @@ export struct HomeDeckRowMenu {
       values: [{ id: 'filtered', value: String(this.filtered) }, { id: 'tone', value: String(this.tone) },
         { id: 'presentation', value: this.centered ? 'centered_details_menu' : this.point === undefined ? 'lifted_deck_context_menu' : 'pointer_context_menu' },
         { id: 'tone_presentation', value: 'secondary_dialog' },
+        { id: 'backdrop_blur_radius', value: String(this.backdropBlurRadius()) },
         { id: 'triggers', value: 'long_press,right_click,details_more' }, { id: 'deck_name', value: this.deckName }] });
     if (this.expandedIds.includes('tone')) {
       const tones: AppInterfaceControl[] = DECK_TONE_CHOICES.map((choice: DeckToneChoice): AppInterfaceControl => ({
@@ -208,6 +212,10 @@ export struct HomeDeckRowMenu {
     } else appInterface.leave('deck_tones');
   }
 
+  private backdropBlurRadius(): number {
+    return this.material === 'glass' && this.point === undefined ? FOCUSED_DIALOG_BACKDROP_BLUR : 0;
+  }
+
   private placement(): DeckMenuPlacement {
     const left = Math.max(16, this.safeLeft - this.hostLeft + 16);
     const top = Math.max(16, this.safeTop - this.hostTop + 16);
@@ -216,7 +224,7 @@ export struct HomeDeckRowMenu {
         height: Math.max(48, this.viewportHeight - top - this.safeBottom - 16) }, this.menuContentHeight, this.previewHeight);
     return deckMenuPlacement(actionMenuHostAnchor(this.liftAnchor, this.hostLeft, this.hostTop),
       { left, top, width: Math.max(48, this.viewportWidth - left - this.safeRight - 16),
-        height: Math.max(160, this.viewportHeight - top - this.safeBottom - 16) }, this.previewHeight, this.menuContentHeight);
+        height: Math.max(160, this.viewportHeight - top - this.safeBottom - 16) }, this.previewHeight, this.menuContentHeight || undefined);
   }
   private previewTop(): number { return this.placement().preview.top; }
   private menuTop(): number { return this.placement().menu.top; }
@@ -228,7 +236,7 @@ export struct HomeDeckRowMenu {
     this.liftMeasured = true;
     if (this.liftRequested) this.startLift();
   }
-  private usesGlass(): boolean { return this.material === 'glass' && this.refractionSource !== '' && deviceInfo.apiAvailable(23); }
+  private usesGlass(): boolean { return this.material === 'glass' && this.sourceId !== '' && deviceInfo.apiAvailable(23); }
   private startLift(): void {
     this.liftRequested = true;
     if (!this.previewReady || !this.menuReady) return;
@@ -244,6 +252,11 @@ export struct HomeDeckRowMenu {
     }, 0);
   }
 
+  private measureMenuContent(height: number): void {
+    if (height <= 0 || height === this.menuContentHeight || (this.liftStarted && !this.centered)) return;
+    this.menuContentHeight = height;
+  }
+
   @Builder
   private dialogContent() {
     Column() {
@@ -254,7 +267,7 @@ export struct HomeDeckRowMenu {
           onSelect: (): void => { if (item.id === 'tone') this.toggleBranch(item); else this.selectItem(item); } })
       }, (item: ActionMenuListItem): string => item.id)
     }.width('100%').onAreaChange((_old: Area, area: Area): void => {
-      if (!this.liftStarted) this.menuContentHeight = Number(area.height);
+      this.measureMenuContent(Number(area.height));
     })
       .accessibilityLevel(this.expandedIds.includes('tone') ? 'no-hide-descendants' : 'auto')
   }
@@ -268,18 +281,19 @@ export struct HomeDeckRowMenu {
           onSelect: (item: CardActionMenuEntry): void => { item.action?.(); }, onClose: (): void => { this.dismiss(); } })
           .hitTestBehavior(this.expandedIds.includes('tone') ? HitTestMode.None : HitTestMode.Default)
       } else {
-        DialogBackdrop().onClick((): void => { this.dismiss(); })
-        AnchoredMenu({ onPanelArea: (area: Area): void => { this.recordToneAnchor(area); }, refractionSource: this.refractionSource, materialRole: 'menu',
+        DialogBackdrop({ blurRadius: this.backdropBlurRadius(), tracksHierarchy: false })
+          .onClick((): void => { this.dismiss(); })
+        AnchoredMenu({ onPanelArea: (area: Area): void => { this.recordToneAnchor(area); }, refractionSource: this.sourceId, materialRole: 'menu',
           menuWidth: this.panelWidth(), topOffset: this.menuTop(), alignEnd: false,
           contentLeft: this.placement().menu.left, contentMaxWidth: this.panelWidth(),
           onPrepared: (): void => { this.menuReady = true; this.startLift(); },
-          maxHeight: this.placement().menu.height,
+          maxHeight: this.centered ? undefined : this.placement().menu.height,
           cornerRadius: 应用尺寸.圆角_卡片, onClose: (): void => { this.dismiss(); } }) {
           this.dialogContent()
         }
         Stack() {
           if (this.usesGlass() && !this.previewFailed) {
-            GlassBackdrop({ source: this.refractionSource, role: 'menu', region: this.previewRegion,
+            GlassBackdrop({ source: this.sourceId, role: 'menu', region: this.previewRegion,
               radius: 应用尺寸.圆角_牌组行, onReady: (): void => {
                 this.previewReady = true; clearTimeout(this.previewTimer); this.startLift();
               } }).width('100%').height('100%').position({ x: 0, y: 0 })

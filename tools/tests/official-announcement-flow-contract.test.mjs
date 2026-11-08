@@ -62,7 +62,11 @@ test('announcement modal is native, themed, scrollable and non-dismissible', () 
   assert.match(source, /onAcknowledge/);
   assert.match(source, /onOpenDetails/);
   assert.match(source, /DialogBackdrop\(\{ widthPercent: 88, maximumWidth: 480,/);
-  assert.match(source, /\.transition\(SurfaceTransition\.dialog\(\)\)/);
+  assert.match(source, /GlassPanel\(\{ radius: 应用尺寸\.圆角_卡片, panelWidth: this\.surfaceWidth, maximumWidth: this\.surfaceMaximumWidth, maximumHeight: '80%' \}\)/);
+  const panel = read('../../entry/src/main/ets/components/common/GlassPanel.ets');
+  assert.match(panel, /SharedGlassPanel\(\{/);
+  assert.match(panel, /flatTransition: SurfaceTransition\.dialog\(\)/);
+  assert.doesNotMatch(source, /\.transition\(SurfaceTransition\.dialog\(\)\)/, 'the shared panel owns the single content transition');
   assert.match(source, /\.transition\(SurfaceTransition\.backdrop\(\)\)/);
   assert.match(source, /edgeEffect\(EdgeEffect\.Spring\)/);
   assert.doesNotMatch(source, /Web\(|RichText\(|onClose|\.onClick\(\(\) => this\.onAcknowledge/);

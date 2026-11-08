@@ -9,7 +9,7 @@ test('cloud deck hosting has one replaceable catalog URL and no management crede
   assert.match(source, /云端牌组目录地址/);
   assert.match(
     source,
-    /export const 云端牌组目录地址: string =\s*\n?\s*'https:\/\/4001784660\.cdn\.123clouddisk\.com\/4001784660\/CET%E5%9B%9B%E5%85%AD%E7%BA%A7\/cloud-decks\.json'/,
+    /export const 云端牌组目录地址: string =\s*\n?\s*'https:\/\/4001784660\.cdn\.123clouddisk\.com\/4001784660\/CET%E5%9B%9B%E5%85%AD%E7%BA%A7\/cloud-decks-20261105-final\.json'/,
   );
   assert.doesNotMatch(source, /(accessKey|secretKey|clientSecret|管理密钥)/i);
 });
@@ -120,9 +120,8 @@ test('cloud deck modal presents selectable public decks, locked future decks and
   assert.match(source, /deck\.cardCount/);
   assert.match(source, /cloud_deck_enter/);
   assert.match(source, /cloud_deck_qq_group_entry/);
-  assert.match(source, /maxHeight: '72%'/);
-  assert.doesNotMatch(source, /maxHeight: '88%'/);
-  assert.match(source, /DialogBackdrop\(\{ widthPercent: 90, maximumWidth: 560,/);
+  assert.match(source, /DialogFrame\(\{ maximumWidth: 应用尺寸\.dialogWideMaxWidth/);
+  assert.doesNotMatch(source, /GlassPanel\(|DialogBackdrop\(|Scroll\(\)/);
   // 双态契约：引导态提供「稍后再说」，菜单态主按钮退化为「关闭」，首次说明只在引导态出现。
   assert.match(source, /cloud_deck_skip/);
   assert.match(source, /从菜单打开: boolean = false/);
@@ -171,7 +170,8 @@ test('cloud deck and import source strings are aligned and translated', () => {
   );
   assert.doesNotMatch(zhMap.get('cloud_deck_onboarding_message'), /首次进入牌组|单机应用|菜单里的「获取直链牌组」/);
   assert.equal(zhMap.get('cloud_deck_qq_group_entry'),
-    '更多牌组文件可前往官方 QQ 群 %s 免费下载（点击复制）');
+    '加入官方 QQ 群 %s 可免费下载所有牌组（点击复制群号）');
+  assert.match(zhMap.get('cloud_deck_onboarding_message'), /合计不超过 %d MB/);
   assert.equal(zhMap.get('cloud_deck_selection_limit'), '最多只能选择 %d 个牌组');
   assert.doesNotMatch(enMap.get('cloud_deck_onboarding_message'), /安装|导入|牌组|QQ群/);
   assert.deepEqual([...zhMap.keys()].sort(), [...enMap.keys()].sort());

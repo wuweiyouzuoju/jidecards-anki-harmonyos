@@ -2,13 +2,12 @@
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { settingsItemText } from '../../utils/SettingsStructureText';
-import { OFFICIAL_QQ_GROUP } from '../../model/OfficialCommunity';
+import { OFFICIAL_QQ_GROUP, OFFICIAL_HELP_LINKS, OfficialHelpLink } from '../../model/OfficialCommunity';
 import { common } from '@kit.AbilityKit';
-import { pasteboard } from '@kit.BasicServicesKit';
+import { copyOfficialQQGroup, openOfficialHelpLink } from '../../utils/OfficialHelpActions';
 import { 链接服务 } from '../../backend/链接服务';
 import { HelpPage } from '../../proto/messages/LinksMessages';
 import { 设置面板色板_取 } from '../../utils/设置面板配色';
-import { showToastSafely } from '../../utils/UiFeedback';
 import { 打开应用内好评 } from '../../utils/好评引导';
 import { 颜色键 } from '../../model/颜色主题';
 import { AboutActionDialog } from './AboutActionDialog';
@@ -20,14 +19,11 @@ import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 @Component
 export struct AboutSettings {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @Prop centerCommunity: boolean = false;
   @Prop 是否深色: boolean = false;
   @StorageLink(颜色键.动作主色) private 动作主色链接: string = '';
   打开许可证回调: () => void = (): void => {};
   private readonly 链接服务实例: 链接服务 = new 链接服务();
-  // AnkiWeb 共享牌组网址（与 AnkiWeb引导对话框.ets 同款字面量，作为外部网址保留原文）
-  private readonly AnkiWeb网址: string = 'https://ankiweb.net/shared/decks';
-  // Anki 官方文档 URL（后端 LinksService.HelpPageLink 不可用时的兜底常量，与 docs.ankiweb.net 一致）
-  private readonly Anki文档网址: string = 'https://docs.ankiweb.net';
   // 官方 QQ 群号（关于分组入口点击复制到剪贴板，与 欢迎弹窗 中 QQ群号 保持一致）
   private readonly QQ群号: string = OFFICIAL_QQ_GROUP;
   // 本应用 bundleName，用于拼接应用市场 DeepLink 跳转本应用详情页（好评回退路径）
@@ -41,7 +37,7 @@ export struct AboutSettings {
       builder: AboutActionDialog({
         onClose: this.feedbackDialog.guard((): void => { this.feedbackDialog.close(); }),
         groupNumber: this.QQ群号,
-        onCopyGroup: (): void => { this.复制QQ群号到剪贴板(); }
+        onCopyGroup: (): void => { copyOfficialQQGroup(this.getUIContext()); }
       }),
       width: presentation.width, height: presentation.height, keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor,
       autoCancel: presentation.autoCancel,
@@ -58,81 +54,12 @@ export struct AboutSettings {
   private 解析主色(): string {
     return this.动作主色链接 !== '' ? this.动作主色链接 : 设置面板色板_取(this.是否深色).主色;
   }
-  private 打开AnkiWeb网址(): void {
-    const 上下文: common.UIAbilityContext =
-      this.getUIContext().getHostContext() as common.UIAbilityContext;
-    上下文.startAbility({
-      action: 'ohos.want.action.viewData',
-      uri: this.AnkiWeb网址
-    }).catch((错误: Error): void => {
-      // 兜底：复制网址到剪贴板 + toast 提示用户手动打开
-      this.复制AnkiWeb网址到剪贴板();
-    });
-  }
-
-  private async 复制AnkiWeb网址到剪贴板(): Promise<void> {
-    try {
-      const 剪贴数据: pasteboard.PasteData =
-        pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.AnkiWeb网址);
-      const 系统剪贴板: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
-      await 系统剪贴板.setData(剪贴数据);
-      showToastSafely(this.getUIContext(), {
-        message: $r('app.string.about_ankiweb_open_failed')
-      });
-    } catch (错误) {
-      // 复制失败静默；用户仍可在关于分组看到网址文本手动抄录
+  private async openLink(link: OfficialHelpLink): Promise<void> {
+    let url: string = link.url;
+    if (link.id === 'anki_documentation') {
+      try { url = await this.链接服务实例.获取帮助页链接(HelpPage.INDEX) || url; } catch {}
     }
-  }
-
-  private async 打开Anki官方文档(): Promise<void> {
-    let 网址: string = this.Anki文档网址;
-    try {
-      const 后端网址: string = await this.链接服务实例.获取帮助页链接(HelpPage.INDEX);
-      if (后端网址 !== '') {
-        网址 = 后端网址;
-      }
-    } catch (错误) {
-      // 后端不可用：兜底用本地常量网址，确保用户仍能打开文档
-    }
-    const 上下文: common.UIAbilityContext =
-      this.getUIContext().getHostContext() as common.UIAbilityContext;
-    上下文.startAbility({
-      action: 'ohos.want.action.viewData',
-      uri: 网址
-    }).catch((错误: Error): void => {
-      // 兜底：复制网址到剪贴板 + toast 提示用户手动打开
-      this.复制Anki文档网址到剪贴板(网址);
-    });
-  }
-
-  private async 复制Anki文档网址到剪贴板(网址: string): Promise<void> {
-    try {
-      const 剪贴数据: pasteboard.PasteData =
-        pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, 网址);
-      const 系统剪贴板: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
-      await 系统剪贴板.setData(剪贴数据);
-      showToastSafely(this.getUIContext(), {
-        message: $r('app.string.about_anki_docs_open_failed')
-      });
-    } catch (错误) {
-      // 复制失败静默；用户仍可在关于分组看到网址文本手动抄录
-    }
-  }
-
-  // 点击「关于 → QQ 群」入口行：把 QQ 群号写入系统剪贴板并 toast 提示。
-  // 不跳转 QQ 应用（避免未装 QQ 时 startAbility 失败的复杂降级链路），统一走复制 + 用户自行打开 QQ 加群。
-  private async 复制QQ群号到剪贴板(): Promise<void> {
-    try {
-      const 剪贴数据: pasteboard.PasteData =
-        pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.QQ群号);
-      const 系统剪贴板: pasteboard.SystemPasteboard = pasteboard.getSystemPasteboard();
-      await 系统剪贴板.setData(剪贴数据);
-      showToastSafely(this.getUIContext(), {
-        message: $r('app.string.about_qq_group_copied')
-      });
-    } catch (错误) {
-      // 复制失败静默；用户仍可在关于分组看到群号文本手动抄录
-    }
+    await openOfficialHelpLink(this.getUIContext(), url);
   }
 
   private 打开好评弹窗(): void {
@@ -143,47 +70,63 @@ export struct AboutSettings {
   @Builder
   private communityHint(): void {
     Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
-      Text($r('app.string.about_qq_group_summary')).fontSize(12).fontColor($r('app.color.text_secondary'))
-      Text($r('app.string.about_qq_group_number_label')).fontSize(12).fontColor($r('app.color.text_secondary'))
+      Text($r('app.string.home_intro_copy_qq')).fontSize(12).fontColor($r('app.color.text_secondary'))
       Text() { ForEach([themeTextKey(this.QQ群号, [], this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.QQ群号, [], this.getUIContext()) }, (_textKey: string): string => _textKey) }
         .fontSize(12).fontColor(this.解析主色()).fontWeight(FontWeight.Medium)
-        .copyOption(CopyOptions.LocalDevice)
     }.width('100%')
+    Text($r('app.string.about_qq_group_summary')).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
   }
 
   build() {
     Column() {
-      Column({ space: 9 }) {
-        Text(settingsItemText(this.getUIContext(), 'app_information', this.uiLanguage))
-          .fontSize(18).fontWeight(FontWeight.Bold)
-          .fontColor(设置面板色板_取(this.是否深色).主文字).width('100%')
-        Text($r('app.string.app_about_copyright')).fontSize(12)
-          .fontColor(设置面板色板_取(this.是否深色).三级文字).width('100%')
-      }.width('100%').alignItems(HorizontalAlign.Start).padding({ bottom: 12 })
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'feedback', this.uiLanguage), icon: settingsIcon('feedback'),
-        onAction: (): void => { this.feedbackDialog.open(this.createFeedbackDialog); } })
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'rate', this.uiLanguage),
-        hint: $r('app.string.about_rate_summary'), icon: settingsIcon('rate'),
-        onAction: (): void => { this.打开好评弹窗(); } })
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'ankiweb', this.uiLanguage),
-        hint: this.AnkiWeb网址, icon: settingsIcon('ankiweb'),
-        onAction: (): void => { this.打开AnkiWeb网址(); } })
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'community', this.uiLanguage),
-        hint: $r('app.string.about_qq_group_summary'), icon: settingsIcon('community'),
-        hintContent: (): void => { this.communityHint(); },
-        onAction: (): void => { this.复制QQ群号到剪贴板(); } })
+      if (this.centerCommunity) {
+        Column({ space: 6 }) {
+          Button({ type: ButtonType.Normal }) {
+            Row({ space: 10 }) {
+              Text($r('app.string.about_qq_group_title')).fontSize(18).fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.text_primary'))
+              Text(this.QQ群号).fontSize(18).fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.home_intro_link'))
+            }.width('100%').justifyContent(FlexAlign.Center)
+          }.width('100%').constraintSize({ minHeight: 44 }).backgroundColor(Color.Transparent)
+            .onClick((): void => { copyOfficialQQGroup(this.getUIContext()); })
+          Text($r('app.string.home_intro_qq_details')).fontSize(12).lineHeight(18)
+            .fontColor($r('app.color.text_secondary')).textAlign(TextAlign.Center).width('100%')
+            .onClick((): void => { copyOfficialQQGroup(this.getUIContext()); })
+        }.width('100%').alignItems(HorizontalAlign.Center).padding({ bottom: 16 })
+      }
+      if (!this.centerCommunity) {
+        Column({ space: 9 }) {
+          Text(settingsItemText(this.getUIContext(), 'app_information', this.uiLanguage))
+            .fontSize(18).fontWeight(FontWeight.Bold)
+            .fontColor(设置面板色板_取(this.是否深色).主文字).width('100%')
+          Text($r('app.string.app_about_copyright')).fontSize(12)
+            .fontColor(设置面板色板_取(this.是否深色).三级文字).width('100%')
+        }.width('100%').alignItems(HorizontalAlign.Start).padding({ bottom: 12 })
+        Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
+        SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'feedback', this.uiLanguage), icon: settingsIcon('feedback'),
+          onAction: (): void => { this.feedbackDialog.open(this.createFeedbackDialog); } })
+        Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
+        SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'rate', this.uiLanguage),
+          hint: $r('app.string.about_rate_summary'), icon: settingsIcon('rate'),
+          onAction: (): void => { this.打开好评弹窗(); } })
+      }
+      ForEach(OFFICIAL_HELP_LINKS.filter((link: OfficialHelpLink): boolean => !this.centerCommunity || link.id !== 'community'), (link: OfficialHelpLink) => {
+        Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
+        if (link.id === 'community') {
+          SettingsActionRow({ title: settingsItemText(this.getUIContext(), link.id, this.uiLanguage),
+            icon: settingsIcon('community'), hint: $r('app.string.about_qq_group_summary'),
+            hintContent: (): void => { this.communityHint(); },
+            onAction: (): void => { copyOfficialQQGroup(this.getUIContext()); } })
+        } else {
+          SettingsActionRow({ title: settingsItemText(this.getUIContext(), link.id, this.uiLanguage),
+            hint: this.centerCommunity ? '' : link.url, icon: settingsIcon(link.id), onAction: (): void => { this.openLink(link); } })
+        }
+      }, (link: OfficialHelpLink): string => link.id)
       Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
       SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'licenses', this.uiLanguage),
-        hint: $r('app.string.licenses_summary'), icon: settingsIcon('licenses'),
+        hint: this.centerCommunity ? '' : $r('app.string.licenses_summary'), icon: settingsIcon('licenses'),
         onAction: (): void => { this.打开许可证回调(); } })
-      Divider().color(设置面板色板_取(this.是否深色).分隔线).strokeWidth(1)
-      SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'anki_documentation', this.uiLanguage),
-        hint: this.Anki文档网址, icon: settingsIcon('anki_documentation'),
-        onAction: (): void => { this.打开Anki官方文档(); } })
     }.width('100%')
   }
 }

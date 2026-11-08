@@ -1,3 +1,4 @@
+import {menuPresentation,loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 import { 自定义学习预设 } from '../../entry/src/main/ets/proto/messages/SchedulerMessages.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
@@ -12,18 +13,19 @@ import { 牌组显示名, 空牌组汇总 } from '../../entry/src/main/ets/model
 import { deckScopeSearch } from '../../entry/src/main/ets/model/DeckScope.ts';
 import { ActionMenuPointerSide, actionMenuBubbleOutline, actionMenuHostAnchor, placeAnchoredActionMenu, actionMenuGroupInset, placeActionMenuGroups } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
 import { actionMenuRows, visibleActionMenuRows } from '../../entry/src/main/ets/components/common/ActionMenuTree.ts';
+import { DEFAULT_DIALOG_BACKDROP_BLUR, FOCUSED_DIALOG_BACKDROP_BLUR } from '../../entry/src/main/ets/components/common/PopupAppearance.ts';
 import { deckMenuPlacement, centeredDeckMenuPlacement } from '../../entry/src/main/ets/model/DeckMenuPresentation.ts';
 import { HOME_SHORTCUTS, shortcutCommand } from '../../entry/src/main/ets/model/KeyboardShortcuts.ts';
 import { KeyboardPressSession } from '../../entry/src/main/ets/model/KeyboardInput.ts';
 import { safeMenuGeometry, keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 
-const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
+const read = path => menuPresentation(path,readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8'));
 const dictionaries = Object.fromEntries(['base', 'en_US'].map(locale => [locale,
   Object.fromEntries(JSON.parse(readFileSync(new URL('../../entry/src/main/resources/' + locale + '/element/string.json', import.meta.url), 'utf8')).string.map(item => [item.name, item.value]))]));
 function menuHarness(locale = 'base') {
   const tracker = new AppInterfaceTracker();
   const Menu = loadComponentLogic('components/home/HomeDeckRowMenu.ets', 'HomeDeckRowMenu', {
-    deviceInfo: {apiAvailable:()=>true}, deckMenuPlacement, centeredDeckMenuPlacement, WINDOW_SAFE_TOP_KEY: 'top', WINDOW_SAFE_BOTTOM_KEY: 'bottom', WINDOW_SAFE_LEFT_KEY: 'left', WINDOW_SAFE_RIGHT_KEY: 'right',
+    DEFAULT_DIALOG_BACKDROP_BLUR, FOCUSED_DIALOG_BACKDROP_BLUR, currentGlassSource:()=> 'home', deviceInfo: {apiAvailable:()=>true}, deckMenuPlacement, centeredDeckMenuPlacement, WINDOW_SAFE_TOP_KEY: 'top', WINDOW_SAFE_BOTTOM_KEY: 'bottom', WINDOW_SAFE_LEFT_KEY: 'left', WINDOW_SAFE_RIGHT_KEY: 'right',
     DECK_TONE_CHOICES, 牌组色调, 空牌组汇总, deckRowMenuItems, appInterface: tracker, actionMenuHostAnchor,
     interfaceItemText: loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceItemText', { APP_INTERFACE_SURFACES, ...uiFeedback }),
     ...uiFeedback,
@@ -440,7 +442,7 @@ test('pointer follows the selected column when colors open near either screen ed
     assert.ok(Math.abs(tipY - (placement.pointerSide === ActionMenuPointerSide.Top ? anchor.top + anchor.height : anchor.top)) <= 0.5,
       'the actual outline tip meets the selected border, including the half-stroke inset');
   }
-  const Shell = loadComponentLogic('components/common/AnchoredMenu.ets', 'AnchoredMenu', {
+  const Shell = loadSharedMenu('AnchoredMenu.ets', 'SharedAnchoredMenu', {
     应用尺寸: { compactMenuWidth: 136, 页面底部间距: () => 12 }, safeMenuGeometry
   });
   const shell = new Shell(); Object.assign(shell, { viewportHeight: 800, viewportTop: 0, topOffset: 430, maxHeight: 180 });
@@ -618,4 +620,42 @@ test('details more menu centers within safe phone and wide window with a row pre
     assert.ok(p.menu.top >= bounds.top);
     assert.ok(p.menu.top + p.menu.height <= bounds.top + bounds.height);
   }
+});
+
+
+test('details more uses the available viewport before its first content measurement', () => {
+  const { menu } = menuHarness();
+  Object.assign(menu, { centered: true, viewportHeight: 900, viewportWidth: 420, liftStarted: true });
+
+  const first = menu.placement();
+  assert.ok(first.menu.height > 620);
+  menu.measureMenuContent(620);
+  const measured = menu.placement();
+  assert.equal(measured.menu.height, 620);
+  assert.ok(measured.preview.top > first.preview.top);
+  menu.measureMenuContent(0);
+  assert.deepEqual(menu.placement(), measured);
+
+  menu.viewportHeight = 350;
+  const short = menu.placement();
+  assert.ok(short.menu.height < 620 && short.menu.height >= 48);
+  assert.ok(short.menu.top + short.menu.height <= 350 - 16);
+  menu.aboutToDisappear();
+});
+
+test('more and long press use strong page blur only in glass across window sizes',()=>{
+ for(const width of [360,1200])for(const material of ['flat','glass'])for(const centered of [false,true]){
+  const {menu,tracker}=menuHarness();menu.viewportWidth=width;menu.material=material;menu.centered=centered;
+  menu.publishInterface();
+  const radius=material==='glass'?FOCUSED_DIALOG_BACKDROP_BLUR:0;
+  assert.equal(menu.backdropBlurRadius(),radius);
+  assert.ok(FOCUSED_DIALOG_BACKDROP_BLUR>=DEFAULT_DIALOG_BACKDROP_BLUR*4);
+  assert.equal(tracker.snapshot().find(item=>item.surface==='deck_row_menu').values.find(value=>value.id==='backdrop_blur_radius').value,String(radius));
+  menu.point={x:100,y:200};assert.equal(menu.backdropBlurRadius(),0);
+  menu.aboutToDisappear();
+ }
+ const source=read('components/home/HomeDeckRowMenu.ets');
+ assert.match(source,/DialogBackdrop\(\{ blurRadius: this\.backdropBlurRadius\(\), tracksHierarchy: false \}\)/);
+ assert.doesNotMatch(source,/if \(!this\.centered/);
+ assert.doesNotMatch(source,/\.blur\(|\.backdropBlur\(/,'the shared page scrim owns blur, never menu or preview');
 });

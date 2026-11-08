@@ -2,14 +2,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadComponentLogic } from './platform-module-harness.mjs';
+import * as cloudDeckModel from '../../entry/src/main/ets/model/云端牌组模型.ts';
 import { CloudDeckImportController } from '../../entry/src/main/ets/model/CloudDeckImportController.ts';
+const decks = (...ids) => ids.map(id => ({ id, name: id, accessType: 'public', size: 1024 }));
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return{promise,resolve};};
 function harness(){
-  const events=[];let confirm=1, quota=true, acknowledged=true;
+  const events=[];let quota=true, acknowledged=true;
   const backend={清理残留下载:()=>events.push('cleanup'),加载目录:async()=>({decks:[]}),
     下载牌组:async(_,dir,deck)=>{events.push(['download',deck.id]);return deck.id;}};
   const Feature=loadComponentLogic('components/home/CloudDeckFeature.ets','CloudDeckFeature',{
-    $r:(key,...args)=>({key,args}),颜色键:{动作主色:'action'},云端牌组服务:class{constructor(){return backend;}},
+    ...cloudDeckModel,
+    $r:(key,...args)=>({key,args}),云端牌组服务:class{constructor(){return backend;}},
     云端牌组服务错误:class extends Error{},CloudDeckImportController,
     AppStorage:{get:()=>({filesDir:'sandbox'}),setOrCreate:()=>events.push('committed')},resourceText:(_,r)=>r.key,
     showToastSafely:(_,x)=>events.push(['toast',x.message]),
@@ -19,32 +22,33 @@ function harness(){
     标记已完成云端牌组引导:async()=>{events.push('acknowledge');return acknowledged;},
     pasteboard:{MIMETYPE_TEXT_PLAIN:'text',createData:(_,text)=>text,getSystemPasteboard:()=>({setData:async data=>events.push(['copy',data])})}
   });
-  const feature=new Feature();feature.getUIContext=()=>({getPromptAction:()=>({showDialog:async()=>({index:confirm})})});
-  feature.onClose=welcome=>events.push(['close',welcome]);feature.onImported=async()=>events.push('refresh');
+  const feature=new Feature();feature.getUIContext=()=>({});
+  feature.onClose=()=>events.push(['close']);feature.onImported=async()=>events.push('refresh');
   feature.onQuota=value=>events.push(['quotaValue',value]);
-  return{feature,backend,events,setConfirm:x=>{confirm=x;},setQuota:x=>{quota=x;},setAcknowledged:x=>{acknowledged=x;}};
+  return{feature,backend,events,setQuota:x=>{quota=x;},setAcknowledged:x=>{acknowledged=x;}};
 }
 test('cloud selection enforces three-deck limit while permitting deselection and excluding completed decks',()=>{
-  const {feature:f}=harness();for(const id of ['a','b','c','d'])f.切换云端牌组选择(id);
+  const {feature:f}=harness();f.云端牌组列表=decks('a','b','c','d','e');for(const id of ['a','b','c','d'])f.切换云端牌组选择(id);
   assert.deepEqual(f.云端牌组选中ID列表,['a','b','c']);f.切换云端牌组选择('b');f.切换云端牌组选择('d');
   assert.deepEqual(f.云端牌组选中ID列表,['a','c','d']);f.云端牌组成功ID列表=['e'];f.切换云端牌组选择('e');
   assert.deepEqual(f.云端牌组选中ID列表,['a','c','d']);
 });
 test('cloud imports public selection serially, preserves successes on retry, and completes after quota persistence',async()=>{
-  const h=harness(),f=h.feature;f.云端牌组列表=['a','b','c'].map(id=>({id,name:id,accessType:'public'}));
+  const h=harness(),f=h.feature;f.云端牌组列表=decks('a','b','c');
   f.云端牌组选中ID列表=['a','b'];let fail=true;
   h.backend.下载牌组=async(_,dir,deck)=>{if(deck.id==='b'&&fail)throw Error('offline');h.events.push(['download',deck.id]);return deck.id;};
   await f.下载选中云端牌组();assert.deepEqual(f.云端牌组成功ID列表,['a']);assert.deepEqual(f.云端牌组选中ID列表,['b']);
   assert.equal(h.events.some(e=>Array.isArray(e)&&e[0]==='close'),false);assert.ok(h.events.includes('quota'));
+  f.切换云端牌组选择('c');assert.deepEqual(f.云端牌组选中ID列表,['b']);
   fail=false;await f.下载选中云端牌组();assert.deepEqual(f.云端牌组成功ID列表,['a','b']);
   assert.equal(h.events.filter(e=>Array.isArray(e)&&e[0]==='import'&&e[1]==='a').length,1);
-  assert.deepEqual(h.events.at(-1),['close',true]);assert.equal(f.云端牌组忙碌,false);
+  assert.deepEqual(h.events.at(-1),['close']);assert.equal(f.云端牌组忙碌,false);
 });
 test('cloud skip requires explicit confirmation and persistence, while menu close never consumes quota',async()=>{
-  const h=harness();h.setConfirm(0);await h.feature.跳过云端牌组引导();assert.deepEqual(h.events,[]);
-  h.setConfirm(1);h.setAcknowledged(false);await h.feature.跳过云端牌组引导();assert.equal(h.events.some(e=>Array.isArray(e)&&e[0]==='close'),false);
-  h.setAcknowledged(true);await h.feature.跳过云端牌组引导();assert.deepEqual(h.events.at(-1),['close',true]);assert.equal(h.events.includes('quota'),false);
-  h.feature.云端牌组从菜单打开=true;await h.feature.跳过云端牌组引导();assert.deepEqual(h.events.at(-1),['close',false]);
+  const h=harness();h.feature.跳过云端牌组引导();h.feature.backChanged();assert.deepEqual(h.events,[]);
+  h.feature.跳过云端牌组引导();h.setAcknowledged(false);await h.feature.confirmSkip();assert.equal(h.events.some(e=>Array.isArray(e)&&e[0]==='close'),false);
+  h.setAcknowledged(true);await h.feature.confirmSkip();assert.deepEqual(h.events.at(-1),['close']);assert.equal(h.events.includes('quota'),false);
+  const menu=harness();menu.feature.云端牌组从菜单打开=true;await menu.feature.跳过云端牌组引导();assert.deepEqual(menu.events,[['close']]);
 });
 test('cloud catalog cleans temporary downloads and rejects results after feature disposal',async()=>{
   const h=harness(),pending=deferred();h.backend.加载目录=()=>pending.promise;const work=h.feature.加载云端牌组目录();
@@ -52,12 +56,13 @@ test('cloud catalog cleans temporary downloads and rejects results after feature
   assert.deepEqual(h.feature.云端牌组列表,[]);
 });
 test('exit confirmation is single flight and blocks downloads until it settles',async()=>{
-  const h=harness(),f=h.feature,pending=deferred();let prompts=0;
-  f.getUIContext=()=>({getPromptAction:()=>({showDialog:()=>{prompts++;return pending.promise;}})});
-  f.云端牌组列表=[{id:'a',name:'A',accessType:'public'}];f.云端牌组选中ID列表=['a'];
-  const work=f.跳过云端牌组引导();await f.跳过云端牌组引导();await f.下载选中云端牌组();
-  assert.equal(prompts,1);assert.equal(h.events.includes('prepare'),false);
-  pending.resolve({index:0});await work;assert.equal(f.exitPending,false);
+  const h=harness(),f=h.feature,pending=deferred();
+  f.云端牌组列表=decks('a');f.云端牌组选中ID列表=['a'];
+  f.跳过云端牌组引导();await f.下载选中云端牌组();assert.ok(!h.events.includes('prepare'));
+  h.setAcknowledged(pending.promise);
+  const work=f.confirmSkip();await f.confirmSkip();f.backChanged();await f.下载选中云端牌组();
+  assert.equal(h.events.filter(e=>e==='acknowledge').length,1);assert.equal(h.events.includes('prepare'),false);
+  pending.resolve(false);await work;assert.equal(f.exitPending,false);f.backChanged();
   await f.下载选中云端牌组();assert.ok(h.events.includes('prepare'));
 });
 
@@ -68,7 +73,7 @@ test('cloud completion cannot close without success, and clipboard uses the disp
 
 test('cloud skip persistence cannot close a disposed feature',async()=>{
   const h=harness(),pending=deferred(); h.setAcknowledged(pending.promise);
-  const work=h.feature.跳过云端牌组引导();
+  h.feature.跳过云端牌组引导();const work=h.feature.confirmSkip();
   await Promise.resolve(); h.feature.aboutToDisappear(); pending.resolve(true); await work;
   assert.ok(h.events.includes('acknowledge'));
   assert.equal(h.events.some(e=>Array.isArray(e)&&e[0]==='close'),false);
@@ -76,7 +81,7 @@ test('cloud skip persistence cannot close a disposed feature',async()=>{
 
 test('accepted cloud import finishes cleanup and quota after disposal without UI callbacks',async()=>{
   const h=harness(),pending=deferred(),f=h.feature;
-  f.云端牌组列表=[{id:'a',name:'A',accessType:'public'}]; f.云端牌组选中ID列表=['a'];
+  f.云端牌组列表=decks('a'); f.云端牌组选中ID列表=['a'];
   h.backend.下载牌组=()=>pending.promise;
   const work=f.下载选中云端牌组(); f.aboutToDisappear();
   pending.resolve('a'); await work;
@@ -86,4 +91,43 @@ test('accepted cloud import finishes cleanup and quota after disposal without UI
   assert.equal(h.events.includes('refresh'),false);
   assert.equal(h.events.some(e=>Array.isArray(e)&&['close','quotaValue','toast'].includes(e[0])),false);
   assert.deepEqual(f.云端牌组选中ID列表,['a']); assert.deepEqual(f.云端牌组成功ID列表,[]);
+});
+
+test('the first batch allows exactly 100 MB and rechecks size before touching the backend', async () => {
+  const {feature, events}=harness();
+  feature.云端牌组列表=decks('a','b','extra','unknown');
+  const limit=cloudDeckModel.CLOUD_DECK_MAX_BYTES;
+  feature.云端牌组列表[0].size=limit-1;
+  feature.云端牌组列表[1].size=1;
+  feature.云端牌组列表[2].size=1;
+  delete feature.云端牌组列表[3].size;
+  for (const id of ['a','b','extra','unknown']) feature.切换云端牌组选择(id);
+  assert.deepEqual(feature.云端牌组选中ID列表,['a','b']);
+  feature.云端牌组列表[1].size=2;
+  await feature.下载选中云端牌组();
+  assert.ok(!events.includes('prepare'));
+  feature.云端牌组列表[1].size=1;
+  await feature.下载选中云端牌组();
+  assert.deepEqual(feature.云端牌组成功ID列表,['a','b']);
+});
+
+test('fresh installation and unspent quota are both required for the cloud deck entry', async () => {
+  const {readFile} = await import('node:fs/promises');
+  const {stripTypeScriptTypes} = await import('node:module');
+  const moduleSource = await readFile(new URL('../../entry/src/main/ets/model/云端牌组引导存储.ets', import.meta.url), 'utf8');
+  const source=moduleSource.replace(/^import.*;\r?$/gm,'').replace(/^export /gm,'');
+  let fresh=true, spent=false;
+  const create=new Function('AppStorage','preferences','isFreshInstall','CLOUD_DECK_CHANNEL_ENABLED',
+    stripTypeScriptTypes(source)+'\nreturn isCloudDeckAvailable;');
+  const prefs={getPreferences:async()=>({get:async()=>spent})};
+  const context={get:()=>({})};
+  const available=create(context,prefs,async()=>fresh,true);
+  assert.equal(await available(),true);
+  fresh=false;
+  assert.equal(await available(),false);
+  fresh=true;
+  spent=true;
+  assert.equal(await available(),false);
+  spent=false;
+  assert.equal(await create(context,prefs,async()=>true,false)(),false);
 });

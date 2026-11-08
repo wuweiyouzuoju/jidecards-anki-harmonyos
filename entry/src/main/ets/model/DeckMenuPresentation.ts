@@ -21,7 +21,9 @@ export function deckMenuPlacement(anchor: DeckMenuRect, bounds: DeckMenuRect, pr
 export function centeredDeckMenuPlacement(bounds: DeckMenuRect, menuHeight: number, previewHeight: number = 64, previewWidth: number = 360): DeckMenuPlacement {
   const gap = 12;
   const height = Math.min(Math.max(32, previewHeight), Math.max(32, bounds.height - gap - 48));
-  const menuSize = Math.min(Math.max(48, menuHeight), Math.max(48, bounds.height - height - gap));
+  const available = Math.max(48, bounds.height - height - gap);
+  // 首帧先给内容可用高度，拿到实际尺寸后再将预览与菜单整体居中。
+  const menuSize = menuHeight > 0 ? Math.min(Math.max(48, menuHeight), available) : available;
   const width = Math.min(previewWidth, 360, bounds.width);
   const menuWidth = Math.min(280, bounds.width);
   const top = bounds.top + (bounds.height - height - gap - menuSize) / 2;

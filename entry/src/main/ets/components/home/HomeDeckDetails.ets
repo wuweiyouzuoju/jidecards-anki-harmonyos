@@ -8,6 +8,8 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
 import { DeckPreviewScopeMenu } from './DeckPreviewScopeMenu';
 import { DeckPreviewScope } from '../../model/DeckPreviewSession';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
+import { GlassSource } from '../common/GlassSource';
+import { GLASS_DECK_DETAILS_SOURCE } from '../../utils/GlassBackdrop';
 import { AnchoredMenu } from '../common/AnchoredMenu';
 import { MenuSlideScope } from '../../model/MenuSlideSession';
 import { HomeActionAnchor } from '../../model/HomeHeaderLayout';
@@ -37,8 +39,8 @@ export struct HomeDeckDetails {
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('publishInterface') private agentEnabled: boolean = false;
   private interfaceMounted: boolean = false;
   @State @Watch('publishInterface') private previewMenuOpen: boolean = false;
+  @State private previewMenuCloseRequest: number = 0;
   @State private actionAnchor: HomeActionAnchor = { left: 0, top: 0, width: 0 };
-  @State private detailsOrigin: HomeActionAnchor = { left: 0, top: 0, width: 0 };
   onBackHandlerChange: (handler: (() => boolean) | null) => void = (): void => {};
   onBack: () => void = (): void => {};
   onStudy: () => void = (): void => {};
@@ -95,7 +97,7 @@ export struct HomeDeckDetails {
 
   private consumeBack(): boolean {
     if (!this.previewMenuOpen) return false;
-    this.closePreviewMenu();
+    this.previewMenuCloseRequest++;
     return true;
   }
 
@@ -122,17 +124,6 @@ export struct HomeDeckDetails {
       width: Math.max(0, Number(area.width) - 2 * inset) };
   }
 
-  private detailsAreaChanged(area: Area): void {
-    this.detailsOrigin = { left: Number(area.globalPosition.x), top: Number(area.globalPosition.y),
-      width: Number(area.width) };
-  }
-
-  private menuAnchor(): HomeActionAnchor {
-    // 宽屏详情位于右侧分栏：窗口实测坐标只在宿主边界转换一次。
-    return { left: Math.max(0, this.actionAnchor.left - this.detailsOrigin.left),
-      top: Math.max(0, this.actionAnchor.top - this.detailsOrigin.top), width: this.actionAnchor.width };
-  }
-
   @Builder
   private previewScopes() {
     DeckPreviewScopeMenu({ slideScope: this.previewSlideScope, onSelect: (scope: DeckPreviewScope): void => { this.selectPreview(scope); } })
@@ -140,6 +131,7 @@ export struct HomeDeckDetails {
 
   build() {
     Stack() {
+      GlassSource({ sourceId: GLASS_DECK_DETAILS_SOURCE, freezeDuringPanels: true }) {
       Column() {
         if (this.compact) {
           Row() {
@@ -206,10 +198,11 @@ export struct HomeDeckDetails {
       .width('100%')
       .height('100%')
       .backgroundColor(Color.Transparent)
+      }
       if (this.previewMenuOpen && this.actionAnchor.width > 0) {
         AnchoredMenu({ menuWidth: Math.min(应用尺寸.compactMenuWidth, this.actionAnchor.width), alignEnd: true, slideScope: this.previewSlideScope,
-          contentLeft: this.menuAnchor().left, contentMaxWidth: this.actionAnchor.width,
-          topOffset: this.menuAnchor().top,
+          closeRequest: this.previewMenuCloseRequest,
+          toolbarBounds: this.actionAnchor,
           onClose: (): void => { this.closePreviewMenu(); } }) {
           this.previewScopes()
         }
@@ -217,6 +210,5 @@ export struct HomeDeckDetails {
     }
     .width('100%')
     .height('100%')
-    .onAreaChange((_old: Area, area: Area): void => { this.detailsAreaChanged(area); })
   }
 }

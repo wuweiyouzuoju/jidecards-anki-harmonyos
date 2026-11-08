@@ -3,6 +3,11 @@
 /** 云端牌组的访问方式；兑换码能力只保留协议位，本版本不负责兑换。 */
 export type 云端牌组访问类型 = 'public' | 'redeem_code';
 
+export const CLOUD_DECK_MAX_COUNT: number = 3;
+export const CLOUD_DECK_MAX_MB: number = 100;
+export const CLOUD_DECK_MAX_BYTES: number = CLOUD_DECK_MAX_MB * 1024 * 1024;
+export const CLOUD_DECK_QQ_GROUP: string = '726837065';
+
 /** 经过校验、可以交给界面和下载服务使用的目录条目。 */
 export interface 云端牌组目录项 {
   id: string;
@@ -20,6 +25,26 @@ export interface 云端牌组目录项 {
 export interface 云端牌组目录 {
   schemaVersion: number;
   decks: 云端牌组目录项[];
+}
+
+export type CloudDeckSelectionIssue = 'count' | 'size' | 'unavailable' | 'retry_only';
+
+export function cloudDeckSelectionIssue(decks: 云端牌组目录项[], ids: string[],
+  successIds: string[], failedIds: string[]): CloudDeckSelectionIssue | null {
+  if (ids.length + successIds.length > CLOUD_DECK_MAX_COUNT) return 'count';
+  const unique: Set<string> = new Set<string>();
+  let bytes: number = 0;
+  for (const id of successIds.concat(ids)) {
+    if (unique.has(id)) return 'unavailable';
+    unique.add(id);
+    const deck: 云端牌组目录项 | undefined = decks.find((item: 云端牌组目录项): boolean => item.id === id);
+    if (deck === undefined || deck.accessType !== 'public' || deck.size === undefined ||
+      !Number.isSafeInteger(deck.size) || deck.size <= 0) return 'unavailable';
+    bytes += deck.size;
+    if (bytes > CLOUD_DECK_MAX_BYTES) return 'size';
+  }
+  if (successIds.length > 0 && ids.some((id: string): boolean => failedIds.indexOf(id) < 0)) return 'retry_only';
+  return null;
 }
 
 interface 原始牌组目录项 {

@@ -11,26 +11,34 @@ const homePage = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets
 const studyGuide = readFileSync(new URL('../../entry/src/main/ets/components/StudyGuideDialog.ets', import.meta.url), 'utf8');
 function storeHarness(initial = [['welcome_shown', '2.7.0']]) {
   const values = new Map(initial);
-  const state = { fail: false };
+  const state = { fail: false, installTime: 100, updateTime: 100 };
   const store = {
     getSync: (key, fallback) => values.get(key) ?? fallback,
     putSync: (key, value) => values.set(key, value),
     flush: async () => { if (state.fail) throw new Error('disk full'); }
   };
   const body = source.slice(source.indexOf('const INTRO_KEY')).replaceAll('export ', '');
-  const api = new Function('AppStorage', 'preferences', stripTypeScriptTypes(body, { mode: 'transform' }) +
-    ';return { isHomeIntroCompleted, completeHomeIntro };')({ get: () => ({}) }, { getPreferencesSync: () => store });
+  const api = new Function('AppStorage', 'preferences', 'bundleManager', stripTypeScriptTypes(body, { mode: 'transform' }) +
+    ';return { isHomeIntroCompleted, completeHomeIntro };')({ get: () => ({}) }, { getPreferencesSync: () => store },
+    { BundleFlag: {}, getBundleInfoForSelf: async () => state });
   return { api, state, values };
 }
 
-test('new installs and existing welcome versions receive the introduction once after confirmation', async () => {
-  for (const initial of [[], [['welcome_shown', '2.7.0']]]) {
+test('fresh installs receive the introduction once after confirmation', async () => {
+  for (const initial of [[], [['home_intro_completed_v1', false]]]) {
     const { api, values } = storeHarness(initial);
     assert.equal(await api.isHomeIntroCompleted(), false);
-    assert.equal(values.get('welcome_shown'), initial[0]?.[1]);
+    assert.equal(values.get('home_intro_completed_v1'), initial[0]?.[1]);
     await api.completeHomeIntro();
     assert.equal(await api.isHomeIntroCompleted(), true);
   }
+});
+
+test('upgrades skip the introduction even without a completion marker', async () => {
+  const { api, state, values } = storeHarness([['welcome_shown', '2.7.0']]);
+  state.updateTime = 200;
+  assert.equal(await api.isHomeIntroCompleted(), true);
+  assert.equal(values.has('home_intro_completed_v1'), false);
 });
 
 test('real startup sequence presents unread introduction and skips it only after persisted confirmation', async () => {
@@ -71,39 +79,43 @@ async function panelHarness() {
   const model=await import('../../entry/src/main/ets/model/HomeIntro.ts');
   const saved=[], materials=[], views=[], failures=[];
   const state={fail:false};
-  const methods=['currentPage','movePage','selectAction','chooseExperience','chooseMaterial','publishInterface'].map(method).join('\n');
-  const names=['homeIntroPageIndex','homeIntroActionVisible','homeIntroBlocks','homeIntroTarget','HOME_INTRO_PAGES','HOME_INTRO_ACTIONS'];
-  const Panel=new Function(...names,'保存简洁模式','completeGlassSuggestion','showToastSafely','$r','appInterface',
+  const methods=['currentPage','movePage','readyToAdvance','choiceSelected','selectAction','chooseExperience','chooseMaterial','publishInterface'].map(method).join('\n');
+  const names=['homeIntroPageIndex','homeIntroActionVisible','homeIntroTarget','HOME_INTRO_PAGES','HOME_INTRO_ACTIONS'];
+  const Panel=new Function(...names,'保存简洁模式','completeGlassSuggestion','showToastSafely','$r','appInterface','INTRO_ABOUT_ITEMS',
     stripTypeScriptTypes(`class Panel { ${methods} }`,{mode:'transform'})+';return Panel;')(
       ...names.map(name=>model[name]),async value=>{saved.push(value);if(state.fail)throw Error('disk');},
-      async value=>{materials.push(value);if(state.fail)throw Error('disk');},(_ctx,value)=>failures.push(value),key=>key,{observe:value=>views.push(value)});
+      async value=>{materials.push(value);if(state.fail)throw Error('disk');},(_ctx,value)=>failures.push(value),key=>key,{observe:value=>views.push(value)},[]);
   const instance=new Panel();
-  Object.assign(instance,{pageIndex:0,isActive:true,savingMode:false,experienced:false,selectedStart:'',pendingAnswer:'',
-    text:key=>key,getUIContext:()=>({}),onStart(action){this.started=action;},onClose(){this.closed=true;},onDismiss(){this.dismissed=true;}});
+  Object.assign(instance,{pageIndex:0,answeredExperience:false,isActive:true,savingMode:false,experienced:false,selectedStart:'',pendingAnswer:'',
+    text:key=>key,getUIContext:()=>({}),onFinish(){this.finished=true;},onClose(){this.closed=true;},onDismiss(){this.dismissed=true;}});
   return {instance,saved,materials,views,failures,state,model};
 }
-test('all choices finish before the selected real action starts',async()=>{
-  for(const used of [false,true])for(const action of used?['start_sync','start_import','start_create']:['start_import','start_create']) {
-    const {instance,saved,materials}=await panelHarness();
+test('both experience paths reach About without a start-choice page',async()=>{
+  for(const used of [false,true]) {
+    const {instance,saved,materials,views}=await panelHarness();
+    instance.selectAction('next');assert.equal(instance.pageIndex,0);
+    await instance.chooseMaterial(false);assert.equal(instance.pageIndex,1);
     await instance.chooseExperience(used);assert.deepEqual(saved,[!used]);
-    instance.selectAction(action);assert.equal(instance.pageIndex,used?5:2);assert.equal(instance.started,undefined);
-    if(!used){for(const expected of [3,4,5]){instance.selectAction('next');assert.equal(instance.pageIndex,expected);assert.equal(instance.started,undefined);}}
-    assert.equal(instance.selectedStart,action);
-    await instance.chooseMaterial(false);assert.deepEqual(materials,[false]);assert.equal(instance.started,action);
+    assert.equal(instance.pageIndex,used?5:2);
+    const expected=used?[]:[3,4,5];
+    for(const page of expected){instance.selectAction('next');assert.equal(instance.pageIndex,page);}
+    instance.publishInterface();
+
+    assert.equal(views.at(-1).sectionId,'community');
+    assert.ok(views.at(-1).items.some(item=>item.id==='copy_qq'));
+    instance.selectAction('finish');assert.deepEqual(materials,[false]);assert.equal(instance.finished,true);
   }
 });
-test('save failure stays retryable, hidden sync is rejected, and returning preserves the selected route',async()=>{
-  const {instance,state,views}=await panelHarness();
-  state.fail=true;await instance.chooseExperience(true);assert.equal(instance.pageIndex,0);assert.equal(instance.savingMode,false);
-  assert.equal(views[0].busy,true);assert.ok(views[0].items.every(x=>!x.enabled));
-  state.fail=false;await instance.chooseExperience(false);
-  instance.selectAction('start_sync');assert.equal(instance.pageIndex,1);
-  instance.selectAction('start_create');assert.equal(instance.pageIndex,2);
-  for(let i=0;i<3;i++)instance.selectAction('next');
-  state.fail=true;await instance.chooseMaterial(true);assert.equal(instance.started,undefined);assert.equal(instance.pageIndex,5);
-  state.fail=false;for(let i=0;i<4;i++)instance.selectAction('previous');assert.equal(instance.pageIndex,1);assert.equal(instance.selectedStart,'start_create');
-  instance.selectAction('start_import');for(let i=0;i<3;i++)instance.selectAction('next');await instance.chooseMaterial(true);assert.equal(instance.started,'start_import');
-  instance.isActive=false;instance.started='';await instance.chooseMaterial(false);assert.equal(instance.started,'');
+test('save failures stay retryable and About goes back to the correct page',async()=>{
+  const {instance,state}=await panelHarness();
+  state.fail=true;await instance.chooseMaterial(true);assert.equal(instance.pageIndex,0);
+  state.fail=false;await instance.chooseMaterial(true);assert.equal(instance.pageIndex,1);
+  state.fail=true;await instance.chooseExperience(true);assert.equal(instance.pageIndex,1);
+  instance.selectAction('next');assert.equal(instance.pageIndex,1);
+  state.fail=false;await instance.chooseExperience(true);assert.equal(instance.pageIndex,5);
+  instance.selectAction('previous');assert.equal(instance.pageIndex,1);
+  instance.selectAction('previous');assert.equal(instance.pageIndex,0);
+  assert.equal(instance.finished,undefined);
 });
 test('closing the integrated introduction suppresses a second glass recommendation without changing material',async()=>{
   const start=homePage.indexOf('  private closeHomeIntro(startAction:');
@@ -143,13 +155,9 @@ test('home launches the selected domain only after completion has persisted',asy
   }
 });
 
-test('novices reuse practical original copy while experienced users skip teaching in both directions',async()=>{
-  const {homeIntroBlocks,homeIntroTarget,homeIntroActionVisible}=await import('../../entry/src/main/ets/model/HomeIntro.ts');
-  assert.equal(homeIntroBlocks(2,'start_create')[0].bodyKey,'home_intro_flashcards_body');
-  assert.equal(homeIntroBlocks(3,'start_create')[0].bodyKey,'home_intro_manual_body');
-  assert.equal(homeIntroBlocks(3,'start_import')[0].bodyKey,'home_intro_apkg_body');
-  assert.equal(homeIntroBlocks(4,'start_create')[0].bodyKey,'intro_novice_daily');
-  assert.equal(homeIntroTarget(1,true,true),5);assert.equal(homeIntroTarget(5,false,true),1);
-  assert.equal(homeIntroTarget(1,true,false),2);assert.equal(homeIntroTarget(5,false,false),4);
-  assert.equal(homeIntroActionVisible('next',3,false),true);assert.equal(homeIntroActionVisible('next',3,true),false);
+test('the six declared pages include About and omit the start-choice page',async()=>{
+  const {HOME_INTRO_PAGES,homeIntroTarget}=await import('../../entry/src/main/ets/model/HomeIntro.ts');
+  assert.deepEqual(HOME_INTRO_PAGES.map(page=>page.id),['appearance','experience','basics','prepare','review','community']);
+  assert.equal(homeIntroTarget(5,false,true),1);
+  assert.equal(homeIntroTarget(5,false,false),4);
 });

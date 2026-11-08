@@ -2,6 +2,8 @@
 
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { isFreshInstall } from '../utils/HomeIntroStore';
+import { CLOUD_DECK_CHANNEL_ENABLED } from './ReleaseFeatures';
 
 const 存储名: string = 'jidecards_settings';
 // 固定代际键：后续普通版本升级不得再次触发本次强制引导。
@@ -59,6 +61,11 @@ export async function 是否已完成云端牌组引导(): Promise<boolean> {
 /** 读取本机直链牌组下载配额是否已用尽；用尽后菜单入口隐藏。 */
 export async function 是否已用尽云端牌组下载配额(): Promise<boolean> {
   return await 读取标记(下载配额已用尽键);
+}
+
+/** 首页与 JIDE 共用新安装和未用配额条件。 */
+export async function isCloudDeckAvailable(): Promise<boolean> {
+  return CLOUD_DECK_CHANNEL_ENABLED && await isFreshInstall() && !await 是否已用尽云端牌组下载配额();
 }
 
 /** 标记首次云端牌组引导已完成；只有真正落盘后才允许进入软件。 */

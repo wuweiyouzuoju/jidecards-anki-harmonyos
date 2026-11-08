@@ -1,3 +1,4 @@
+import { glassPopupTriggerRect } from 'jide_foundation';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { GlassFusionRect } from 'jide_foundation';
 import { IconActionButton } from '../common/IconActionButton';
@@ -93,8 +94,8 @@ export struct HomeSummaryHeader {
       IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
         controlSize: this.geometry().controlHeight, controlWidth: this.geometry().controlWidth, controlGlyphSize: this.geometry().controlGlyphSize,
         slideMenu: true, onHoldOpen: this.onMoreHold, onHoldCancel: this.onMenusClose, onAction: this.onMore })
-        .onAreaChange((_old: Area, area: Area): void=>{this.onMoreAnchor({x:Number(area.globalPosition.x),y:Number(area.globalPosition.y),
-          width:Number(area.width),height:Number(area.height),radius:Math.min(应用尺寸.圆角_卡片,Number(area.width)/2,Number(area.height)/2)});})
+        .onAreaChange((_old: Area, area: Area): void=>{this.onMoreAnchor(glassPopupTriggerRect(Number(area.globalPosition.x),Number(area.globalPosition.y),
+          Number(area.width),Number(area.height),应用尺寸.圆角_卡片));})
   }
 
   @Builder
@@ -102,8 +103,8 @@ export struct HomeSummaryHeader {
       IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_new'), label: $r('app.string.create_deck'),
         controlSize: this.geometry().controlHeight, controlWidth: this.geometry().controlWidth, controlGlyphSize: this.geometry().controlGlyphSize,
         slideMenu: true, onHoldOpen: this.onCreateHold, onHoldCancel: this.onMenusClose, onAction: this.onCreate })
-        .onAreaChange((_old: Area, area: Area): void=>{this.onCreateAnchor({x:Number(area.globalPosition.x),y:Number(area.globalPosition.y),
-          width:Number(area.width),height:Number(area.height),radius:Math.min(应用尺寸.圆角_卡片,Number(area.width)/2,Number(area.height)/2)});})
+        .onAreaChange((_old: Area, area: Area): void=>{this.onCreateAnchor(glassPopupTriggerRect(Number(area.globalPosition.x),Number(area.globalPosition.y),
+          Number(area.width),Number(area.height),应用尺寸.圆角_卡片));})
   }
 
   @Builder

@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { common } from '@kit.AbilityKit';
-import { promptAction } from '@kit.ArkUI';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { 云端牌组服务, 云端牌组服务错误 } from '../../backend/云端牌组服务';
 import { 后端会话 } from '../../backend/后端会话';
 import { 执行牌组导入 } from '../../backend/数据迁移服务';
 import { CloudDeckImportController, CloudDeckImportBackend, CloudDeckImportProgress } from '../../model/CloudDeckImportController';
-import { 云端牌组目录, 云端牌组目录项 } from '../../model/云端牌组模型';
+import { CLOUD_DECK_MAX_COUNT, CLOUD_DECK_MAX_MB, CLOUD_DECK_QQ_GROUP, CloudDeckSelectionIssue,
+  cloudDeckSelectionIssue, 云端牌组目录, 云端牌组目录项 } from '../../model/云端牌组模型';
 import { 标记已完成云端牌组引导, 标记已用尽云端牌组下载配额 } from '../../model/云端牌组引导存储';
 import { 云端牌组弹窗 } from '../云端牌组弹窗';
-import { 颜色键 } from '../../model/颜色主题';
-const 云端牌组最多选择数量: number = 3;
 
 @Component
 export struct CloudDeckFeature {
@@ -19,8 +17,7 @@ export struct CloudDeckFeature {
   @Prop isDark: boolean = false;
   云端牌组从菜单打开: boolean = false;
   @Prop @Watch('backChanged') backRequest: number = 0;
-  @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
-  onClose: (welcome: boolean) => void = (_welcome: boolean): void => {};
+  onClose: () => void = (): void => {};
   onBusy: (busy: boolean) => void = (_busy: boolean): void => {};
   onQuota: (exhausted: boolean) => void = (_exhausted: boolean): void => {};
   onImported: () => Promise<void> = async (): Promise<void> => {};
@@ -31,6 +28,7 @@ export struct CloudDeckFeature {
   @State private 云端牌组加载中: boolean = false;
   @State @Watch('busyChanged') private 云端牌组忙碌: boolean = false;
   @State private exitPending: boolean = false;
+  @State private skipConfirmationOpen: boolean = false;
   @State private 云端牌组错误: string = '';
   @State private 云端牌组列表: 云端牌组目录项[] = [];
   @State private 云端牌组选中ID列表: string[] = [];
@@ -45,12 +43,17 @@ export struct CloudDeckFeature {
   aboutToAppear(): void { this.加载云端牌组目录(); }
   aboutToDisappear(): void { this.disposed = true; this.cloudCatalogVersion++; }
   private busyChanged(): void { if (!this.disposed) this.onBusy(this.云端牌组忙碌); }
-  private backChanged(): void { this.云端牌组弹窗按主按钮出口(); }
+  private backChanged(): void {
+    if (this.skipConfirmationOpen) {
+      if (!this.exitPending) this.skipConfirmationOpen = false;
+      return;
+    }
+    this.云端牌组弹窗按主按钮出口();
+  }
   private 取能力上下文(): common.UIAbilityContext | null {
     return AppStorage.get<common.UIAbilityContext>('abilityContext') ?? null;
   }
   private 显示提示(message: Resource, _locale: string = this.uiLanguage): void { if (!this.disposed) showToastSafely(this.getUIContext(), { message: resourceText(this.getUIContext(), message) }); }
-  private 取本地化文本(resource: Resource, _locale: string = this.uiLanguage): string { return resourceText(this.getUIContext(), resource); }
   private 云端牌组错误文案(error: Error, _locale: string = this.uiLanguage): string {
     let resource: Resource = $r('app.string.cloud_deck_load_failed');
     if (error instanceof 云端牌组服务错误) {
@@ -64,7 +67,7 @@ export struct CloudDeckFeature {
   }
 
   private async 加载云端牌组目录(): Promise<void> {
-    if (this.disposed || this.云端牌组忙碌 || this.exitPending) return;
+    if (this.disposed || this.云端牌组忙碌 || this.exitPending || this.云端牌组成功ID列表.length > 0) return;
     const version: number = ++this.cloudCatalogVersion;
     this.云端牌组加载中 = true;
     this.云端牌组错误 = '';
@@ -97,7 +100,7 @@ export struct CloudDeckFeature {
         this.显示提示($r('app.string.cloud_deck_save_failed'));
         return;
       }
-      this.onClose(!this.云端牌组从菜单打开);
+      this.onClose();
     } finally { if (!this.disposed) this.exitPending = false; }
   }
 
@@ -112,42 +115,31 @@ export struct CloudDeckFeature {
     this.跳过云端牌组引导();
   }
 
-  private async 跳过云端牌组引导(): Promise<void> {
+  private 跳过云端牌组引导(): void {
     if (this.disposed || this.云端牌组忙碌 || this.exitPending) return;
     if (this.云端牌组从菜单打开) {
-      this.onClose(!this.云端牌组从菜单打开);
-
+      this.onClose();
       return;
     }
+    this.skipConfirmationOpen = true;
+  }
+
+  private async confirmSkip(): Promise<void> {
+    if (this.disposed || !this.skipConfirmationOpen || this.云端牌组忙碌 || this.exitPending) return;
     this.exitPending = true;
     try {
-      try {
-        const result: promptAction.ShowDialogSuccessResponse =
-          await this.getUIContext().getPromptAction().showDialog({
-            title: this.取本地化文本($r('app.string.cloud_deck_skip_confirm_title')),
-            message: this.取本地化文本($r('app.string.cloud_deck_skip_confirm_message')),
-            buttons: [
-              { text: this.取本地化文本($r('app.string.cancel')), color: '#666666' },
-              { text: this.取本地化文本($r('app.string.cloud_deck_enter')), color: this.动作主色 }
-            ]
-          });
-        if (this.disposed || this.云端牌组忙碌 || result.index !== 1) return;
-      } catch (error) {
-        // 弹窗失败不阻断：留在原弹窗上，用户可以重新点「稍后再说」。
-        return;
-      }
       const 已保存: boolean = await 标记已完成云端牌组引导();
       if (this.disposed) return;
       if (!已保存) {
         this.显示提示($r('app.string.cloud_deck_save_failed'));
         return;
       }
-      this.onClose(true);
+      this.onClose();
     } finally { if (!this.disposed) this.exitPending = false; }
   }
 
   private async 复制云端牌组QQ群号(): Promise<void> {
-    const groupNumber: string = '726837065';
+    const groupNumber: string = CLOUD_DECK_QQ_GROUP;
     try {
       const data: pasteboard.PasteData =
         pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, groupNumber);
@@ -159,26 +151,32 @@ export struct CloudDeckFeature {
   }
 
   private 切换云端牌组选择(deckId: string): void {
-    if (this.disposed || this.exitPending || this.云端牌组忙碌 || this.云端牌组成功ID列表.indexOf(deckId) >= 0) return;
+    if (this.disposed || this.exitPending || this.skipConfirmationOpen || this.云端牌组忙碌 || this.云端牌组加载中 ||
+      this.云端牌组成功ID列表.indexOf(deckId) >= 0) return;
     const index: number = this.云端牌组选中ID列表.indexOf(deckId);
     if (index >= 0) {
       this.云端牌组选中ID列表 = this.云端牌组选中ID列表.filter(
         (id: string): boolean => id !== deckId);
       return;
     }
-    if (this.云端牌组选中ID列表.length >= 云端牌组最多选择数量) {
-      this.显示提示($r('app.string.cloud_deck_selection_limit', 云端牌组最多选择数量));
-      return;
-    }
-    this.云端牌组选中ID列表 = this.云端牌组选中ID列表.concat([deckId]);
+    const ids: string[] = this.云端牌组选中ID列表.concat([deckId]);
+    if (this.validateSelection(ids)) this.云端牌组选中ID列表 = ids;
+  }
+
+  private validateSelection(ids: string[]): boolean {
+    const issue: CloudDeckSelectionIssue | null = cloudDeckSelectionIssue(this.云端牌组列表, ids,
+      this.云端牌组成功ID列表, this.云端牌组失败ID列表);
+    if (issue === null) return true;
+    if (issue === 'count') this.显示提示($r('app.string.cloud_deck_selection_limit', CLOUD_DECK_MAX_COUNT));
+    else if (issue === 'size') this.显示提示($r('app.string.cloud_deck_size_limit', CLOUD_DECK_MAX_MB));
+    else if (issue === 'retry_only') this.显示提示($r('app.string.cloud_deck_retry_only'));
+    else this.显示提示($r('app.string.cloud_deck_size_unavailable'));
+    return false;
   }
 
   private async 下载选中云端牌组(): Promise<void> {
-    if (this.disposed || this.exitPending || this.云端牌组忙碌 || this.云端牌组选中ID列表.length === 0) return;
-    if (this.云端牌组选中ID列表.length > 云端牌组最多选择数量) {
-      this.显示提示($r('app.string.cloud_deck_selection_limit', 云端牌组最多选择数量));
-      return;
-    }
+    if (this.disposed || this.exitPending || this.skipConfirmationOpen || this.云端牌组忙碌 || this.云端牌组加载中 ||
+      this.云端牌组选中ID列表.length === 0 || !this.validateSelection(this.云端牌组选中ID列表)) return;
     const context: common.UIAbilityContext | null = this.取能力上下文();
     if (context === null) return;
 
@@ -249,6 +247,9 @@ export struct CloudDeckFeature {
       从菜单打开: this.云端牌组从菜单打开,
       loading: this.云端牌组加载中,
       busy: this.云端牌组忙碌 || this.exitPending,
+      confirmingSkip: this.skipConfirmationOpen,
+      onConfirmSkip: (): void => { this.confirmSkip(); },
+      onCancelSkip: (): void => { if (!this.exitPending) this.skipConfirmationOpen = false; },
       errorMessage: this.云端牌组错误,
       decks: this.云端牌组列表,
       selectedIds: this.云端牌组选中ID列表,

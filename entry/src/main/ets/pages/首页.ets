@@ -1,7 +1,6 @@
 import { insetMaterialFill } from '../utils/GlassMaterial';
 import { deckDetailShortcut, DeckDetailShortcut } from '../model/DeckDetailShortcut';
 import { 自定义学习预设 } from '../proto/messages/SchedulerMessages';
-import { GlassFusionRect } from 'jide_foundation';
 import { GlassSuggestionDialog } from '../components/home/GlassSuggestionDialog';
 import { GLASS_SUGGESTION_PENDING_KEY } from '../model/SurfaceMaterial';
 import { completeGlassSuggestion } from '../utils/SurfaceMaterialStore';
@@ -145,11 +144,13 @@ import { 应用主题 } from '../utils/主题控制器';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 可见牌组行 } from '../model/牌组层级';
 import { 检查节流标记, 获取节流奖励 } from '../utils/操作节流';
+import { 许可证面板 } from '../components/许可证面板';
+import { HomeSoftwareHelp } from '../components/home/HomeSoftwareHelp';
 import { HomeIntroPanel } from '../components/HomeIntroPanel';
 import { isHomeIntroCompleted, completeHomeIntro } from '../utils/HomeIntroStore';
 import {
   是否已完成云端牌组引导,
-  是否已用尽云端牌组下载配额
+  isCloudDeckAvailable
 } from '../model/云端牌组引导存储';
 import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时长';
 import { 当前语言模式 } from '../model/语言存储';
@@ -320,12 +321,12 @@ struct 首页 {
   // 公共菜单使用顶部按钮行的实测窗口锚点，详情分栏时仍对齐列表面板。
   @State private homeMoreCloseRequest: number = 0;
   @State private homeCreateCloseRequest: number = 0;
-  @State private homeMoreFusionAnchor: GlassFusionRect | undefined = undefined;
-  @State private homeCreateFusionAnchor: GlassFusionRect | undefined = undefined;
   @State private homeActionAnchor: HomeActionAnchor = { left: 0, top: 0, width: 0 };
   @State private homeMenuHostLeft: number = 0;
   @State private homeMenuHostTop: number = 0;
   @StorageProp(简洁模式AppStorage键) private homeSimpleMode: boolean = true;
+  @State private softwareLicensesOpen: boolean = false;
+  @State @Watch('homeActivityChanged') private softwareHelpOpen: boolean = false;
   @State @Watch('homeActivityChanged') private collectionHistoryOpen: boolean = false;
   @State @Watch('homeActivityChanged') private collectionHistoryBusy: boolean = false;
   @State private collectionHistoryBackRequest: number = 0;
@@ -422,7 +423,7 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 云端牌组忙碌: boolean = false;
   @State private cloudBackRequest: number = 0;
   private 打开云端牌组弹窗(从菜单打开: boolean): void {
-    if (!CLOUD_DECK_CHANNEL_ENABLED) return;
+    if (!CLOUD_DECK_CHANNEL_ENABLED || !this.cloudDeckAvailable) return;
     if (this.deferForSync((): void => this.打开云端牌组弹窗(从菜单打开))) return;
     this.云端牌组从菜单打开 = 从菜单打开;
     this.显示云端牌组弹窗 = true;
@@ -430,8 +431,7 @@ struct 首页 {
   @State @Watch('homeActivityChanged') private 显示云端牌组弹窗: boolean = false;
   // 打开来源：true 表示从右上角菜单进入，关闭即回首页；false 表示开机引导，关闭需二次确认。
   @State private 云端牌组从菜单打开: boolean = false;
-  // 本机直链牌组下载配额是否已用尽；用尽后菜单第 5 项隐藏，冷启动也不再弹引导。
-  @State private 云端牌组配额已用尽: boolean = false;
+  @State private cloudDeckAvailable: boolean = false;
   @State @Watch('homeActivityChanged') private 显示节流奖励: boolean = false;
   @State private 节流奖励文案: string = '';
   // 窄屏详情显隐（方案 C 2026-07-25）：点牌组后 true，根 Stack 内 牌组详情面板 盖住列表，替代推栈 NavDestination
@@ -547,7 +547,6 @@ struct 首页 {
       this.autoSyncStartupReady = true;
       this.homeActivityChanged();
     });
-    this.刷新云端牌组配额状态();
     this.homeActivityChanged();
   }
 
@@ -765,7 +764,7 @@ struct 首页 {
       collectionReady: 后端会话.获取实例().是否就绪() && this.加载状态 !== 'loading' && this.加载状态 !== 'error',
       collectionBusy: this.collectionHistoryBusy || this.autoSyncCollectionBusy || this.syncController.isRefreshing() || this.刷新中 || this.deckDeletionBusy ||
         (this.transfer.phase !== 'idle') || this.创建牌组中 || this.deckMoveBusy || this.deckRenameBusy || this.filteredDeckBusy || this.deckReorderBusy || this.deckOptionsBusy || this.云端牌组忙碌,
-      dialogOpen: this.deckMenuId !== '' || this.collectionHistoryOpen || this.显示官方公告 || this.显示欢迎弹窗 || this.显示云端牌组弹窗 || this.transfer.visible ||
+      dialogOpen: this.deckMenuId !== '' || this.collectionHistoryOpen || this.softwareHelpOpen || this.显示官方公告 || this.显示欢迎弹窗 || this.显示云端牌组弹窗 || this.transfer.visible ||
         this.显示牌组定制 || this.显示自定义学习 || this.显示过滤牌组面板 || this.显示牌组选项 ||
         this.显示创建牌组 || this.movingDeckId > 0 || this.renamingDeckId > 0 || this.显示主页操作 || this.显示更多菜单 || this.homeSearchOpen || this.显示节流奖励 ||
         this.显示卡片预览 || this.deckPreviewMenuOpen || this.autoSyncModal || this.fsrsPromptActive || this.nativeDialogOpen ||
@@ -998,7 +997,7 @@ struct 首页 {
       checkAnnouncement: (): Promise<boolean> => this.尝试显示官方公告(),
       activateAnnouncementChecks: (): void => { this.主页公告检查已激活 = OFFICIAL_ANNOUNCEMENTS_ENABLED; },
       cloudCompleted: async (): Promise<boolean> =>
-        !CLOUD_DECK_CHANNEL_ENABLED || await 是否已完成云端牌组引导(),
+        !CLOUD_DECK_CHANNEL_ENABLED || !await this.刷新云端牌组配额状态() || await 是否已完成云端牌组引导(),
       introCompleted: (): Promise<boolean> => isHomeIntroCompleted(),
       showCloud: (): void => this.打开云端牌组弹窗(false),
       showIntro: (): void => { this.显示欢迎弹窗 = true; }
@@ -1033,7 +1032,7 @@ struct 首页 {
       onPop: (): void => { this.返回主页后刷新(); } });
   }
 
-  /** 远程公告启用时先处理公告，再继续本地入门与幻彩提醒。 */
+  /** 先处理已启用的远程公告，再依次展示首页入门与首次牌组下载。 */
   private async 显示首次弹窗序列(): Promise<void> {
     await this.startupSequence.start(this.startupHost());
   }
@@ -1094,9 +1093,11 @@ struct 首页 {
     this.homeActivityChanged();
   }
 
-  /** 同步本机下载配额；读取失败按未用尽处理，避免用户平白丢失菜单入口。 */
-  private async 刷新云端牌组配额状态(): Promise<void> {
-    this.云端牌组配额已用尽 = await 是否已用尽云端牌组下载配额();
+  private async 刷新云端牌组配额状态(): Promise<boolean> {
+    const available: boolean = await isCloudDeckAvailable();
+    if (this.homeDisposed) return false;
+    this.cloudDeckAvailable = available;
+    return available;
   }
 
   /** 只有「我知道了」写入已读并关闭；先在当前进程内存抑制该 ID，持久化失败仅提示，仍关闭并继续原启动序列。 */
@@ -1132,13 +1133,6 @@ struct 首页 {
     });
   }
 
-  // 显示欢迎弹窗一次
-  // 只有用户确认才记录已读，避免表单占用或进程退出提前消耗入门机会。
-  private async 显示欢迎弹窗一次(): Promise<void> {
-    await this.startupSequence.welcome(this.startupHost());
-    this.homeActivityChanged();
-  }
-
   /** 用户确认后才记录入门已读，失败提示但不阻止进入应用。 */
   private homeIntroClosing: boolean = false;
   private closeHomeIntro(startAction: string = ''): void {
@@ -1165,6 +1159,8 @@ struct 首页 {
 
   /** 进入后台：取消尚未执行的公告延迟检查，返回前台由 onPageShow 重新协调。 */
   onPageHide(): void {
+    this.closeHomeActions();
+    this.homeSearchOpen = false;
     this.closeSyncChoice();
     this.暂停主页官方公告检查();
     this.syncStatusController.invalidate();
@@ -1212,7 +1208,9 @@ struct 首页 {
     if (this.collectionHistoryOpen) { this.collectionHistoryBackRequest++; return true; }
     if (this.显示更多菜单) { this.homeMoreCloseRequest++; return true; }
     if (this.显示节流奖励) { this.显示节流奖励 = false; return true; }
-    if (this.显示欢迎弹窗) { this.closeHomeIntro(); return true; }
+    if (this.softwareLicensesOpen) { this.softwareLicensesOpen = false; return true; }
+    if (this.softwareHelpOpen) { this.softwareHelpOpen = false; return true; }
+    if (this.显示欢迎弹窗) return true;
     if (this.deckDetailsBackHandler?.()) return true;
     if (this.预览加载中) {
       this.deckPreviewSession.invalidate();
@@ -2261,8 +2259,6 @@ struct 首页 {
               },
               onBrowser: (): void => { this.closeHomeActions(); this.打开浏览页(); },
               onMenusClose: (): void => { this.closeHomeActions(); },
-              onMoreAnchor: (rect: GlassFusionRect): void=>{this.homeMoreFusionAnchor=rect;},
-              onCreateAnchor: (rect: GlassFusionRect): void=>{this.homeCreateFusionAnchor=rect;},
               onMenuAnchor: (anchor: HomeActionAnchor): void => { this.homeActionAnchor = anchor; },
               })
             主页牌组列表({
@@ -2359,7 +2355,7 @@ struct 首页 {
           this.显示主页操作 = false;
           this.从选择器导入牌组();
         },
-        显示获取直链牌组: CLOUD_DECK_CHANNEL_ENABLED && !this.云端牌组配额已用尽,
+        显示获取直链牌组: this.cloudDeckAvailable,
         获取直链牌组回调: (): void => {
           this.显示主页操作 = false;
           this.打开云端牌组弹窗(true);
@@ -2375,9 +2371,9 @@ struct 首页 {
           if (this.homeActivity().collectionBusy || !this.homeActivity().collectionReady) return;
           this.显示更多菜单 = false; this.collectionHistoryOpen = true;
         },
-        onIntro: (): void => {
+        onSoftwareHelp: (): void => {
           this.显示更多菜单 = false;
-          this.显示欢迎弹窗 = true;
+          this.softwareHelpOpen = true;
         },
         设置回调: (): void => {
           this.显示更多菜单 = false;
@@ -2403,15 +2399,9 @@ struct 首页 {
     this.homeMenuHostTop = top;
   }
 
-  private homeMenuAnchor(): HomeActionAnchor {
-    // 标题栏或导航容器会移动宿主；窗口锚点在宿主边界只转成局部坐标一次。
-    return { left: Math.max(0, this.homeActionAnchor.left - this.homeMenuHostLeft),
-      top: Math.max(0, this.homeActionAnchor.top - this.homeMenuHostTop), width: this.homeActionAnchor.width };
-  }
-
   private homeMenuWidth(surface: string): number {
     const items = visibleInterfaceItems(surface, { simple: surface === 'home_create' ? this.homeSimpleMode : false,
-      agent: false, cloudDeck: CLOUD_DECK_CHANNEL_ENABLED && !this.云端牌组配额已用尽, themeHasTextures: false });
+      agent: false, cloudDeck: this.cloudDeckAvailable, themeHasTextures: false });
     const ui = this.getUIContext();
     let widest: number = 0;
     for (const item of items) {
@@ -2425,23 +2415,21 @@ struct 首页 {
   @Builder
   private homeMenus() {
     if (this.显示更多菜单 && this.homeActionAnchor.width > 0) {
-      AnchoredMenu({ fusionAnchor:this.homeMoreFusionAnchor, closeRequest:this.homeMoreCloseRequest, refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth('home_more'), slideScope: this.homeMoreSlideScope,
-        topOffset: this.homeMenuAnchor().top, contentLeft: this.homeMenuAnchor().left,
-        contentMaxWidth: this.homeActionAnchor.width, alignEnd: false, cornerRadius: 应用尺寸.圆角_卡片,
+      AnchoredMenu({ closeRequest:this.homeMoreCloseRequest, refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth('home_more'), slideScope: this.homeMoreSlideScope,
+        toolbarBounds: this.homeActionAnchor, alignEnd: false,
         onClose: (): void => { this.closeHomeActions(); } }) {
         this.homeMoreMenu()
       }
     }
     if (this.显示主页操作 && this.homeActionAnchor.width > 0) {
-      AnchoredMenu({ fusionAnchor:this.homeCreateFusionAnchor, closeRequest:this.homeCreateCloseRequest, refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth('home_create'), slideScope: this.homeCreateSlideScope,
-        topOffset: this.homeMenuAnchor().top, contentLeft: this.homeMenuAnchor().left,
-        contentMaxWidth: this.homeActionAnchor.width, alignEnd: true, cornerRadius: 应用尺寸.圆角_卡片,
+      AnchoredMenu({ closeRequest:this.homeCreateCloseRequest, refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth('home_create'), slideScope: this.homeCreateSlideScope,
+        toolbarBounds: this.homeActionAnchor, alignEnd: true,
         onClose: (): void => { this.closeHomeActions(); } }) {
         this.homeCreateMenu()
       }
     }
     if (this.deckMenuId !== '' && this.按ID查牌组(this.deckMenuId).id !== '') {
-      HomeDeckRowMenu({ centered: this.deckMenuFromDetails, refractionSource: GLASS_HOME_SOURCE, deck: this.按ID查牌组(this.deckMenuId), liftAnchor: this.deckLiftAnchor, deckId: this.deckMenuId, point: this.deckMenuPoint, tone: this.按ID查牌组(this.deckMenuId).tone,
+      HomeDeckRowMenu({ centered: this.deckMenuFromDetails, refractionSource: this.deckMenuFromDetails ? '' : GLASS_HOME_SOURCE, deck: this.按ID查牌组(this.deckMenuId), liftAnchor: this.deckLiftAnchor, deckId: this.deckMenuId, point: this.deckMenuPoint, tone: this.按ID查牌组(this.deckMenuId).tone,
         deckName: this.按ID查牌组(this.deckMenuId).fullName,
         filtered: this.按ID查牌组(this.deckMenuId).filtered === true, busy: this.filteredDeckBusy,
         backRequest: this.deckMenuBackRequest, onClose: (): void => { this.deckMenuId = ''; this.deckMenuPoint = undefined; },
@@ -2505,6 +2493,10 @@ struct 首页 {
 
   @Builder
   private homeFeatures() {
+    if (this.softwareHelpOpen) {
+      HomeSoftwareHelp({ isDark: this.是否深色(), onClose: (): void => { this.softwareHelpOpen = false; },
+        onOpenLicenses: (): void => { this.softwareLicensesOpen = true; } })
+    }
     if (this.collectionHistoryOpen) {
       CollectionHistoryDialog({ backRequest: this.collectionHistoryBackRequest,
         onBusy: (busy: boolean): void => { this.collectionHistoryBusy = busy; },
@@ -2579,16 +2571,15 @@ struct 首页 {
       CloudDeckFeature({ isDark: this.是否深色(), 云端牌组从菜单打开: this.云端牌组从菜单打开,
         backRequest: this.cloudBackRequest,
         onBusy: (busy: boolean): void => { this.云端牌组忙碌 = busy; },
-        onQuota: (exhausted: boolean): void => { this.云端牌组配额已用尽 = exhausted; },
+        onQuota: (exhausted: boolean): void => { if (exhausted) this.cloudDeckAvailable = false; },
         onImported: async (): Promise<void> => {
           const before: Set<string> = new Set(this.主页快照数据.decks.map((deck: 牌组汇总): string => deck.id));
           await this.加载主页数据();
           if (!this.homeDisposed) { this.展开新导入牌组(before); this.requestAutoSync(); }
         },
-        onClose: (welcome: boolean): void => {
+        onClose: (): void => {
           this.显示云端牌组弹窗 = false; this.云端牌组忙碌 = false;
           this.返回主页后刷新();
-          if (welcome) this.显示欢迎弹窗一次();
         }
       })
     }
@@ -2606,9 +2597,6 @@ struct 首页 {
       })
     }
 
-    // 首次启动欢迎弹窗：放最顶层，确保覆盖所有浮层
-    //   关闭时持久化入门已读标记（不会在展示时提前标记，
-    //   这里仅关闭状态；即使弹窗未显示也已标记，保证「只弹一次」语义）
     if (this.显示卡片预览) {
       卡片预览页({
         isDark: this.是否深色(),
@@ -2626,11 +2614,13 @@ struct 首页 {
     }
 
     if (this.显示欢迎弹窗) {
-      HomeIntroPanel({
-        onStart: (action: string): void => { this.closeHomeIntro(action); },
-        onClose: (): void => { this.closeHomeIntro(); },
-        onDismiss: (): void => { this.closeHomeIntro(); }
+      HomeIntroPanel({ isDark: this.是否深色(),
+        onFinish: (): void => { this.closeHomeIntro(); },
+        onOpenLicenses: (): void => { this.softwareLicensesOpen = true; }
       })
+    }
+    if (this.softwareLicensesOpen) {
+      许可证面板({ isDark: this.是否深色(), onClose: (): void => { this.softwareLicensesOpen = false; } })
     }
 
 

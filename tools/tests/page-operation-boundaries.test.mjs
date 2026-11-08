@@ -87,13 +87,15 @@ function homeHarness(announcementsEnabled = true) {
   const events = [], interfaceTracker = new AppInterfaceTracker();
   const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'homeActionControls', 'publishHomeInterface', 'homeActivityChanged', 'startupHost',
     '尝试显示官方公告', '尝试展示待展示官方公告', '请求主页官方公告检查', '暂停主页官方公告检查',
-    '继续首次弹窗序列', '显示欢迎弹窗一次', 'closeHomeIntro', 'onBackPress', 'autoSyncCollectionFinished', 'presentPendingSyncWarning'], {
+    '继续首次弹窗序列', 'closeHomeIntro', 'onBackPress', 'autoSyncCollectionFinished', 'presentPendingSyncWarning'], {
     canPresentHomePrompt, announcementLocale, bundleManager: { BundleFlag: {}, getBundleInfoForSelf: async () => ({ versionName: 'test' }) },
     后端会话: { 获取实例: () => ({ 是否就绪: () => true }) }, 当前语言模式: () => 'zh',
     是否已确认官方公告: async () => false, 是否已完成云端牌组引导: async () => false,
     CLOUD_DECK_CHANNEL_ENABLED: false, OFFICIAL_ANNOUNCEMENTS_ENABLED: announcementsEnabled,
     appInterface: interfaceTracker, isDoubleColumnDeckListStyle, homeSyncIndicator, homeSyncLabelKey,
-    isHomeIntroCompleted: async () => false, completeHomeIntro: async () => events.push('welcome-persist'),
+    isHomeIntroCompleted: async () => events.includes('welcome-persist'),
+    completeHomeIntro: async () => events.push('welcome-persist'),
+    completeGlassSuggestion: async () => {},
     官方公告检查延迟毫秒: () => 600000,
     externalDeckOpens: new ExternalDeckOpenQueue(),
     AppStorage: { get() {}, setOrCreate() {} },
@@ -114,7 +116,8 @@ function homeHarness(announcementsEnabled = true) {
     syncForeground: true, 页面栈: { size: () => 0 }, 主页允许公告检查: true, 加载状态: 'ready',
     startupSequence: new HomeStartupSequence(), homeWork: new HomeWorkCoordinator(new ExternalDeckOpenQueue(), { schedule: fn => { const id = ++next; timers.set(id, { fn, delay: 0 }); return id; }, cancel: id => timers.delete(id) }), 官方公告延迟检查任务: -1, 主页公告检查已激活: true,
     官方公告服务实例: { 加载公告: () => response.promise }, 显示官方公告: false,
-    scheduleAutoSyncCheck() { events.push('sync-check'); }, flushSyncAction() {}, presentDeckWidthHint: () => false,
+    scheduleAutoSyncCheck() { events.push('sync-check'); }, flushSyncAction() {},
+    presentGlassSuggestion: () => false, presentDeckWidthHint: () => false,
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {},
     打开云端牌组弹窗() { page.显示云端牌组弹窗 = true; events.push('cloud'); }
   });
@@ -141,8 +144,8 @@ test('home startup wake waits for the active preference read instead of continua
     const host = page.startupHost();
     host[stage + 'Completed'] = () => { reads++; return gate.promise; };
     page.startupHost = () => host;
-    const pending = stage === 'cloud' ? page.startupSequence.continue(host) :
-      page.startupSequence.welcome(host);
+    if (stage === 'cloud') host.introCompleted = async () => true;
+    const pending = page.startupSequence.continue(host);
     page.homeActivityChanged();
     tick(); await settle();
     assert.equal(reads, 1);
@@ -251,7 +254,7 @@ test('startup skips disabled cloud downloads and defers intro behind the active 
   assert.deepEqual(events, []);
   page.显示创建牌组 = false; page.homeActivityChanged(); tick(); await settle();
   assert.equal(page.显示欢迎弹窗, true);
-  assert.equal(page.startupSequence.hasPending(), false);
+  assert.equal(page.startupSequence.hasPending(), true);
   assert.deepEqual(events.filter(e => e === 'cloud'), []);
   page.homeActivityChanged(); tick(); await settle();
   assert.equal(page.显示欢迎弹窗, true);
@@ -260,14 +263,18 @@ test('startup skips disabled cloud downloads and defers intro behind the active 
 
 test('welcome marker is not consumed while another dialog prevents presentation', async () => {
   const { page, events, tick } = homeHarness();
-  page.显示创建牌组 = true; await page.显示欢迎弹窗一次();
+  const host = page.startupHost();
+  host.cloudCompleted = async () => false;
+  page.startupHost = () => host;
+  page.显示创建牌组 = true; await page.继续首次弹窗序列();
   assert.equal(page.startupSequence.hasPending(), true); assert.deepEqual(events, []);
   page.显示创建牌组 = false; page.homeActivityChanged(); tick(); await settle();
   assert.equal(page.显示欢迎弹窗, true);
   assert.deepEqual(events.filter(e => e === 'welcome-persist'), []);
   page.closeHomeIntro(); await settle();
   assert.equal(page.显示欢迎弹窗, false);
-  assert.deepEqual(events.filter(e => e === 'welcome-persist'), ['welcome-persist']);
+  tick(); await settle();
+  assert.deepEqual(events.filter(e => e === 'welcome-persist' || e === 'cloud'), ['welcome-persist', 'cloud']);
 });
 
 test('back cannot remove an active transaction form', () => {

@@ -152,17 +152,17 @@ test('startup resume reports progress only after a pending phase actually runs',
   assert.equal(await h.sequence.resume(h.host), false);
   h.allow(false); await h.sequence.continue(h.host);
   assert.equal(await h.sequence.resume(h.host), false);
-  h.allow(true); h.host.cloudCompleted = () => gate.promise;
+  h.allow(true); h.host.introCompleted = () => gate.promise;
   const active = h.sequence.resume(h.host);
   assert.equal(await h.sequence.resume(h.host), false);
   gate.resolve(false);
   assert.equal(await active, true);
-  assert.deepEqual(h.events, ['cloud']);
+  assert.deepEqual(h.events, ['intro']);
   h.sequence.dispose();
   assert.equal(await h.sequence.resume(h.host), false);
 });
 
-test('initial announcement precedes cloud and intro; repeated start and disposed checks never replay', async () => {
+test('initial announcement precedes the intro; repeated start and disposed checks never replay', async () => {
   for (const found of [false, true]) {
     for (const disposed of [false, true]) {
       const h = startupHarness(), gate = deferred(); let checks = 0;
@@ -171,29 +171,38 @@ test('initial announcement precedes cloud and intro; repeated start and disposed
       assert.equal(checks, 1); assert.deepEqual(h.events, []);
       if (disposed) h.sequence.dispose();
       gate.resolve(found); await initial;
-      assert.deepEqual(h.events, found || disposed ? [] : ['cloud']);
+      assert.deepEqual(h.events, found || disposed ? [] : ['intro']);
       if (found && !disposed) {
-        await h.sequence.continue(h.host); assert.deepEqual(h.events, ['cloud']);
+        await h.sequence.continue(h.host); assert.deepEqual(h.events, ['intro']);
       }
     }
   }
 });
 
-test('startup defers cloud guide behind active UI, then shows intro only after cloud completion', async () => {
+test('startup waits for intro confirmation and an idle home before checking and presenting cloud decks', async () => {
   const h = startupHarness(); h.allow(false);
+  let cloudReads = 0;
+  h.host.cloudCompleted = async () => { cloudReads++; return false; };
   await h.sequence.continue(h.host); assert.deepEqual(h.events, []);
   h.allow(true); await h.sequence.resume(h.host); await h.sequence.resume(h.host);
-  assert.deepEqual(h.events, ['cloud']);
-  h.allow(true); await h.sequence.welcome(h.host);
-  assert.deepEqual(h.events, ['cloud', 'intro']);
+  assert.deepEqual(h.events, ['intro']);
+  assert.equal(cloudReads, 0);
+  assert.equal(h.sequence.hasPending(), true);
+  h.host.introCompleted = async () => true;
+  assert.equal(await h.sequence.resume(h.host), false);
+  h.allow(true); await h.sequence.resume(h.host);
+  assert.deepEqual(h.events, ['intro', 'cloud']);
+  assert.equal(cloudReads, 1);
+  assert.equal(h.sequence.hasPending(), false);
 });
 
 test('preference reads coalesce; background and disposal reject late presentation', async () => {
   for (const kind of ['cloud', 'intro']) {
     for (const disposed of [false, true]) {
       const h = startupHarness(), gate = deferred(); let reads = 0;
+      if (kind === 'cloud') h.host.introCompleted = async () => true;
       h.host[kind === 'cloud' ? 'cloudCompleted' : 'introCompleted'] = () => { reads++; return gate.promise; };
-      const call = () => kind === 'cloud' ? h.sequence.continue(h.host) : h.sequence.welcome(h.host);
+      const call = () => h.sequence.continue(h.host);
       const first = call(); await call(); assert.equal(reads, 1);
       if (disposed) h.sequence.dispose(); else h.allow(false);
       gate.resolve(false); await first; assert.deepEqual(h.events, []);
@@ -205,14 +214,15 @@ test('preference reads coalesce; background and disposal reject late presentatio
 
 test('failed preference reads release busy state and remain retryable; completed intro is not shown', async () => {
   const h = startupHarness();
+  h.host.introCompleted = async () => true;
   h.host.cloudCompleted = async () => { throw new Error('disk'); };
   await assert.rejects(h.sequence.continue(h.host), /disk/);
-  h.host.cloudCompleted = async () => true; h.host.introCompleted = async () => true;
+  h.host.cloudCompleted = async () => true;
   await h.sequence.resume(h.host);
   assert.deepEqual(h.events, []); assert.equal(h.sequence.hasPending(), false);
 });
 
-test('startup ends after completed intro without consulting retired gift preferences or presenting another popup', async () => {
+test('startup ends when both guides are completed, without consulting retired gift preferences', async () => {
   const h=startupHarness();
   h.host.cloudCompleted=async()=>true; h.host.introCompleted=async()=>true;
   h.host.giftCompleted=async()=>assert.fail('retired gift preferences must not be read');

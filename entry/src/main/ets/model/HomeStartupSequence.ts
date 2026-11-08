@@ -18,12 +18,10 @@ export class HomeStartupSequence {
   private started: boolean = false;
   private continuationPending: boolean = false;
   private continuationRunning: boolean = false;
-  private introPending: boolean = false;
-  private introRunning: boolean = false;
   private disposed: boolean = false;
 
   hasPending(): boolean {
-    return this.continuationPending || this.continuationRunning || this.introPending || this.introRunning;
+    return this.continuationPending || this.continuationRunning;
   }
 
   /** 首次检查结束前不读取引导偏好；有公告时由确认事件继续序列。 */
@@ -38,10 +36,8 @@ export class HomeStartupSequence {
 
   /** 已在读取或被弹层阻挡时不推进；宿主不能把这种立即返回当作完成并再次唤醒。 */
   async resume(host: HomeStartupHost): Promise<boolean> {
-    if (this.disposed || this.continuationRunning || this.introRunning || !host.canPresent()) return false;
-    if (this.continuationPending) await this.continue(host);
-    else if (this.introPending) await this.welcome(host);
-    else return false;
+    if (this.disposed || !this.continuationPending || this.continuationRunning || !host.canPresent()) return false;
+    await this.continue(host);
     return true;
   }
 
@@ -51,36 +47,24 @@ export class HomeStartupSequence {
     if (this.continuationRunning || !host.canPresent()) return;
     this.continuationRunning = true;
     try {
-      const completed: boolean = await host.cloudCompleted();
+      const introCompleted: boolean = await host.introCompleted();
+      if (this.disposed || !host.canPresent()) return;
+      // 欢迎页写入已读并关闭后，首页协调器才会继续检查牌组引导。
+      if (!introCompleted) {
+        host.showIntro();
+        return;
+      }
+      const cloudCompleted: boolean = await host.cloudCompleted();
       if (this.disposed || !host.canPresent()) return;
       this.continuationPending = false;
-      if (!completed) host.showCloud();
-      else await this.welcome(host);
+      if (!cloudCompleted) host.showCloud();
     } finally {
       this.continuationRunning = false;
-    }
-  }
-
-  async welcome(host: HomeStartupHost): Promise<void> {
-    if (this.disposed) return;
-    this.introPending = true;
-    if (this.introRunning) return;
-    this.introRunning = true;
-    try {
-      const shown: boolean = await host.introCompleted();
-      if (this.disposed) return;
-      if (shown) { this.introPending = false; return; }
-      if (!host.canPresent()) return;
-      this.introPending = false;
-      host.showIntro();
-    } finally {
-      this.introRunning = false;
     }
   }
 
   dispose(): void {
     this.disposed = true;
     this.continuationPending = false;
-    this.introPending = false;
   }
 }

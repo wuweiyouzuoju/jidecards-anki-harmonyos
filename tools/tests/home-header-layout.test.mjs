@@ -1,8 +1,9 @@
+import {loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { homeHeaderGeometry, homeSummaryGeometry, homeSummaryStacksMetrics } from '../../entry/src/main/ets/model/HomeHeaderLayout.ts';
-import { safePopupContentHeight, safeMenuGeometry, windowSafeInsets, safeDialogMaxHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
+import { safePopupContentHeight, safeMenuGeometry, keyboardViewportHeight, windowSafeInsets, safeDialogMaxHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 import { searchHomeDecks } from '../../entry/src/main/ets/model/HomeDeckSearch.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { readFileSync } from 'node:fs';
@@ -115,10 +116,10 @@ test('the real window owner publishes the union in vp and the shared anchored me
   assert.equal(values.get('height'),400);
   ability.主窗口.getWindowAvoidArea=()=>{throw Error('temporarily unavailable');};
   ability.同步规避区高度();assert.equal(values.get('safeTop'),26,'temporary errors preserve the last known safe edge');
-  const Menu=loadComponentLogic('components/common/AnchoredMenu.ets','AnchoredMenu',{
+  const Menu=loadSharedMenu('AnchoredMenu.ets','SharedAnchoredMenu',{
     ...keys,safeMenuGeometry,应用尺寸:{compactMenuWidth:104,页面底部间距:narrow=>narrow?8:12}
   });
-  const menu=new Menu();Object.assign(menu,{viewportHeight:400,safeTop:26,safeBottom:12,topOffset:0});
+  const menu=new Menu();Object.assign(menu,{viewportHeight:400,safeTop:26,safeBottom:12,topOffset:0,bottomGap:12});
   assert.deepEqual(menu.menuGeometry(),{top:38,maxHeight:338});
   menu.topOffset=100;assert.deepEqual(menu.menuGeometry(),{top:100,maxHeight:276});
   Object.assign(menu,{safeTop:80,topOffset:56,viewportTop:200});
@@ -190,15 +191,17 @@ const decks = [
 
 test('both home menus retain the button gap when their host has a title bar or navigation offset', () => {
   const page=readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets',import.meta.url),'utf8');
-  const methods=['homeMenuHostChanged','homeMenuAnchor'].map(name=>{
+  const methods=['homeMenuHostChanged'].map(name=>{
     const start=page.indexOf(`  private ${name}(`);
     assert.ok(start>=0);
     return page.slice(start,page.indexOf('\n  }',start)+4);
   }).join('\n');
   const Host=new Function(stripTypeScriptTypes(`class Host { ${methods} }`,{mode:'transform'})+';return Host;')();
-  const menuInputs=[...page.matchAll(/topOffset: ([^,\n]+), contentLeft: ([^,\n]+)/g)];
-  assert.equal(menuInputs.length,2,'both menus retain the original measured button anchors');
-  const evaluate=(expression,host)=>new Function('return '+expression).call(host);
+  const menuInputs=[...page.matchAll(/toolbarBounds: this.homeActionAnchor, alignEnd: (false|true)/g)];
+  assert.deepEqual(menuInputs.map(match=>match[1]),['false','true']);
+  const Menu=loadSharedMenu('AnchoredMenu.ets','SharedAnchoredMenu',{
+    MenuSlideScope:class{},Scroller:class{},应用尺寸:dimensions,safeMenuGeometry,keyboardViewportHeight
+  });
   for(const narrow of [false,true]) for(const width of [240,768]) for(const inset of [0,24])
     for(const origin of [{x:0,y:0},{x:0,y:36},{x:140,y:80}]) {
       const host=new Host();let closed=0;
@@ -212,13 +215,13 @@ test('both home menus retain the button gap when their host has a title bar or n
       header.updateAnchor({width,globalPosition:{x:origin.x+12,y:origin.y+buttonTop}});
       const gap=dimensions.页面内容顶部间距(narrow);
       const buttonHeight=homeHeaderGeometry(width,dimensions.页面分组间距(narrow),true,dimensions.按钮高度).controlHeight;
-      for(const [,top,left] of menuInputs) {
-        const localTop=evaluate(top,host),localLeft=evaluate(left,host);
-        assert.equal(localTop,buttonTop+buttonHeight+gap,'the title bar is not added a second time');
-        assert.equal(localLeft,12,'navigation offsets are not added a second time');
-        const geometry=safeMenuGeometry(600,localTop,inset,24,dimensions.页面底部间距(narrow));
-        assert.equal(origin.y+geometry.top-(origin.y+buttonTop+buttonHeight),gap,
-          'normal/compact layouts with and without safety insets keep exactly one content gap');
+      for(const [,alignEnd] of menuInputs) {
+        const menu=new Menu();
+        Object.assign(menu,{toolbarBounds:host.homeActionAnchor,alignEnd:alignEnd==='true',
+          viewportLeft:origin.x,viewportTop:origin.y,viewportWidth:width+24,viewportHeight:600,
+          safeTop:origin.y+inset,safeBottom:24,narrowDeckLayout:narrow});
+        assert.equal(menu.panelLeft(),12+(menu.alignEnd?width-menu.menuWidth:0));
+        assert.equal(menu.menuGeometry().top,buttonTop+buttonHeight+gap);
       }
       host.homeMenuHostChanged({globalPosition:{x:origin.x+1,y:origin.y+1}});
       assert.equal(closed,changes+1,'moving the host closes stale menus');
@@ -256,7 +259,8 @@ test('home uses grouped small icon buttons and public menus while summary pages 
   assert.match(header,/if \(this.actionsVisible\) \{ this.actions\(\) \}\s*if \(this.showSummary\) \{ this.summaryCard\(\) \}/);
   assert.doesNotMatch(header,/bindPopup|enableArrow|MenuSurface/);
   assert.equal((header.match(/IconActionButton\(\{/g) ?? []).length, 6);
-  assert.equal((read('pages/首页.ets').match(/cornerRadius: 应用尺寸.圆角_卡片/g) ?? []).length,2);
+  assert.match(read('components/common/AnchoredMenu.ets'), /SharedAnchoredMenu\(/);
+  assert.match(sharedSource('harmony/shared/AnchoredMenu.ets'), /radius: this.toolbarBounds === undefined \? this.cornerRadius : SharedMenuTokens.toolbarRadius/);
   assert.match(read('components/common/IconActionButton.ets'),/this.usesSquareSurface\(\) \? 应用尺寸.圆角_卡片 : this.controlSize \/ 2/);
   assert.doesNotMatch(header, /\.scale\(/);
   assert.doesNotMatch(header, /caption|Text\(\$r\('app.string/);

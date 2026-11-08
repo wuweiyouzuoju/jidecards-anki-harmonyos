@@ -84,9 +84,10 @@ test('rapid toggles snapshot inputs, serialize disk writes and retain latest sta
 
 test('page restores before loading, saves all expansion mutations and does not expand on automatic selection', async () => {
   let saved = { expanded: new Set(), known: initial().known }, failLoad = false;
-  const writes = [], warnings = [];
+  const writes = [], warnings = [], layoutSettles = [], visibleRows = [];
   const Page = componentMethods(home, ['restoreHomeDeckExpansion', 'persistHomeDeckExpansion',
     '切换牌组展开', '递归切换牌组', '展开牌组路径', '尝试恢复上次牌组'], {
+    GLASS_HOME_SOURCE: 'home-source', settleGlassSourceLayout: source => layoutSettles.push(source),
     loadHomeDeckExpansion: () => { if (failLoad) throw new Error('unavailable'); return saved; },
     saveHomeDeckExpansion: async state => { writes.push(encodeHomeExpansion(state)); },
     可见牌组行: all => all, 加载上次牌组ID: async () => 'child',
@@ -94,7 +95,7 @@ test('page restores before loading, saves all expansion mutations and does not e
   });
   const page = Object.assign(new Page(), {
     homeExpansionLoaded: false, 牌组展开已初始化: false, 已知牌组ID集合: new Set(),
-    主页快照数据: { decks }, 牌组数据源: { replaceAll() {} }, 隐藏的牌组ID集合: new Set(),
+    主页快照数据: { decks }, 牌组数据源: { replaceVisible: rows => visibleRows.push(rows) }, 隐藏的牌组ID集合: new Set(),
     上次牌组已恢复: false, 按ID查牌组: id => decks.find(deck => deck.id === id)
   });
   let expanded = new Set();
@@ -120,6 +121,9 @@ test('page restores before loading, saves all expansion mutations and does not e
   const before = writes.length;
   page.restoreHomeDeckExpansion(); page.切换牌组展开('parent');
   assert.equal(writes.length, before); assert.equal(warnings.length, 1);
+  assert.deepEqual(layoutSettles, Array(5).fill('home-source'));
+  assert.equal(visibleRows.length, 5);
+  assert.ok(visibleRows.every(rows => rows === decks));
   assert.match(home, /@State @Watch\('persistHomeDeckExpansion'\) private 展开的牌组ID集合/);
   assert.match(home, /aboutToAppear\(\): void \{\s*this\.restoreHomeDeckExpansion\(\)/);
   assert.ok(home.indexOf('this.已知牌组ID集合 = expansion.known') < home.indexOf('this.展开的牌组ID集合 = expansion.expanded'));
@@ -136,6 +140,9 @@ test('compact details hide the underlying home without destroying list state or 
         breakpoint === 'xs' && open ? 'hidden' : 'visible');
     }
   }
-  assert.match(home, /Stack\(\) \{\s*this\.homeLayout\(\)/);
+  assert.match(home, /GlassSource\(\{ sourceId: GLASS_HOME_SOURCE, freezeDuringPanels: true, previewWarm: this\.glassSuggestionPending \}\) \{\s*this\.homeLayout\(\)/);
+  const build = home.slice(home.indexOf('  build() {'));
+  assert.ok(build.indexOf('this.homeMenus()') > build.indexOf('this.compactDeckDetails()'));
+  assert.match(build, /this\.compactDeckDetails\(\)\s*\}\s*this\.homeMenus\(\)/, 'menus stay outside the captured content');
   assert.match(layout, /onBreakpointChange/);
 });

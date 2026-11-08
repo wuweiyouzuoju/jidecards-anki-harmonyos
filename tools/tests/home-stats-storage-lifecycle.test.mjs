@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
+import { DEFAULT_MODULE_OPACITY } from '../../entry/src/main/ets/model/SurfaceMaterial.ts';
 import { appInterfaceDependencies } from './app-interface-harness.mjs';
 
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
@@ -192,7 +193,7 @@ test('shared background decoder closes the file and releases both source and pix
 function reminderPageHarness() {
   const state={settings:[],saveError:false,refreshError:false,saves:[],refreshes:0};
   const Page=loadComponentLogic('pages/学习提醒页.ets','学习提醒页',{
-    ...appInterfaceDependencies(),加载学习提醒设置:async()=>({提醒项列表:state.settings}),
+    ...appInterfaceDependencies(),DEFAULT_MODULE_OPACITY,加载学习提醒设置:async()=>({提醒项列表:state.settings}),
     保存学习提醒设置:async items=>{if(state.saveError)throw Error('save');state.settings=items;state.saves.push(items);},
     刷新学习提醒:async()=>{state.refreshes++;if(state.refreshError)throw Error('publish');},
     生成提醒项ID:()=>5,首次引导通知设置:async()=>{}

@@ -16,7 +16,7 @@ export struct 主页更多面板 {
   onHistory: () => void = (): void => {};
   统计回调: () => void = (): void => {};
   提醒回调: () => void = (): void => {};
-  onIntro: () => void = (): void => {};
+  onSoftwareHelp: () => void = (): void => {};
 
   private menuItems(): AppInterfaceItem[] {
     return visibleInterfaceItems('home_more', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false });
@@ -35,7 +35,7 @@ export struct 主页更多面板 {
       case 'history': return $r('app.media.ic_study_undo');
       case 'stats': return $r('app.media.ic_home_stats');
       case 'reminders': return $r('app.media.ic_home_reminders');
-      case 'intro': return $r('app.media.ic_study_guide');
+      case 'software_help': return $r('app.media.ic_study_guide');
       default: return undefined;
     }
   }
@@ -47,7 +47,7 @@ export struct 主页更多面板 {
       case 'history': this.onHistory(); break;
       case 'stats': this.统计回调(); break;
       case 'reminders': this.提醒回调(); break;
-      case 'intro': this.onIntro(); break;
+      case 'software_help': this.onSoftwareHelp(); break;
     }
   }
 
