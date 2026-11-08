@@ -74,7 +74,7 @@ function fixture() {
   });
   const Tools = loadPlatformModule('backend/agent/AgentAppSettingsTools.ets', 'AgentAppSettingsTools', {
     buildAgentAppStructure, appInterface: views, themeDefinition,
-    AI_AGENT_CHANNELS_APP_STORAGE_KEY: 'aiAgentChannelsEnabled', CLOUD_DECK_CHANNEL_ENABLED: false, APP_FOREGROUND_KEY: 'appForeground',
+    AI_AGENT_CHANNELS_APP_STORAGE_KEY: 'aiAgentChannelsEnabled', isCloudDeckAvailable: async () => false, APP_FOREGROUND_KEY: 'appForeground',
     agentSettingDefinitions, decodeSettingsArguments, requestedThemeMode, isAppThemeMode, AgentToolSchemaError,
     appThemeSession: themes, appThemeColorSession: colors, THEME_CATALOG, isThemeAvailable, UNLOCKED_CONTENTS_KEY, isThemeId,
     createAgentAction, readFsrsEnabled, agentPreferenceDefinitions, buildAgentDeckSettings, customSchedulingInfo,

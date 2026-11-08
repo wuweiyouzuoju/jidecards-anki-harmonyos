@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { glassDistance, glassSample, glassMesh, glassTexturePoint, glassFrostAlpha } from '../../../记得系列基础/src/core/GlassOptics.ts';
+import { glassDistance, glassSample, glassMesh, glassTexturePoint, glassFrostAlpha } from '../vendor/jide-foundation/src/core/GlassOptics.ts';
 test('玻璃折射保持中心、边缘向内采样且左右对称', () => {
   assert.deepEqual(glassSample(100, 40, 200, 80, 20, 14, 9), {x:100,y:40});
   const left=glassSample(1,40,200,80,20,14,9),right=glassSample(199,40,200,80,20,14,9);

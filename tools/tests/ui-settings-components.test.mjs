@@ -169,7 +169,7 @@ test('directory and same-semantic setting entries have one row, icon and spacing
   assert.doesNotMatch(row, /padding\(\{ left:|margin\(|offset\(/, 'host owns horizontal gutters and safe areas');
   assert.doesNotMatch(row, /\.height\(/, 'long content must grow');
   assert.match(read('components/common/ActionIcon.ets'), /glyphSize: number = 18/);
-  assert.match(readFileSync(new URL('../../../记得系列基础/src/harmony/shared/ActionIcon.ets', import.meta.url), 'utf8'), /\.width\(this.glyphSize\)\.height\(this.glyphSize\)\.flexShrink\(0\)/);
+  assert.match(readFileSync(new URL('../vendor/jide-foundation/src/harmony/shared/ActionIcon.ets', import.meta.url), 'utf8'), /\.width\(this.glyphSize\)\.height\(this.glyphSize\)\.flexShrink\(0\)/);
   assert.match(read('components/common/MenuItem.ets'), /ActionIcon\(\{/);
   for (const name of readdirSync(new URL('components/settings/', root)).filter(name => name.endsWith('.ets'))) {
     const source = read('components/settings/' + name);

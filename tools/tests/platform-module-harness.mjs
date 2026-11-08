@@ -1,3 +1,4 @@
+import { DEFAULT_MODULE_OPACITY, DEFAULT_BUTTON_OPACITY } from '../../entry/src/main/ets/model/SurfaceMaterial.ts';
 import { AiContentExportPolicy } from '../../entry/src/main/ets/model/AiContentExportPolicy.ts';
 import { noteLinkBridgeScript } from '../../entry/src/main/ets/model/NoteLinkBridge.ts';
 import { NoteLinksProxy } from '../../entry/src/main/ets/model/NoteLinksProxy.ts';
@@ -24,14 +25,14 @@ function memoryAiContentPolicy() {
 }
 
 // 系列按压核心直接执行；产品只注入当前动效偏好。
-const sharedPressSource = readFileSync(new URL('../../../记得系列基础/src/harmony/shared/PressFeedback.ets', import.meta.url), 'utf8')
+const sharedPressSource = readFileSync(new URL('../vendor/jide-foundation/src/harmony/shared/PressFeedback.ets', import.meta.url), 'utf8')
   .replace(/^export /gm, '');
 const SharedPressFeedback = new Function(stripTypeScriptTypes(sharedPressSource, { mode: 'transform' }) + ';return SharedPressFeedback;')();
 
 // Public popup renderer is executed, not a test double.
-const popupCoreSource = readFileSync(new URL('../../../记得系列基础/src/core/PopupAppearance.ts', import.meta.url), 'utf8').replace(/^export /gm, '');
+const popupCoreSource = readFileSync(new URL('../vendor/jide-foundation/src/core/PopupAppearance.ts', import.meta.url), 'utf8').replace(/^export /gm, '');
 const popupCore = new Function(stripTypeScriptTypes(popupCoreSource, {mode:'transform'}) + ';return {popupAppearance, dialogPanelFill};')();
-const surfaceSource = readFileSync(new URL('../../../记得系列基础/src/harmony/shared/Surface.ets', import.meta.url), 'utf8')
+const surfaceSource = readFileSync(new URL('../vendor/jide-foundation/src/harmony/shared/Surface.ets', import.meta.url), 'utf8')
   .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
 function popupSurfaceClass(dependencies) {
   return new Function(...Object.keys(popupCore), 'Color', 'BlurStyle', stripTypeScriptTypes(surfaceSource, {mode:'transform'}) + ';return SharedPopupSurface;')
@@ -65,6 +66,7 @@ export function nativeDialogMembers(source, excluded = []) {
 
 function localeDependencies(dependencies) {
   return {
+    DEFAULT_MODULE_OPACITY, DEFAULT_BUTTON_OPACITY,
     SharedPressFeedback, SharedPopupSurface: popupSurfaceClass(dependencies), $r: key => key, noteLinkBridgeScript, NoteLinksProxy, ...appLocales, ...localeFormatting, SUMMARY_LABEL_KEYS, DialogButtonDirection: { AUTO: 'auto' },
     MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight, AgentTaskPlan, KeyboardPressSession, StudyKeyboardSession: KeyboardPressSession,
     NativeDialogHost: nativeDialogHostClass(dependencies), aiContentExportPolicy: memoryAiContentPolicy(),

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { readFileSync } from 'node:fs';
 import { loadComponentLogic, loadPlatformSource } from './platform-module-harness.mjs';
-import * as geometry from '../../../记得系列基础/src/core/MenuLayout.ts';
-export const sharedSource = path => readFileSync(new URL('../../../记得系列基础/src/' + path, import.meta.url), 'utf8');
+import * as geometry from '../vendor/jide-foundation/src/core/MenuLayout.ts';
+export const sharedSource = path => readFileSync(new URL('../vendor/jide-foundation/src/' + path, import.meta.url), 'utf8');
 const {GLASS_POPUP_ENTER_MS,GLASS_MENU_ENTER_MS} = loadPlatformSource(sharedSource('core/GlassFusion.ts'), '({GLASS_POPUP_ENTER_MS,GLASS_MENU_ENTER_MS})', {});
 export const menuTypes = loadPlatformSource(sharedSource('harmony/shared/MenuTypes.ets'),
   '({sharedMenuTheme,sharedMenuScope,SharedMenuTokens})', {});
 export function loadSharedMenu(file, name, dependencies = {}) {
-  return loadComponentLogic(new URL('../../../记得系列基础/src/harmony/shared/' + file, import.meta.url), name, {
+  return loadComponentLogic(new URL('../vendor/jide-foundation/src/harmony/shared/' + file, import.meta.url), name, {
     ...geometry, ...menuTypes, GLASS_POPUP_ENTER_MS,GLASS_MENU_ENTER_MS,
     Curve: {EaseOut: 'ease-out'}, TransitionEffect: {IDENTITY: {}},
     TextAlign: {Start:'start',Center:'center'}, ...dependencies

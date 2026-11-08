@@ -107,7 +107,7 @@ test('a content-only shell clears old highlights as well as fill and border befo
 test('popup trigger snapshots expire and can only be consumed once',()=>{
  const source=readFileSync(new URL('../../entry/src/main/ets/utils/PopupTrigger.ets',import.meta.url),'utf8')+'\nexport const triggerApi = { rememberPopupTrigger, takePopupTrigger };';
  let now=100;
- const {glassPopupTriggerRect}=loadPlatformSource(readFileSync(new URL('../../../记得系列基础/src/core/GlassFusion.ts',import.meta.url),'utf8'),'({glassPopupTriggerRect})',{});
+ const {glassPopupTriggerRect}=loadPlatformSource(readFileSync(new URL('../vendor/jide-foundation/src/core/GlassFusion.ts',import.meta.url),'utf8'),'({glassPopupTriggerRect})',{});
  const api=loadPlatformSource(source,'triggerApi',{Date:{now:()=>now},Math,Number,glassPopupTriggerRect});
  api.rememberPopupTrigger({width:80,height:44,globalPosition:{x:300,y:40}});
  assert.deepEqual(api.takePopupTrigger(),{x:300,y:40,width:80,height:44,radius:16});

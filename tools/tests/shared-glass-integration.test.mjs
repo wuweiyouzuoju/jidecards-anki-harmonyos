@@ -4,7 +4,7 @@ import {loadSharedMenu, sharedSource} from './shared-menu-harness.mjs';
 import assert from 'node:assert/strict';
 import { surfaceMotionApi } from './motion-harness.mjs';
 import { loadComponentLogic } from './platform-module-harness.mjs';
-import { glassContour, glassMesh, glassDistance, glassSample } from '../../../记得系列基础/src/core/GlassOptics.ts';
+import { glassContour, glassMesh, glassDistance, glassSample } from '../vendor/jide-foundation/src/core/GlassOptics.ts';
 import { actionMenuBubbleOutline, ActionMenuPointerSide } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
 function panel({api=23, source='body'}={}) {
   const timers=new Map(); let next=0, entries=0, prepared=0;
@@ -62,7 +62,7 @@ test('all four arrow contours drive the same optical field as their exact shared
 test('native glass node rebuilds its mesh only for optical geometry, never repeated layout or translation', async()=>{
   const {readFileSync}=await import('node:fs');
   const {loadPlatformSource}=await import('./platform-module-harness.mjs');
-  const source=readFileSync(new URL('../../../记得系列基础/src/harmony/shared/GlassBackdrop.ets',import.meta.url),'utf8');
+  const source=readFileSync(new URL('../vendor/jide-foundation/src/harmony/shared/GlassBackdrop.ets',import.meta.url),'utf8');
   const code=source.slice(source.indexOf('class GlassRenderNode extends'),source.indexOf('class GlassController extends'));
   let builds=0;
   const Node=loadPlatformSource(code,'GlassRenderNode',{
@@ -310,7 +310,7 @@ test('expanding child panels never replays an already prepared parent entrance',
 test('fusion paints the unwarped original button after its complete glass mesh',async()=>{
  const {readFileSync}=await import('node:fs');
  const {loadPlatformSource}=await import('./platform-module-harness.mjs');
- const source=readFileSync(new URL('../../../记得系列基础/src/harmony/shared/GlassBackdrop.ets',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../vendor/jide-foundation/src/harmony/shared/GlassBackdrop.ets',import.meta.url),'utf8');
  const code=source.slice(source.indexOf('class GlassRenderNode extends'),source.indexOf('class GlassController extends'));
  const calls=[];
  class Brush { setAntiAlias(){} setColor(){} setShaderEffect(){} }
