@@ -110,6 +110,7 @@ export type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSe
 
 @Component
 export struct 卡片表格 {
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Prop @Watch('同步行数据源') 行列表: 浏览行数据[] = [];
@@ -222,14 +223,14 @@ export struct 卡片表格 {
   }
 
   private rowBackground(row: 浏览行数据): ResourceColor {
-    if (!this.traditionalLayout) return $r('app.color.surface_card');
+    if (!this.traditionalLayout) return insetMaterialFill($r('app.color.surface_card'), this.surfaceMaterial);
     if (row.id === this.focusedId || this.选中IDs.includes(row.id)) return $r('app.color.surface_selected');
     const flag: string = this.取行标志色(row);
     if (flag !== 'transparent') return `#33${flag.substring(1)}`;
     if (row.color === BrowserRowColor.COLOR_MARKED) return $r('app.color.browser_row_marked');
     if (row.color === BrowserRowColor.COLOR_SUSPENDED) return $r('app.color.browser_row_suspended');
     if (row.color === BrowserRowColor.COLOR_BURIED) return $r('app.color.browser_row_buried');
-    return $r('app.color.surface_card');
+    return insetMaterialFill($r('app.color.surface_card'), this.surfaceMaterial);
   }
 
   /** 暂停状态独立于旗标颜色，用于弱化行背景。 */

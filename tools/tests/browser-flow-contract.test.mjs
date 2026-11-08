@@ -149,8 +149,6 @@ test('browser keeps editing in the dedicated editor and exposes both row routes'
   assert.match(page, /name: 'EditNotePage', param: params/);
   const click=page.slice(page.indexOf('private 行点击处理('),page.indexOf('// T5 打开预览'));
   assert.match(click,/this\.打开预览\(行ID\)/);
-  // Both routes are executed by browser-traditional.test.mjs; width alone never changes the mode.
-  assert.doesNotMatch(click,/browserWidth/);
   assert.match(page, /this.openEditPage\(卡片ID, false\)/);
   assert.doesNotMatch(page, /浏览编辑区\(/);
   const editor=read('entry/src/main/ets/pages/EditNotePage.ets');

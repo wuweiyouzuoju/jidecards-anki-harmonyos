@@ -1,3 +1,4 @@
+import {menuPresentation,loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -128,7 +129,7 @@ test('Back closes the popup before exiting selection; explicit exit clears the m
 });
 
 test('batch and study reuse the same marking popup, flag choices and viewport-limited scroll surface', () => {
-  const read = file => readFileSync(new URL('../../entry/src/main/ets/'+file,import.meta.url),'utf8');
+  const read = file => menuPresentation(file,readFileSync(new URL('../../entry/src/main/ets/'+file,import.meta.url),'utf8'));
   const menu = read(path), page = read('pages/浏览页.ets'), surface = read('components/common/AnchoredMenu.ets');
   assert.match(menu,/CardActionMenu\(\{ items: this.entries\(\), menuWidth: 应用尺寸.cardActionMenuWidth, topOffset: this.topOffset/);
   assert.match(menu,/flagMenuChoices\(/); assert.doesNotMatch(menu,/Scroll\(|\.height\(|\.padding\(/);

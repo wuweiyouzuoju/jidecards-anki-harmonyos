@@ -16,6 +16,8 @@ export struct BrowserMoreMenu {
   @Prop @Watch('publishInterface') traditionalMode: boolean = false;
   onTraditional: () => void = (): void => {};
   @Prop @Watch('publishInterface') subtitleIndex: number = 1;
+  @Prop toolbarRight: number | undefined = undefined;
+  @Prop toolbarBottom: number | undefined = undefined;
   @Prop topOffset: number = 68;
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
   @State private menuCloseRequest: number = 0;
@@ -105,7 +107,8 @@ export struct BrowserMoreMenu {
   }
 
   build() {
-    CardActionMenu({ items: this.entries(), menuWidth: 应用尺寸.cardActionMenuWidth, topOffset: this.topOffset, closeRequest: this.menuCloseRequest,
+    CardActionMenu({ items: this.entries(), menuWidth: 应用尺寸.cardActionMenuWidth, topOffset: this.topOffset,
+      toolbarRight: this.toolbarRight, toolbarBottom: this.toolbarBottom, closeRequest: this.menuCloseRequest,
       expandedIds: this.expandedIds,
       onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleBranch(item.id ?? ''); },
       onClose: (): void => { this.onClose(); },

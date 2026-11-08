@@ -160,6 +160,8 @@ export struct 浏览页 {
   @State private collectionHistoryBackRequest: number = 0;
   private resetSelection: BrowserOperationContext | null = null;
   @State private showMoreMenu: boolean = false;
+  @State private browserMoreRight: number | undefined = undefined;
+  @State private browserMoreBottom: number | undefined = undefined;
   @State private moreBackRequest: number = 0;
   @State private showBatchMenu: boolean = false;
   @State private showViewMenu: boolean = false;
@@ -186,6 +188,7 @@ export struct 浏览页 {
   @State private ignoreAccents: boolean = false;
   private preferencesLoaded: boolean = false;
   @State private browserWidth: number = 0;
+  private wideEditorOpened: boolean = false;
   @State @Watch('handleBrowserPreferenceBoundary') private inlineEditorId: number = 0;
   @State private inlineEditorIsNote: boolean = false;
   @State private inlineEditorBackRequest: number = 0;
@@ -528,6 +531,7 @@ export struct 浏览页 {
       this.行列表 = rows;
       this.consumedRowCount = consumed;
       this.阶段 = 'list';
+      this.openInitialWideEditor();
     } catch (error) {
       if (version !== this.searchVersion) { return; }
       this.错误详情 = error instanceof Error ? error.message : `${error}`;
@@ -585,9 +589,16 @@ export struct 浏览页 {
     });
   }
 
+  private openInitialWideEditor(): void {
+    if (this.browserWidth < 1000 || this.wideEditorOpened || this.阶段 !== 'list' ||
+      this.focusedRowId <= 0 || !this.browserVisible || this.显示预览 || this.多选模式值 || this.批量忙碌) return;
+    this.openEditPage(this.focusedRowId, this.浏览模式值 === 'notes');
+  }
+
   private openEditPage(id: number, isNote: boolean): void {
     if (!this.operations.isAlive() || this.mutationBusy || this.editingPageOpen) return;
     if (this.browserWidth >= 1000 || this.inlineEditorId > 0) {
+      if (this.browserWidth >= 1000) this.wideEditorOpened = true;
       if (this.inlineEditorId === id && this.inlineEditorIsNote === isNote) return;
       if (this.inlineEditorId > 0) {
         this.pendingEditorId = id; this.pendingEditorIsNote = isNote; this.inlineEditorBackRequest++;
@@ -608,11 +619,11 @@ export struct 浏览页 {
     this.执行搜索(true);
   }
 
-  // 传统模式点击行直接编辑；现有模式继续先预览。
+  // 宽屏分栏和传统模式点击行直接编辑。
   private 行点击处理(行ID: number): void {
     if (!this.operations.isAlive() || this.mutationBusy || this.批量忙碌 || this.多选模式值) return;
     this.focusedRowId = 行ID;
-    if (this.browserPreferences.traditionalMode) this.openEditPage(行ID, this.浏览模式值 === 'notes');
+    if (this.browserWidth >= 1000 || this.browserPreferences.traditionalMode) this.openEditPage(行ID, this.浏览模式值 === 'notes');
     else this.打开预览(行ID);
   }
 
@@ -1796,7 +1807,8 @@ export struct 浏览页 {
   @Builder
   private browserMoreMenu() {
     if (this.showMoreMenu) {
-      BrowserMoreMenu({ filterActive: this.browserFilterActive(), available: this.viewControlsAvailable(),
+      BrowserMoreMenu({ toolbarRight: this.browserMoreRight, toolbarBottom: this.browserMoreBottom,
+        filterActive: this.browserFilterActive(), available: this.viewControlsAvailable(),
         traditionalMode: this.browserPreferences.traditionalMode === true,
         onTraditional: (): void => { this.showMoreMenu = false; this.toggleTraditionalMode(); },
         subtitleIndex: this.subtitleIndex, backRequest: this.moreBackRequest,
@@ -1847,6 +1859,7 @@ export struct 浏览页 {
         IconActionButton({ toolbarStyle: true,
           source: $r('app.media.ic_home_more'), label: $r('app.string.browser_selection_actions'),
           isInteractive: !this.批量忙碌 && !this.mutationBusy,
+          onMenuAnchor: (right: number, bottom: number): void => { this.browserMoreRight = right; this.browserMoreBottom = bottom; },
           slideMenu: true, onHoldOpen: (): void => { this.showBatchMenu = true; },
           onHoldCancel: (): void => { this.showBatchMenu = false; }, onAction: (): void => { this.showBatchMenu = !this.showBatchMenu; }
         })
@@ -1854,6 +1867,7 @@ export struct 浏览页 {
 
         IconActionButton({ toolbarStyle: true,
           source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
+          onMenuAnchor: (right: number, bottom: number): void => { this.browserMoreRight = right; this.browserMoreBottom = bottom; },
           slideMenu: true, onHoldOpen: (): void => { this.showMoreMenu = true; },
           onHoldCancel: (): void => { this.showMoreMenu = false; }, onAction: (): void => { this.showMoreMenu = !this.showMoreMenu; }
         })
@@ -2007,7 +2021,8 @@ export struct 浏览页 {
           已加载行数: this.consumedRowCount,
           多选模式: this.多选模式值,
           选中IDs: this.选中ID列表,
-          focusedId: this.focusedRowId,
+          focusedId: this.browserWidth >= 1000 && this.inlineEditorId > 0 &&
+            this.inlineEditorIsNote === (this.浏览模式值 === 'notes') ? this.inlineEditorId : this.focusedRowId,
           onAnchor: (id: number): void => { this.selectionAnchor = id; this.focusedRowId = id; },
           onRange: (id: number): void => { this.selectRangeTo(id); },
           onRowClick: (行ID: number): void => { this.行点击处理(行ID); },
@@ -2184,6 +2199,7 @@ export struct 浏览页 {
     }
     if (this.showBatchMenu && this.多选模式值) {
       批量操作栏({
+        toolbarRight: this.browserMoreRight, toolbarBottom: this.browserMoreBottom,
         isDark: this.是否深色(), busy: this.批量忙碌 || this.mutationBusy,
         backRequest: this.batchBackRequest, labels: this.flagLabels,
         选中数: this.选中ID列表.length, notesMode: this.浏览模式值 === 'notes',
@@ -2285,7 +2301,7 @@ Row() {
           if (this.inlineEditorId > 0) {
             ForEach([this.inlineEditorId], (id: number) => {
               BrowserEditorPane({ targetId: id, isNote: this.inlineEditorIsNote, isDark: this.是否深色(),
-                backRequest: this.inlineEditorBackRequest, pathStack: this.pathStack, visible: this.browserVisible,
+                backRequest: this.inlineEditorBackRequest, pathStack: this.pathStack, visible: this.browserVisible && !this.显示预览,
                 onBusy: (busy: boolean): void => { this.mutationBusy = busy; },
                 onClose: (): void => { this.closeInlineEditor(false); },
                 onCloseCancelled: (): void => { this.pendingEditorId = 0; },
@@ -2350,14 +2366,25 @@ Row() {
       .width('100%')
       .height('100%')
       .onKeyEvent((event: KeyEvent): void => { this.handleBrowserKey(event); })
-      .onAreaChange((_old: Area, area: Area): void => { this.browserWidth = Number(area.width); })
+      .onAreaChange((_old: Area, area: Area): void => {
+        this.browserWidth = Number(area.width);
+        if (this.browserWidth < 1000) this.wideEditorOpened = false;
+        else this.openInitialWideEditor();
+      })
     }
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => this.onBackPress())
     .onShown((): void => { this.browserVisible = true; appInterface.showPage('browser'); this.returnFromEditor(); this.publishInterface(); this.refreshBrowserPreferences();
-      if (this.interfaceMounted) this.loadFlagLabels(); })
-    .onHidden((): void => { this.browserVisible = false; appInterface.hidePage('browser'); })
+      if (this.interfaceMounted) this.loadFlagLabels();
+      this.openInitialWideEditor(); })
+    .onHidden((): void => {
+      this.browserVisible = false;
+      this.showMoreMenu = false;
+      this.showViewMenu = false;
+      this.showBatchMenu = false;
+      appInterface.hidePage('browser');
+    })
     .opacity(this.转场透明度)
     .translate({ x: this.navigationOffset })
   }

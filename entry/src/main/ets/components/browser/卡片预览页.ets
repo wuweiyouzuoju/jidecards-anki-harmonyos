@@ -1,3 +1,4 @@
+import { WALLPAPER_KEY } from '../../model/AppearanceCustomization';
 import { pageMaterialFill } from '../../utils/GlassMaterial';
 import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { GlassSource } from '../common/GlassSource';
@@ -107,12 +108,16 @@ type 预览面 = 'question' | 'answer';
 @Component
 export struct 卡片预览页 {
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
+  @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @State private currentMarking: CardMarkingState | null = null;
   @State private flagLabels: FlagLabels = {};
   private markingBackend: AnkiCardMarking = new AnkiCardMarking();
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @State private moreMenuOpen: boolean = false;
+  @State private moreMenuCloseRequest: number = 0;
+  @State private moreMenuRight: number | undefined = undefined;
+  @State private moreMenuBottom: number | undefined = undefined;
   private initialFocusPending: boolean = true;
   private readonly desktopPreview: boolean = deviceInfo.deviceType === '2in1' || deviceInfo.deviceType === 'pc';
   @StorageProp(PAGE_SURFACE_KEY) private pageSurface: string = '#F5F7FA';
@@ -242,7 +247,7 @@ export struct 卡片预览页 {
   aboutToAppear(): void {
     this.mounted = true;
     this.cardThemeChanged();
-    this.onBackHandlerChange((): boolean => this.dismissMoreMenu() || this.backNoteLink());
+    this.onBackHandlerChange((): boolean => this.requestMoreMenuClose() || this.backNoteLink());
     // 固定本次预览的 ID 顺序；字段编辑后的搜索重排不能把当前卡换成另一张。
     this.previewIds = this.卡片ID列表.slice();
     this.当前索引值 = Math.max(0, Math.min(this.初始索引, this.previewIds.length - 1));
@@ -266,6 +271,12 @@ export struct 卡片预览页 {
   private dismissMoreMenu(): boolean {
     if (!this.moreMenuOpen) return false;
     this.moreMenuOpen = false;
+    return true;
+  }
+
+  private requestMoreMenuClose(): boolean {
+    if (!this.moreMenuOpen) return false;
+    this.moreMenuCloseRequest++;
     return true;
   }
 
@@ -720,6 +731,7 @@ export struct 卡片预览页 {
           }
           IconActionButton({ toolbarStyle: true,
             source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
+            onMenuAnchor: (right: number, bottom: number): void => { this.moreMenuRight = right; this.moreMenuBottom = bottom; },
             slideMenu: true, keepMenuOnHoldRelease: true, onHoldOpen: (): void => { this.moreMenuOpen = true; },
             onHoldCancel: (): void => { this.moreMenuOpen = false; }, onAction: (): void => { this.moreMenuOpen = true; }
           })
@@ -751,7 +763,7 @@ export struct 卡片预览页 {
         .javaScriptAccess(true)
         .fileAccess(true)
         .domStorageAccess(true)
-        .attributeModifier(new CardWebAttributes())
+        .attributeModifier(new CardWebAttributes(this.getUIContext()))
         .zoomAccess(true)
         .focusable(true)
         // 进入预览即接收方向键，无需先点卡片；Web 内表单仍自行处理编辑按键。
@@ -821,7 +833,7 @@ export struct 卡片预览页 {
       right: 应用尺寸.页面内边距_水平,
       bottom: 应用尺寸.间距_8
     })
-    .backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial))
+    .backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial, this.wallpaperPath))
   }
 
   @Builder
@@ -872,7 +884,7 @@ export struct 卡片预览页 {
 CardViewport({ content: () => { this.cardViewportContent(); } })
       .width('100%')
       .height('100%')
-      .backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial))
+      .backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial, this.wallpaperPath))
       }
       if (this.noteLinksOpen) {
         NoteLinksPanel({ noteId: this.noteLinksNoteId, readOnly: this.linksReadOnly, backRequest: this.noteLinksBack, onClose: (): void => {
@@ -884,7 +896,8 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
           onPreview: (ids: number[]): void => { this.pushLinkedPreview(ids); } })
       }
       if (this.moreMenuOpen) {
-        CardActionMenu({ items: this.预览更多菜单(),
+        CardActionMenu({ items: this.预览更多菜单(), toolbarRight: this.moreMenuRight, toolbarBottom: this.moreMenuBottom,
+          closeRequest: this.moreMenuCloseRequest,
           onClose: (): void => { this.dismissMoreMenu(); },
           onSelect: (item: CardActionMenuEntry): void => {
             this.selectPreviewAction(item.id ?? '');
@@ -899,7 +912,7 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
     .onClick((): void => {})
     .onKeyPreIme((event: KeyEvent): boolean => {
       if (!this.moreMenuOpen) return false;
-      if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.dismissMoreMenu();
+      if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.requestMoreMenuClose();
       return true;
     })
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])

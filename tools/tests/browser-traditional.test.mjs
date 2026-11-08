@@ -9,7 +9,7 @@ import {loadComponentLogic} from './platform-module-harness.mjs';
 
 function harness() {
   const source=readFileSync(new URL('../../entry/src/main/ets/pages/浏览页.ets',import.meta.url),'utf8');
-  const names=['toggleTraditionalMode','saveDisplayColumns','openColumnOptions','replaceDisplayColumn','行点击处理','viewControlsAvailable'];
+  const names=['toggleTraditionalMode','saveDisplayColumns','openColumnOptions','replaceDisplayColumn','行点击处理','openInitialWideEditor','viewControlsAvailable'];
   const methods=names.map(name=>{
     const start=source.search(new RegExp(`  private (?:async )?${name}\\(`));
     assert.ok(start>=0,name);return source.slice(start,source.indexOf('\n  }',start)+4);
@@ -43,15 +43,30 @@ test('traditional columns reject empty, duplicate and invalid proposals before s
   assert.throws(()=>replaceBrowserColumn(['question','answer'],'question','answer'));
   assert.throws(()=>replaceBrowserColumn(['question','answer'],'missing','tags'));
 });
-test('regular clicks preview, traditional clicks edit with the correct card/note identity at every width',()=>{
+test('wide and traditional rows edit with the correct identity; regular narrow rows preview',()=>{
   const {page,calls}=harness();
   for(const width of [320,800,1400])for(const notes of [false,true]){
-    page.browserWidth=width;page.浏览模式值=notes?'notes':'cards';page.browserPreferences.traditionalMode=false;page.行点击处理(42);assert.deepEqual(calls.pop(),['preview',42]);
+    page.browserWidth=width;page.浏览模式值=notes?'notes':'cards';page.browserPreferences.traditionalMode=false;page.行点击处理(42);assert.deepEqual(calls.pop(),width>=1000?['edit',42,notes]:['preview',42]);
     page.browserPreferences.traditionalMode=true;page.行点击处理(42);assert.deepEqual(calls.pop(),['edit',42,notes]);
   }
   page.mutationBusy=true;page.行点击处理(5);assert.equal(calls.length,0);
   page.mutationBusy=false;page.多选模式值=true;page.行点击处理(5);assert.equal(calls.length,0);
 });
+test('initial wide editor requires a visible list with a focused result and opens once', () => {
+  const { page, calls } = harness();
+  Object.assign(page, { browserWidth: 999, browserVisible: true, focusedRowId: 21, 浏览模式值: 'notes' });
+  page.openInitialWideEditor();
+  page.browserWidth = 1000;
+  page.显示预览 = true;
+  page.openInitialWideEditor();
+  assert.deepEqual(calls, []);
+  page.显示预览 = false;
+  page.openEditPage = (id, notes) => { calls.push(['edit', id, notes]); page.wideEditorOpened = true; };
+  page.openInitialWideEditor();
+  page.openInitialWideEditor();
+  assert.deepEqual(calls, [['edit', 21, true]]);
+});
+
 test('manual toggle saves, searches once and reports persistence failure without changing the live mode',async()=>{
   const h=harness();await h.page.toggleTraditionalMode();assert.equal(h.stored().traditionalMode,true);assert.equal(h.page.browserPreferences.traditionalMode,true);
   assert.equal(h.calls.filter(c=>c[0]==='search').length,1);assert.equal(h.page.displayBusy,false);

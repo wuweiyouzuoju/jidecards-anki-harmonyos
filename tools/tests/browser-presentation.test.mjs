@@ -15,7 +15,7 @@ import { AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface
 
 const source = readFileSync(new URL('../../entry/src/main/ets/pages/浏览页.ets', import.meta.url), 'utf8');
 const names = ['执行搜索', '加载更多', 'sortableColumns', 'sortDescending', 'sortLabel', 'sortOptions', 'sortIndex', 'selectSort', '切换模式', 'resultCountLabel',
-  'viewControlsAvailable', 'openViewMenu', 'openBrowserFilter', '行点击处理', '打开预览'];
+  'viewControlsAvailable', 'openViewMenu', 'openBrowserFilter', '行点击处理', '打开预览', 'openInitialWideEditor'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`  private (?:async )?${name}\\(`));
   assert.ok(start >= 0, name);
@@ -203,9 +203,9 @@ test('mode and status dialogs hold selection drafts until the shared confirmatio
   }
 });
 
-test('card and note row clicks preview real card ids at both widths and ignore stale note reads', async () => {
-  for (const width of [360,1200]) for (const notes of [false,true]) {
-    const {page}=harness(notes); await page.执行搜索(); page.browserWidth=width;
+test('card and note row clicks preview real card ids at narrow width and ignore stale note reads', async () => {
+  for (const notes of [false,true]) {
+    const {page}=harness(notes); await page.执行搜索(); page.browserWidth=360;
     const edits=[]; page.openEditPage=(...args)=>edits.push(args);
     page.笔记服务实例={获取笔记的卡片:async id=>{assert.equal(id,21);return [101,102];}};
     page.行点击处理(notes?21:12); await new Promise(setImmediate);
