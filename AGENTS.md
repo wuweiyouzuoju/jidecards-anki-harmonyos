@@ -38,3 +38,10 @@
 - 不为通过测试削弱行为断言；替换源码形状测试前先建立等价的直接行为验证。
 
 细则：[工作流](.agents/rules/workflow.md)、[测试](.agents/rules/testing.md)、[命名](.agents/rules/naming.md)、[注释](.agents/rules/comments.md)、[知识维护](.agents/rules/context.md)、[目录级规则](.agents/rules/paths/)。模块责任见 [模块责任与边界](docs/development/ownership.md)，任务完成标准见 [开发任务契约](docs/development/task-contract.md)。
+
+
+## 应用版本命名（用户于2026-11-02确认）
+
+记得闪卡后续展示版本采用 `YY.MM.DD.序号`，日期取Asia/Shanghai当前日期加1天，例如2026-11-02对应 `26.11.03.1`。最后一段是常规递增序号，不是日期；后续版本通过公共版本管理工具默认bump递增末段，同时更新到当前日期+1天的日期前缀。versionCode保持独立递增，不从展示版本计算。唯一事实来源仍是AppScope/app.json5，更新README与开发状态中的当前版本，历史发布说明不改名。
+
+官网与 README 不维护或展示应用市场具体版本号；保留下载链接，版本以应用市场页面为准。HTML、结构化数据、Markdown 和 JSON 同步遵循此规则，历史发布记录保留。

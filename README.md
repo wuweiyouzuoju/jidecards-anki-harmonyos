@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
-[![Source 3.8.35](https://img.shields.io/badge/source-3.8.35-6750a4.svg)](AppScope/app.json5)
-[![AppGallery 3.8.1](https://img.shields.io/badge/AppGallery-3.8.1-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
+[![Source 26.11.03.1](https://img.shields.io/badge/source-26.11.03.1-6750a4.svg)](AppScope/app.json5)
+[![AppGallery](https://img.shields.io/badge/AppGallery-Download-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
 [![HarmonyOS NEXT](https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0a59f7.svg)](https://www.harmonyos.com/)
 
 jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
 
-**当前源码版本：3.8.35（versionCode 3136）** · **华为应用市场版本：3.8.1**
+**当前源码版本：26.11.06.7（versionCode 3147）**
 
 每天一点，把知识记牢。用闪卡整理知识，以间隔复习建立自己的学习节奏。
 
@@ -39,7 +39,7 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 - [版本与发布](#版本与发布)
 - [许可证与第三方声明](#许可证与第三方声明)
 
-当前源码 3.8.35 完善字段展开、页面玻璃背景、主题对比度和分流入门教学，并包含浏览计数、牌组快捷操作与自定义学习记忆改进。详见[3.8.35 源码更新说明](docs/releases/3.8.35.md)。应用市场已上架版本为作者于 2026-11-01 确认的 3.8.1。
+当前源码恢复新安装用户的首批牌组直链引导。26.11.05.2 将菜单、玻璃弹层和中性表面呈现提取到系列基础，产品通过薄适配共同消费；保留半屏窗口生命周期适配和日期版本编号；3.8.37 开放自定义主色的浅色/深色明暗适配和实际强调色预览。此前 3.8.35 完善字段展开、页面玻璃背景、主题对比度和分流入门教学，并包含浏览计数、牌组快捷操作与自定义学习记忆改进。详见[3.8.35 源码更新说明](docs/releases/3.8.35.md)。应用市场版本以下载页面为准。
 
 ## 项目特点
 
@@ -265,7 +265,7 @@ npm run verify             # 完整测试、双架构构建与签名 HAP
 
 ## 版本与发布
 
-当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[3.8.35 源码更新说明](docs/releases/3.8.35.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。华为应用市场版本由作者确认，当前为 3.8.1；商店版本与源码版本分别维护。
+当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[3.8.35 源码更新说明](docs/releases/3.8.35.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。华为应用市场版本以下载页面为准，不在官网或 README 维护具体版本号。
 
 历史应用市场 2.9.22 的更新内容见 [2.9.22 应用市场版说明](docs/releases/appgallery-2.9.22.md)。GitHub 的 `appgallery-v2.9.22` 标签记录当时的版本介绍，自动生成的源码快照对应标签中的 2.9.10 / versionCode 2991，不随 main 的后续更新变化；应用安装请使用应用市场入口。
 
