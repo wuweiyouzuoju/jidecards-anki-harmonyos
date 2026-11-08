@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { aiContentExportPolicy } from '../AiContentExportService';
 import { common } from '@kit.AbilityKit';
 import type { Card } from '../../proto/messages/CardsMessages';
 import type { DeckTreeNode } from '../../proto/messages/DeckMessages';
@@ -413,6 +414,7 @@ export class AgentDraftExecutor {
           const imageAttachments: AgentImageAttachment[] = (draft.imageAttachments ?? []).filter(
             (attachment: AgentImageAttachment): boolean => attachment.noteId === group.noteId);
           await this.appendImages(note, imageAttachments, draft.id, groupIndex, writtenMedia);
+          await aiContentExportPolicy.recordNotes([note]);
           const noteId: number = await this.notes.添加笔记(note, draft.affectedDeckIds[0]);
           this.appendSuccess(result, 'create_note', noteId);
         } catch (error) {
@@ -439,6 +441,8 @@ export class AgentDraftExecutor {
           if (operation.kind === 'update_tags') { note.tags = JSON.parse(operation.after) as string[]; }
         }
         await this.appendImages(note, imageAttachments, draft.id, noteId, writtenMedia);
+        if (noteOperations.some((operation: DraftOperation): boolean => operation.kind === 'update_field'))
+          await aiContentExportPolicy.recordNotes([note]);
         await this.notes.更新笔记([note], false);
         this.appendSuccess(result, 'update_note', noteId);
       } catch (error) {
@@ -485,6 +489,7 @@ export class AgentDraftExecutor {
           await this.notetypes.变更笔记类型(request);
           this.appendSuccess(result, operation.kind, payload.noteIds.length);
         } else if (operation.kind === 'update_notetype_fields') {
+          await aiContentExportPolicy.recordNotetypes(draft.affectedNotetypeIds);
           await this.notetypes.更新笔记类型旧版(operation.after, false);
           const saved: Record<string, Object> = JSON.parse(await this.notetypes.获取笔记类型旧版(draft.affectedNotetypeIds[0])) as Record<string, Object>;
           const expected: Record<string, Object> = JSON.parse(operation.after) as Record<string, Object>;
@@ -493,6 +498,7 @@ export class AgentDraftExecutor {
           }
           this.appendSuccess(result, operation.kind, draft.affectedNotetypeIds[0]);
         } else if (operation.kind === 'update_notetype_latex') {
+          await aiContentExportPolicy.recordNotetypes(draft.affectedNotetypeIds);
           await this.notetypes.更新笔记类型旧版(operation.after, false);
           if (!agentNotetypeLatexMatches(await this.notetypes.获取笔记类型旧版(draft.affectedNotetypeIds[0]), operation.after)) {
             throw new AgentDraftExecutorError('notetype_latex_save_unverified');
@@ -510,6 +516,7 @@ export class AgentDraftExecutor {
           const notetype: LegacyNotetypeJson = JSON.parse(operation.before) as LegacyNotetypeJson;
           notetype.tmpls = parseTemplates(payload.templates);
           notetype.css = payload.css;
+          await aiContentExportPolicy.recordNotetypes(draft.affectedNotetypeIds);
           await this.notetypes.更新笔记类型旧版(JSON.stringify(notetype), false);
           const saved: LegacyNotetypeJson = JSON.parse(
             await this.notetypes.获取笔记类型旧版(draft.affectedNotetypeIds[0])) as LegacyNotetypeJson;

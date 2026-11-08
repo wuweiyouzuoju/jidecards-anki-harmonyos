@@ -1,3 +1,4 @@
+import { aiContentExportPolicy } from '../AiContentExportService';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { AgentOperationBackend, OperationArguments, OperationSnapshot } from '../../model/agent/AgentOperations';
 import { operationDefinition } from '../../model/agent/AgentOperations';
@@ -267,14 +268,19 @@ export class CoreAgentOperations implements AgentOperationBackend {
         const json = this.savedSearch(await this.sidebar.savedSearches(), args); await this.sidebar.saveSavedSearches(json);
         if (await this.sidebar.savedSearches() !== json) throw new Error('saved_search_save_unverified'); result = JSON.parse(json) as Object; break;
       }
-      case 'propose_find_replace': result = await this.search.查找并替换({ nids: args.noteIds!, search: args.find!, replacement: args.replace!, regex: args.regex!, matchCase: args.matchCase!, fieldName: args.field! }); break;
+      case 'propose_find_replace': await aiContentExportPolicy.recordNotes(await this.noteList(args.noteIds!)); result = await this.search.查找并替换({ nids: args.noteIds!, search: args.find!, replacement: args.replace!, regex: args.regex!, matchCase: args.matchCase!, fieldName: args.field! }); break;
       case 'propose_collection_history': result = args.operation === 'undo' ? await this.collection.撤销() : await this.collection.重做(); break;
       case 'propose_check_database': result = await this.collection.检查数据库(); break;
       case 'propose_flag_name': result = await renameCardFlag(this.marking, args.flag!, args.name!); break;
-      case 'propose_clone_notetype': result = { notetypeId: await this.types.添加笔记类型旧版(cloneNotetypeJson(await this.types.获取笔记类型旧版(args.notetypeId!), args.name!)) }; break;
+      case 'propose_clone_notetype': {
+        const id: number = await this.types.添加笔记类型旧版(cloneNotetypeJson(await this.types.获取笔记类型旧版(args.notetypeId!), args.name!));
+        await aiContentExportPolicy.recordNotetypes([id]);
+        result = { notetypeId: id }; break;
+      }
       case 'propose_rename_notetype':
       case 'propose_edit_notetype_structure': {
         const json = await this.types.获取笔记类型旧版(args.notetypeId!);
+        if (name === 'propose_edit_notetype_structure') await aiContentExportPolicy.recordNotetypes([args.notetypeId!]);
         await this.types.更新笔记类型旧版(notetypeDraft(json, args), false); result = await this.types.获取笔记类型旧版(args.notetypeId!); break;
       }
       case 'propose_create_filtered_deck': {

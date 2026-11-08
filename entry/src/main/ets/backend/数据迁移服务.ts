@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { aiContentExportPolicy } from './AiContentExportService';
 import { CoreRpc } from '../proto/generated/CoreRpc';
 // 数据迁移服务：Anki 包（.apkg）与集合包（.colpkg）导入导出的高层边界。
 // 职责：
@@ -76,6 +77,7 @@ export class 数据迁移校验错误 extends Error {
 /** Exports a selected deck and its children into an Anki .apkg sandbox file. */
 /** @throws {Error} 导出文件创建或后端导出失败，交由导出入口显示错误。 */
 export async function 导出牌组(文件目录: string, 牌组ID: number, 选项: 牌组导出选项): Promise<string> {
+    await aiContentExportPolicy.assertExport({ deckId: 牌组ID });
     const 输出路径 = await 生成输出路径(文件目录, 'deck', 'apkg');
     try {
         await new CoreRpc(后端会话.获取实例()).ImportExport_export_anki_package(encodeExportAnkiPackageRequest(输出路径, 牌组ID, 选项));
@@ -88,6 +90,7 @@ export async function 导出牌组(文件目录: string, 牌组ID: number, 选�
 }
 /** @throws {Error} 文本导出失败保留原始错误并清理临时文件。 */
 export async function exportText(filesDir: string, deckId: number, options: TextExportOptions): Promise<string> {
+    await aiContentExportPolicy.assertExport({ deckId: deckId });
     const path = await 生成输出路径(filesDir, 'text', 'txt');
     try {
         const rpc = new CoreRpc(后端会话.获取实例());
@@ -103,6 +106,7 @@ export async function exportText(filesDir: string, deckId: number, options: Text
 /** JIDE 的确认子集使用 Core 原生范围，临时文件仍归现有导出生命周期。
  * @throws {Error} 路径或 Core 导出失败交给确认执行器；临时文件仍清理。 */
 export async function exportSubset(filesDir: string, subset: ExportSubset, format: string, withMedia: boolean, withScheduling: boolean): Promise<string> {
+    await aiContentExportPolicy.assertExport({ mode: subset.mode, ids: subset.ids });
     if (format !== 'apkg' && format !== 'text')
         throw new Error('invalid_export_format');
     const path = await 生成输出路径(filesDir, 'subset', format === 'apkg' ? 'apkg' : 'txt');
@@ -123,6 +127,7 @@ export async function exportSubset(filesDir: string, subset: ExportSubset, forma
 /** Exports all personal Anki data into a sandbox .colpkg file. */
 /** @throws {Error} 导出文件创建或后端导出失败，交由导出入口显示错误。 */
 export async function 导出集合(文件目录: string, 选项: 集合导出选项): Promise<string> {
+    await aiContentExportPolicy.assertExport({});
     const 输出路径 = await 生成输出路径(文件目录, 'collection', 'colpkg');
     const 会话 = 后端会话.获取实例();
     try {

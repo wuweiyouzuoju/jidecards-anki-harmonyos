@@ -273,6 +273,7 @@ export struct 数据迁移面板 {
   }
 
   private errorText(): string {
+    if (this.errorMessage === 'transfer_ai_content_export_blocked') return this.解析文本($r('app.string.transfer_ai_content_export_blocked'));
     if (this.errorMessage === 'transfer_file_unsupported') return this.解析文本($r('app.string.transfer_file_unsupported'));
     if (this.errorMessage === 'transfer_space_insufficient') return this.解析文本($r('app.string.transfer_space_insufficient'));
     if (this.errorMessage === 'transfer_csv_mapping_invalid') return this.解析文本($r('app.string.transfer_csv_mapping_invalid'));

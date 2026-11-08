@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { aiContentExportPolicy } from '../AiContentExportService';
 import { filteredDeckCommands } from '../FilteredDeckService';
 import type { FilteredDeckProposal } from '../../model/FilteredDeckCommands';
 import { 牌组服务 } from '../牌组服务';
@@ -140,6 +141,7 @@ export class AgentActionExecutor {
             args.kind === 'cloze' ? 标准笔记类型种类.CLOZE : 标准笔记类型种类.BASIC);
           const id: number = await this.notetypes.添加笔记类型旧版(buildAgentNotetypeJson(stock, args));
           if (id <= 0) { throw new Error('notetype_creation_failed'); }
+          await aiContentExportPolicy.recordNotetypes([id]);
           this.scope.registerReadableNotetypeIds([id]); this.scope.configureCreateTarget(target[0], id);
           result = JSON.stringify({ status: 'completed', notetypeId: id, name: args.name });
         }
