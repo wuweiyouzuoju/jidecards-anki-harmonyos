@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { readFileSync } from 'node:fs';
+import { loadPlatformSource } from './platform-module-harness.mjs';
+const glassMotion = loadPlatformSource(readFileSync(new URL('../../../记得系列基础/src/core/GlassFusion.ts',import.meta.url),'utf8'),
+  '({GLASS_MENU_ENTER_MS,GLASS_POPUP_ENTER_MS,glassExitMotion})',{});
 import * as model from '../../entry/src/main/ets/model/MotionStyle.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 
@@ -29,6 +33,6 @@ export function surfaceMotionApi(initial = 'restrained') {
     opacity: value => effect('opacity', value), translate: value => effect('translate', value),
     scale: value => effect('scale', value), asymmetric: (enter, exit) => ({ enter, exit }) };
   const SurfaceTransition = loadPlatformModule('utils/SurfaceTransition.ets', 'SurfaceTransition',
-    { ...api, ...timing, TransitionEffect });
+    { ...api, ...timing, TransitionEffect, ...glassMotion });
   return { ...api, ...timing, TransitionEffect, SurfaceTransition };
 }

@@ -1,3 +1,4 @@
+import {menuPresentation,loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import assert from 'node:assert/strict';
@@ -7,7 +8,7 @@ import { loadPlatformModule } from './platform-module-harness.mjs';
 import { motionApi, surfaceMotionApi } from './motion-harness.mjs';
 
 function read(path) {
-  return readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
+  return menuPresentation(path,readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8'));
 }
 
 test('small anchored menus share the restrained 150ms transition', () => {
@@ -113,7 +114,7 @@ test('plain buttons share PressFeedback without a second touch animation', () =>
   assert.doesNotMatch(batch, /onTouch\(|已按下|\.animation\(/);
   const menuItem = read('entry/src/main/ets/components/common/MenuItem.ets');
   assert.match(menuItem, /\.enabled\(this.available\)/);
-  assert.match(menuItem, /new PressFeedback\(/);
+  assert.match(menuItem, /new (?:Shared)?PressFeedback\(/);
   const info = read('entry/src/main/ets/components/browser/卡片信息.ets');
   assert.match(info, /DialogHeader\(\{/);
   const header = read('entry/src/main/ets/components/common/DialogHeader.ets');

@@ -1,3 +1,4 @@
+import {sharedSource} from './shared-menu-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -108,13 +109,17 @@ test('same surface effects have one owner across all modal implementations', () 
     if (source.includes('SurfaceTransition.dialog()')) {
       owners++;
       assert.match(source, /SurfaceTransition\.(?:backdrop|glassExit)\(/, path);
-      if (path.replaceAll('\\','/') !== 'components/common/GlassPanel.ets') assert.doesNotMatch(source, /TransitionEffect\.scale|TransitionEffect\.asymmetric/, path);
+      assert.match(source, /Shared(?:GlassPanel|GlassBubblePanel|AnchoredMenu)\(/, path);
+      assert.doesNotMatch(source, /\.transition\(/, 'product adapter supplies motion inputs; shared panel owns presentation');
     }
     if (path.replaceAll('\\', '/') !== 'utils/SurfaceTransition.ets') {
       assert.doesNotMatch(source, /TransitionEffect\.scale\(\{ x: currentMotionProfile\(\)\.dialogScale/, path);
     }
   }
-  assert.equal(owners, 1, 'GlassPanel owns panel transitions, including the migrated image crop surface');
+  assert.equal(owners, 3, 'three thin adapters supply motion preferences to the same public presentation');
+  const panel = sharedSource('harmony/shared/PopupPanel.ets');
+  assert.equal((panel.match(/\.transition\(/g) ?? []).length, 1);
+  assert.match(panel, /TransitionEffect\.asymmetric\(TransitionEffect\.IDENTITY, this\.exitTransition\)/);
   assert.doesNotMatch(read('components/牌组选项面板.ets'), /SurfaceTransition\.(?:dialog|backdrop)/);
   assert.match(read('pages/DeckOptionsPage.ets'), /注册NavParam\('DeckOptionsPage'/);
   for (const file of ['components/提醒编辑面板.ets', 'components/browser/查找替换对话框.ets',

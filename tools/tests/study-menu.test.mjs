@@ -1,3 +1,4 @@
+import {menuPresentation,loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +10,7 @@ import { ActionMenuPointerSide, actionMenuGroupInset, placeActionMenuGroups, pla
 import { safeMenuGeometry, keyboardViewportHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 import { StudyKeyboardSession } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 
-const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
+const read = path => menuPresentation(path,readFileSync(new URL('../../' + path, import.meta.url), 'utf8'));
 const source = read('entry/src/main/ets/pages/学习页.ets');
 const methods = ['openStudyMenu', 'closeStudyMenu', 'toggleStudyMenuBranch', 'backStudyMenu', 'selectStudyMenu', '处理按键']
   .map(name => {
@@ -35,6 +36,18 @@ function harness() {
     评分中: false, 更多菜单: () => root, loadFlagLabels: () => events.push('labels'),
     stopStudyTimers: () => events.push('stop'), clearChoiceAutoAdvance: () => events.push('cancel'),
     startStudyTimers: () => events.push('resume'), scheduleChoiceAutoAdvance: () => events.push('schedule') });
+  const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
+    Scroller:class{},应用尺寸:{compactMenuWidth:168},actionMenuRows,visibleActionMenuRows
+  });
+  const menu=new Menu();
+  menu.items=root;
+  menu.onClose=()=>page.closeStudyMenu();
+  menu.onToggleBranch=item=>page.toggleStudyMenuBranch(item.id);
+  let closeRequest=0;
+  Object.defineProperty(page,'studyMenuCloseRequest',{
+    get:()=>closeRequest,
+    set:value=>{closeRequest=value;menu.expandedIds=page.studyExpandedIds;menu.dismissTop();}
+  });
   return { page, events, root };
 }
 
@@ -267,12 +280,12 @@ test('all card menu callers share one viewport-limited surface and one row rende
   assert.doesNotMatch(menu, /popupOpen|rowGap|collapsedGroupIds/);
   assert.match(menu, /placeActionMenuGroups\(/);
   const shell = read('entry/src/main/ets/components/common/AnchoredMenu.ets');
-  const Menu = loadComponentLogic('components/common/AnchoredMenu.ets', 'AnchoredMenu', {
+  const Menu = loadSharedMenu('AnchoredMenu.ets', 'SharedAnchoredMenu', {
     应用尺寸: { compactMenuWidth: 320, 页面底部间距: compact => compact ? 8 : 12 },
     PAGE_COMPACT_LAYOUT_KEY: '', WINDOW_SAFE_TOP_KEY: '', WINDOW_SAFE_BOTTOM_KEY: '',
     WINDOW_SAFE_LEFT_KEY: '', WINDOW_SAFE_RIGHT_KEY: '', safeMenuGeometry
   });
-  const mounted = new Menu();
+  const mounted = new Menu(); mounted.menuWidth=320;
   for (const viewportLeft of [0, 40]) for (const safeRight of [0, 60]) {
     Object.assign(mounted, { viewportLeft, viewportWidth: 1000, safeRight, anchorRight: 970 + viewportLeft });
     assert.equal(mounted.panelLeft() + mounted.menuWidth + viewportLeft, mounted.anchorRight,
@@ -283,7 +296,7 @@ test('all card menu callers share one viewport-limited surface and one row rende
   mounted.contentLeft = 80; assert.equal(mounted.panelLeft(), 80, 'explicit row placement retains priority');
 
   for (const compact of [false, true]) for (const safeTop of [0, 36]) for (const safeBottom of [0, 24]) {
-    Object.assign(mounted, { viewportHeight: 640, topOffset: 20, narrowDeckLayout: compact, safeTop, safeBottom });
+    Object.assign(mounted, { viewportHeight: 640, topOffset: 20, narrowDeckLayout: compact, bottomGap: compact ? 8 : 12, safeTop, safeBottom });
     const geometry = mounted.menuGeometry(), gap = compact ? 8 : 12;
     assert.ok(geometry.top >= safeTop + gap);
     assert.ok(geometry.top + geometry.maxHeight <= 640 - safeBottom - gap);
@@ -318,8 +331,8 @@ test('region-anchored menus retain the full positioning region for left/right al
  const shell=read('entry/src/main/ets/components/common/AnchoredMenu.ets');
  assert.match(shell,/width\(this.contentLeft !== undefined \? this.contentMaxWidth : this.panelLeft\(\) !== undefined \? this.menuWidth : '100%'\)/);
  const home=read('entry/src/main/ets/pages/首页.ets');
- assert.match(home,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: false/);
- assert.match(home,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: true/);
+ assert.match(home,/toolbarBounds: this.homeActionAnchor, alignEnd: false/);
+ assert.match(home,/toolbarBounds: this.homeActionAnchor, alignEnd: true/);
 });
 
 

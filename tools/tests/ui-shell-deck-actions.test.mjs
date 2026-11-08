@@ -6,6 +6,8 @@ import test from 'node:test';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { appInterfaceDependencies } from './app-interface-harness.mjs';
 import { homeHeaderGeometry } from '../../entry/src/main/ets/model/HomeHeaderLayout.ts';
+import { deckDetailShortcuts } from '../../entry/src/main/ets/model/DeckDetailShortcut.ts';
+import { DEFAULT_MODULE_OPACITY } from '../../entry/src/main/ets/model/SurfaceMaterial.ts';
 import { browserBackItem } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 const read = file => readFileSync(new URL('../../entry/src/main/ets/' + file, import.meta.url), 'utf8')
@@ -90,7 +92,9 @@ test('direct detail actions release the preview menu and preserve back, layout a
     page.selectAction(page[name]); assert.equal(back(), false);
   }
   assert.deepEqual(actions, ['onAddNote', 'onCreateWithAI', 'onPreview', 'onMore']);
-  page.openPreviewMenu(); assert.equal(back(), true); assert.equal(back(), false);
+  page.openPreviewMenu(); assert.equal(back(), true);
+  assert.equal(page.previewMenuCloseRequest, 1);
+  page.closePreviewMenu(); assert.equal(back(), false);
   page.openPreviewMenu(); page.closePreviewMenu(); assert.equal(back(), false);
   page.openPreviewMenu(); page.compact = false; page.compactChanged();
   assert.equal(page.previewMenuOpen, false); assert.equal(typeof registrations.at(-1), 'function');
@@ -105,8 +109,7 @@ test('compact and wide Preview reuse one arrowless public surface and public men
   const homeMenu = read('components/home/主页更多面板.ets');
   assert.equal((shell.match(/AnchoredMenu\(\{/g) ?? []).length, 1);
   assert.match(shell, /menuWidth: Math.min\(应用尺寸.compactMenuWidth, this.actionAnchor.width\)/);
-  assert.match(shell, /contentLeft: this.menuAnchor\(\).left, contentMaxWidth: this.actionAnchor.width/);
-  assert.match(shell, /topOffset: this.menuAnchor\(\).top/);
+  assert.match(shell, /toolbarBounds: this.actionAnchor/);
   assert.match(shell, /if \(this.previewMenuOpen && this.actionAnchor.width > 0\)/);
   const scopes = read('components/home/DeckPreviewScopeMenu.ets');
   assert.match(scopes, /ActionMenuList\(\{ items: this.menuItems/);
@@ -115,7 +118,7 @@ test('compact and wide Preview reuse one arrowless public surface and public men
   assert.match(homeMenu, /ActionMenuList\(/);
   const header=read('components/home/HomeSummaryHeader.ets');
   assert.doesNotMatch(header, /bindPopup|enableArrow/);
-  assert.match(read('pages/首页.ets'), /AnchoredMenu\(\{ refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth\('home_more'\)/);
+  assert.match(read('pages/首页.ets'), /AnchoredMenu\(\{ [^\n]*refractionSource: GLASS_HOME_SOURCE, menuWidth: this.homeMenuWidth\('home_more'\)/);
   assert.match(shell, /alignEnd: true/);
   assert.match(shell, /onClose:.*this.closePreviewMenu\(\)/);
   assert.doesNotMatch(shell, /bindPopup|enableArrow|autoCancel:/);
@@ -205,8 +208,10 @@ test('the real detail publisher reports the wide left group and compact right gr
   const observations=[];
   const Detail=loadComponentLogic('components/牌组详情面板.ets','牌组详情面板',{
     应用尺寸:dimensions,ExpansionReveal:class{cancel(){}},GLASS_HIGHLIGHT_COLORS:[],
+    deckDetailShortcuts,DEFAULT_MODULE_OPACITY,namedResourceText:(_context,key)=>key,
     牌组显示名:deck=>deck.name,appInterface:{observe:view=>observations.push(view),leave(){}}
   });
+  Detail.prototype.getUIContext=()=>({});
   const detail=new Detail();Object.assign(detail,{主页快照数据:{decks:[{id:'1',name:'Deck',fullName:'Deck'}]},选中牌组Id:'1'});
   detail.aboutToAppear();
   const position=()=>observations.at(-1).values.find(value=>value.id==='header_actions_position').value;

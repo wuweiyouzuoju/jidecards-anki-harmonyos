@@ -175,3 +175,10 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 
 
 地区文案、格式、长名称和大字体验收见[地区语言与长文案布局](localization.md)。设备入口为 `node tools/test-locales-device.mjs <connect-key> all`；保留数据覆盖安装，输出矩阵与截图，不以构建通过代替显示验收。
+
+
+## 日期版本与窗口模式回归
+
+记得闪卡的展示版本采用根AGENTS声明的YY.MM.DD.序号；日期由公共版本管理工具按Asia/Shanghai当前日期+1天生成，尾段常规递增，versionCode独立增加。唯一实现仍为鸿蒙公共tools/version-manager/versions.py；工具的test_versions.py只使用临时工程验证日期合法性、跨日/跨年、序号和原x.y.z兼容，不对真实项目批量加版测试。
+
+`ui-window-mode-lifecycle.test.mjs`执行EntryAbility真实窗口同步队列，验证分屏冷启动、模式变化、最小化跳过、拒绝恢复与窗口销毁隔离；`theme-configuration.test.mjs`覆盖主题与配置事件。分屏实际保持、比例变化与焦点切换必须单独用系统窗口模式和矩形确认，不能只凭manifest支持字段或打开过系统分屏菜单认定通过。

@@ -1,3 +1,4 @@
+import { AiContentExportPolicy } from '../../entry/src/main/ets/model/AiContentExportPolicy.ts';
 import { noteLinkBridgeScript } from '../../entry/src/main/ets/model/NoteLinkBridge.ts';
 import { NoteLinksProxy } from '../../entry/src/main/ets/model/NoteLinksProxy.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -16,10 +17,26 @@ import * as appLocales from '../../entry/src/main/ets/model/AppLocales.ts';
 import { SUMMARY_LABEL_KEYS } from '../../entry/src/main/ets/model/SummaryLabels.ts';
 import * as localeFormatting from '../../entry/src/main/ets/utils/LocaleFormatting.ts';
 
+function memoryAiContentPolicy() {
+  let state = '{}';
+  return new AiContentExportPolicy({ read: async () => state,
+    write: async value => { state = JSON.stringify({jide_ai_content_provenance_v1: JSON.parse(value)}); }, notes: async () => [] });
+}
+
 // 系列按压核心直接执行；产品只注入当前动效偏好。
 const sharedPressSource = readFileSync(new URL('../../../记得系列基础/src/harmony/shared/PressFeedback.ets', import.meta.url), 'utf8')
   .replace(/^export /gm, '');
 const SharedPressFeedback = new Function(stripTypeScriptTypes(sharedPressSource, { mode: 'transform' }) + ';return SharedPressFeedback;')();
+
+// Public popup renderer is executed, not a test double.
+const popupCoreSource = readFileSync(new URL('../../../记得系列基础/src/core/PopupAppearance.ts', import.meta.url), 'utf8').replace(/^export /gm, '');
+const popupCore = new Function(stripTypeScriptTypes(popupCoreSource, {mode:'transform'}) + ';return {popupAppearance, dialogPanelFill};')();
+const surfaceSource = readFileSync(new URL('../../../记得系列基础/src/harmony/shared/Surface.ets', import.meta.url), 'utf8')
+  .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
+function popupSurfaceClass(dependencies) {
+  return new Function(...Object.keys(popupCore), 'Color', 'BlurStyle', stripTypeScriptTypes(surfaceSource, {mode:'transform'}) + ';return SharedPopupSurface;')
+    (...Object.values(popupCore), dependencies.Color ?? {Transparent:'transparent'}, dependencies.BlurStyle ?? {NONE:0});
+}
 
 // 直接执行公共窗口管理器；只在调用方替换平台窗口。
 export function nativeDialogHostClass(dependencies = {}) {
@@ -48,9 +65,9 @@ export function nativeDialogMembers(source, excluded = []) {
 
 function localeDependencies(dependencies) {
   return {
-    SharedPressFeedback, noteLinkBridgeScript, NoteLinksProxy, ...appLocales, ...localeFormatting, SUMMARY_LABEL_KEYS, DialogButtonDirection: { AUTO: 'auto' },
+    SharedPressFeedback, SharedPopupSurface: popupSurfaceClass(dependencies), $r: key => key, noteLinkBridgeScript, NoteLinksProxy, ...appLocales, ...localeFormatting, SUMMARY_LABEL_KEYS, DialogButtonDirection: { AUTO: 'auto' },
     MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight, AgentTaskPlan, KeyboardPressSession, StudyKeyboardSession: KeyboardPressSession,
-    NativeDialogHost: nativeDialogHostClass(dependencies),
+    NativeDialogHost: nativeDialogHostClass(dependencies), aiContentExportPolicy: memoryAiContentPolicy(),
     Scroller: class { currentOffset() { return {xOffset:0,yOffset:0}; } scrollBy() {} scrollToIndex() {} },
     CoreRpc, ...privateRpc, ...coreMessages,
     localizedResourceText: (context, _locale, resource, ...args) =>
@@ -65,6 +82,8 @@ export function loadPlatformModule(path, exportName, dependencies) {
 }
 export function loadPlatformSource(source, exportName, dependencies) {
   dependencies = localeDependencies(dependencies);
+  if (/export const aiContentExportPolicy\b/.test(source)) delete dependencies.aiContentExportPolicy;
+  if (/class SharedPopupSurface\b/.test(source)) delete dependencies.SharedPopupSurface;
   source = source.replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
   return new Function(...Object.keys(dependencies), stripTypeScriptTypes(source, { mode: 'transform' }) + ';return ' + exportName + ';')(...Object.values(dependencies));
 }
@@ -79,7 +98,7 @@ export function expansionRevealDependencies() {
 /** 执行组件的真实非渲染逻辑；不模拟 ArkUI 观察或布局，后者由 HAP/设备验证。 */
 export function loadComponentLogic(path, exportName, dependencies) {
   dependencies = localeDependencies(dependencies);
-  let source = readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8').replaceAll('\r\n', '\n');
+  let source = readFileSync(path instanceof URL ? path : new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8').replaceAll('\r\n', '\n');
   source = source.replace(/^import[^;]+;\s*/gm, '').replace(/^export type[^;]+;\s*/gm, '');
   source = source.replace(/^export\s*\{[^}]+\}\s*from[^;]+;\s*/gm, '');
   source = source.replace(/^@Builder\nexport function[\s\S]*?^}\n/gm, '');
