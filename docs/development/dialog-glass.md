@@ -1,6 +1,6 @@
 # 自绘弹窗玻璃接入
 
-本页只记录当前交互契约、实现责任和验收边界。材质参数见[原生表面规范](material-standard.md)，光学实现见[系列弹窗玻璃](../../../记得系列基础/docs/弹窗玻璃.md)。逐次试验及失败证据已移入[历史记录](dialog-glass-history-2026-10-31.md)，不能把历史方案当成当前要求。
+本页只记录当前交互契约、实现责任和验收边界。材质参数见[原生表面规范](material-standard.md)，光学实现见[系列弹窗玻璃](../../tools/vendor/jide-foundation/src/core/GlassOptics.ts)。逐次试验及失败证据已移入[历史记录](dialog-glass-history-2026-10-31.md)，不能把历史方案当成当前要求。
 
 ## 用户确认的交互契约
 

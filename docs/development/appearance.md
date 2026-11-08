@@ -383,7 +383,7 @@ SurfaceSelect继续拥有原当前项、禁用与迟到点击守卫，选择入�
 3.5.16/3097最终验收：105项材质、搜索行为、轮盘、边框、JIDE认知、文档和光学模型回归通过，签名HAP通过；两台模拟器覆盖安装重启。宽屏实看深色主页无灰白块/大面积反光、详情文字清晰、各模块轮廓连续，以及深色搜索和编辑轮盘；手机实看学习更多的两列/侧组菜单，透明布局占位无反光。深色采样使用通透材质降级，原生折射纹理仍仅在浅色运行；未覆盖所有页面、全部语言及真机。
 
 
-2026-10-30 弹窗玻璃当前入口见[弹窗玻璃接入](dialog-glass.md)，基础实现与参数见[系列弹窗玻璃](../../../记得系列基础/docs/弹窗玻璃.md)。SharedGlassBackdrop统一拥有真实背景采样、整块5.5vp模糊及连续折射；GlassSource、GlassPanel和GlassBubblePanel分别拥有产品采样源、准备/降级/单次展开与箭头轮廓。明暗共用纹理，不再保留本地GlassOptics或深色跳过采样的旧路径。前述3.5.16记录仅为当时设备证据，不能用于推断当前深色实现。
+2026-10-30 弹窗玻璃当前入口见[弹窗玻璃接入](dialog-glass.md)，基础实现与参数见[系列弹窗玻璃](../../tools/vendor/jide-foundation/src/harmony/shared/GlassBackdrop.ets)。SharedGlassBackdrop统一拥有真实背景采样、整块5.5vp模糊及连续折射；GlassSource、GlassPanel和GlassBubblePanel分别拥有产品采样源、准备/降级/单次展开与箭头轮廓。明暗共用纹理，不再保留本地GlassOptics或深色跳过采样的旧路径。前述3.5.16记录仅为当时设备证据，不能用于推断当前深色实现。
 
 紧凑动作/选择弹层的选项统一居中：ActionMenuList 默认 Center，CardActionMenu 各层条目显式 Center，图标和文字整体居中，分支箭头仍靠右。表单分组折叠行保留 Start，不属于弹出菜单。预览、学习、牌组及设置选择共用此规则。
 
