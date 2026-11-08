@@ -26,6 +26,8 @@
 // 启动读取失败可回退；公共严格读取和保存失败必须传给设置调用方。
 // ========================================================
 
+import { CUSTOM_ACCENT_KEY, DEFAULT_CUSTOM_ACCENT, normalizedAccent, ACCENT_LIGHT_ADAPTATION_KEY, ACCENT_DARK_ADAPTATION_KEY, AccentAdaptation, adaptationStrength } from './AppearanceCustomization';
+import { loadAppearanceCustomization } from '../utils/AppearanceCustomizationStore';
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from './ThemeCatalog';
 import { isThemeId } from './settings/ThemeColorSession';
 import { common } from '@kit.AbilityKit';
@@ -49,6 +51,7 @@ export async function 加载颜色主题(): Promise<颜色主题> {
     return 默认颜色主题;
   }
   try {
+    await loadAppearanceCustomization();
     const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
     const 值: preferences.ValueType = await 存储.get(颜色主题键, 默认颜色主题);
     const theme: 颜色主题 = typeof 值 === 'string' ? 规范化颜色主题(值) : 默认颜色主题;
@@ -81,4 +84,42 @@ export async function 保存颜色主题(主题: 颜色主题): Promise<void> {
   const 存储: preferences.Preferences = await preferences.getPreferences(上下文, 存储名);
   await 存储.put(颜色主题键, 主题);
   await 存储.flush();
+}
+
+/** 由 ThemeColorSession 串行调用，一次 flush 保存自定义种子和主题身份。 */
+export async function 保存自定义颜色主题(seed: string, adaptation?: AccentAdaptation): Promise<void> {
+  const accent: string = normalizedAccent(seed);
+  if (adaptation !== undefined) { adaptationStrength(adaptation.light); adaptationStrength(adaptation.dark); }
+  const context: common.UIAbilityContext | null = 取能力上下文();
+  if (context === null) throw new Error('ability_context_unavailable');
+  const store: preferences.Preferences = await preferences.getPreferences(context, 存储名);
+  const previousTheme: preferences.ValueType = await store.get(颜色主题键, 默认颜色主题);
+  const previousAccent: preferences.ValueType = await store.get(CUSTOM_ACCENT_KEY, DEFAULT_CUSTOM_ACCENT);
+  const previousLight: preferences.ValueType = await store.get(ACCENT_LIGHT_ADAPTATION_KEY, 100);
+  const previousDark: preferences.ValueType = await store.get(ACCENT_DARK_ADAPTATION_KEY, 100);
+  try {
+    if (adaptation !== undefined) {
+      await store.put(ACCENT_LIGHT_ADAPTATION_KEY, adaptation.light);
+      await store.put(ACCENT_DARK_ADAPTATION_KEY, adaptation.dark);
+    }
+    await store.put(CUSTOM_ACCENT_KEY, accent);
+    await store.put(颜色主题键, 'custom');
+    await store.flush();
+    if (await store.get(CUSTOM_ACCENT_KEY, '') !== accent || await store.get(颜色主题键, '') !== 'custom' ||
+      (adaptation !== undefined && (await store.get(ACCENT_LIGHT_ADAPTATION_KEY, 100) !== adaptation.light ||
+        await store.get(ACCENT_DARK_ADAPTATION_KEY, 100) !== adaptation.dark))) {
+      throw new Error('custom_theme_save_mismatch');
+    }
+  } catch (error) {
+    store.putSync(CUSTOM_ACCENT_KEY, previousAccent);
+    store.putSync(ACCENT_LIGHT_ADAPTATION_KEY, previousLight);
+    store.putSync(ACCENT_DARK_ADAPTATION_KEY, previousDark);
+    store.putSync(颜色主题键, previousTheme);
+    throw new Error(error instanceof Error ? error.message : 'custom_theme_save_unverified');
+  }
+  if (adaptation !== undefined) {
+    AppStorage.setOrCreate<number>(ACCENT_LIGHT_ADAPTATION_KEY, adaptation.light);
+    AppStorage.setOrCreate<number>(ACCENT_DARK_ADAPTATION_KEY, adaptation.dark);
+  }
+  AppStorage.setOrCreate<string>(CUSTOM_ACCENT_KEY, accent);
 }

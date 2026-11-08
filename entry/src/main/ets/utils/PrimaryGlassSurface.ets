@@ -11,9 +11,11 @@ export class PrimaryGlassSurface extends PressFeedback {
   private material: string;
   private actionColor: string;
   private isDark: boolean;
+  private opacityPercent: number;
 
-  constructor(material: string, style: PrimaryGlassStyle, actionColor: string = '#2F5FD0', isDark: boolean = darkMaterial()) {
+  constructor(material: string, style: PrimaryGlassStyle, actionColor: string = '#2F5FD0', isDark: boolean = darkMaterial(), opacity: number = 100) {
     super();
+    this.opacityPercent = opacity;
     this.material = material;
     this.style = style; this.actionColor = actionColor; this.isDark = isDark;
   }
@@ -35,6 +37,6 @@ export class PrimaryGlassSurface extends PressFeedback {
 
   private applySurface(instance: CommonAttribute, pressed: boolean): void {
     SeriesVisual.primaryAction(this.material, this.isDark, this.actionColor,
-      18).applyNormalAttribute(instance);
+      18, this.opacityPercent).applyNormalAttribute(instance);
   }
 }

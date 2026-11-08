@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { AccentAdaptation } from '../AppearanceCustomization';
+import { adaptationStrength } from '../AppearanceCustomization';
 import type { ThemeId, ThemeDefinition } from '../ThemeCatalog';
 import { THEME_CATALOG } from '../ThemeCatalog';
 
 export interface ThemeColorHost {
   readSavedColor(): Promise<ThemeId>;
-  saveColor(theme: ThemeId): Promise<void>;
+  saveColor(theme: ThemeId, customAccent?: string, adaptation?: AccentAdaptation): Promise<void>;
   applyColor(theme: ThemeId): void;
   isAvailable(theme: ThemeId): boolean;
 }
@@ -28,8 +30,13 @@ export class ThemeColorSession {
 
   read(): Promise<ThemeId> { return this.tail.then((): Promise<ThemeId> => this.host.readSavedColor()); }
 
-  setColor(theme: ThemeId, expected: ThemeId | null = null): Promise<ThemeColorChange> {
+  setColor(theme: ThemeId, expected: ThemeId | null = null, customAccent?: string, adaptation?: AccentAdaptation): Promise<ThemeColorChange> {
     const result = this.tail.then(async (): Promise<ThemeColorChange> => {
+      if (customAccent !== undefined && (theme !== 'custom' || !/^#[0-9a-fA-F]{6}$/.test(customAccent))) throw new Error('invalid_custom_accent');
+      if (adaptation !== undefined) {
+        if (theme !== 'custom' || customAccent === undefined) throw new Error('invalid_custom_accent');
+        adaptationStrength(adaptation.light); adaptationStrength(adaptation.dark);
+      }
       if (!isThemeId(theme)) { throw new Error('invalid_theme_color'); }
       if (!this.host.isAvailable(theme)) { throw new Error('theme_color_locked'); }
       const previous: ThemeId = await this.host.readSavedColor();
@@ -37,7 +44,7 @@ export class ThemeColorSession {
       const change: ThemeColorChange = { status: 'partial', theme: theme, previousTheme: previous,
         saved: false, applied: false, errorCode: '' };
       try {
-        await this.host.saveColor(theme);
+        await this.host.saveColor(theme, customAccent, adaptation);
         if (await this.host.readSavedColor() !== theme) { throw new Error('theme_color_save_mismatch'); }
         change.saved = true;
       } catch (error) { change.errorCode = 'theme_color_save_unverified'; return change; }

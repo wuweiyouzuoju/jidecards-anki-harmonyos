@@ -1,6 +1,6 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SeriesVisual } from '../utils/SeriesVisual';
-import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { LengthMetrics } from '@kit.ArkUI';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../model/ThemeCatalog';
 import { themeProgressGradient } from '../utils/ThemeVisuals';
@@ -36,6 +36,7 @@ import { 颜色键 } from '../model/颜色主题';
 @Component
 export struct 今日摘要卡 {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('themeMode') private themeMode: string = 'system';
   @StorageProp('systemDarkMode') private systemDark: boolean = false;
   @StorageProp(颜色键.页面底色微染) private pageTint: string = '';
@@ -221,10 +222,7 @@ export struct 今日摘要卡 {
     .onAreaChange((_old: Area, area: Area): void => { this.contentWidth = Number(area.width); })
     .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
       left: this.pageGeometry().padding, right: this.pageGeometry().padding })
-    .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
     .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
-      this.动作主色, this.pageTint))
+      this.动作主色, this.pageTint, undefined, this.moduleOpacity))
   }
 }

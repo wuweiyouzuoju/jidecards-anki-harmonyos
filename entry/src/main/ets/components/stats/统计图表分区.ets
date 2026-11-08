@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { HelpLabel } from '../common/HelpLabel';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -20,6 +21,7 @@ import { localizedNamedResourceText, resourceText, namedResourceText } from '../
 @Component
 export struct 统计图表分区 {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp('themeMode') private themeMode: string = 'system';
   @StorageProp('systemDarkMode') private systemDark: boolean = false;
@@ -110,6 +112,6 @@ export struct 统计图表分区 {
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_指标卡)
     .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
-      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, 应用尺寸.圆角_卡片))
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity))
   }
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-export type ThemeId = 'aurora' | 'forest' | 'midnight' | 'lagoon' | 'sunset' | 'lemon' | 'minimal_gray' | 'iridescent';
+export type ThemeId = 'aurora' | 'forest' | 'midnight' | 'lagoon' | 'sunset' | 'lemon' | 'minimal_gray' | 'custom' | 'iridescent';
 export const THEME_VISUALS_KEY: string = 'themeVisuals';
 export const THEME_TEXT_COLORS_KEY: string = 'themeTextColors';
 export const THEME_MOTION_KEY: string = 'themeMotion';
@@ -89,7 +89,7 @@ function iridescentTheme(): ThemeDefinition {
 export const THEME_CATALOG: ThemeDefinition[] = [
   solidTheme('aurora', '#2F5FD0'), solidTheme('forest', '#00B42A'), solidTheme('midnight', '#722ED1'),
   solidTheme('lagoon', '#14C9C9'), solidTheme('sunset', '#FF7D00'), solidTheme('lemon', '#F7BA1E'),
-  solidTheme('minimal_gray', '#595959'), iridescentTheme()
+  solidTheme('minimal_gray', '#595959'), iridescentTheme(), solidTheme('custom', '#5B6B8A')
 ];
 
 export function themeDefinition(id: string): ThemeDefinition {
@@ -102,7 +102,7 @@ export function isThemeAvailable(id: string, contents: string[]): boolean {
 }
 
 export function availableThemes(contents: string[]): ThemeId[] {
-  return THEME_CATALOG.filter((theme: ThemeDefinition): boolean => isThemeAvailable(theme.id, contents))
+  return selectableThemes().filter((theme: ThemeDefinition): boolean => isThemeAvailable(theme.id, contents))
     .map((theme: ThemeDefinition): ThemeId => theme.id);
 }
 
@@ -116,4 +116,13 @@ export function themeDeckColors(theme: ThemeDefinition, id: string): string[] {
   let hash: number = 0;
   for (let index: number = 0; index < id.length; index++) hash = (hash * 31 + id.charCodeAt(index)) % 997;
   return theme.deckColors[hash % theme.deckColors.length];
+}
+
+/** 自定义主色生成独立配置，不修改共享目录常量。 */
+export function customTheme(seed: string): ThemeDefinition { return solidTheme('custom', seed); }
+
+/** 展示顺序不依赖目录中的自定义项位置；未来追加主题仍排在自定义之前。 */
+export function selectableThemes(): ThemeDefinition[] {
+  return THEME_CATALOG.filter((theme: ThemeDefinition): boolean => theme.id !== 'custom')
+    .concat(THEME_CATALOG.filter((theme: ThemeDefinition): boolean => theme.id === 'custom'));
 }

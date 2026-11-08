@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { HelpLabel } from '../common/HelpLabel';
 
@@ -12,6 +13,7 @@ import { settingsGroupText } from '../../utils/SettingsStructureText';
 @Component
 export struct 设置分组卡片 {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 标题: Resource = $r('app.string.settings_about');
   @Prop groupId: string = '';
@@ -44,6 +46,6 @@ export struct 设置分组卡片 {
     }
     .width('100%')
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距, top: 8, bottom: 8 })
-    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.actionColor, this.pageTint, 应用尺寸.圆角_卡片))
+    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.actionColor, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity))
   }
 }

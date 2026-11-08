@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { isSettingsItemVisible } from '../../model/SettingsStructure';
 import { settingsItemText } from '../../utils/SettingsStructureText';
@@ -13,6 +14,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 @Component
 export struct 数据分组 {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @StorageProp(颜色键.页面底色微染) private pageTint: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -97,6 +99,6 @@ export struct 数据分组 {
     }
     .width('100%')
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距, top: 8, bottom: 8 })
-    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.actionColor, this.pageTint, 应用尺寸.圆角_卡片))
+    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.actionColor, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity))
   }
 }

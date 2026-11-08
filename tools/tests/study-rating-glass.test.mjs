@@ -58,6 +58,6 @@ test('primary study surfaces repaint from explicit theme inputs without a press 
    assert.deepEqual(actual,paint(api.SeriesVisual.primaryAction(material,dark,accent,18)));
    backgrounds.push(actual.backgroundColor);
   }
-  if(material==='glass')assert.notEqual(backgrounds[0],backgrounds[1]);
+  if(material==='glass')assert.deepEqual(backgrounds,Array(2).fill(dark?'#591C1C1E':'#52FFFFFF'));
  }
 });

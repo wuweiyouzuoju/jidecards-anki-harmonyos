@@ -1,3 +1,4 @@
+import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteDraftPreview } from '../components/common/NoteDraftPreview';
@@ -11,6 +12,7 @@ import { navigationEnterOffset } from '../utils/AppMotion';
 @Component
 export struct NoteDraftPreviewPage {
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
+  @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @Prop input: NoteDraftPreviewInput;
   pathStack: NavPathStack = new NavPathStack();
   @StorageLink('themeMode') private theme: 主题模式 = 'system';
@@ -43,7 +45,7 @@ export struct NoteDraftPreviewPage {
         NoteDraftPreview({ input: this.input, isDark: 解析是否深色(this.theme, this.systemDark),
           fullScreen: true, isVisible: this.visible, onClose: (): void => { this.close(); },
           onBackHandlerChange: (handler: (() => boolean) | null): void => { this.previewBack = handler; } })
-      }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial))
+      }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial, this.wallpaperPath))
     }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
       .translate({ x: this.navigationOffset })
       .onShown((): void => { this.visible = true; })

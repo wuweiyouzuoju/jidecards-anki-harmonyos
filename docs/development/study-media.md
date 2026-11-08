@@ -302,11 +302,15 @@ jidecards 当前保留自己的卡片色板：`buildCardAppearance` 默认浅色
 
 对照本地 AnkiDroid 新版的 `AnkiServer.baseUrl()`、`network_security_config.xml` 与 `CardViewerFragment.setupWebView`：其卡片使用 HTTP 本地页面，允许明文请求和有声媒体自动播放。Jidecards 继续使用 HTTPS 地址，因此通过卡片专用 Web 属性提供同等的 HTTP 资源加载条件；没有全局关闭证书校验。学习 Web 允许焦点以支持作者 ID 输入，原 `StudyGestures` 的 input_focus 桥与根快捷键守卫继续保护网页输入；原生软键盘及实体键盘仍需设备验收。
 
-`CardReviewerRuntime` 捕获 script 资源失败和脚本错误；首次加载与翻面共用诊断。外部脚本明确加载失败后继续执行后续脚本，对齐 [Anki 26.05 的 replaceScript](https://github.com/ankitects/anki/blob/26.05/ts/reviewer/index.ts)；缺少可选的轮播库不能挡住后面的作者授权脚本。失败后已有可见正文、媒体或表单时保留卡面，显示可展开的本地化提示；没有可显示内容时经原加载失败通道恢复，不把空白确认成成功。load 之后的异步作者请求失败也显示提示。诊断只显示脚本源和路径，剥除 query/hash，避免显示授权 URL 中的用户 ID；资源仍按原 URL 请求。翻面清除上一面的诊断，成功重读移除提示，15 秒脚本加载超时与已登记 Hook 拒绝仍走原失败通道，不将超时或 Hook 失败改成成功。
+`CardReviewerRuntime` 捕获 script 资源失败和脚本错误；首次加载与翻面共用诊断。外部脚本明确加载失败后继续执行后续脚本，对齐 [Anki 26.05 的 replaceScript](https://github.com/ankitects/anki/blob/26.05/ts/reviewer/index.ts)；缺少可选的轮播库不能挡住后面的作者授权脚本。失败后已有可见正文、媒体或表单时保留卡面，显示本地化轻提示，点击复用原生提示弹窗；没有可显示内容时经原加载失败通道恢复，不把空白确认成成功。load 之后的异步作者请求失败也显示提示。诊断只显示脚本源和路径，剥除 query/hash，避免显示授权 URL 中的用户 ID；资源仍按原 URL 请求。翻面清除上一面的诊断，成功重读移除提示，15 秒脚本加载超时与已登记 Hook 拒绝仍走原失败通道，不将超时或 Hook 失败改成成功。
 
-`CardReviewerRuntime` 在卡片有内容时显示默认折叠的简短脚本提示，点击原生 HTML `summary` 展开资源加载或脚本执行诊断；空卡仍走原失败通道。错误记录保留异常消息、行列号与可用调用栈，以完整记录去重，同一来源的不同异常分别保留；新错误不折叠已展开详情。内嵌脚本、本地媒体、内置资源用可理解的本地化名称，外部脚本保留源与路径；地址、异常消息和栈中的 URL 均去除用户信息、查询及片段。跨域浏览器未提供的错误细节不能补造，也不能仅凭异常断言整个卡片失效。`CardWebView.cardScriptDiagnosticLabels` 唯一读取各宿主共用的中英文文案，经 HTML 元数据传入运行时；JIDE 的 `CardRenderingSupport.web.scriptFailures` 同步说明诊断能力，不提供读取卡面脚本或代点详情的权限。
+`CardReviewerRuntime` 在卡片有内容时只显示轻量按钮，点击后由共用 `CardWebAttributes` 的 `onAlert` 复用应用已有 `UIContext.showAlertDialog` 提示弹窗；不在卡片正文插入或展开技术堆栈，不新增详情页，不修改附件、更多或学习进度。三个宿主传入各自 UIContext，关闭或返回均完成 Web 的 JsResult。空卡继续走原失败通道。
 
-诊断只拥有卡片正文后的 top margin 12px，summary 的上下 padding 各6px；折叠时无外框与详情正文高度，展开正文仅 top margin 4px，长栈限制40vh并滚动。应用原生卡片、安全区和预览边距不在此叠加；窄/宽、深/浅共用同一 Web 入口。`tools/test-card-authorization-browser.mjs` 覆盖默认折叠、真实点击展开、同源不同异常、错误位置/消息、URL脱敏和翻面清理；`card-web-session.test.mjs` 保留绘制等待期间空卡失败验证。原截图未提供牌组或异常日志，本次没有确定其原始脚本故障，也未验证原牌组在 ArkWeb 的显示与交互。
+错误记录保留异常消息、行列号与可用调用栈，以完整记录去重；点击时读取最新错误，异步新增错误也可查看。地址、异常消息和栈中的 URL 均去除用户信息、查询及片段。跨域未提供的细节不能补造。`CardWebView.cardScriptDiagnosticLabels` 唯一读取各宿主共用文案，JIDE 的 `CardRenderingSupport.web.scriptFailures` 读取同一能力声明，不提供代点详情权限。
+
+轻提示独占正文后12px间距及内部上下12px、左右14px padding，100% border-box 不叠加原生卡片/安全区边距；诊断正文由已有原生弹窗负责。窄/宽、深/浅共用同一入口。`tools/test-card-authorization-browser.mjs` 覆盖真实点击打开提示、卡面无堆栈、异步错误、错误位置、URL脱敏和翻面清理；`card-web-session.test.mjs` 验证共用弹窗接线及失败恢复。浏览器不能替代 ArkWeb 原生弹窗的设备验收。
+
+2026-11-02 异常提示改版验收：版本3.8.36/3137，局部会话/弹窗与文档34项通过，Chromium卡片浏览器五组回归全部通过（异常/授权19场景包含深浅色、390/900宽度及三个宿主）。`devecocli build --modules entry` 签名构建通过，尚未安装到设备验收。当前共享工作树的JIDE结构扩展检查有两项设置相关失败（设置卡片数10/9、editor_wheel_on_entry绑定）；构建警告门禁报告53种未允许签名，未涉及本次CardWebView或三个宿主。未将这些结果报告为全仓验收通过，也未改动其他任务以消除失败。
 
 授权表单由作者脚本生成，其是否出现、有效 ID 和授权状态仍由作者服务决定。无网络、服务不可用、作者脚本自身错误或缺少账号支持不会被本次兼容配置修复。真实用户 APKG 和远程作者脚本只在本机隔离诊断中使用，不纳入仓库。
 
@@ -322,7 +326,7 @@ jidecards 当前保留自己的卡片色板：`buildCardAppearance` 默认浅色
 
 滚动定位由 `CardReviewerRuntime` 统一处理：题目面回到顶部；学习页显示答案时，有 `id="answer"` 则定位到答案起点，没有则回到顶部，避免长答案被跳过。只读预览不请求答案定位，翻面保留当前滚动位置。`card-web-session.test.mjs` 执行生产脚本，覆盖首次加载与同卡翻面的滚动行为。
 
-完成信号由 JS 桥带文档/卡面版本回传，不能把 `runJavaScript` 返回当作页面内异步脚本已执行完毕。首次加载未结束的翻面请求排队，连续更新串行处理最新一面；旧文档回调不能确认新卡，无正文的脚本失败进入页面错误态，有正文时保留卡面并显示可展开诊断，不通过重新 loadData 隐式丢掉作答状态。资源超时为 15 秒。
+完成信号由 JS 桥带文档/卡面版本回传，不能把 `runJavaScript` 返回当作页面内异步脚本已执行完毕。首次加载未结束的翻面请求排队，连续更新串行处理最新一面；旧文档回调不能确认新卡，无正文的脚本失败进入页面错误态，有正文时保留卡面并显示轻提示并通过原生提示弹窗查看诊断，不通过重新 loadData 隐式丢掉作答状态。资源超时为 15 秒。
 
 切卡时的原生 Web 底色与加载占位由当前页面的 `cardSurfaceBackground` 拥有，沿用最近一次真实渲染完成的模板背景，不回退为浅色 `surface_card`。`CardReviewerRuntime` 在脚本、公式和布局完成，且两次动画帧完成后读取实际 html/body 配色，使用 1px Canvas 合成透明度并回传不透明 RGB；`CardWebSession` 先检查文档/卡面版本，再校验颜色格式，旧回调不能改变新卡底色。首次卡片尚未取得颜色时使用原应用表面；背景图片和渐变保留在模板内，原生占位只跟随其基础背景色，不复制图片。
 
@@ -495,3 +499,7 @@ jidecards 当前保留自己的卡片色板：`buildCardAppearance` 默认浅色
 固定字段图钉可见性：NoteFieldCard在新增字段标题旁复用IconActionButton，未固定时明确使用主题色空心描边（不再依赖空strokeColor），图标20vp、点击区44vp，未固定透明度75%，固定为主题色实心。仅添加笔记/图片遮盖字段允许切换，已有笔记编辑不展示固定配置入口；持久化仍由changeFieldSticky与原Service负责，保存/禁用/离页守卫不变。26项连续制卡/固定配置与字段布局检查、签名HAP通过。
 
 宽屏模拟器深色实测：新增卡片正面/背面标题针可见，点击正面针切换为主题色实心，再点击恢复原未固定；未创建笔记。按用户要求未继续操作API23。
+
+字段媒体与源码：NoteFieldCard可视模式通过noteMediaParts拆分文字与媒体，展示缩略图/视频/音频控件，不将文件名额外铺入正文。源码模式经noteFieldDisplayParts投影整个字段为一个文本输入，包括原始<img src>和[sound:]，不改写文件名/属性/顺序，也不同时绘制媒体预览。切换前等待各文字块发布草稿；切回可视时校验每个文字块的可转换性，复杂HTML保留完整源码。NoteFieldEditor.initialSourceMode只由字段宿主显式初始化，其他富文本使用方沿用原自动判断。工具能力由NOTE_FIELD_MODE_TOOLS共同声明进入JIDE结构及revision，源码编辑声明同步包含媒体引用。
+
+2026-11-02 源码媒体验收：122项字段富文本、媒体管理、音视频、引用、浏览编辑和组件检查通过，3项JIDE编辑结构回归通过，增量签名HAP通过。Harmony_API23保留数据覆盖安装，用不保存的新增草稿验证整字段源码显示.jpg与.mp3引用，切回可视模式恢复媒体块/文字编辑，再转源码保持原标签与文件名；测试草稿已明确放弃，未保存笔记或修改既有卡片。复杂HTML保护由直接回归覆盖，本轮未做真机/全笔记类型/复杂媒体草稿设备矩阵。

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { AccentAdaptation } from '../model/AppearanceCustomization';
 import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { ThemeModeSession } from '../model/settings/ThemeModeSession';
@@ -6,7 +7,7 @@ import { ThemeColorSession } from '../model/settings/ThemeColorSession';
 import type { ThemeColorHost } from '../model/settings/ThemeColorSession';
 import type { ThemeId } from '../model/ThemeCatalog';
 import { UNLOCKED_CONTENTS_KEY, isThemeAvailable } from '../model/ThemeCatalog';
-import { readSavedThemeColor, 保存颜色主题 } from '../model/颜色主题存储';
+import { readSavedThemeColor, 保存颜色主题, 保存自定义颜色主题 } from '../model/颜色主题存储';
 import type { AppThemeMode, ThemeModeHost } from '../model/settings/ThemeModeSession';
 import { readSavedThemeMode, 保存主题模式 } from '../model/主题存储';
 import { 解析是否深色 } from '../model/主题设置';
@@ -49,7 +50,9 @@ class AppThemeColorHost implements ThemeColorHost {
   /** @throws {Error} 严格读取失败传回调用方。 */
   readSavedColor(): Promise<ThemeId> { return readSavedThemeColor(); }
   /** @throws {Error} 持久化失败由会话返回未确认结果。 */
-  saveColor(theme: ThemeId): Promise<void> { return 保存颜色主题(theme); }
+  saveColor(theme: ThemeId, customAccent?: string, adaptation?: AccentAdaptation): Promise<void> {
+    return customAccent !== undefined ? 保存自定义颜色主题(customAccent, adaptation) : 保存颜色主题(theme);
+  }
   isAvailable(theme: ThemeId): boolean {
     return isThemeAvailable(theme, AppStorage.get<string[]>(UNLOCKED_CONTENTS_KEY) ?? []);
   }

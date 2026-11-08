@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { noteTypeText } from '../../utils/NoteTypeText';
 import { showToastSafely, resourceText } from '../../utils/UiFeedback';
@@ -51,6 +52,7 @@ import type { NotetypeNameId } from '../../proto/messages/NotetypeMessages';
 @Component
 export struct 笔记类型管理面板 {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp(颜色键.动作主色) private materialAccent: string = '#2F5FD0';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
@@ -205,7 +207,7 @@ export struct 笔记类型管理面板 {
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .padding(应用尺寸.间距_12)
-    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.isDark, this.materialAccent, '', 应用尺寸.圆角_卡片))
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.isDark, this.materialAccent, '', 应用尺寸.圆角_卡片, this.moduleOpacity))
   }
 
   private openCreate(sourceId: number = 0, sourceName: string = ''): void {

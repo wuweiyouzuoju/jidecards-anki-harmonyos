@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { loadComponentLogic } from './platform-module-harness.mjs';
 import { uiFeedback } from './ui-feedback-harness.mjs';
 import { surfaceMotionApi } from './motion-harness.mjs';
-import { THEME_CATALOG, isThemeAvailable } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
+import { THEME_CATALOG, isThemeAvailable, selectableThemes } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 
 const resource = key => ({ id: key, type: 10003, params: [key] });
 const read = path => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
@@ -21,7 +21,7 @@ function appearanceHarness(locale = 'base') {
     }
   } }) };
   const Appearance = loadComponentLogic('components/settings/外观分组.ets', '外观分组', {
-    ...uiFeedback, ...surfaceMotionApi(), $r: resource, THEME_CATALOG, isThemeAvailable,
+    ...uiFeedback, ...surfaceMotionApi(), $r: resource, THEME_CATALOG, isThemeAvailable, selectableThemes, DEFAULT_CUSTOM_ACCENT: '#5B6B8A',
     CustomDialogController: class { constructor() { assert.fail('theme selection must not create a gift popup'); } },
     DialogAlignment: {}, Color: {}
   });

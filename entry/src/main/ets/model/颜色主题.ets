@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { adaptedAccent } from './AppearanceCustomization';
 import type { ThemeId } from './ThemeCatalog';
 import { themeDefinition } from './ThemeCatalog';
 
@@ -7,8 +8,8 @@ import { themeDefinition } from './ThemeCatalog';
 // @名称 颜色主题
 //
 // @作用
-// 定义 7 个颜色主题（极光蓝/仙野绿/暗夜紫/碧涛青/活力橙/柠檬金/极简灰），
-// 每个主题由一个种子色派生出 19 个颜色键的完整色板，供 AppStorage 全局绑定。
+// 定义 ThemeCatalog 登记的预设与自定义颜色主题，
+// 每个主题由一个种子色派生出语义色板，供 AppStorage 全局绑定。
 // 极简灰主题跳过色阶算法，使用硬编码纯灰调色板（WCAG 2.1 AA 验证通过）。
 // 与 主题模式（system/light/dark）正交——这是主色调维度。
 //
@@ -35,7 +36,7 @@ import { themeDefinition } from './ThemeCatalog';
 //         不跟随主色变化，让用户通过颜色快速识别卡片状态。
 // - 每个主题提供浅色+深色两套配色，由 是否深色 决定使用哪套（构建完整色阶 自动选档）。
 // 主题种子色取自 ArcoDesign 色板（https://arco.design/palette/list），均经 WCAG AA/AAA 验证。
-// 7 个主题枚举值与 preferences 持久化字符串一一对应，不得改名。
+// 主题枚举值与 preferences 持久化字符串一一对应，不得改名。
 //
 // @副作用
 // 无。本文件为纯函数与常量定义，不读不写状态。
@@ -285,7 +286,7 @@ export function 规范化颜色主题(值: string): 颜色主题 {
 // @副作用
 // 无。
 // ========================================================
-export function 解析主题色板(主题: 颜色主题, 是否深色: boolean): 主题色板 {
+export function 解析主题色板(主题: 颜色主题, 是否深色: boolean, customSeed: string = '', adaptation: number = 100): 主题色板 {
   // 新卡计数色（蓝）：浅色 #2E63BC / 深色 #7C9AE8，所有主题通用
   // （AppGallery 审核修复：原浅色 #366ECE 配各主题页面底色微染 4.2~4.4 压线不达标，再加深一档）
   const 新卡计数色: string = 是否深色 ? '#7C9AE8' : '#2E63BC';
@@ -352,9 +353,28 @@ export function 解析主题色板(主题: 颜色主题, 是否深色: boolean):
     };
   }
 
-  const 种子: string = 取主题种子色(主题);
+  const 种子: string = 主题 === 'custom' && /^#[0-9a-fA-F]{6}$/.test(customSeed) ? customSeed : 取主题种子色(主题);
   const 色阶 = 构建完整色阶(种子, 是否深色);
   const 语义 = 色阶.语义;
+  if (主题 === 'custom') {
+    // 任意 RGB 可能超出预设色阶范围；在真实使用底色上修正文字/按钮对比度。
+    const background: string = 是否深色 ? 深色卡片底色 : 浅色卡片底色常量;
+    const readable: string = customContrastColor(语义.主色文字, background, 4.5, 是否深色 ? '#FFFFFF' : '#000000');
+    语义.主色文字 = readable;
+    语义.主色图标 = readable;
+    语义.按钮背景主色 = customContrastColor(语义.按钮背景主色, '#FFFFFF', 4.5, '#000000');
+    语义.按钮背景按下 = customContrastColor(语义.按钮背景按下, '#FFFFFF', 4.5, '#000000');
+    // 用户可分别控制深浅色自动适配；0保留原色，100沿用完整色阶和对比度处理。
+    语义.主色 = adaptedAccent(种子, 语义.主色, adaptation);
+    语义.主色悬停 = adaptedAccent(种子, 语义.主色悬停, adaptation);
+    语义.主色按下 = adaptedAccent(种子, 语义.主色按下, adaptation);
+    语义.主色文字 = adaptedAccent(种子, 语义.主色文字, adaptation);
+    语义.主色图标 = adaptedAccent(种子, 语义.主色图标, adaptation);
+    语义.按钮背景主色 = adaptedAccent(种子, 语义.按钮背景主色, adaptation);
+    语义.按钮背景按下 = adaptedAccent(种子, 语义.按钮背景按下, adaptation);
+    语义.主色边框 = adaptedAccent(种子, 语义.主色边框, adaptation);
+  }
+
 
   // 2.1.4.2 华为规范: 可交互控件活动状态背板 vs 卡片底 ≥ 2.2:1
   //   浅色模式 主色容器(选中态/Tag底色) 与白底 #FFFFFF 需 ≥ 2.2:1
@@ -432,11 +452,20 @@ export function 颜色主题色块(主题: 颜色主题): string {
  * 调用方用 linearGradient 把这 3 档渲染为色阶预览，让用户在选 chip 时就能看到该主题的色阶层次，
  * 而非单一纯色——蓝紫等冷色主题与暖色主题都能通过渐变看出"颜色丰富度"差异。
  */
-export function 颜色主题渐变档(主题: 颜色主题): string[] {
+export function 颜色主题渐变档(主题: 颜色主题, customSeed: string = ''): string[] {
   const preview: string[] = themeDefinition(主题).previewColors;
   if (preview.length > 0) return preview;
-  const 种子: string = 取主题种子色(主题);
+  const 种子: string = 主题 === 'custom' && /^#[0-9a-fA-F]{6}$/.test(customSeed) ? customSeed : 取主题种子色(主题);
   const 色阶 = 构建完整色阶(种子, false);
   // shades[0]=shade 1 极浅，shades[3]=shade 4 中浅，shades[5]=shade 6 种子色（= primary）
   return [色阶.色阶[0], 色阶.色阶[3], 色阶.色阶[5]];
+}
+
+/** 保持原色相倾向，逐步混入明暗端点直至满足对比度。 */
+function customContrastColor(color: string, background: string, minimum: number, endpoint: string): string {
+  for (let step: number = 0; step <= 100; step++) {
+    const candidate: string = 混合十六进制色(color, endpoint, step / 100);
+    if (对比度(candidate, background) >= minimum) return candidate;
+  }
+  return endpoint;
 }

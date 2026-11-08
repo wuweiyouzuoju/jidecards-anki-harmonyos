@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WALLPAPER_KEY, WALLPAPER_OPACITY_KEY, WALLPAPER_LIGHT_KEY, WALLPAPER_DARK_KEY } from '../../model/AppearanceCustomization';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../../model/ThemeCatalog';
 import {
   ThemeBackgroundPose, initialThemeBackgroundPoses, nextThemeBackgroundPoses, sampleThemeBackgroundPoses, DEFAULT_BACKGROUND_CYCLE_MS
@@ -16,6 +17,11 @@ import { SeriesVisual } from '../../utils/SeriesVisual';
  */
 @Component
 export struct ThemeBackground {
+  @StorageProp('surface_material') @Watch('updatePlayback') private material: string = 'flat';
+  @StorageProp(WALLPAPER_KEY) @Watch('updatePlayback') private wallpaper: string = '';
+  @StorageProp(WALLPAPER_OPACITY_KEY) private wallpaperOpacity: number = 100;
+  @StorageProp(WALLPAPER_LIGHT_KEY) private lightMask: number = 0.2;
+  @StorageProp(WALLPAPER_DARK_KEY) private darkMask: number = 0.45;
   @Prop @Watch('updatePlayback') transitionActive: boolean = false;
   @StorageProp(THEME_VISUALS_KEY) @Watch('updatePlayback') private visual: ThemeDefinition = themeDefinition('aurora');
   @StorageProp(THEME_MOTION_KEY) @Watch('updatePlayback') private motion: boolean = true;
@@ -37,7 +43,7 @@ export struct ThemeBackground {
   /** 重复可见通知不重启当前轮次，关闭开关时保留当下画面。 */
   private updatePlayback(): void {
     if (!this.mounted) return;
-    if (this.visual.backgroundTextures.length === 0 || !this.motion || !this.foreground || !this.visible || this.transitionActive) {
+    if (this.material !== 'glass' || this.wallpaper !== '' || this.visual.backgroundTextures.length === 0 || !this.motion || !this.foreground || !this.visible || this.transitionActive) {
       this.pauseMotion();
       return;
     }
@@ -79,21 +85,38 @@ export struct ThemeBackground {
     this.generation++;
   }
 
+  private isFlat(): boolean { return this.material !== 'glass'; }
+
+  private textures(): string[] { return !this.isFlat() && this.wallpaper === '' ? this.visual.backgroundTextures : []; }
+
   private seriesPalette(): VisualPalette {
-    return SeriesVisual.palette(SeriesVisual.isDark(this.themeMode, this.systemDark), this.actionColor, this.baseColor);
+    const palette: VisualPalette = SeriesVisual.palette(SeriesVisual.isDark(this.themeMode, this.systemDark), this.actionColor, this.baseColor);
+    // 根背景和扁平页面壳使用同一纯色；背景不读取当前页面或页面局部尺寸。
+    palette.page = this.baseColor;
+    return palette;
   }
 
   build() {
     Stack() {
-      SharedPageBackground({ isDark: SeriesVisual.isDark(this.themeMode, this.systemDark), palette: this.seriesPalette() })
+      SharedPageBackground({ reduceTransparency: this.isFlat(), isDark: SeriesVisual.isDark(this.themeMode, this.systemDark), palette: this.seriesPalette() })
         .width('100%').height('100%')
-      ForEach(this.visual.backgroundTextures, (texture: string, index: number) => {
+      ForEach(this.textures(), (texture: string, index: number) => {
         Image($rawfile(texture))
           .width('130%').height('130%').objectFit(ImageFit.Fill).draggable(false)
           .translate({ x: `${this.poses[index].x * 100}%`, y: `${this.poses[index].y * 100}%` })
           .scale({ x: this.poses[index].scale, y: this.poses[index].scale })
           .opacity(this.poses[index].opacity)
       }, (texture: string): string => texture)
+      if (this.wallpaper !== '') {
+        Stack() {
+          Image('file://' + this.wallpaper).width('100%').height('100%').objectFit(ImageFit.Cover)
+            .onError((): void => { console.warn('[appearance] Wallpaper unavailable'); })
+          Column().width('100%').height('100%')
+            .backgroundColor(SeriesVisual.isDark(this.themeMode, this.systemDark) ? '#000000' : '#FFFFFF')
+            .opacity(SeriesVisual.isDark(this.themeMode, this.systemDark) ? this.darkMask : this.lightMask)
+            .hitTestBehavior(HitTestMode.None)
+        }.width('100%').height('100%').opacity(this.wallpaperOpacity / 100)
+      }
     }
     .width('100%').height('100%').backgroundColor(this.baseColor).clip(true)
     .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')

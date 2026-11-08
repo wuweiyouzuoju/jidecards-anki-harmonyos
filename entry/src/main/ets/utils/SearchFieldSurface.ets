@@ -13,8 +13,7 @@ export class SearchFieldSurface implements AttributeModifier<TextInputAttribute>
     const glass: boolean = this.material === 'glass';
     instance.backgroundBlurStyle(BlurStyle.NONE).backdropBlur(0)
       .backgroundColor(glass ? themedGlassFill(this.dark ? '#80121820' : '#66FFFFFF', this.dark, this.accent) : $r('app.color.surface_card'))
-      .linearGradient({ angle: 135, colors: glass ? [[this.dark ? '#04FFFFFF' : '#08FFFFFF', 0], ['#00FFFFFF', 1]] :
-        [['#00FFFFFF', 0], ['#00FFFFFF', 1]] });
+      .linearGradient({ angle: 135, colors: [['#00FFFFFF', 0], ['#00FFFFFF', 1]] });
     instance.border(SurfaceBorder.materialOptions(this.material, this.dark)).borderRadius(this.radius);
   }
 }

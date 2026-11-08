@@ -1,3 +1,4 @@
+import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../model/SurfaceMaterial';
 import { insetMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 颜色键 } from '../model/颜色主题';
@@ -10,6 +11,7 @@ import { resourceText } from '../utils/UiFeedback';
 /** 详情主操作与显示答案共用高度、字体和圆角，表面复用公共玻璃操作按钮。 */
 @Component
 export struct 开始学习按钮 {
+  @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp('themeMode') private themeMode: string = 'system';
@@ -29,7 +31,7 @@ export struct 开始学习按钮 {
     .border(SurfaceBorder.options(应用尺寸.卡片边框))
     .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, GLASS_HIGHLIGHT_COLORS,
       $r('app.color.surface_card'), false, this.actionColor,
-      this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark))).stateEffect(false)
+      this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark), buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial))).stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板).clip(true).enabled(this.isAvailable)
     .accessibilityText(resourceText(this.getUIContext(), this.文案))
     .onClick((): void => { if (this.isAvailable) this.开始学习回调(); })

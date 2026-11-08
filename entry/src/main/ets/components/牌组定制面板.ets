@@ -49,7 +49,7 @@ import { DECK_LIST_NARROW_KEY } from '../model/DeckListAppearance';
 // ========================================================
 
 import { common } from '@kit.AbilityKit';
-import { IBestImageCropper } from '@ibestservices/ibest-ui';
+import { ImageCropViewport } from './common/ImageCropViewport';
 import { IBestImageCropperController } from '@ibestservices/ibest-ui';
 import { loadDeckBackground, releaseDeckBackground } from '../backend/DeckBackgroundImage';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -462,19 +462,9 @@ export struct 牌组定制面板 {
           // 组件高度 = 预览高度 * 3，给用户足够的拖动空间；裁剪框尺寸 = 预览尺寸（与实机一致）
           if (this.预览宽度 > 0 && this.预览高度 > 0 && this.待裁剪Uri !== '') {
             Column() {
-              IBestImageCropper({
-                componentWidth: this.预览宽度,
-                componentHeight: this.预览高度 * 3,
-                url: this.待裁剪Uri,
-                shape: 'rect',
-                centerWidth: this.预览宽度,
-                centerHeight: this.预览高度,
-                showBorder: true,
-                bdColor: this.动作主色,
-                maxScale: 4,
-                enableRotate: false,
-                controller: this.裁剪器控制器
-              })
+              ImageCropViewport({ uri: this.待裁剪Uri, cropWidth: this.预览宽度,
+                cropHeight: this.预览高度, viewportHeight: this.预览高度 * 3,
+                accent: this.动作主色, controller: this.裁剪器控制器 })
             }
             .width('100%')
             .height(this.预览高度 * 3)

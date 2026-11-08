@@ -1,3 +1,4 @@
+import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
@@ -27,6 +28,7 @@ import { NoteDraftPreviewPageParams } from '../model/navigation/PageParams';
 @Component
 export struct EditNotePage {
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
+  @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   targetId: number = 0;
@@ -149,7 +151,7 @@ export struct EditNotePage {
             .stateEffect(false)
             .onClick((): void => { this.load(); })
           }
-        }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial))
+        }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial, this.wallpaperPath))
       }
     }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
       .translate({ x: this.navigationOffset })

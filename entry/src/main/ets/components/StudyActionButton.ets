@@ -1,3 +1,4 @@
+import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { GlassSurface } from '../utils/GlassSurface';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
@@ -10,6 +11,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
  */
 @Component
 export struct StudyActionButton {
+  @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
   @Prop label: ResourceStr;
@@ -19,6 +21,10 @@ export struct StudyActionButton {
   @Prop labelColor: ResourceColor = $r('app.color.text_primary');
   @Prop fillColor: ResourceColor = $r('app.color.surface_card');
   onActivate: () => void = (): void => {};
+
+  private buttonOpacityPercent(): number {
+    return buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial);
+  }
 
   build() {
     Button({ type: ButtonType.Normal }) {
@@ -45,7 +51,7 @@ export struct StudyActionButton {
       .fontSize(this.labelFontSize)
       .fontColor(this.labelColor)
       // 公共多态表面拥有按压反馈，不叠加 Button 默认效果。
-      .attributeModifier(new GlassSurface(this.surfaceMaterial, this.glassColors, this.fillColor))
+      .attributeModifier(new GlassSurface(this.surfaceMaterial, this.glassColors, this.fillColor, undefined, false, this.buttonOpacityPercent()))
       .stateEffect(false)
       .borderRadius(应用尺寸.圆角_面板)
       .onClick((): void => {

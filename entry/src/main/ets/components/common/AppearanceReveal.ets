@@ -21,6 +21,7 @@ export struct AppearanceReveal {
   private played: boolean = false;
   @Prop colors: string[] = themeDefinition('iridescent').lightActionColors;
   @Prop gift: boolean = false;
+  @Prop @Watch('settleMotion') ready: boolean = true;
   @Prop label: ResourceStr = '';
   @StorageProp('themeMode') private themeMode: string = 'system';
   @StorageProp('systemDarkMode') private systemDark: boolean = false;
@@ -39,24 +40,26 @@ export struct AppearanceReveal {
 
   private revealGift(): void {
     this.mounted = true;
-    if (this.played) return;
+    if (this.played || this.ready === false || (!this.gift && !this.foreground && this.motion)) return;
     this.played = true;
     if (!this.motion || !this.foreground || prefersReducedMotion(this.getUIContext())) {
       this.revealed = true;
       this.burst = true;
       return;
     }
-    this.getUIContext().animateTo({ duration: 560, curve: Curve.FastOutSlowIn }, (): void => {
+    this.getUIContext().animateTo({ duration: 560, delay: this.gift ? 0 : 140, curve: Curve.FastOutSlowIn }, (): void => {
       this.revealed = true;
     });
-    this.getUIContext().animateTo({ duration: 1400, delay: 120, curve: Curve.EaseOut }, (): void => {
+    this.getUIContext().animateTo({ duration: 1400, delay: this.gift ? 120 : 260, curve: Curve.EaseOut }, (): void => {
       this.burst = true;
     });
   }
 
   /** 关闭动态效果或进入后台时直接落到静态礼物，不在回前台后重复庆祝。 */
   private settleMotion(): void {
-    if (!this.mounted || !this.played || (this.motion && this.foreground)) return;
+    if (!this.mounted) return;
+    if (!this.played) { this.revealGift(); return; }
+    if (this.motion && this.foreground) return;
     this.getUIContext().animateTo({ duration: 0 }, (): void => {
       this.revealed = true;
       this.burst = true;
@@ -75,6 +78,13 @@ export struct AppearanceReveal {
       Image($rawfile('themes/iridescent_cloud_2.png')).width(180).height(160)
         .translate({ x: 34, y: 12 }).opacity(this.revealed ? 0.45 : 0)
         .scale({ x: this.revealed ? 1 : 0.6, y: this.revealed ? 1 : 0.6 })
+      } else {
+        // 预览用局部对比色带展示玻璃下的轮廓变化。
+        Row({ space: 8 }) {
+          Row().width('28%').height(100).borderRadius(20).backgroundColor('#547BBD')
+          Row().width('24%').height(100).borderRadius(20).backgroundColor('#799DCD')
+          Row().width('18%').height(100).borderRadius(20).backgroundColor('#A481B6')
+        }.width('94%').justifyContent(FlexAlign.Center).rotate({ angle: -15 })
       }
       Circle().width(140).height(140).fill(Color.Transparent).stroke(this.colors[1]).strokeWidth(1)
         .scale({ x: this.burst ? 1.35 : 0.65, y: this.burst ? 1.35 : 0.65 })
@@ -99,6 +109,7 @@ export struct AppearanceReveal {
             Row().width('55%').height(6).backgroundColor(this.colors[1]).opacity(0.16).borderRadius(3)
           }.alignItems(HorizontalAlign.Start).padding(20).width('76%')
             .attributeModifier(SeriesVisual.surfaceFor('glass', SeriesVisual.isDark(this.themeMode, this.systemDark), this.colors[0]))
+            .backgroundEffect({ radius: 24, saturation: 1, brightness: 1, color: Color.Transparent })
             .borderRadius(20).clip(true)
         }
       }

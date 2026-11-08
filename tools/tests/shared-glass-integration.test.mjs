@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
+import {loadSharedMenu, sharedSource} from './shared-menu-harness.mjs';
 import assert from 'node:assert/strict';
 import { surfaceMotionApi } from './motion-harness.mjs';
 import { loadComponentLogic } from './platform-module-harness.mjs';
@@ -7,7 +8,7 @@ import { glassContour, glassMesh, glassDistance, glassSample } from '../../../�
 import { actionMenuBubbleOutline, ActionMenuPointerSide } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
 function panel({api=23, source='body'}={}) {
   const timers=new Map(); let next=0, entries=0, prepared=0;
-  const Panel=loadComponentLogic('components/common/GlassPanel.ets','GlassPanel',{
+  const Panel=loadSharedMenu('PopupPanel.ets','SharedGlassPanel',{
   takePopupTrigger:()=>undefined,
     hilog:{info(){},warn(){}}, Curve:{EaseOut:'ease-out'},
     supportsGlassBackdrop:()=>api>=23, currentGlassSource:()=>source, retainGlassPanel:()=>{}, releaseGlassPanel:()=>{},
@@ -15,7 +16,7 @@ function panel({api=23, source='body'}={}) {
     materialPopupAnimation:()=>({duration:150}), SurfaceTransition:surfaceMotionApi().SurfaceTransition,
     setTimeout:fn=>{timers.set(++next,fn);return next;},clearTimeout:id=>timers.delete(id)
   });
-  const p=new Panel();p.getUniqueId=()=>1;p.material='glass';p.foreground=true;
+  const p=new Panel();p.getUniqueId=()=>1;Object.assign(p.theme,{material:'glass',foreground:true,supported:api>=23});p.source=source;
   p.getUIContext=()=>({animateTo:(_options,update)=>{entries++;update();}});
   p.onPrepared=()=>prepared++;
   return {p,timers,entries:()=>entries,prepared:()=>prepared};
@@ -105,6 +106,58 @@ test('home source freezes while the embedded deck preview menu retains its panel
  api.releaseGlassPanel('home');assert.equal(api.sourceCaptureAllowed('home'),true);
 });
 
+for (const surface of ['home', 'deck-details']) test(`a frozen ${surface} with no cached glass frame captures once before keeping the backdrop frozen`, async () => {
+  const {readFileSync} = await import('node:fs');
+  const {loadPlatformSource} = await import('./platform-module-harness.mjs');
+  const source = readFileSync(new URL('../../entry/src/main/ets/utils/GlassBackdrop.ets', import.meta.url), 'utf8');
+  const home = surface === 'home' ? 'jide-glass-home-source' : 'jide-glass-deck-details-source';
+  if (surface === 'deck-details') {
+    const details = readFileSync(new URL('../../entry/src/main/ets/components/home/HomeDeckDetails.ets', import.meta.url), 'utf8');
+    assert.match(details, /GlassSource\(\{ sourceId: GLASS_DECK_DETAILS_SOURCE, freezeDuringPanels: true \}\)/);
+  }
+  const policy = loadPlatformSource(source.slice(source.indexOf('const frozenSources:')),
+    '({setGlassSourceFreeze, retainGlassPanel, sourceCaptureAllowed, setGlassSourceScrolling})',
+    {captureAllowed: () => true, GLASS_HOME_SOURCE: 'jide-glass-home-source', GLASS_DECK_DETAILS_SOURCE: 'jide-glass-deck-details-source'});
+  policy.setGlassSourceFreeze(home, true);
+  policy.retainGlassPanel(home);
+  policy.setGlassSourceFreeze('inline-editor', true);
+  policy.retainGlassPanel('inline-editor');
+  assert.equal(policy.sourceCaptureAllowed('inline-editor', true), false);
+  policy.setGlassSourceScrolling(home, true);
+  assert.equal(policy.sourceCaptureAllowed(home, true), false);
+  policy.setGlassSourceScrolling(home, false);
+
+  const shared = sharedSource('harmony/shared/GlassBackdrop.ets');
+  const Session = loadPlatformSource(
+    shared.slice(shared.indexOf('class BackdropSession'), shared.indexOf('const sessions:')),
+    'BackdropSession', {
+      deviceInfo: {apiAvailable: () => true},
+      effectKit: {TileMode: {CLAMP: 0}, createEffect: () => ({
+        blur: () => ({getEffectPixelMap: async () => ({release() {}})})
+      })},
+      hilog: {info() {}, warn() {}}
+    });
+  const node = {getMeasuredSize: () => ({width: 400, height: 800}), getPositionToWindow: () => ({x: 0, y: 0})};
+  const session = new Session({getWindowId: () => 1, getFrameNodeById: () => node, vp2px: value => value}, home);
+  const updates = [];
+  let snapshots = 0, fail = true;
+  session.listeners.add({freezeBackdrop: false, updateFrame: frame => updates.push(frame)});
+  session.canCapture = initial => policy.sourceCaptureAllowed(home, initial);
+  session.capturePixels = async () => {
+    snapshots++;
+    if (fail) throw new Error('snapshot unavailable');
+    return {getImageInfoSync: () => ({size: {width: 400, height: 800}}), release() {}};
+  };
+  await session.capture();
+  assert.equal(updates.length, 0);
+  fail = false;
+  await session.capture();
+  assert.equal(updates.length, 1, 'the missing first frame must reach the waiting glass panel');
+  await session.capture();
+  assert.equal(snapshots, 2, 'a completed frame must restore the normal panel freeze');
+  assert.equal(session.busy, false);
+});
+
 test('all app custom dialog and popup hosts retain shared glass ownership', async()=>{
   const {readdirSync,readFileSync}=await import('node:fs');
   const {join}=await import('node:path');
@@ -129,7 +182,7 @@ test('opaque reading dialog opens immediately without waiting for a glass textur
 
 test('glass sampling remains enabled in explicit and system dark modes',()=>{
  for(const [mode,systemDark] of [['light',false],['dark',false],['system',true]]) {
-  const h=panel();h.p.mode=mode;h.p.systemDark=systemDark;h.p.aboutToAppear();
+  const h=panel();h.p.theme.dark=mode==='dark'||mode==='system'&&systemDark;h.p.aboutToAppear();
   assert.equal(h.p.usesGlass(),true);assert.equal(h.p.panelOpacity,.01);assert.equal(h.timers.size,0);
   h.p.finish();assert.equal(h.p.panelOpacity,1);assert.equal(h.prepared(),1);
  }
@@ -150,8 +203,8 @@ test('native glass preview in flat mode permits capture only while its own previ
  assert.equal(api.sourceCaptureAllowed('home'),false);
 });
 test('explicit glass preview prepares glass without changing the saved flat material',()=>{
- const h=panel();h.p.material='flat';h.p.materialOverride='glass';h.p.source='home';h.p.aboutToAppear();
- assert.equal(h.p.usesGlass(),true);h.p.finish();assert.equal(h.p.material,'flat');h.p.aboutToDisappear();
+ const h=panel();h.p.theme.material='flat';h.p.materialOverride='glass';h.p.source='home';h.p.aboutToAppear();
+ assert.equal(h.p.usesGlass(),true);h.p.finish();assert.equal(h.p.theme.material,'flat');h.p.aboutToDisappear();
 });
 
 test('flat-mode preview prewarms visible home content and stops warming when hidden or dismissed',()=>{
@@ -198,21 +251,33 @@ test('branch menus retain primary width and right edge through expansion on narr
 });
 
 
-test('nested menu samples only the preceding panels and releases its independent sampling session', async () => {
+test('all composite menu layers share the page source without recursively sampling parent menus', async () => {
  const { readFileSync } = await import('node:fs');
- const calls=[];
  const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{ takePopupTrigger:()=>undefined, Scroller: class {},
-   应用尺寸:{compactMenuWidth:168}, warmGlassSource:(_ui,id,active)=>calls.push([id,active])
+   应用尺寸:{compactMenuWidth:168}, currentGlassSource:()=> 'page'
  });
- const menu=new Menu(); menu.getUniqueId=()=>42; menu.getUIContext=()=>({});
- menu.aboutToAppear(); menu.warmLayers(); menu.aboutToDisappear();
- assert.equal(menu.layerSource,'jide-menu-layer-42');
- assert.deepEqual(calls,[['jide-menu-layer-42',true],['jide-menu-layer-42',false]]);
+ const menu=new Menu(); menu.getUIContext=()=>({});menu.aboutToAppear();
+ assert.equal(menu.menuSource,'page');
  const code=readFileSync(new URL('../../entry/src/main/ets/components/common/CardActionMenu.ets',import.meta.url),'utf8');
- assert.ok(code.indexOf('.id(this.layerSource)') < code.indexOf('MenuBubble({ source: this.layerSource'));
- assert.match(code,/MenuBubble\(\{ source: this.layerSource/);
- const bubble=readFileSync(new URL('../../entry/src/main/ets/components/common/MenuBubble.ets',import.meta.url),'utf8');
- assert.match(bubble,/GlassBubblePanel\(\{ source: this.source/);
+ assert.doesNotMatch(code,/warmGlassSource|layerSource/);
+ for (const component of ['MenuBubble','GlassBubblePanel','GlassPanel'])
+  assert.ok(code.includes(component+'({ source: this.menuSource'));
+ assert.match(code,/refractionSource: this.menuSource,/);
+});
+
+test('toolbar menu keeps its main panel aligned with a split-pane button as branches expand', () => {
+ const Menu=loadComponentLogic('components/common/CardActionMenu.ets','CardActionMenu',{
+  Scroller:class{},应用尺寸:{compactMenuWidth:168,cardActionGroupWidth:140,间距_8:8}
+ });
+ const menu=new Menu();
+ Object.assign(menu,{viewportWidth:1200,contentWidth:840,viewportLeft:20,viewportTop:10,
+  toolbarRight:320,toolbarBottom:80,safeLeft:20,safeRight:0,menuWidth:168,
+  items:[{id:'group',children:[{id:'item'}]}]});
+ for(const expandedIds of [[],['group']]) {
+  menu.expandedIds=expandedIds;
+  assert.equal(menu.toolbarLeft()+menu.totalWidth(),300);
+  assert.equal(menu.menuTop(),78);
+ }
 });
 
 
@@ -256,16 +321,16 @@ test('fusion paints the unwarped original button after its complete glass mesh',
   hilog:{info(){},warn(){}},setTimeout:()=>0,
   drawing:{Brush,Pen,Path,ShaderEffect:{createImageShader:()=>({})},TileMode:{CLAMP:0},SamplingOptions:class{},
    FilterMode:{FILTER_MODE_LINEAR:0},VertexMode:{TRIANGLES_VERTEXMODE:0},BlendMode:{SRC:0,SRC_OVER:1},
-   ClipOp:{INTERSECT:0},RoundRect:class{constructor(rect){this.rect=rect;}}}
+   ClipOp:{INTERSECT:0,DIFFERENCE:1},RoundRect:class{constructor(rect){this.rect=rect;}}}
  });
  const node=new Node(),pixels={id:'sharp'},frosted={id:'blurred'};
  const mesh={positions:[{x:0,y:0},{x:100,y:0},{x:0,y:200}],texture:[{x:0,y:0},{x:100,y:0},{x:0,y:200}],indices:[0,1,2],edge:[{x:0,y:0}]};
  node.configureFusion(100,200,50,60,mesh,false,1,{x:20,y:30,width:44,height:44,radius:16});
  node.updateFrame({pixels,frosted,left:0,top:0,width:1000,height:1000,scaleX:.5,scaleY:.5});
  const canvas={attachBrush(){},detachBrush(){},drawVertices(){calls.push('mesh');},save(){},restore(){},
-  clipRoundRect(){},drawImageRectWithSrc(image,src,dst){calls.push({image,src,dst});}};
+  clipRoundRect(rect,op){if(op===1)assert.deepEqual(rect.rect,{left:20,top:30,right:64,bottom:74});},drawImageRectWithSrc(image,src,dst){calls.push({image,src,dst});}};
  node.draw({canvas});assert.deepEqual(calls.slice(0,2),['mesh','mesh']);
- assert.deepEqual(calls[2],{image:pixels,src:{left:35,top:45,right:57,bottom:67},dst:{left:20,top:30,right:64,bottom:74}});
+ assert.deepEqual(calls[2],{image:pixels,src:{left:36,top:46,right:56,bottom:66},dst:{left:22,top:32,right:62,bottom:72}});
  calls.length=0;node.configureFusion(100,200,50,60,mesh,false,1);node.draw({canvas});
  assert.deepEqual(calls,['mesh','mesh'],'settled popup has no persistent button cutout or overlay');
  const edges=[{x:0,y:0},{x:10,y:0},{x:30,y:40},{x:30,y:50}];

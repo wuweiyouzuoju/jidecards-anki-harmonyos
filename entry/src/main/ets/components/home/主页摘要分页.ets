@@ -1,7 +1,7 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { namedResourceText, resourceText } from '../../utils/UiFeedback';
 import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
-import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { homeSummaryGeometry, HomeSummaryGeometry, HOME_SUMMARY_HEIGHT } from '../../model/HomeHeaderLayout';
 
 // ========================================================
@@ -161,6 +161,7 @@ struct 柱状图组件 {
 export struct 主页摘要分页 {
 
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @Prop cardHeight: number = HOME_SUMMARY_HEIGHT;
   @Prop compactCard: boolean = false;
   @Prop 主页快照数据: 主页快照;
@@ -255,11 +256,8 @@ export struct 主页摘要分页 {
     .height(this.cardHeight)
     .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
       left: this.pageGeometry().padding, right: this.pageGeometry().padding })
-    .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
     .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
-      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint))
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, undefined, this.moduleOpacity))
   }
 
   // ========================================================
@@ -297,11 +295,8 @@ export struct 主页摘要分页 {
     .height(this.cardHeight)
     .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
       left: this.pageGeometry().padding, right: this.pageGeometry().padding })
-    .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
     .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
-      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint))
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, undefined, this.moduleOpacity))
   }
 
   // 难度刻度标签：桶数 >=5 时取五等分点（0/25%/50%/75%/100% 索引）的难度值；
@@ -389,11 +384,8 @@ export struct 主页摘要分页 {
     .height(this.cardHeight)
     .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
       left: this.pageGeometry().padding, right: this.pageGeometry().padding })
-    .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
     .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
-      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint))
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, undefined, this.moduleOpacity))
   }
 
   // ========================================================
@@ -464,11 +456,8 @@ export struct 主页摘要分页 {
     .height(this.cardHeight)
     .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
       left: this.pageGeometry().padding, right: this.pageGeometry().padding })
-    .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
     .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
-      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint))
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, undefined, this.moduleOpacity))
   }
 
   // ========================================================
@@ -514,11 +503,8 @@ export struct 主页摘要分页 {
     .height(this.cardHeight)
     .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
       left: this.pageGeometry().padding, right: this.pageGeometry().padding })
-    .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
     .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
-      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint))
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, undefined, this.moduleOpacity))
   }
 
   // ========================================================
@@ -562,11 +548,8 @@ export struct 主页摘要分页 {
     .height(this.cardHeight)
     .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
       left: this.pageGeometry().padding, right: this.pageGeometry().padding })
-    .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
     .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
-      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint))
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, undefined, this.moduleOpacity))
   }
 
   // ========================================================
@@ -617,11 +600,8 @@ export struct 主页摘要分页 {
     .height(this.cardHeight)
     .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
       left: this.pageGeometry().padding, right: this.pageGeometry().padding })
-    .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
     .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
-      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint))
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, undefined, this.moduleOpacity))
   }
 
   // ========================================================

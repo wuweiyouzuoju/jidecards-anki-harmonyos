@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ColorMetrics } from '@kit.ArkUI';
+import { MaterialOpacity, moduleOpacityPercent } from '../model/SurfaceMaterial';
 import { tintGlassFill } from '../model/GlassTheme';
 import { SurfaceBorder } from './SurfaceBorder';
 import { SharedSurface, VisualPalette, VisualTokens, visualPalette } from 'jide_foundation';
@@ -26,14 +28,24 @@ export class SeriesVisual {
     };
   }
 
-  static control(material: string, dark: boolean, action: string, radius: number, visible: boolean, fill: ResourceColor | undefined = undefined): SharedSurface {
-    return new ProductControl(dark, material, radius, SeriesVisual.palette(dark, action), visible, fill);
+  static control(material: string, dark: boolean, action: string, radius: number, visible: boolean, fill: ResourceColor | undefined = undefined, opacity: number = 100): SharedSurface {
+    return new ProductControl(dark, material, radius, SeriesVisual.palette(dark, action), visible, fill, opacity);
   }
 
-  static primaryAction(material: string, dark: boolean, action: string, radius: number): SharedSurface {
+  static primaryAction(material: string, dark: boolean, action: string, radius: number, opacity: number = 100): SharedSurface {
     const fill: ResourceColor | undefined = material === 'glass' && SeriesVisual.rgb(action) ?
       (dark ? '#33' : '#26') + action.slice(1) : undefined;
-    return SeriesVisual.control(material, dark, action, radius, true, fill);
+    return SeriesVisual.control(material, dark, action, radius, true, fill, opacity);
+  }
+
+  static buttonFill(fill: ResourceColor, opacity: number): ResourceColor {
+    if (opacity === 100) return fill;
+    try {
+      const color: ColorMetrics = ColorMetrics.resourceColor(fill);
+      return `rgba(${color.red},${color.green},${color.blue},${color.alpha * opacity / 25500})`;
+    } catch (error) {
+      return fill;
+    }
   }
 
   /** 同层级表面只保留一档轻投影；内嵌、深色和扁平表面显式清除。 */
@@ -44,18 +56,18 @@ export class SeriesVisual {
 
   static material(): string { return AppStorage.get<string>('surface_material') ?? 'flat'; }
 
-  static settingsSurface(material: string, dark: boolean, action: string, pageTint: string, radius: number): SharedSurface {
-    return SeriesVisual.clearSurface(material, dark, action, pageTint, radius);
+  static settingsSurface(material: string, dark: boolean, action: string, pageTint: string, radius: number, opacity?: MaterialOpacity): SharedSurface {
+    return SeriesVisual.clearSurface(material, dark, action, pageTint, radius, opacity);
   }
 
   /** 设置及详情模块共用轻透明底层，扁平模式沿用原表面。 */
-  static clearSurface(material: string, dark: boolean, action: string, pageTint: string, radius: number = VisualTokens.cardRadius): SharedSurface {
-    return SeriesVisual.surfaceFor(material, dark, action, pageTint, radius);
+  static clearSurface(material: string, dark: boolean, action: string, pageTint: string, radius: number = VisualTokens.cardRadius, opacity?: MaterialOpacity): SharedSurface {
+    return SeriesVisual.surfaceFor(material, dark, action, pageTint, radius, opacity);
   }
 
   static surfaceFor(material: string, dark: boolean, action: string, pageTint: string = '',
-    radius: number = VisualTokens.cardRadius): SharedSurface {
-    return new ProductSurface(dark, material, radius, SeriesVisual.palette(dark, action, pageTint));
+    radius: number = VisualTokens.cardRadius, opacity?: MaterialOpacity): SharedSurface {
+    return new ProductSurface(dark, material, radius, SeriesVisual.palette(dark, action, pageTint), false, false, opacity);
   }
 
   /** 已有玻璃容器内不重复绘制底色、轮廓和投影。 */
@@ -79,80 +91,49 @@ export class SeriesVisual {
   }
 }
 
-/** 产品材质只调整表面：扁平清除所有旧效果，深色玻璃避免亮白塑料高光。 */
+/** 当前中性表面由公共基础 series 档绘制；本产品只映射资源和偏好。 */
 class ProductSurface extends SharedSurface {
-  private productDark: boolean;
-  private glass: boolean;
-  private nested: boolean;
+  private flatBorder: BorderOptions;
   private productRadius: number;
-  private tintedFill: string;
-  constructor(dark: boolean, material: string, radius: number, palette: VisualPalette, reduce: boolean = false, nested: boolean = false) {
-    super(dark, material, reduce, radius, palette);
-    // 内容保持中性，避免主题染色让左右模块呈现不同色块。
-    this.tintedFill = dark ? '#591C1C1E' : '#52FFFFFF';
-    this.productDark = dark;
-    this.glass = material === 'glass' && !reduce;
-    this.nested = nested;
+  private useFlatBorder: boolean;
+  constructor(dark: boolean, material: string, radius: number, palette: VisualPalette, reduce: boolean = false,
+    nested: boolean = false, opacity?: MaterialOpacity) {
+    super(dark, material, reduce, radius, palette, true, 'content', 'series',
+      opacity === undefined ? -1 : moduleOpacityPercent(opacity, material === 'glass' && !reduce ? 'glass' : 'flat', dark), nested);
     this.productRadius = radius;
+    this.useFlatBorder = material !== 'glass' || reduce;
+    this.flatBorder = SurfaceBorder.contentOptions('flat', dark, nested);
   }
   applyNormalAttribute(instance: CommonAttribute): void {
     super.applyNormalAttribute(instance);
-    instance.shadow(SeriesVisual.shadow(this.glass ? 'glass' : 'flat', this.productDark, this.nested));
-    if (!this.glass) {
-      instance.backgroundColor(this.productDark ? '#1C1C1E' : '#FFFFFF')
-        .border(SurfaceBorder.contentOptions('flat', this.productDark, this.nested)).borderRadius(this.productRadius);
-    } else {
-      instance.backgroundBlurStyle(BlurStyle.NONE).backdropBlur(0)
-        .backgroundColor(this.nested ? Color.Transparent : this.tintedFill)
-        .linearGradient({angle:135,colors:this.nested ? [[Color.Transparent,0],[Color.Transparent,1]] :
-          [['#00FFFFFF',0],['#00FFFFFF',1]]})
-        .border(SurfaceBorder.contentOptions('glass', this.productDark, this.nested)).borderRadius(this.productRadius)
-        .shadow(SeriesVisual.shadow('glass', this.productDark, this.nested));
-    }
+    if (this.useFlatBorder) instance.border(this.flatBorder).borderRadius(this.productRadius);
   }
 }
 
-/** 选中覆盖层由牌组行拥有，基础材质绘制中性底色与公共深色轮廓。 */
 export class SeriesDeckSurface extends ProductSurface {
-  constructor(material: string, dark: boolean, action: string, pageTint: string, radius: number) {
-    super(dark, material, radius, SeriesVisual.palette(dark, action, pageTint));
+  constructor(material: string, dark: boolean, action: string, pageTint: string, radius: number, opacity?: MaterialOpacity) {
+    super(dark, material, radius, SeriesVisual.palette(dark, action, pageTint), false, false, opacity);
   }
 }
-
 
 class ProductControl extends SharedSurface {
   private active: boolean;
-  private controlDarkFlat: boolean;
-  private lightGlass: boolean;
-  private glassControl: boolean;
-  private glassFill: string;
-  private controlOutline: BorderOptions;
+  private flat: boolean;
+  private flatFill: ResourceColor | undefined;
+  private productOpacity: number;
   private controlRadius: number;
-  private controlShadow: ShadowOptions;
-  private controlFill: ResourceColor | undefined;
-  constructor(dark: boolean, material: string, radius: number, palette: VisualPalette, active: boolean, fill: ResourceColor | undefined = undefined) {
-    super(dark, material, false, radius, palette, true, 'control');
-    this.controlFill = fill;
-    this.glassControl = material === 'glass';
-    this.glassFill = tintGlassFill(dark ? '#3D18202B' : '#57FFFFFF', palette.action, dark);
-    this.controlShadow = SeriesVisual.shadow(material, dark);
-    // iOS 按钮的柔白细边只用于操作表面，内容卡继续使用公共模块轮廓。
-    this.controlOutline = material === 'glass' && !dark ?
-      { width: 0.9, color: '#9EFFFFFF' } : SurfaceBorder.materialOptions(material, dark);
-    this.active = active;
-    this.lightGlass = !dark && material === 'glass';
-    this.controlDarkFlat = dark && material !== 'glass';
+  constructor(dark: boolean, material: string, radius: number, palette: VisualPalette, active: boolean,
+    fill: ResourceColor | undefined = undefined, opacity: number = 100) {
+    super(dark, material, false, radius, palette, true, 'control', 'series', opacity);
     this.controlRadius = radius;
+    this.active = active; this.flat = material !== 'glass'; this.flatFill = fill; this.productOpacity = opacity;
   }
   applyNormalAttribute(instance: CommonAttribute): void {
-    if (this.active) {
-      super.applyNormalAttribute(instance);
-      instance.shadow(this.controlShadow);
-      if (this.glassControl) instance.backgroundColor(this.glassFill);
-      if (this.controlFill !== undefined) instance.backgroundColor(this.controlFill);
-      if (this.lightGlass) instance.border(this.controlOutline).borderRadius(this.controlRadius);
-      if (this.controlDarkFlat) instance.border(SurfaceBorder.options()).borderRadius(this.controlRadius);
+    if (!this.active) return;
+    super.applyNormalAttribute(instance);
+    if (this.flat) {
+      instance.border(SurfaceBorder.options()).borderRadius(this.controlRadius);
+      if (this.flatFill !== undefined) instance.backgroundColor(SeriesVisual.buttonFill(this.flatFill, this.productOpacity));
     }
   }
 }
-

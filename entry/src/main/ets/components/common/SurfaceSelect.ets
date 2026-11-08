@@ -1,4 +1,3 @@
-import { GlassFusionRect } from 'jide_foundation';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { GlassPanel } from './GlassPanel';
 import { SelectionValueButton } from './SelectionValueButton';
@@ -81,13 +80,10 @@ export struct SurfaceSelect {
     this.popupAngle = selectionPopupAngle(this.triggerRect, { left: Number(area.globalPosition.x),
       top: Number(area.globalPosition.y), width: Number(area.width), height: Number(area.height) });
   }
-  private buttonOrigin(): GlassFusionRect {
-    return { x: this.triggerRect.left, y: this.triggerRect.top, width: this.triggerRect.width,
-      height: this.triggerRect.height, radius: 12 };
-  }
+
   @Builder
   private choices() {
-    GlassPanel({ fusionAnchor: this.buttonOrigin(), radius: 12, role: 'menu', centerX: this.motionCenterX, centerY: this.motionCenterY, content: (): void => { this.choiceContent(); } })
+    GlassPanel({ radius: 12, role: 'menu', centerX: this.motionCenterX, centerY: this.motionCenterY, content: (): void => { this.choiceContent(); } })
       .onAreaChange((_old: Area, area: Area): void => { this.popupArea(area); })
   }
   @Builder

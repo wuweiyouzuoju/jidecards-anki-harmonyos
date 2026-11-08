@@ -1,3 +1,5 @@
+import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../../model/SurfaceMaterial';
+import { SeriesVisual } from '../../utils/SeriesVisual';
 import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { darkMaterial } from '../../utils/GlassMaterial';
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -43,6 +45,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 按下态按钮 {
+  @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @Prop feedback: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -90,6 +93,10 @@ export struct 按下态按钮 {
       this.selectable && this.selected ? this.resolvedSelectionColor() : SurfaceBorder.color());
   }
 
+  private buttonOpacityPercent(): number {
+    return buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial);
+  }
+
   build() {
     Button() {
       Row({ space: 应用尺寸.间距_8 }) {
@@ -135,9 +142,9 @@ export struct 按下态按钮 {
     .constraintSize({ minWidth: 0, minHeight: 应用尺寸.按钮高度, maxWidth: '100%' })
     .accessibilityText(typeof this.文案 === 'string' ? this.文案 : localizedResourceText(this.getUIContext(), this.uiLanguage, this.文案))
     .fontColor(this.labelColor())
-    .backgroundColor(this.compact && this.selected ? `#1A${this.actionColor.slice(-6)}` : Color.Transparent)
+    .backgroundColor(this.compact && this.selected ? SeriesVisual.buttonFill(`#1A${this.actionColor.slice(-6)}`, this.buttonOpacityPercent()) : Color.Transparent)
     .border(this.buttonBorder())
-    .attributeModifier(this.compact ? new PressFeedback(1, 0.4, true) : new GlassSurface(this.surfaceMaterial, this.glassColors, $r('app.color.surface_card'), this.buttonBorder(), true))
+    .attributeModifier(this.compact ? new PressFeedback(1, 0.4, true) : new GlassSurface(this.surfaceMaterial, this.glassColors, $r('app.color.surface_card'), this.buttonBorder(), true, this.buttonOpacityPercent()))
     .stateEffect(false)
     .borderRadius(this.compact ? 8 : 应用尺寸.圆角_胶囊)
     .enabled(this.是否启用)

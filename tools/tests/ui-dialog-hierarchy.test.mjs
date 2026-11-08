@@ -55,7 +55,7 @@ test('backdrop lifecycle owns one entry and releases exactly its own surface', a
   const {loadComponentLogic} = await import('./platform-module-harness.mjs');
   const hierarchy = new DialogHierarchy();
   const Backdrop = loadComponentLogic('components/common/DialogBackdrop.ets', 'DialogBackdrop', {
-    dialogHierarchy: hierarchy, 应用尺寸: { dialogWidth: '88%', dialogMaxWidth: 480 }
+    DEFAULT_DIALOG_BACKDROP_BLUR: 8, dialogHierarchy: hierarchy, 应用尺寸: { dialogWidth: '88%', dialogMaxWidth: 480 }
   });
   const events = [];
   const parent = new Backdrop();
@@ -84,10 +84,28 @@ test('every custom backdrop feeds its hierarchy size back into the visible surfa
     const source = readFileSync(new URL(file.replaceAll('\\', '/'), root), 'utf8');
     const calls = [...source.matchAll(/\bDialogBackdrop\(/g)];
     if (calls.length === 0) continue;
+    // 菜单仅借用页面磨砂，不把没有表单的背景层计入嵌套窗口尺寸。
+    if (source.includes('tracksHierarchy: false')) {
+      assert.equal(calls.length, 1, file);
+      assert.match(source, /DialogBackdrop\(\{[^}]*tracksHierarchy: false/);
+      continue;
+    }
     count += calls.length;
     assert.equal([...source.matchAll(/onSize:\s*\(width: string, maximumWidth: number\)/g)].length, calls.length, file);
     assert.match(source, /\.width\(this\.surfaceWidth\)/, file);
     assert.match(source, /maxWidth:\s*this\.surfaceMaximumWidth/, file);
   }
   assert.ok(count >= 10, 'audit must include shared frames and legacy surfaces');
+});
+
+
+test('page-only menu backdrops do not shrink the next real dialog',async()=>{
+ const {loadComponentLogic} = await import('./platform-module-harness.mjs');
+ const hierarchy=new DialogHierarchy();
+ const Backdrop=loadComponentLogic('components/common/DialogBackdrop.ets','DialogBackdrop',{
+  DEFAULT_DIALOG_BACKDROP_BLUR:8,dialogHierarchy:hierarchy,应用尺寸:{dialogWidth:'88%',dialogMaxWidth:480}
+ });
+ const menu=new Backdrop();menu.tracksHierarchy=false;menu.aboutToAppear();
+ const next=hierarchy.enter(88,480);assert.equal(next.widthPercent,88);assert.equal(next.maximumWidth,480);
+ menu.aboutToDisappear();hierarchy.leave(next.id);
 });

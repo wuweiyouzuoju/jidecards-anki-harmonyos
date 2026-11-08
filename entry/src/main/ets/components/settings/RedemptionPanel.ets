@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { RedemptionDialog } from './RedemptionDialog';
@@ -21,6 +22,7 @@ import { 颜色主题, 颜色键 } from '../../model/颜色主题';
 @Component
 export struct RedemptionPanel {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('themeMode') private materialMode: string = 'system';
   @StorageProp('systemDarkMode') private materialSystemDark: boolean = false;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -181,7 +183,7 @@ export struct RedemptionPanel {
 
     }
     .padding(16).width('100%').border(SurfaceBorder.options()).borderRadius(20)
-    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.primary, '', 20))
+    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.primary, '', 20, this.moduleOpacity))
   }
   build() {
     this.redemptionDetails()

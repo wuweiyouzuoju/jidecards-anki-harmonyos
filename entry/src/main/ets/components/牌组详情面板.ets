@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 import { rememberPopupTrigger } from '../utils/PopupTrigger';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { AppInterfaceControl } from '../model/AppInterface';
@@ -56,6 +57,7 @@ import { SeriesVisual } from '../utils/SeriesVisual';
 @Component
 export struct 牌组详情面板 {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('publishInterface') private Agent入口已启用: boolean = false;
@@ -239,7 +241,7 @@ export struct 牌组详情面板 {
               }.width('100%')
             }.width('100%').padding(应用尺寸.卡片内边距)
               .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色,
-                this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片))
+                this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片, this.moduleOpacity))
               .attributeModifier(new PressFeedback(1, 0.4, true)).stateEffect(false)
               .onAreaChange((_old: Area, area: Area): void => { this.shortcutAreas.set('name', area); })
               .onClick((): void => { this.activateShortcut('name'); })
@@ -259,7 +261,7 @@ export struct 牌组详情面板 {
             .padding(应用尺寸.卡片内边距)
             .border(SurfaceBorder.options())
             .borderRadius(应用尺寸.圆角_指标卡)
-            .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色, this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片))
+            .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色, this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片, this.moduleOpacity))
 
             DeckStudyHistoryCard({
               search: deckHistorySearch(deck.id, this.主页快照数据.decks),

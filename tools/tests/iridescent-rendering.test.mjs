@@ -1,3 +1,4 @@
+import * as appearance from '../../entry/src/main/ets/model/AppearanceCustomization.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -48,9 +49,9 @@ function createBackground() {
     .replace('export struct ThemeBackground', 'class ThemeBackground')
     .replace(/@(Prop|State|StorageProp|Watch)(?:\([^)]*\))?\s*/g, '');
   const js = stripTypeScriptTypes(methods + '\ngetUIContext() { return context; }\n}', { mode: 'transform' });
-  const values = { ...style, ...catalog, context, Curve: { EaseInOut: 'ease-in-out' }, Date: { now: () => now } };
+  const values = { ...appearance, ...style, ...catalog, context, Curve: { EaseInOut: 'ease-in-out' }, Date: { now: () => now } };
   const background = new Function(...Object.keys(values), js + '\nreturn new ThemeBackground();')(...Object.values(values));
-  Object.assign(background, { mounted: true, visible: true, visual: catalog.themeDefinition('iridescent'), foreground: true });
+  Object.assign(background, { material: 'glass', mounted: true, visible: true, visual: catalog.themeDefinition('iridescent'), foreground: true });
   return { background, animations, advance: ms => { now += ms; } };
 }
 
@@ -331,4 +332,18 @@ test('navigation completion respects background lifecycle, motion preference and
   startTransition();
   assert.equal(background.transitionActive, false);
   assert.equal(background.running, true);
+});
+
+test('flat backgrounds disable every ambient layer for preset and custom colors and stop animation',()=>{
+ const {background,animations}=createBackground();
+ for(const theme of catalog.THEME_CATALOG){
+  background.visual=theme;background.material='flat';
+  assert.equal(background.isFlat(),true,theme.id);assert.deepEqual(background.textures(),[],theme.id);
+  background.updatePlayback();assert.equal(background.running,false);
+ }
+ assert.equal(animations.length,0);
+ background.material='glass';background.visual=catalog.themeDefinition('iridescent');background.updatePlayback();
+ assert.equal(background.running,true);background.material='flat';background.updatePlayback();assert.equal(background.running,false);
+ background.material='glass';assert.deepEqual(background.textures(),background.visual.backgroundTextures);
+ background.wallpaper='/files/test.jpg';assert.deepEqual(background.textures(),[]);
 });

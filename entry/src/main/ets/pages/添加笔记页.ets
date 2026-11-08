@@ -1,3 +1,4 @@
+import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
 import { insetMaterialFill } from '../utils/GlassMaterial';
 import { GlassSource } from '../components/common/GlassSource';
@@ -80,6 +81,7 @@ interface 添加笔记下拉选项 { value: string; }
 @Component
 export struct 添加笔记页 {
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
+  @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
@@ -906,7 +908,7 @@ Column() {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial))
+      .backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial, this.wallpaperPath))
       }
       
 

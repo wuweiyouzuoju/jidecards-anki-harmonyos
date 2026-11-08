@@ -3,9 +3,8 @@ import { SeriesVisual } from './SeriesVisual';
 import { translucentGlassFill, usesGlassMaterial, darkMaterial } from './GlassMaterial';
 import { PressFeedback } from './PressFeedback';
 import { SurfaceBorder } from './SurfaceBorder';
-import { themePressGradient } from './ThemeVisuals';
 
-/** 由 ArkUI 按压状态直接改变色层，不经组件 @State 重建文字或切换透明底。 */
+/** 玻璃表面不叠底色或渐变；按压反馈仍由公共反馈拥有。 */
 export class GlassSurface extends PressFeedback {
   private colors: string[];
   private background: ResourceColor;
@@ -13,11 +12,13 @@ export class GlassSurface extends PressFeedback {
 
   private material: string;
   private stableAnchor: boolean;
+  private buttonOpacity: number;
 
   constructor(material: string, colors: string[], background: ResourceColor = $r('app.color.surface_card'),
-    outline: BorderOptions | undefined = undefined, stableAnchor: boolean = false) {
+    outline: BorderOptions | undefined = undefined, stableAnchor: boolean = false, buttonOpacity: number = 100) {
     super(1, 0.4, stableAnchor);
     this.stableAnchor = stableAnchor;
+    this.buttonOpacity = buttonOpacity;
     this.material = material;
     this.colors = colors;
     this.background = background;
@@ -41,7 +42,8 @@ export class GlassSurface extends PressFeedback {
 
   private applySurface(instance: CommonAttribute, pressed: boolean): void {
     if (!usesGlassMaterial(this.material)) {
-      instance.backgroundColor(darkMaterial() ? '#000000' : '#FFFFFF').backgroundBlurStyle(BlurStyle.NONE).backdropBlur(0)
+      const fill: string = darkMaterial() ? '#000000' : '#FFFFFF';
+      instance.backgroundColor(this.buttonOpacity === 100 ? fill : SeriesVisual.buttonFill(fill, this.buttonOpacity)).backgroundBlurStyle(BlurStyle.NONE).backdropBlur(0)
         .linearGradient({angle:0,colors:[[Color.Transparent,0],[Color.Transparent,1]]})
         .shadow({radius:0,color:Color.Transparent,offsetX:0,offsetY:0}).border(SurfaceBorder.options());
       return;
@@ -50,7 +52,7 @@ export class GlassSurface extends PressFeedback {
 
     instance.backgroundColor(translucentGlassFill(this.background))
       .backgroundBlurStyle(BlurStyle.NONE).backdropBlur(24)
-      .linearGradient({ angle: 110, colors: darkMaterial() ? [['#04FFFFFF',0],['#00FFFFFF',1]] : themePressGradient(this.colors, pressed) })
+      .linearGradient({ angle: 110, colors: [[Color.Transparent, 0], [Color.Transparent, 1]] })
       .shadow(SeriesVisual.shadow(this.material, darkMaterial()))
       .border(this.outline ?? (darkMaterial() ? SurfaceBorder.materialOptions(this.material, true) : SurfaceBorder.options()));
   }

@@ -1,3 +1,4 @@
+import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../../model/SurfaceMaterial';
 import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { SeriesVisual } from '../../utils/SeriesVisual';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -13,6 +14,7 @@ import { hasActionStatus } from '../../model/InteractionFeedback';
 export struct PrimaryActionButton {
   @StorageProp('themeMode') private materialTheme: string = 'system';
   @StorageProp('systemDarkMode') private materialSystemDark: boolean = false;
+  @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(颜色键.主色按钮背景) private primaryBackground: string = '#2F5FD0';
@@ -51,7 +53,7 @@ export struct PrimaryActionButton {
       .fontColor(this.foreground)
       .attributeModifier(SeriesVisual.control('glass', SeriesVisual.isDark(this.materialTheme, this.materialSystemDark),
         this.glassAccent, 应用尺寸.圆角_行动按钮, this.glassSurface, this.resolvedTint()))
-      .backgroundColor(this.resolvedTint())
+      .backgroundColor(SeriesVisual.buttonFill(this.resolvedTint(), buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial)))
       .borderRadius(应用尺寸.圆角_行动按钮)
       .shadow(SeriesVisual.shadow(this.glassSurface ? 'glass' : this.surfaceMaterial, SeriesVisual.isDark(this.materialTheme, this.materialSystemDark)))
       .enabled(this.isInteractive)

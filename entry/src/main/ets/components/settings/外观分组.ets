@@ -1,3 +1,5 @@
+import { AppearanceCustomizationControl } from './AppearanceCustomizationControl';
+import { CUSTOM_ACCENT_KEY, DEFAULT_CUSTOM_ACCENT } from '../../model/AppearanceCustomization';
 import { SurfaceMaterialControl } from './SurfaceMaterialControl';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { isSettingsItemVisible } from '../../model/SettingsStructure';
@@ -8,7 +10,7 @@ import { FormRowLayout } from '../../utils/FormRowLayout';
 
 import { 主题模式 } from '../../model/主题设置';
 import { 设置分组卡片 } from './设置分组卡片';
-import { UNLOCKED_CONTENTS_KEY, THEME_CATALOG, ThemeDefinition, isThemeAvailable, themeDefinition } from '../../model/ThemeCatalog';
+import { UNLOCKED_CONTENTS_KEY, selectableThemes, ThemeDefinition, isThemeAvailable, themeDefinition } from '../../model/ThemeCatalog';
 import { ThemeMotionControl } from './ThemeMotionControl';
 import { MotionStyleControl } from './MotionStyleControl';
 import { CardTextSizeControl } from './CardTextSizeControl';
@@ -40,6 +42,7 @@ import {
 // ========================================================
 @Component
 export struct 外观分组 {
+  @StorageProp(CUSTOM_ACCENT_KEY) private customAccent: string = DEFAULT_CUSTOM_ACCENT;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(UNLOCKED_CONTENTS_KEY) private unlockedContents: string[] = [];
   @State private themeSelectionRevision: number = 0;
@@ -90,7 +93,7 @@ export struct 外观分组 {
 
   /** 展示完整目录，应用主题时仍校验权益。 */
   private displayedThemes(): 颜色主题[] {
-    return THEME_CATALOG.map((theme: ThemeDefinition): 颜色主题 => theme.id);
+    return selectableThemes().map((theme: ThemeDefinition): 颜色主题 => theme.id);
   }
 
   private selectColorTheme(index: number): void {
@@ -120,7 +123,7 @@ export struct 外观分组 {
 
   /** 把 颜色主题渐变档 返回的 3 档 hex 转为 linearGradient 需要的 [color, stop] 数组。 */
   private 色样档位(主题: 颜色主题): Array<[ResourceColor, number]> {
-    const 色档: string[] = 颜色主题渐变档(主题);
+    const 色档: string[] = 颜色主题渐变档(主题, this.customAccent);
     return [
       [色档[0] as ResourceColor, 0.0],
       [色档[1] as ResourceColor, 0.5],
@@ -157,6 +160,7 @@ export struct 外观分组 {
           if (isSettingsItemVisible('theme_motion', this.简洁模式, themeDefinition(this.当前颜色主题).backgroundTextures.length > 0)) {
             ThemeMotionControl({ isDark: this.是否深色 })
           }
+          AppearanceCustomizationControl()
           SurfaceMaterialControl()
           MotionStyleControl()
           DeckWidthControl()

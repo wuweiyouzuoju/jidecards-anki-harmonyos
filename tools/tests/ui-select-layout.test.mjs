@@ -1,3 +1,4 @@
+import {menuPresentation,loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 import { popupAppearance } from '../../entry/src/main/ets/components/common/PopupAppearance.ts';
 import { materialHarness } from './surface-material-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -10,7 +11,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 const root = fileURLToPath(new URL('../../entry/src/main/ets/', import.meta.url));
-const read = path => readFileSync(join(root, path), 'utf8');
+const read = path => menuPresentation(path,readFileSync(join(root, path), 'utf8'));
 
 test('restored custom batch limits remain the selected option instead of highlighting 1000', () => {
   const path = 'components/settings/AIAgent设置分组.ets';
@@ -146,7 +147,7 @@ test('browser subtitle choices share aligned theme selection and dismissal', () 
   assert.doesNotMatch(menu, /[✓✔]/);
   assert.match(item, /@Prop labelAlignment: TextAlign = TextAlign\.Start/);
   assert.match(item, /\.textAlign\(this\.labelAlignment\)/);
-  assert.match(item, /this\.usesAccent\(\) \? this\.accent/);
+  assert.match(item, /this\.usesAccent\(\) \? this\.theme.accent/);
   assert.match(item, /themeLabelGlyphs\(this\.label, this\.accentColors/);
   for (const index of [1, 4, 2]) {
     assert.match(read('model/AppInterface.ts'), new RegExp(`subtitleIndex === ${index}`));
@@ -160,7 +161,7 @@ test('browser subtitle choices share aligned theme selection and dismissal', () 
 
 test('menu rows retain optional centering while card menus align left with arrow clearance', () => {
   const dimensions = loadPlatformModule('utils/应用尺寸.ets', '应用尺寸', {});
-  const MenuItem = loadComponentLogic('components/common/MenuItem.ets', 'AnchoredMenuItem', {
+  const MenuItem = loadSharedMenu('MenuItem.ets', 'SharedMenuItem', {
     应用尺寸: dimensions, TextAlign: { Center: 'center', Start: 'start' }, $r: key => key
   });
   const item = new MenuItem();
@@ -183,7 +184,7 @@ test('menu rows retain optional centering while card menus align left with arrow
   item.icon = undefined;
   assert.equal(item.hasCenteredIcon(), false);
   const source = read('components/common/MenuItem.ets');
-  assert.match(source, /Row\(\{ space: 应用尺寸\.间距_8 \}\)[\s\S]*?ActionIcon\([\s\S]*?this\.labelText\(\)/);
+  assert.match(source, /Row\(\{ space: SharedMenuTokens\.gap \}\)[\s\S]*?ActionIcon\([\s\S]*?this\.labelText\(\)/);
   assert.match(source, /\.justifyContent\(this\.labelAlignment === TextAlign.Center \? FlexAlign.Center : FlexAlign.Start\)/);
   assert.equal((source.match(/ActionIcon\(\{/g) || []).length, 1, 'all icon labels use one real Row, never a separate overlay');
   assert.doesNotMatch(source, /centerIconLabel|menuHorizontalPadding \+ 30/);
@@ -199,11 +200,11 @@ test('menu rows retain optional centering while card menus align left with arrow
 });
 
 test('clear flag remains selected without accent text, rainbow glyphs or accent icon fill', () => {
-  const AnchoredMenuItem = loadComponentLogic('components/common/MenuItem.ets', 'AnchoredMenuItem', {
+  const AnchoredMenuItem = loadSharedMenu('MenuItem.ets', 'SharedMenuItem', {
     TextAlign: { Center: 'center' }, $r: key => key,
     颜色键: { 动作主色: 'accent' }, THEME_TEXT_COLORS_KEY: 'accentColors'
   });
-  const item = new AnchoredMenuItem();
+  const item = new AnchoredMenuItem(); item.theme.iconFill='app.color.menu_icon_fill';
   item.selected = true;
   item.accentColors = ['#ff0000', '#0000ff'];
   assert.equal(item.usesAccent(), true, 'ordinary selected entries still use the active theme');
@@ -212,17 +213,17 @@ test('clear flag remains selected without accent text, rainbow glyphs or accent 
   assert.equal(item.resolvedIconTint(), 'app.color.menu_icon_fill');
   assert.equal(item.selected, true);
   item.selectionUsesAccent = true;
-  item.accent = '#2F5FD0';
+  item.theme.accent = '#2F5FD0';
   assert.equal(item.resolvedIconTint(), '#402F5FD0');
   item.iconTint = '#123456';
   assert.equal(item.resolvedIconTint(), '#123456');
   item.selected = false;
   assert.equal(item.usesAccent(), false);
   const source = read('components/common/MenuItem.ets');
-  assert.match(source, /if \(this\.usesAccent\(\) && this\.accentColors\.length > 0\)/);
-  assert.match(source, /\.fontColor\(this\.usesAccent\(\) \? this\.accent :[\s\S]*?app\.color\.text_primary/);
-  assert.match(source, /ActionIcon\(\{ source: this\.icon, tint: this\.resolvedIconTint\(\) \}\)/);
-  assert.match(read('components/common/ActionIcon.ets'), /\.fillColor\(this\.tint\)/);
+  assert.match(source, /if \(this\.usesAccent\(\) && this\.labelGlyphs\.length > 0\)/);
+  assert.match(source, /\.fontColor\(this\.usesAccent\(\) \? this\.theme.accent :[\s\S]*?this\.theme.text/);
+  assert.match(source, /ActionIcon\(\{ outlineOnly: this\.theme.material === \'glass\', source: this\.icon, tint: this\.resolvedIconTint\(\), semanticStrokeColor: this\.iconTint \}\)/);
+  assert.match(read('components/common/ActionIcon.ets'), /SharedActionIcon\(\{ source: this.source, tint: this.tint/);
 });
 
 test('shared menu surfaces distinguish dark overlays from cards and retain readable neutral labels', () => {

@@ -3,6 +3,10 @@ import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { SURFACE_MATERIAL_KEY, DEFAULT_SURFACE_MATERIAL, GLASS_SUGGESTION_HANDLED_KEY, GLASS_SUGGESTION_PENDING_KEY, isSurfaceMaterial } from '../model/SurfaceMaterial';
+import { MODULE_OPACITY_KEY, FLAT_MODULE_OPACITY_KEY, GLASS_MODULE_OPACITY_KEY, MaterialOpacity,
+  DEFAULT_MODULE_OPACITY, BUTTON_OPACITY_KEY, FLAT_BUTTON_OPACITY_KEY, GLASS_BUTTON_OPACITY_KEY,
+  DEFAULT_BUTTON_OPACITY, DIALOG_OPACITY_KEY, FLAT_DIALOG_OPACITY_KEY, GLASS_DIALOG_OPACITY_KEY,
+  DEFAULT_DIALOG_OPACITY, validModuleOpacity } from '../model/SurfaceMaterial';
 import { saveLocalPreference } from './LocalPreferenceWrite';
 
 /** @throws {Error} 缺少应用上下文时由设置控件或 JIDE 展示失败。 */
@@ -16,8 +20,14 @@ function surfacePreferences(): preferences.Preferences {
 export function initializeSurfaceMaterial(): void {
   let style: string = DEFAULT_SURFACE_MATERIAL;
   let pending: boolean = false;
+  let opacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
+  let buttonOpacity: MaterialOpacity = DEFAULT_BUTTON_OPACITY;
+  let dialogOpacity: MaterialOpacity = DEFAULT_DIALOG_OPACITY;
   try {
     const store: preferences.Preferences = surfacePreferences();
+    opacity = readMaterialOpacity(store, FLAT_MODULE_OPACITY_KEY, GLASS_MODULE_OPACITY_KEY, DEFAULT_MODULE_OPACITY);
+    buttonOpacity = readMaterialOpacity(store, FLAT_BUTTON_OPACITY_KEY, GLASS_BUTTON_OPACITY_KEY, DEFAULT_BUTTON_OPACITY);
+    dialogOpacity = readMaterialOpacity(store, FLAT_DIALOG_OPACITY_KEY, GLASS_DIALOG_OPACITY_KEY, DEFAULT_DIALOG_OPACITY);
     const saved: preferences.ValueType = store.getSync(SURFACE_MATERIAL_KEY, DEFAULT_SURFACE_MATERIAL);
     if (typeof saved !== 'string' || !isSurfaceMaterial(saved)) { throw new Error('invalid_saved_setting:surface_material'); }
     style = saved;
@@ -28,6 +38,9 @@ export function initializeSurfaceMaterial(): void {
     if (skipSuggestion) store.putSync(GLASS_SUGGESTION_HANDLED_KEY, true);
     if (needsMaterial || skipSuggestion) store.flushSync();
   } catch (error) { hilog.warn(0x4342, 'jidecards', 'Surface material could not be loaded'); }
+  AppStorage.setOrCreate<MaterialOpacity>(MODULE_OPACITY_KEY, opacity);
+  AppStorage.setOrCreate<MaterialOpacity>(BUTTON_OPACITY_KEY, buttonOpacity);
+  AppStorage.setOrCreate<MaterialOpacity>(DIALOG_OPACITY_KEY, dialogOpacity);
   AppStorage.setOrCreate<string>(SURFACE_MATERIAL_KEY, style);
   AppStorage.setOrCreate<boolean>(GLASS_SUGGESTION_PENDING_KEY, pending);
 }
@@ -45,3 +58,34 @@ export async function saveSurfaceMaterial(style: string, expected: string | null
   await saveLocalPreference(surfacePreferences(), SURFACE_MATERIAL_KEY, style, DEFAULT_SURFACE_MATERIAL, expected);
 }
 
+
+function readMaterialOpacity(store: preferences.Preferences, flatKey: string, glassKey: string,
+  defaults: MaterialOpacity): MaterialOpacity {
+  const flat = store.getSync(flatKey, defaults.flat);
+  const glass = store.getSync(glassKey, defaults.glass);
+  return {
+    flat: typeof flat === 'number' && validModuleOpacity(flat) ? flat : defaults.flat,
+    glass: typeof glass === 'number' && validModuleOpacity(glass) ? glass : defaults.glass
+  };
+}
+
+async function saveMaterialOpacity(material: string, value: number, key: string, flatKey: string, glassKey: string,
+  defaults: MaterialOpacity): Promise<void> {
+  if (!isSurfaceMaterial(material) || !validModuleOpacity(value)) throw new Error('invalid_surface_opacity');
+  const store: preferences.Preferences = surfacePreferences();
+  const glass: boolean = material === 'glass';
+  await saveLocalPreference(store, glass ? glassKey : flatKey, value, glass ? defaults.glass : defaults.flat);
+  AppStorage.setOrCreate<MaterialOpacity>(key, readMaterialOpacity(store, flatKey, glassKey, defaults));
+}
+
+export async function saveModuleOpacity(material: string, value: number): Promise<void> {
+  await saveMaterialOpacity(material, value, MODULE_OPACITY_KEY, FLAT_MODULE_OPACITY_KEY, GLASS_MODULE_OPACITY_KEY, DEFAULT_MODULE_OPACITY);
+}
+
+export async function saveButtonOpacity(material: string, value: number): Promise<void> {
+  await saveMaterialOpacity(material, value, BUTTON_OPACITY_KEY, FLAT_BUTTON_OPACITY_KEY, GLASS_BUTTON_OPACITY_KEY, DEFAULT_BUTTON_OPACITY);
+}
+
+export async function saveDialogOpacity(material: string, value: number): Promise<void> {
+  await saveMaterialOpacity(material, value, DIALOG_OPACITY_KEY, FLAT_DIALOG_OPACITY_KEY, GLASS_DIALOG_OPACITY_KEY, DEFAULT_DIALOG_OPACITY);
+}

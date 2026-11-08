@@ -1,3 +1,4 @@
+import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DeckOptionsFeature } from '../components/home/DeckOptionsFeature';
@@ -11,6 +12,7 @@ import { appInterface } from '../backend/AppInterfaceService';
 @Component
 export struct DeckOptionsPage {
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
+  @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   deckId: number = 0;
   deckName: string = '';
   pathStack: NavPathStack = new NavPathStack();
@@ -46,7 +48,7 @@ export struct DeckOptionsPage {
         DeckOptionsFeature({ deckId: this.deckId, deckName: this.deckName,
           isDark: 解析是否深色(this.theme, this.systemDark), backRequest: this.backRequest,
           onBusy: this.onBusy, onClose: (): void => { this.pathStack.pop({}); } })
-      }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial))
+      }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial, this.wallpaperPath))
     }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
       .translate({ x: this.navigationOffset })
       .onShown((): void => { appInterface.showPage('deck_options'); })

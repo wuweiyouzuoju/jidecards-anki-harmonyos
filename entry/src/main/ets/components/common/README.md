@@ -151,9 +151,9 @@
 
 编辑字段分组外壳见[EditorSectionCard.ets](EditorSectionCard.ets)，帮助标题独立测量与图标热区摆放见[HelpTitleLayout.ets](HelpTitleLayout.ets)。
 
-弹窗材质统一由[PopupSurface.ets](PopupSurface.ets)与[PopupAppearance.ts](PopupAppearance.ts)提供：本体始终有限透明，默认磨砂背后页面、玻璃档通透背后页面；DialogFrame、MenuSurface、SurfaceSelect和带尖角GlassBubblePanel共同消费，白板原生Popup同样读取色层和模糊策略。DialogBackdrop负责页面背景默认磨砂/玻璃通透；不修改页面颜色和纹理。
+弹窗材质统一由[PopupSurface.ets](PopupSurface.ets)与[PopupAppearance.ts](PopupAppearance.ts)提供：玻璃档本体不叠底色或渐变，扁平档沿用有限透明及背景磨砂；DialogFrame、MenuSurface、SurfaceSelect和带尖角GlassBubblePanel共同消费，白板原生Popup同样读取色层和模糊策略。DialogBackdrop负责页面背景默认磨砂/玻璃通透；不修改页面颜色和纹理。
 
-搜索输入由SearchFieldSurface独占材质参数，LiveSearchField及浏览搜索栏复用；普通FormInputStyle不改变。编辑轮盘半圆/手柄由EditorWheelSurface独立绘制，选中态与几何保留。页面模块仍由SeriesVisual负责，三者不能共用透明度。透明菜单布局宿主MenuSurface(false)必须清除全部绘制属性并早返回，避免学习更多两列菜单间的空白带反光。
+搜索输入由SearchFieldSurface独占材质参数，LiveSearchField及浏览搜索栏复用；普通FormInputStyle不改变。编辑轮盘半圆/手柄由EditorWheelSurface独立绘制，选中态与几何保留。页面模块仍由SeriesVisual负责，玻璃档三者统一不叠装饰填充，扁平档保留各自底色。透明菜单布局宿主MenuSurface(false)必须清除全部绘制属性并早返回，避免学习更多两列菜单间的空白带反光。
 
 
 [GlassSource.ets](GlassSource.ets) 只包页面正文和真实底色，按可见性、材质与前后台预热并释放源；同一窗口由可见正文登记采样源，宽屏内嵌编辑器沿用完整浏览正文。弹窗和遮罩在源外。
@@ -172,6 +172,16 @@
 - [NoteFieldExpandedDialog.ets](NoteFieldExpandedDialog.ets)：字段展开原生窗口，借DialogFrame承载原编辑器，不复制草稿。
 
 
-居中选择框使用 DialogFrame(buttonFusion=false)，只替换材质，保留扁平模式的居中几何与提交操作；该参数传给 GlassPanel，丢弃按钮起点并用 source=target 的静态轻玻璃。浏览三个选择按钮保持向下箭头。按钮旁菜单继续用 AnchoredMenu；不能因玻璃模式把居中选择框改成锚点菜单。
+居中选择框使用 DialogFrame，按钮旁菜单使用 AnchoredMenu。玻璃表面与内容共享一次淡入和轻微缩放，保持各自的定位和提交操作。
 
 主题表面实时更新：StudyRatingSurface和PrimaryGlassSurface由调用方传入响应式主题色、明暗与材质，不在绘制时读取AppStorage。深色模块与牌组行共用SurfaceBorder.contentOptions；浅色和内嵌状态显式清掉旧线，排序强调仍由牌组行拥有。当前参数与验证见[原生表面规范](../../../../../../docs/development/material-standard.md)。
+
+菜单触发：IconActionButton将实测尺寸和实际圆角经PopupTrigger交给系列glassPopupTriggerRect；SurfaceTransition.menuEnterMs引用系列GLASS_MENU_ENTER_MS。CardActionMenu各层共用页面源，嵌套返回通过AnchoredMenu.dismissesNestedLayer直接移除最上层，不收起主面板。GlassSource只能包含正文，菜单为兄弟层，不能采入自身。
+
+ActionIcon只映射产品材质和状态语义，Image几何、填色/描边矩阵统一由SharedActionIcon拥有。玻璃默认outlineOnly；语义tint转为描边。确实表达状态的徽标显式preserveFill，普通菜单不得用该例外恢复装饰填色。
+
+
+玻璃材质下 DialogBackdrop.blurRadius 默认取PopupAppearance.DEFAULT_DIALOG_BACKDROP_BLUR（8）。玻璃材质的牌组详情更多与列表长按在宽窄屏均复用FOCUSED_DIALOG_BACKDROP_BLUR（64），保留原有阴影。backgroundEffect对遮罩后方场景做真实磨砂，保留原压暗色；菜单及预览作为上层兄弟节点保持清晰，宽窄布局共用规则，扁平模式关闭磨砂。tracksHierarchy=false用于纯菜单背景，避免改变后续二级表单尺寸；普通表单默认仍参与原尺寸层级。
+
+
+2026-11-04：完整菜单与弹层呈现由系列HAR拥有。[GlassPanel.ets](GlassPanel.ets)、[GlassBubblePanel.ets](GlassBubblePanel.ets)、[AnchoredMenu.ets](AnchoredMenu.ets)、[MenuItem.ets](MenuItem.ets)、[ActionMenuList.ets](ActionMenuList.ets)及[PopupSurface.ets](PopupSurface.ets)保留产品契约并转交Shared同名实现。[MenuTheme.ets](../../utils/MenuTheme.ets)只解析当前UI偏好、资源和API能力；PopupTrigger与SurfaceMaterial是通用UI依赖，不是业务服务。菜单定位、安全区、有限滚动、准备/迟到回调、图文排列和动作ID重验都在基础实现中。产品保留AppInterface声明、动作回调、路由会话和采样源引用。共享契约见[完整菜单接入](../../../../../../../记得系列基础/docs/完整菜单接入.md)。

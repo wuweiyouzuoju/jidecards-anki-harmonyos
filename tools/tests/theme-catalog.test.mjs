@@ -36,14 +36,12 @@ test('primary action text stays readable on the solid surface and pressed feedba
 
 test('start study and show-answer actions share the series translucent action surface', () => {
   const surface = read('entry/src/main/ets/utils/PrimaryGlassSurface.ets');
-  assert.match(surface, /backgroundColor\(translucentGlassFill\(\$r\('app.color.surface_card'\)\)\)/);
-  assert.match(surface, /themePressGradient\(this.style.pressedColors, pressed\)/);
-  assert.match(surface, /\.border\(SurfaceBorder\.options\(\)\)/);
+  assert.match(surface, /SeriesVisual.primaryAction\(this.material, this.isDark, this.actionColor/);
   const study = read('entry/src/main/ets/pages/学习页.ets');
   assert.match(study, /StudyAnswerActionBar\(\{[\s\S]*?显示答案回调: \(\): void => \{ this\.显示答案\(\); \}/);
   assert.doesNotMatch(study, /显示答案按下|PrimaryGlassSurface/);
   const start = read('entry/src/main/ets/components/开始学习按钮.ets');
-  assert.match(start, /SeriesVisual.control\(/, 'start study uses the shared themed control');
+  assert.match(start, /new StudyRatingSurface\(/, 'start study uses the shared themed control');
   assert.doesNotMatch(start, /PrimaryGlassSurface/);
   const group = read('entry/src/main/ets/components/StudyAnswerActionBar.ets');
   assert.match(group, /new StudyRatingSurface/);
@@ -54,7 +52,7 @@ test('start study and show-answer actions share the series translucent action su
     const source = read('entry/src/main/ets/' + path);
     assert.match(source, /@StorageProp\(PRIMARY_GLASS_KEY\)/, path);
     assert.match(source, /attributeModifier\(new PrimaryGlassSurface\(/, path);
-    assert.match(source, /new PrimaryGlassSurface\([^\n]*this\.primaryGlass\)\)/, path);
+    assert.match(source, /new PrimaryGlassSurface\([^\n]*this\.primaryGlass/, path);
   }
   const theme = themeDefinition('iridescent');
   assert.ok(new Set(themePrimaryGlass(theme, false).colors).size >= 3);
@@ -91,7 +89,7 @@ test('registered themes have unique identities, localized names and valid render
 });
 
 test('theme selection and redemption use the same entitlement mapping', () => {
-  assert.equal(availableThemes([]).length, 7);
+  assert.equal(availableThemes([]).length, 8);
   assert.equal(isThemeAvailable('iridescent', []), false);
   assert.equal(isThemeAvailable('iridescent', ['unrelated-content']), false);
   assert.equal(isThemeAvailable('iridescent', ['theme-iridescent']), true);

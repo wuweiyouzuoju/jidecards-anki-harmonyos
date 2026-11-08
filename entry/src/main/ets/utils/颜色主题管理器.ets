@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { THEME_VISUALS_KEY, THEME_TEXT_COLORS_KEY, PAGE_SURFACE_KEY, themeDefinition } from '../model/ThemeCatalog';
+import { THEME_VISUALS_KEY, THEME_TEXT_COLORS_KEY, PAGE_SURFACE_KEY, themeDefinition, customTheme, ThemeDefinition } from '../model/ThemeCatalog';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS, GLASS_DARK_COLORS } from '../model/ThemeCatalog';
 import { PRIMARY_GLASS_KEY, themePrimaryGlass } from '../model/ThemeCatalog';
 
@@ -32,15 +32,22 @@ import { PRIMARY_GLASS_KEY, themePrimaryGlass } from '../model/ThemeCatalog';
 // 选中背景 = primaryContainer，保留旧键名兼容既有组件。
 // ========================================================
 
+import { CUSTOM_ACCENT_KEY, DEFAULT_CUSTOM_ACCENT, PREVIEW_ACCENT_KEY, ACCENT_LIGHT_ADAPTATION_KEY, ACCENT_DARK_ADAPTATION_KEY, PREVIEW_LIGHT_ADAPTATION_KEY, PREVIEW_DARK_ADAPTATION_KEY } from '../model/AppearanceCustomization';
 import { common } from '@kit.AbilityKit';
 import { 颜色主题, 颜色键, 解析主题色板 } from '../model/颜色主题';
 import { 应用系统栏样式 } from './主题控制器';
 
 export function 应用颜色主题(主题: 颜色主题, 是否深色: boolean): void {
-  const 色板 = 解析主题色板(主题, 是否深色);
+  const preview: string = AppStorage.get<string>(PREVIEW_ACCENT_KEY) ?? '';
+  if (/^#[0-9a-fA-F]{6}$/.test(preview)) 主题 = 'custom';
+  const customSeed: string = preview || AppStorage.get<string>(CUSTOM_ACCENT_KEY) || DEFAULT_CUSTOM_ACCENT;
+  const savedAdaptation: number = AppStorage.get<number>(是否深色 ? ACCENT_DARK_ADAPTATION_KEY : ACCENT_LIGHT_ADAPTATION_KEY) ?? 100;
+  const adaptation: number = preview ? AppStorage.get<number>(是否深色 ? PREVIEW_DARK_ADAPTATION_KEY : PREVIEW_LIGHT_ADAPTATION_KEY) ?? savedAdaptation : savedAdaptation;
+  const 色板 = 解析主题色板(主题, 是否深色, customSeed, adaptation);
   const visual = themeDefinition(主题);
-  AppStorage.setOrCreate(THEME_VISUALS_KEY, visual);
-  AppStorage.setOrCreate(PRIMARY_GLASS_KEY, themePrimaryGlass(visual, 是否深色));
+  const effective: ThemeDefinition = 主题 === 'custom' ? customTheme(customSeed) : visual;
+  AppStorage.setOrCreate(THEME_VISUALS_KEY, effective);
+  AppStorage.setOrCreate(PRIMARY_GLASS_KEY, themePrimaryGlass(effective, 是否深色));
   AppStorage.setOrCreate<string[]>(THEME_TEXT_COLORS_KEY, 是否深色 ? visual.darkActionColors : visual.lightActionColors);
   AppStorage.setOrCreate<string[]>(GLASS_COLORS_KEY, 是否深色 ? GLASS_DARK_COLORS : GLASS_HIGHLIGHT_COLORS);
   AppStorage.setOrCreate<string>(PAGE_SURFACE_KEY, visual.backgroundTextures.length > 0 ? '#00000000' : 色板.页面底色微染);

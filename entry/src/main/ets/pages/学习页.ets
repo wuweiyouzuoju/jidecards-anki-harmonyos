@@ -1,3 +1,4 @@
+import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
 import { GlassSource } from '../components/common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -167,6 +168,7 @@ class StudyGestureProxy {
 @Component
 export struct 学习页 {
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
+  @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @State private currentMarking: CardMarkingState | null = null;
   @State private flagLabels: FlagLabels = {};
@@ -246,7 +248,9 @@ export struct 学习页 {
   private readonly autoAdvanceDialog: NativeDialogHost = new NativeDialogHost();
   private autoAdvanceDialogBack: () => void = (): void => {};
   @State @Watch('publishInterface') private studyMenuOpen: boolean = false;
+  @State private studyMenuCloseRequest: number = 0;
   @State private studyMoreRight: number | undefined = undefined;
+  @State private studyMoreBottom: number | undefined = undefined;
   @State @Watch('publishInterface') private studyExpandedIds: string[] = ['marking', 'card_actions'];
   private questionHasAudio: boolean = false;
   private 正面HTML: string = '';
@@ -1423,8 +1427,7 @@ export struct 学习页 {
   }
 
   private backStudyMenu(): void {
-    if (this.studyExpandedIds.includes('flag')) this.studyExpandedIds = this.studyExpandedIds.filter((id: string): boolean => id !== 'flag');
-    else this.closeStudyMenu();
+    this.studyMenuCloseRequest++;
   }
 
   private selectStudyMenu(item: CardActionMenuEntry): void {
@@ -2310,11 +2313,9 @@ export struct 学习页 {
         // 右侧：更多（共享菜单展示学习动作）
         // 菜单项 enabled 跟随 可撤销 / 阶段 状态，组件重新 build 时数组重新求值。
         IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_more'), label: $r('app.string.study_more'),
+          onMenuAnchor: (right: number, bottom: number): void => { this.studyMoreRight = right; this.studyMoreBottom = bottom; },
           slideMenu: true, onHoldOpen: (): void => { this.openStudyMenu(); },
           onHoldCancel: (): void => { this.closeStudyMenu(); }, onAction: (): void => { this.openStudyMenu(); } })
-          .onAreaChange((_old: Area, area: Area): void => {
-            this.studyMoreRight = Number(area.globalPosition.x) + Number(area.width);
-          })
       }
       .width('100%')
       .height('100%')
@@ -2330,7 +2331,7 @@ export struct 学习页 {
       top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
-    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
+    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial, this.wallpaperPath))
   }
 
   @Builder
@@ -2352,7 +2353,7 @@ export struct 学习页 {
         .javaScriptAccess(true)
         .fileAccess(true)
         .domStorageAccess(true)
-        .attributeModifier(new CardWebAttributes())
+        .attributeModifier(new CardWebAttributes(this.getUIContext()))
         // 作者授权表单需要网页焦点；input_focus 桥让根快捷键在输入期间保留原始按键。
         .focusable(true)
         // 同一代理接收手势与四象限，携带原文档/卡面代次。
@@ -2449,7 +2450,7 @@ export struct 学习页 {
         .height('100%')
         .justifyContent(FlexAlign.Center)
         .padding(应用尺寸.卡片内边距)
-        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
+        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial, this.wallpaperPath))
       }
 
       if (this.阶段 === 'done') {
@@ -2506,7 +2507,7 @@ export struct 学习页 {
         .height('100%')
         .justifyContent(FlexAlign.Center)
         .padding(应用尺寸.卡片内边距)
-        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
+        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial, this.wallpaperPath))
       }
       if (this.tapZonesGuideVisible) {
         StudyTapZonesGuide({ onConfirm: (): void => { this.closeTapZonesGuide(true); } })
@@ -2592,7 +2593,7 @@ export struct 学习页 {
       bottom: this.isFloatingStudyLayout() ? 应用尺寸.页面分组间距(this.narrowDeckLayout) : 0
     })
     // 幻彩时 PAGE_SURFACE_KEY 为透明，让卡片四周显示已有根背景。
-    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
+    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial, this.wallpaperPath))
   }
 
   @Builder
@@ -2618,7 +2619,7 @@ export struct 学习页 {
       // 抬高避让手势导航条（AppGallery 导航栏适配要求）
       bottom: 应用尺寸.操作区底部间距(this.narrowDeckLayout, this.导航条高度)
     })
-    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
+    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial, this.wallpaperPath))
   }
 
   @Builder
@@ -2724,10 +2725,12 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
             onRemove: (): void => { this.replaceVoice(); }, onClose: (): void => { this.closeVoice(); } })
         }
       if (this.studyMenuOpen) {
-          CardActionMenu({ items: this.更多菜单(), menuWidth: 应用尺寸.cardActionMenuWidth, toolbarRight: this.studyMoreRight,
+          CardActionMenu({ items: this.更多菜单(), menuWidth: 应用尺寸.cardActionMenuWidth,
+            toolbarRight: this.studyMoreRight, toolbarBottom: this.studyMoreBottom,
+            closeRequest: this.studyMenuCloseRequest,
             expandedIds: this.studyExpandedIds,
             onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleStudyMenuBranch(item.id ?? ''); },
-            onClose: (): void => { this.backStudyMenu(); },
+            onClose: (): void => { this.closeStudyMenu(); },
             onSelect: (item: CardActionMenuEntry): void => { this.selectStudyMenu(item); } })
         }
         if (this.flagNamesOpen) {

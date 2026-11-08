@@ -4,13 +4,14 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import * as catalog from '../../entry/src/main/ets/model/ThemeCatalog.ts';
+import * as appearance from '../../entry/src/main/ets/model/AppearanceCustomization.ts';
 import * as colors from '../../entry/src/main/ets/model/颜色主题.ets';
 import { resolveAppLocale } from '../../entry/src/main/ets/model/AppLocales.ts';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
 const abilitySource = read('entryability/EntryAbility.ets');
 const methodNames = ['publishSystemDarkMode', 'refreshSystemDarkMode', 'effectiveDarkMode', 'refreshThemeColors',
-  'onConfigurationUpdate', 'onForeground'];
+  'onConfigurationUpdate', 'onForeground', 'syncWindowLayout'];
 const methods = methodNames.map(name => {
   const start = abilitySource.search(new RegExp(`  (?:private )?${name}\\(`));
   assert.ok(start >= 0, name);
@@ -31,7 +32,7 @@ function harness(mode = 'system', systemDark = false) {
   } };
   const context = { resourceManager: { getConfigurationSync() { throw Error('application configuration is not the system theme'); } } };
   store.set('abilityContext', context);
-  const dependencies = { ...catalog, ...colors, AppStorage: storage,
+  const dependencies = { ...catalog, ...colors, ...appearance, AppStorage: storage,
     应用系统栏样式: (_context, dark) => bars.push(dark) };
   const applyColors = new Function(...Object.keys(dependencies), managerJs + '\nreturn 应用颜色主题;')(...Object.values(dependencies));
   const resources = { ColorMode: { DARK: 0, LIGHT: 1 }, getSysResourceManager: () => systemResources };

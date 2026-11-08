@@ -221,8 +221,7 @@ test('shared chrome owns theme, scroll limits and safe areas; slots retain their
   const backdrop = read('components/common/DialogBackdrop.ets');
   assert.match(backdrop, /@StorageProp\('themeMode'\)/);
   assert.match(backdrop, /@StorageProp\('systemDarkMode'\)/);
-  assert.match(backdrop, /backgroundBlurStyle\(BlurStyle.NONE/);
-  assert.match(backdrop, /backdropBlur\(8\)/);
+  assert.match(backdrop, /backgroundEffect\(\(this\.materialOverride \|\| this\.material\) === 'glass' && this\.blurRadius > 0 \?/);
   assert.match(backdrop, /expandSafeArea/);
   const frame = read('components/common/DialogFrame.ets');
   assert.match(frame, /Scroll\(\)[\s\S]*maxHeight: this.bodyHeight\(\)/);

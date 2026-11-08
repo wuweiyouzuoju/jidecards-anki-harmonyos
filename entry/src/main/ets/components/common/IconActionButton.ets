@@ -1,3 +1,4 @@
+import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../../model/SurfaceMaterial';
 import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { SeriesVisual } from '../../utils/SeriesVisual';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -16,6 +17,7 @@ import { hasActionStatus, MENU_SLIDE_HOLD_MS } from '../../model/InteractionFeed
 /** 仅图标动作默认44vp点击区；可按布局调整几何，宿主提供完整本地化无障碍名称。 */
 @Component
 export struct IconActionButton {
+  @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('themeMode') private materialThemeMode: string = 'system';
   @StorageProp('systemDarkMode') private materialSystemDark: boolean = false;
@@ -38,13 +40,14 @@ export struct IconActionButton {
   @Prop surfaceVisible: boolean = true;
   @Prop contentVisible: boolean = true;
   @Prop slideMenu: boolean = false;
+  onMenuAnchor: (right: number, bottom: number) => void = (_right: number, _bottom: number): void => {};
   @Prop keepMenuOnHoldRelease: boolean = false;
   @Prop feedback: string = 'idle';
   onAction: () => void = (): void => {};
   onHoldOpen: () => void = (): void => {};
   onHoldCancel: () => void = (): void => {};
   private readonly hold: MenuHoldController = new MenuHoldController(
-    (): boolean => this.isInteractive, (): void => { if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea); this.onHoldOpen(); }, (): void => { this.onHoldCancel(); });
+    (): boolean => this.isInteractive, (): void => { if (this.triggerArea !== undefined) this.rememberTrigger(); this.onHoldOpen(); }, (): void => { this.onHoldCancel(); });
 
   aboutToDisappear(): void { this.stopSlide(); }
   private stopSlide(): void {
@@ -59,9 +62,14 @@ export struct IconActionButton {
 
   private triggerArea: Area | undefined = undefined;
 
+  private rememberTrigger(): void {
+    if (this.triggerArea === undefined) return;
+    rememberPopupTrigger(this.triggerArea, this.usesSquareSurface() ? 应用尺寸.圆角_卡片 : this.controlSize / 2);
+  }
+
   private activate(): void {
     if (this.hold.consumeClick()) {
-      if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea);
+      if (this.triggerArea !== undefined) this.rememberTrigger();
       this.onAction();
     }
   }
@@ -87,10 +95,10 @@ export struct IconActionButton {
     .width(this.controlWidth > 0 ? this.controlWidth : this.controlSize).height(this.controlSize).padding(0).flexShrink(0)
     .border(SurfaceBorder.options(this.usesSquareSurface() && this.surfaceVisible ? 应用尺寸.卡片边框 : 0))
     .borderRadius(this.usesSquareSurface() ? 应用尺寸.圆角_卡片 : this.controlSize / 2)
-    .backgroundColor(this.resolvedSurface())
+    .backgroundColor(SeriesVisual.buttonFill(this.resolvedSurface(), buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial)))
     .attributeModifier(SeriesVisual.control(this.surfaceMaterial,
       SeriesVisual.isDark(this.materialThemeMode, this.materialSystemDark), this.actionColor,
-      this.usesSquareSurface() ? 应用尺寸.圆角_卡片 : this.controlSize / 2, this.toolbarStyle && this.surfaceVisible))
+      this.usesSquareSurface() ? 应用尺寸.圆角_卡片 : this.controlSize / 2, this.toolbarStyle && this.surfaceVisible, undefined, buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial)))
     .opacity(this.isInteractive ? 1 : 0.4)
     .hitTestBehavior(this.surfaceVisible && this.contentVisible ? HitTestMode.Default : HitTestMode.None)
     .accessibilityText(typeof this.label === 'string' ? this.label :
@@ -99,7 +107,11 @@ export struct IconActionButton {
     .focusOnTouch(!this.slideMenu)
     .enabled(this.isInteractive)
     .attributeModifier(new PressFeedback(1, 0.4, true)).stateEffect(false)
-    .onAreaChange((_old: Area, area: Area): void => { this.triggerArea = area; })
+    .onAreaChange((_old: Area, area: Area): void => {
+      this.triggerArea = area;
+      if (this.slideMenu) this.onMenuAnchor(Number(area.globalPosition.x) + Number(area.width),
+        Number(area.globalPosition.y) + Number(area.height));
+    })
     .onClick((): void => { this.activate(); })
     .onTouch((event: TouchEvent): void => { this.slideTouch(event); })
     .gesture(LongPressGesture({ duration: MENU_SLIDE_HOLD_MS }).onAction((): void => { this.holdOpen(); }))

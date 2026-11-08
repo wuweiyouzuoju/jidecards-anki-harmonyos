@@ -1,3 +1,4 @@
+import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { currentMotionProfile, motionAnimation } from '../utils/AppMotion';
 import { StudyRatingSurface } from '../utils/StudyRatingSurface';
@@ -73,6 +74,7 @@ import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../mode
 
 @Component
 export struct 学习浮动工具栏 {
+  @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -453,7 +455,7 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .height('100%')
     .padding({ left: 4, right: 4 })
-    .attributeModifier(new PrimaryGlassSurface(this.surfaceMaterial, this.primaryGlass, this.动作主色, this.是否深色))
+    .attributeModifier(new PrimaryGlassSurface(this.surfaceMaterial, this.primaryGlass, this.动作主色, this.是否深色, buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial)))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .onClick(() => {
@@ -484,7 +486,7 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .padding({ left: 4, right: 4 })
     .layoutWeight(1)
-    .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, this.glassColors, 底色, true, this.动作主色, this.是否深色))
+    .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, this.glassColors, 底色, true, this.动作主色, this.是否深色, buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial)))
     .stateEffect(false)
     .borderRadius(应用尺寸.圆角_面板)
     .onClick(() => {

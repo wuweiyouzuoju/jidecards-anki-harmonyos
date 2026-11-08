@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 按下态按钮 } from './按下态按钮';
 import { SeriesVisual } from '../../utils/SeriesVisual';
@@ -9,6 +10,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 @Component
 export struct ResultNotice {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('themeMode') private materialMode: string = 'system';
   @StorageProp('systemDarkMode') private materialSystemDark: boolean = false;
   @StorageProp('theme_color_action_primary') private materialAccent: string = '#2F5FD0';
@@ -41,7 +43,7 @@ export struct ResultNotice {
     }.width('100%').padding(应用尺寸.间距_12)
       .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options())
       .borderRadius(应用尺寸.圆角_卡片)
-      .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.materialAccent, '', 应用尺寸.圆角_卡片))
+      .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.materialAccent, '', 应用尺寸.圆角_卡片, this.moduleOpacity))
       .transition(TransitionEffect.OPACITY.animation(motionAnimation(currentMotionProfile().menuEnterMs)))
   }
 }

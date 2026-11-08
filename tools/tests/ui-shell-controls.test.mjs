@@ -240,13 +240,10 @@ test('primary button callers preserve login readiness, secret validation and sav
   const sync = read('components/settings/同步分组.ets');
   assert.match(sync, /PrimaryActionButton\(\{[\s\S]*?isInteractive: this.serverLoaded && !this.登录中 && !this.settingsSaving && this.serverInput === this.savedServer/);
   assert.match(sync, /onAction:.*this.点击登录\(\)/);
-  const developer = read('components/settings/开发者调试分组.ets');
-  assert.match(developer, /isInteractive: !this.正在启用 && this.开发者密钥.trim\(\) !== ''/);
-  assert.match(developer, /onAction:.*this.启用开发者功能\(\)/);
   const agent = read('components/settings/AIAgent设置分组.ets');
   assert.match(agent, /PrimaryActionButton\(\{[\s\S]*?isInteractive: this.canEdit\(\)/);
   assert.match(agent, /onAction:.*this.save\(\)/);
-  for (const source of [agent, developer]) assert.match(source, /\.type\(InputType.Password\)/);
+  assert.match(agent, /\.type\(InputType.Password\)/);
 });
 
 test('settings switches share geometry; help, hint and host failure states remain distinct', () => {

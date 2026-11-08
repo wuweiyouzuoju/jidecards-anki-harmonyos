@@ -1,3 +1,4 @@
+import { WALLPAPER_KEY } from '../../model/AppearanceCustomization';
 import { pageMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { WINDOW_SAFE_TOP_KEY } from '../../model/WindowSafeLayout';
@@ -12,6 +13,7 @@ import { IconActionButton } from '../common/IconActionButton';
 @Component
 export struct 主页顶部工具栏 {
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
+  @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @Prop 排序模式中: boolean = false;
   @Prop reorderBusy: boolean = false;
   on排序退出: () => void = (): void => {};
@@ -61,6 +63,6 @@ export struct 主页顶部工具栏 {
       top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
       bottom: 0
     })
-    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial))
+    .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial, this.wallpaperPath))
   }
 }

@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 import { GlassSource } from '../components/common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { navigationEnterOffset } from '../utils/AppMotion';
@@ -44,6 +45,7 @@ import { namedResourceText } from '../utils/UiFeedback';
 @Component
 export struct 学习提醒页 {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @State private 转场透明度: number = 1;
@@ -430,7 +432,7 @@ export struct 学习提醒页 {
     .backgroundColor($r('app.color.surface_card'))
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
-    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.是否深色, this.动作主色))
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.是否深色, this.动作主色, '', undefined, this.moduleOpacity))
   }
 
   @Builder

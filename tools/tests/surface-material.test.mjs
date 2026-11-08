@@ -1,6 +1,7 @@
+import {sharedSource} from './shared-menu-harness.mjs';
 import { THEME_CATALOG } from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import { tintGlassFill } from '../../entry/src/main/ets/model/GlassTheme.ts';
-import {popupAppearance} from '../../entry/src/main/ets/components/common/PopupAppearance.ts';
+import {popupAppearance,dialogPanelFill} from '../../entry/src/main/ets/components/common/PopupAppearance.ts';
 import {selectionMenuWidth,selectionMenuMaxHeight} from '../../entry/src/main/ets/components/common/SelectionMenuLayout.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,13 +24,93 @@ test('flat clears all glass styles after glass, keeping dark/light flat surfaces
   assert.equal(state.backgroundColor,dark?'#1C1C1E':'#FFFFFF');
  }
 });
+test('module opacity changes only the active material fill and leaves controls and borders intact',()=>{
+ const api=materialHarness('glass'),state={};
+ const node=new Proxy({}, {get:(_,name)=>(...args)=>{state[name]=args[0];return node;}});
+ api.SeriesVisual.surfaceFor('glass',false,'#3344FF').applyNormalAttribute(node);
+ const border=state.border;
+ const opacity={flat:80,glass:25};
+ api.SeriesVisual.surfaceFor('glass',false,'#3344FF','',undefined,opacity).applyNormalAttribute(node);
+ assert.equal(state.backgroundColor,'#40FFFFFF');assert.deepEqual(state.border,border);
+ api.SeriesVisual.surfaceFor('flat',false,'#3344FF','',undefined,opacity).applyNormalAttribute(node);
+ assert.equal(state.backgroundColor,'#CCFFFFFF');
+ api.SeriesVisual.control('glass',false,'#3344FF',16,true).applyNormalAttribute(node);
+ assert.equal(state.backgroundColor,'#52FFFFFF');
+ const controlBorder=state.border;
+ api.SeriesVisual.control('glass',false,'#3344FF',16,true,undefined,50).applyNormalAttribute(node);
+ assert.equal(state.backgroundColor,`rgba(255,255,255,${41/255})`);
+ assert.deepEqual(state.border,controlBorder);
+ assert.equal(api.SeriesVisual.buttonFill('#3344FF',50),'rgba(51,68,255,0.5)');
+});
+test('dialog fill preserves the default, scales the panel and menu fills without introducing blur',()=>{
+ const api=materialHarness('flat'),state={};
+ const node=new Proxy({}, {get:(_,name)=>(...args)=>{state[name]=args[0];return node;}});
+ const Popup=loadPlatformModule('components/common/PopupSurface.ets','PopupSurface',{
+  ...api,popupAppearance,dialogPanelFill,themedGlassFill:()=> '#00000000'
+ });
+ new Popup('flat',false,16,'dialog',true,'',false,model.DEFAULT_DIALOG_OPACITY.flat).applyNormalAttribute(node);
+ assert.equal(state.backgroundColor,popupAppearance('flat',false).fill);
+ const border=state.border;
+ new Popup('flat',false,16,'dialog',true,'',false,40).applyNormalAttribute(node);
+ assert.equal(state.backgroundColor,'#66FFFFFF');assert.deepEqual(state.border,border);
+ assert.equal(state.backdropBlur,0);
+ new Popup('flat',false,16,'menu',true,'',false,40).applyNormalAttribute(node);
+ assert.equal(state.backgroundColor,'#66FFFFFF');
+ assert.equal(state.backdropBlur,0);
+ assert.equal(dialogPanelFill(true,model.DEFAULT_DIALOG_OPACITY.glass),'#0018202B');
+});
+test('dragging previews the active material without saving until release, and restores cancelled or failed edits',async()=>{
+ const modes={Begin:0,Moving:1,End:2,Click:3};
+ const writes=[];
+ let dialog, rejectSave=false;
+ const publish=(key,value)=>{
+  const field={module_opacity:'moduleOpacity',button_opacity:'buttonOpacity',dialog_opacity:'dialogOpacity'}[key];
+  dialog[field]=value;
+  dialog.syncOpacity();
+ };
+ const save=(target)=>async(material,value)=>{
+  writes.push({target,material,value});
+  if(rejectSave) throw Error('disk');
+ };
+ const Dialog=loadComponentLogic('components/settings/SurfaceMaterialDialog.ets','SurfaceMaterialDialog',{
+  ...model,SeriesVisual:{isDark:()=>false},AppStorage:{setOrCreate:publish},SliderChangeMode:modes,
+  appInterface:{observe(){},leave(){}},saveModuleOpacity:save('module'),saveButtonOpacity:save('button'),
+  saveDialogOpacity:save('dialog')
+ });
+ dialog=new Dialog();dialog.style='glass';dialog.aboutToAppear();
+ dialog.changeOpacity(18,modes.Begin,'dialog');
+ dialog.changeOpacity(72,modes.Moving,'dialog');
+ assert.deepEqual(dialog.dialogOpacity,{flat:94,glass:72});
+ assert.deepEqual(writes,[]);
+ dialog.changeOpacity(72,modes.End,'dialog');await Promise.resolve();
+ assert.deepEqual(writes,[{target:'dialog',material:'glass',value:72}]);
+ assert.deepEqual(dialog.dialogOpacity,{flat:94,glass:72});
+ dialog.changeOpacity(55,modes.Moving,'button');
+ assert.deepEqual(dialog.buttonOpacity,{flat:100,glass:55});
+ dialog.aboutToDisappear();assert.deepEqual(dialog.buttonOpacity,{flat:100,glass:100});
+ assert.equal(writes.length,1);
+ dialog.aboutToAppear();rejectSave=true;
+ dialog.changeOpacity(65,modes.Click,'module');await Promise.resolve();
+ assert.deepEqual(dialog.moduleOpacity,model.DEFAULT_MODULE_OPACITY);
+ assert.equal(dialog.saveFailed,true);
+});
 test('existing flat preference is preserved, accepted saves broadcast only after persistence',async()=>{
  const api=materialHarness(),values=new Map([[model.SURFACE_MATERIAL_KEY,'flat']]),store={getAllSync:()=>Object.fromEntries(values),hasSync:k=>values.has(k),flushSync:()=>{},getSync:(k,d)=>values.get(k)??d,putSync:(k,v)=>values.set(k,v),flush:async()=>{}};
  const persist=localPreferenceApi(api.AppStorage);
- const settings=loadPlatformModule('utils/SurfaceMaterialStore.ets','({initializeSurfaceMaterial,saveSurfaceMaterial})',{
+ const settings=loadPlatformModule('utils/SurfaceMaterialStore.ets','({initializeSurfaceMaterial,saveSurfaceMaterial,saveModuleOpacity,saveButtonOpacity,saveDialogOpacity})',{
   ...model,...api,...persist,preferences:{getPreferencesSync:()=>store},hilog:{warn(){}},
  });
  api.storage.set('abilityContext',{});settings.initializeSurfaceMaterial();assert.equal(api.storage.get(model.SURFACE_MATERIAL_KEY),'flat');
+ await settings.saveModuleOpacity('flat',80);
+ await settings.saveModuleOpacity('glass',25);
+ await settings.saveButtonOpacity('glass',45);
+ await settings.saveButtonOpacity('flat',70);
+ await settings.saveDialogOpacity('glass',30);
+ await settings.saveDialogOpacity('flat',82);
+ settings.initializeSurfaceMaterial();
+ assert.deepEqual(api.storage.get(model.MODULE_OPACITY_KEY),{flat:80,glass:25});
+ assert.deepEqual(api.storage.get(model.BUTTON_OPACITY_KEY),{flat:70,glass:45});
+ assert.deepEqual(api.storage.get(model.DIALOG_OPACITY_KEY),{flat:82,glass:30});
  await settings.saveSurfaceMaterial('glass','flat');assert.equal(values.get(model.SURFACE_MATERIAL_KEY),'glass');assert.equal(api.storage.get(model.SURFACE_MATERIAL_KEY),'glass');
  await assert.rejects(settings.saveSurfaceMaterial('flat','flat'),/setting_changed/);
  store.flush=async()=>{throw Error('disk');};await assert.rejects(settings.saveSurfaceMaterial('flat','glass'),/disk/);
@@ -81,10 +162,14 @@ test('select popup guards stale, busy and invalid callbacks and preserves select
  view.open();view.isInteractive=false;view.availabilityChanged();view.select('0');assert.deepEqual(calls,[1]);
  view.isInteractive=true;view.open();view.aboutToDisappear();assert.equal(view.menuOpen,false);
 });
-test('flat preference never gates iridescent background rendering or playback',()=>{
+test('root background disables built-in gradients for flat material and keeps one shared source across navigation',()=>{
  const source=readFileSync(new URL('../../entry/src/main/ets/components/common/ThemeBackground.ets',import.meta.url),'utf8');
- assert.doesNotMatch(source,/surface_material|surfaceMaterial/);
- assert.match(source,/ForEach\(this.visual.backgroundTextures/);
+ assert.match(source,/@StorageProp\('surface_material'\)/);
+ assert.match(source,/SharedPageBackground\(\{ reduceTransparency: this.isFlat\(\)/);
+ assert.match(source,/ForEach\(this.textures\(\)/);
+ const home=readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets',import.meta.url),'utf8');
+ assert.equal((home.match(/ThemeBackground\(/g)??[]).length,1);
+ assert.ok(home.indexOf('ThemeBackground({')<home.indexOf('Navigation(this.页面栈)'));
 });
 
 
@@ -109,12 +194,12 @@ test('shared option rows reject removed, disabled and busy selections and resolv
  view.value={id:123};view.getUIContext=()=>({});assert.equal(view.valueText(),'Localized');view.value='Raw';assert.equal(view.valueText(),'Raw');
 });
 
-test('all popup surfaces switch frost to clear glass without retaining blur or opaque fill',()=>{
+test('popup fill stays separate from backdrop blur in both materials',()=>{
  for(const dark of [false,true]) {
   const expected=popupAppearance('flat',dark),clear=popupAppearance('glass',dark);
-  assert.equal(expected.frostedBackdrop,true);assert.equal(clear.frostedBackdrop,false);
+  assert.equal(expected.frostedBackdrop,false);assert.equal(clear.frostedBackdrop,false);
   assert.ok(parseInt(clear.fill.slice(1,3),16)<255);
-  assert.ok(parseInt(expected.fill.slice(1,3),16)>=230);assert.ok(parseInt(clear.fill.slice(1,3),16)>=230);
+  assert.ok(parseInt(expected.fill.slice(1,3),16)>=230);assert.equal(clear.fill,'#00000000');
   assert.ok(parseInt(expected.fill.slice(1,3),16)<255);
   const Popup=loadPlatformModule('components/common/PopupSurface.ets','PopupSurface',{
    AppStorage:{get:()=>undefined},themedGlassFill:(fill)=>fill,popupAppearance,SurfaceBorder:{options:()=>({width:1,color:'border'}),materialOptions:(material,dark)=>material==='glass'?{width:dark?.8:1,color:dark?'#22FFFFFF':'#506B7C96'}:{width:1,color:'border'}},Color:{Transparent:'transparent'},BlurStyle:{NONE:'none',COMPONENT_THIN:'frost'}
@@ -130,9 +215,11 @@ test('all popup surfaces switch frost to clear glass without retaining blur or o
   assert.match(source,file === 'MenuSurface' ? /new PopupSurface\(/ : /GlassPanel\(/);assert.doesNotMatch(source,/SeriesVisual.surfaceFor/);
  }
  const backdrop=readFileSync(new URL('../../entry/src/main/ets/components/common/DialogBackdrop.ets',import.meta.url),'utf8');
- assert.match(backdrop,/backdropBlur\(8\)/);
+ assert.match(backdrop,/backgroundEffect\(\(this\.materialOverride \|\| this\.material\) === 'glass' && this\.blurRadius > 0 \?/);
  const bubble=readFileSync(new URL('../../entry/src/main/ets/components/common/GlassBubblePanel.ets',import.meta.url),'utf8');
- assert.match(bubble,/GlassPanel\(/);assert.match(bubble,/actionMenuBubbleOutline\(/);
+ assert.match(bubble,/SharedGlassBubblePanel\(/);
+ assert.match(sharedSource('harmony/shared/MenuBubble.ets'),/SharedGlassPanel\(/);
+ assert.match(sharedSource('harmony/shared/MenuBubble.ets'),/actionMenuBubbleOutline\(/);
 });
 
 test('settings glass modules have a single clear surface owner rather than opaque white or frosting',()=>{
@@ -158,11 +245,11 @@ test('settings directory and data module use the same material as secondary grou
  assert.doesNotMatch(directory,/backgroundColor\(/);
 });
 
-test('glass small menus use a bounded tinted surface and home more centers while create reserves label width',()=>{
+test('glass small menus use a transparent surface and home more centers while create reserves label width',()=>{
  for(const dark of [false,true]) {
   const style=popupAppearance('glass',dark,'menu');
-  assert.equal(parseInt(style.fill.slice(1,3),16),dark?173:140);assert.equal(style.frostedBackdrop,false);
-  assert.equal(style.fill.slice(3).toUpperCase(),dark?'232730':'E9ECF2');
+  assert.equal(parseInt(style.fill.slice(1,3),16),0);assert.equal(style.frostedBackdrop,false);
+  assert.equal(style.fill,'#00000000');
  }
  const page=readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets',import.meta.url),'utf8');
  const menus=page.slice(page.indexOf('private homeMenus()'));
@@ -209,19 +296,19 @@ test('deck details use independent content surfaces without a full-height tinted
 });
 
 
-test('wheel and search glass have separate opacity and restore original flat paint',()=>{
+test('wheel and search glass omit decorative fills and restore original flat paint',()=>{
  for(const dark of [false,true]) {
-  const deps={themedGlassFill:(fill)=>fill,BlurStyle:{NONE:'none'},$r:key=>key,应用尺寸:{圆角_面板:18},SurfaceBorder:{options:()=>({width:1,color:'original-border'}),materialOptions:(material,dark)=>material==='glass'?{width:dark?.8:1,color:dark?'#22FFFFFF':'#506B7C96'}:{width:1,color:'original-border'}}};
+  const deps={themedGlassFill:()=> '#00000000',BlurStyle:{NONE:'none'},$r:key=>key,应用尺寸:{圆角_面板:18},SurfaceBorder:{options:()=>({width:1,color:'original-border'}),materialOptions:(material,dark)=>material==='glass'?{width:dark?.8:1,color:dark?'#22FFFFFF':'#506B7C96'}:{width:1,color:'original-border'}}};
   const Search=loadPlatformModule('utils/SearchFieldSurface.ets','SearchFieldSurface',deps);
   const Wheel=loadPlatformModule('utils/EditorWheelSurface.ets','EditorWheelSurface',deps);
   const state={},node=new Proxy({}, {get:(_,name)=>(...args)=>{state[name]=args[0];return node;}});
   new Search('glass',dark,12).applyNormalAttribute(node);
-  assert.equal(state.backgroundColor,dark?'#80121820':'#66FFFFFF');assert.equal(state.borderRadius,12);
+  assert.equal(state.backgroundColor,'#00000000');assert.equal(state.borderRadius,12);
   assert.equal(state.border.color,dark?'#22FFFFFF':'#506B7C96');
   const searchAlpha=parseInt(state.backgroundColor.slice(1,3),16);
   new Wheel('glass',dark,'wheel-original').applyNormalAttribute(node);
-  assert.equal(state.backgroundColor,dark?'#CC18202B':'#B3FFFFFF');
-  assert.ok(parseInt(state.backgroundColor.slice(1,3),16)>searchAlpha);
+  assert.equal(state.backgroundColor,'#00000000');
+  assert.equal(parseInt(state.backgroundColor.slice(1,3),16),searchAlpha);
   new Wheel('flat',dark,'wheel-original').applyNormalAttribute(node);
   assert.equal(state.backgroundColor,'wheel-original');assert.equal(state.backdropBlur,0);
   assert.ok(state.linearGradient.colors.every(([color])=>color==='#00FFFFFF'));
@@ -276,7 +363,7 @@ test('dark content modules share the common outline with controls in flat and gl
 });
 
 
-test('glass content uses light transparent backing without double-filling nested modules',()=>{
+test('glass modules and entry controls share neutral translucent backing without double-filling nested modules',()=>{
  for(const dark of [false,true]) {
   const api=materialHarness('glass',dark);
   const fill=modifier=>{
@@ -286,14 +373,15 @@ test('glass content uses light transparent backing without double-filling nested
   const alpha=color=>color==='transparent'?0:parseInt(color.slice(1,3),16)/255;
   const content=fill(api.SeriesVisual.surfaceFor('glass',dark,'#336699'));
   const control=fill(api.SeriesVisual.control('glass',dark,'#336699',24,true));
+  assert.equal(content,dark?'#591C1C1E':'#52FFFFFF');
   assert.ok(alpha(content)>=.32 && alpha(content)<=.36);
-  assert.equal(control,tintGlassFill(dark?'#3D18202B':'#57FFFFFF','#336699',dark));
+  assert.equal(control,content);
   assert.equal(fill(api.SeriesVisual.insetSurface('glass',dark,'#336699','',24)),'transparent');
  }
 });
 
 
-test('all theme seeds tint glass while retaining opacity, neutral fallback and flat paint',()=>{
+test('all theme seeds retain the same neutral module and entry backing in light and dark modes',()=>{
  for(const dark of [false,true]) {
   const base=dark?'#AD18202B':'#A6FFFFFF';
   const fills=THEME_CATALOG.map(theme=>tintGlassFill(base,theme.seed,dark));
@@ -304,6 +392,13 @@ test('all theme seeds tint glass while retaining opacity, neutral fallback and f
    const node=new Proxy({}, {get:(_,name)=>(...args)=>{state[name]=args[0];return node;}});
    api.SeriesVisual.surfaceFor('flat',dark,theme.seed).applyNormalAttribute(node);
    assert.equal(state.backgroundColor,dark?'#1C1C1E':'#FFFFFF');
+   const neutral=dark?'#591C1C1E':'#52FFFFFF';
+   api.SeriesVisual.surfaceFor('glass',dark,theme.seed).applyNormalAttribute(node);
+   assert.equal(state.backgroundColor,neutral,`module ${theme.id} dark=${dark}`);
+   new api.SeriesDeckSurface('glass',dark,theme.seed,'',18).applyNormalAttribute(node);
+   assert.equal(state.backgroundColor,neutral,`deck ${theme.id} dark=${dark}`);
+   api.SeriesVisual.control('glass',dark,theme.seed,18,true).applyNormalAttribute(node);
+   assert.equal(state.backgroundColor,neutral,`entry ${theme.id} dark=${dark}`);
   }
   assert.equal(tintGlassFill(base,'',dark),base);
   assert.equal(tintGlassFill(base,'invalid',dark),base);
@@ -311,7 +406,7 @@ test('all theme seeds tint glass while retaining opacity, neutral fallback and f
 });
 
 
-test('light content is near white and borderless while glass controls retain the soft white edge',()=>{
+test('light content has translucent white backing and borderless while glass controls retain the soft white edge',()=>{
  const api=materialHarness('glass',false),state={};
  const node=new Proxy({}, {get:(_,name)=>(...args)=>{state[name]=args[0];return node;}});
  api.SeriesVisual.surfaceFor('glass',false,'#336699').applyNormalAttribute(node);
@@ -388,12 +483,12 @@ test('opaque reading surfaces use fully opaque light and dark fills in every mat
  }
 });
 
-test('preview retains the ordinary fallback opacity and the glass button keeps its supplied blue fill',()=>{
+test('preview omits fill while glass entry controls retain neutral backing instead of supplied blue fill',()=>{
  for(const dark of [false,true]) {
   assert.deepEqual(popupAppearance('glass',dark,'preview'),popupAppearance('glass',dark,'dialog'));
   const api=materialHarness('flat',dark),state={},node=new Proxy({}, {get:(_,name)=>(...args)=>{state[name]=args[0];return node;}});
   api.SeriesVisual.control('glass',dark,'#2F5FD0',18,true,'#B3B8D9FF').applyNormalAttribute(node);
-  assert.equal(state.backgroundColor,'#B3B8D9FF');assert.equal(state.borderRadius,18);
+  assert.equal(state.backgroundColor,dark?'#591C1C1E':'#52FFFFFF');assert.equal(state.borderRadius,18);
   assert.ok(state.border.width>0);
  }
 });
@@ -409,12 +504,13 @@ test('theme and material transitions clear old module outlines on the same actua
  }
 });
 
-test('page shells clear their fill in glass and restore the exact flat fill', () => {
+test('page shells expose the root background in glass or with a wallpaper', () => {
  const api = loadPlatformModule('utils/GlassMaterial.ets', '({pageMaterialFill})', {
   Color: {Transparent: 'transparent'}, tintGlassFill
  });
  for (const fill of ['#FFFFFF', '#1C1C1E', '#F5F7FA']) {
-  assert.equal(api.pageMaterialFill(fill, 'glass'), 'transparent');
-  assert.equal(api.pageMaterialFill(fill, 'flat'), fill);
+  assert.equal(api.pageMaterialFill(fill, 'glass', ''), 'transparent');
+  assert.equal(api.pageMaterialFill(fill, 'flat', ''), fill);
+  assert.equal(api.pageMaterialFill(fill, 'flat', '/files/wallpaper.png'), 'transparent');
  }
 });

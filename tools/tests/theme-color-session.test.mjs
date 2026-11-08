@@ -64,3 +64,27 @@ test('real color preference adapter propagates IO and flush failure, checks IDs 
   state.failFlush=true;await assert.rejects(adapter.保存颜色主题('forest'),/flush/);
   state.context=undefined;await assert.rejects(adapter.readSavedThemeColor(),/ability_context_unavailable/);
 });
+
+test('custom accent and both mode adaptations are saved in one flush and published only after readback',async()=>{
+ const config=await import('../../entry/src/main/ets/model/AppearanceCustomization.ts');
+ const data=new Map([['color_theme','aurora'],[config.CUSTOM_ACCENT_KEY,'#336699'],
+  [config.ACCENT_LIGHT_ADAPTATION_KEY,100],[config.ACCENT_DARK_ADAPTATION_KEY,100]]);
+ const published=new Map();let flushes=0,fail=false;
+ const store={get:async(key,fallback)=>data.get(key)??fallback,put:async(key,value)=>{data.set(key,value);},
+  putSync:(key,value)=>data.set(key,value),flush:async()=>{flushes++;if(fail)throw Error('disk');}};
+ const adapter=loadPlatformModule('model/颜色主题存储.ets','({保存自定义颜色主题})',{
+  ...config,默认颜色主题:'aurora',AppStorage:{get:()=>({}),setOrCreate:(key,value)=>published.set(key,value)},
+  preferences:{getPreferences:async()=>store}
+ });
+ await adapter.保存自定义颜色主题('#ccaa00',{light:0,dark:60});
+ assert.equal(flushes,1);assert.equal(data.get('color_theme'),'custom');
+ assert.equal(data.get(config.CUSTOM_ACCENT_KEY),'#CCAA00');
+ assert.equal(published.get(config.ACCENT_LIGHT_ADAPTATION_KEY),0);
+ assert.equal(published.get(config.ACCENT_DARK_ADAPTATION_KEY),60);
+ published.clear();fail=true;
+ await assert.rejects(adapter.保存自定义颜色主题('#112233',{light:40,dark:80}),/disk/);
+ assert.equal(data.get(config.CUSTOM_ACCENT_KEY),'#CCAA00');assert.equal(published.size,0);
+ assert.equal(data.get(config.ACCENT_LIGHT_ADAPTATION_KEY),0);assert.equal(data.get(config.ACCENT_DARK_ADAPTATION_KEY),60);
+ await assert.rejects(adapter.保存自定义颜色主题('#112233',{light:101,dark:80}),/invalid_accent_adaptation/);
+ assert.equal(flushes,2);
+});

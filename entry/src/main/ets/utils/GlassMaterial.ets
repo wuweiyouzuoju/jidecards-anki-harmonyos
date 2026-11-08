@@ -1,13 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { tintGlassFill } from '../model/GlassTheme';
-import { ColorMetrics } from '@kit.ArkUI';
-/** 只改变绘制背景，保持文字和图标的不透明度及资源主题语义。 */
+/** 玻璃不叠资源色填充，保持文字和图标的不透明度及资源主题语义。 */
 export function translucentGlassFill(color: ResourceColor): ResourceColor {
-  const resolved: ColorMetrics = ColorMetrics.resourceColor(color);
-  const hex: string = '#' + [resolved.red, resolved.green, resolved.blue].map((value: number): string =>
-    value.toString(16).padStart(2, '0')).join('');
-  const tinted: ColorMetrics = ColorMetrics.resourceColor(themedGlassFill(hex, darkMaterial()));
-  return `rgba(${tinted.red},${tinted.green},${tinted.blue},${resolved.alpha / 255 * (darkMaterial() ? 0.35 : 0.32)})`;
+  return Color.Transparent;
 }
 
 export function usesGlassMaterial(material: string = AppStorage.get<string>('surface_material') ?? 'flat'): boolean {
@@ -18,17 +12,17 @@ export function darkMaterial(): boolean {
   return mode === 'dark' || (mode !== 'light' && (AppStorage.get<boolean>('systemDarkMode') ?? false));
 }
 
-/** 非系列控件和弹层也读取同一主题主色。 */
+/** 保留调用契约；玻璃底层不再染主题色或叠加底色。 */
 export function themedGlassFill(fill: string, dark: boolean, accent: string = AppStorage.get<string>('theme_color_action_primary') ?? ''): string {
-  return tintGlassFill(fill, accent, dark);
+  return '#00000000';
 }
 
-/** 弹窗内层沿用外层真实折射，只增加轻色层，不注册自身采样。 */
+/** 弹窗内层沿用外层真实折射，不叠色层或注册自身采样。 */
 export function insetMaterialFill(color: ResourceColor, material: string = AppStorage.get<string>('surface_material') ?? 'flat'): ResourceColor {
   return usesGlassMaterial(material) ? translucentGlassFill(color) : color;
 }
 
-/** 页面壳透出根背景；卡片正文、画布和输入表面不使用此规则。 */
-export function pageMaterialFill(flatFill: ResourceColor, material: string): ResourceColor {
-  return usesGlassMaterial(material) ? Color.Transparent : flatFill;
+/** 玻璃页面或已设置壁纸时，页面壳透出根背景；卡片正文、画布和输入表面不使用此规则。 */
+export function pageMaterialFill(flatFill: ResourceColor, material: string, wallpaperPath: string): ResourceColor {
+  return usesGlassMaterial(material) || wallpaperPath !== '' ? Color.Transparent : flatFill;
 }

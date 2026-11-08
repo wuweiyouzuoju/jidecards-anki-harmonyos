@@ -1,4 +1,6 @@
+import { WALLPAPER_KEY } from '../../model/AppearanceCustomization';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { pageMaterialFill } from '../../utils/GlassMaterial';
 import { localeDate } from '../../utils/LocaleFormatting';
 import { localizedResourceText } from '../../utils/UiFeedback';
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -17,6 +19,8 @@ import { AppInterfaceControl } from '../../model/AppInterface';
 import { interfaceItemText, interfaceItemTitleKey } from '../../utils/AppInterfaceText';
 @Component
 export struct AgentHistoryList {
+  @StorageProp('surface_material') private material: string = 'flat';
+  @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Prop @Watch('refreshSearch') conversations: AgentConversationSummary[] = [];
@@ -160,6 +164,6 @@ export struct AgentHistoryList {
       top: this.management ? 0 : 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
       bottom: this.management ? 0 : 应用尺寸.页面底部间距(this.narrowDeckLayout) + Math.max(0, this.navigationBarHeight)
     })
-    .backgroundColor(this.management ? Color.Transparent : this.页面底色微染值)
+    .backgroundColor(this.management ? Color.Transparent : pageMaterialFill(this.页面底色微染值, this.material, this.wallpaperPath))
   }
 }

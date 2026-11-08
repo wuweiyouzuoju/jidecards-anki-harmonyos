@@ -1,45 +1,60 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
-import { SURFACE_MATERIAL_KEY, SURFACE_MATERIALS, surfaceMaterialTitleKey } from '../../model/SurfaceMaterial';
-import { saveSurfaceMaterial } from '../../utils/SurfaceMaterialStore';
+import { SURFACE_MATERIAL_KEY, surfaceMaterialTitleKey } from '../../model/SurfaceMaterial';
 import { FormSelectRow } from '../common/FormSelectRow';
+import { SelectionValueButton } from '../common/SelectionValueButton';
+import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
+import { SelectStyle } from '../../utils/SelectStyle';
 import { localizedNamedResourceText } from '../../utils/UiFeedback';
+import { SurfaceMaterialDialog } from './SurfaceMaterialDialog';
 
 @Component
 export struct SurfaceMaterialControl {
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(SURFACE_MATERIAL_KEY) private style: string = 'flat';
-  @State private saving: boolean = false;
-  @State private saveFailed: boolean = false;
-  @State private selectionRevision: number = 0;
-
-  private options(): SelectOption[] {
-    return SURFACE_MATERIALS.map((style: string): SelectOption => {
-      return { value: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, surfaceMaterialTitleKey(style)) };
+  private readonly host: NativeDialogHost = new NativeDialogHost();
+  private dismissGuard: () => boolean = (): boolean => true;
+  private readonly createDialog = (dismiss: NativeDialogDismiss): CustomDialogController => {
+    const presentation: NativeDialogPresentation = this.host.presentation();
+    return new CustomDialogController({
+      builder: SurfaceMaterialDialog({
+        registerDismiss: (guard: () => boolean): void => { this.dismissGuard = guard; },
+        onClose: this.host.guard((): void => { this.host.close(); }) }),
+      autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
+      alignment: presentation.alignment, width: presentation.width, height: presentation.height,
+      maskColor: presentation.maskColor, keyboardAvoidMode: presentation.keyboardAvoidMode,
+      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation,
+      onWillDismiss: dismiss
     });
+  };
+
+  aboutToAppear(): void { this.host.activate(); }
+  aboutToDisappear(): void { this.host.dispose(); }
+
+  private open(): void {
+    this.dismissGuard = (): boolean => true;
+    this.host.open(this.createDialog, (): boolean => this.dismissGuard());
   }
 
-  private async selectStyle(index: number): Promise<void> {
-    if (this.saving || index < 0 || index >= SURFACE_MATERIALS.length || SURFACE_MATERIALS[index] === this.style) return;
-    this.saving = true;
-    this.saveFailed = false;
-    try { await saveSurfaceMaterial(SURFACE_MATERIALS[index]); }
-    catch (error) { this.saveFailed = true; }
-    finally { this.saving = false; this.selectionRevision++; }
+  @Builder
+  private materialValue(value: string) {
+    SelectionValueButton({ value: value, label: $r('app.string.surface_material'), disclosureAngle: 0,
+      controlWidth: this.valueWidth(value), onAction: (): void => { this.open(); } })
+      .constraintSize(FormRowLayout.trailingConstraint).flexShrink(0)
+  }
+
+  private valueWidth(value: string): number {
+    const ui = this.getUIContext();
+    return Math.ceil(ui.px2vp(ui.getMeasureUtils().measureText({ textContent: value,
+      fontSize: SelectStyle.controlFont.size, fontWeight: SelectStyle.controlFont.weight }))) +
+      Number(SelectStyle.controlPadding.left) + Number(SelectStyle.controlPadding.right) + SelectStyle.controlSpace + 24;
   }
 
   build() {
-    Column({ space: FormRowLayout.hintGap }) {
-      ForEach([this.selectionRevision], (_revision: number) => {
-        FormSelectRow({ label: settingsItemText(this.getUIContext(), 'surface_material', this.uiLanguage),
-          options: this.options(), selectedIndex: SURFACE_MATERIALS.indexOf(this.style),
-          value: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, surfaceMaterialTitleKey(this.style)),
-          isInteractive: !this.saving, onSelect: (index: number): void => { this.selectStyle(index); } })
-      }, (revision: number): string => revision.toString())
-      if (this.saveFailed) {
-        Text($r('app.string.surface_material_save_failed')).fontSize(12).fontColor($r('app.color.error_text')).width('100%')
-      }
-    }.width('100%')
+    FormSelectRow({ label: settingsItemText(this.getUIContext(), 'surface_material', this.uiLanguage),
+      useCustomControl: true, customControl: (): void => {
+        this.materialValue(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, surfaceMaterialTitleKey(this.style)));
+      } })
   }
 }

@@ -1,3 +1,4 @@
+import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
@@ -11,6 +12,7 @@ import { RATING_AGAIN, RATING_EASY, RATING_GOOD, RATING_HARD } from '../proto/me
 export struct StudyAnswerActionBar {
   @StorageProp('themeMode') private themeMode: string = 'system';
   @StorageProp('systemDarkMode') private systemDark: boolean = false;
+  @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @Prop stage: string = 'question';
@@ -52,7 +54,7 @@ export struct StudyAnswerActionBar {
     // 读取宿主的实时阶段；按值Builder参数会固定首次loading时的禁用值。
     .enabled(this.actionEnabled(wide))
     .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, GLASS_HIGHLIGHT_COLORS, fill, !wide, this.actionColor,
-      this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark)))
+      this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark), buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial)))
     // 原生Button的材质边框更新后恢复既有轮廓，与其他学习按钮顺序一致。
     .borderRadius(应用尺寸.圆角_面板)
     .clip(true)

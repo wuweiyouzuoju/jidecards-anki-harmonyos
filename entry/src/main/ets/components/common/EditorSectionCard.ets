@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -8,6 +9,7 @@ import { 颜色键 } from '../../model/颜色主题';
 @Component
 export struct EditorSectionCard {
   @StorageProp('surface_material') private material: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('themeMode') private mode: string = 'system';
   @StorageProp('systemDarkMode') private systemDark: boolean = false;
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
@@ -19,6 +21,6 @@ export struct EditorSectionCard {
     Column({ space: 应用尺寸.间距_8 }) { this.content() }
       .width('100%').padding(应用尺寸.卡片内边距)
       .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
-      .attributeModifier(SeriesVisual.surfaceFor(this.material, SeriesVisual.isDark(this.mode, this.systemDark), this.actionColor))
+      .attributeModifier(SeriesVisual.surfaceFor(this.material, SeriesVisual.isDark(this.mode, this.systemDark), this.actionColor, '', undefined, this.moduleOpacity))
   }
 }

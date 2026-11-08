@@ -1,3 +1,4 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SeriesVisual } from '../utils/SeriesVisual';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -17,6 +18,7 @@ import { localeNumber } from '../utils/LocaleFormatting';
 @Component
 export struct DeckStudyHistoryCard {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('themeMode') private themeMode: string = 'system';
   @StorageProp('systemDarkMode') private systemDark: boolean = false;
   @StorageProp(颜色键.页面底色微染) private pageTint: string = '';
@@ -204,7 +206,7 @@ export struct DeckStudyHistoryCard {
     .border(SurfaceBorder.options())
     .borderRadius(应用尺寸.圆角_卡片)
     .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
-      this.accent, this.pageTint, 应用尺寸.圆角_卡片))
+      this.accent, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity))
     .onVisibleAreaChange([0], (visible: boolean): void => { this.setVisible(visible); })
   }
 }

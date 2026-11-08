@@ -12,7 +12,6 @@ import { safeDialogMaxHeight, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY,
 /** 常规弹窗固定操作栏、正文按内容收缩并限高滚动；不拥有草稿或业务任务。 */
 @Component
 export struct DialogFrame {
-  @Prop buttonFusion: boolean = true;
   @Prop nativeHost: boolean = false;
   @Prop opaque: boolean = false;
   @Prop materialOverride: string = '';
@@ -33,6 +32,7 @@ export struct DialogFrame {
   @Prop refractionSource: string = '';
   @Prop maximumWidth: number = 应用尺寸.dialogMaxWidth;
   // 卡片预览自行拥有滚动；普通表单继续按内容收缩并由外壳滚动。
+  @Prop fixedHeight: number = 0;
   @Prop fillBody: boolean = false;
   // 自动前进保留底部操作栏，卡片几何、滚动和安全区仍由同一外壳拥有。
   @Prop actionsAtBottom: boolean = false;
@@ -71,19 +71,20 @@ export struct DialogFrame {
   private usableHeight(): number { return keyboardViewportHeight(this.viewportHeight, this.viewportTop, this.keyboardTop); }
 
   private frameMaxHeight(): number {
-    return safeDialogMaxHeight(this.usableHeight(), this.safeTop, this.keyboardTop > 0 ? 0 : this.safeBottom,
+    const safeHeight: number = safeDialogMaxHeight(this.usableHeight(), this.safeTop, this.keyboardTop > 0 ? 0 : this.safeBottom,
       应用尺寸.间距_8, 应用尺寸.dialogHeightRatio);
+    return this.fixedHeight > 0 ? Math.min(this.fixedHeight, safeHeight) : safeHeight;
   }
 
   build() {
     Stack() {
-      DialogBackdrop({ maximumWidth: this.maximumWidth,
+      DialogBackdrop({ maximumWidth: this.maximumWidth, materialOverride: this.materialOverride,
         onSize: (width: string, maximumWidth: number): void => {
           this.surfaceWidth = width; this.surfaceMaximumWidth = maximumWidth;
         } }).onClick((event: ClickEvent): void => { this.dismiss(); })
         .transition(this.nativeHost ? TransitionEffect.IDENTITY : SurfaceTransition.backdrop())
       Stack() {
-        GlassPanel({ buttonFusion: this.buttonFusion,
+        GlassPanel({
           onPrepared: (): void => { this.prepared = true; this.waitingVisible = false; clearTimeout(this.waitingTimer); this.onPrepared(); }, role: this.surfaceRole, source: this.refractionSource, materialOverride: this.materialOverride, opaque: this.opaque, radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth,
           maximumWidth: this.surfaceMaximumWidth || this.maximumWidth, maximumHeight: this.frameMaxHeight() }) {
         Column({ space: 应用尺寸.间距_12 }) {
@@ -95,9 +96,10 @@ export struct DialogFrame {
           } else {
             Scroll() {
               Column({ space: 应用尺寸.间距_12 }) { this.content() }.width('100%')
+                .constraintSize({ minHeight: this.fixedHeight > 0 ? this.bodyHeight() : 0 })
             }
             .width('100%')
-            .constraintSize({ maxHeight: this.bodyHeight() })
+            .constraintSize({ minHeight: this.fixedHeight > 0 ? this.bodyHeight() : 0, maxHeight: this.bodyHeight() })
             .scrollBar(BarState.Auto)
           }
           if (this.actionsAtBottom) {
