@@ -162,7 +162,7 @@ test('both detail layouts receive the history refresh token and history watches 
   assert.match(home, /this\.deckDetails\(true\)/);
   assert.match(home, /this\.deckDetails\(false\)/);
   const details = readFileSync(new URL('../../entry/src/main/ets/components/home/HomeDeckDetails.ets', import.meta.url), 'utf8');
-  assert.match(details, /牌组详情面板\(\{\s*historyRefreshToken: this\.historyRefreshToken/);
+  assert.match(details, /牌组详情面板\(\{\s*onShortcut:[^\n]*\n\s*historyRefreshToken: this\.historyRefreshToken/);
   assert.match(source, /@Prop @Watch\('reload'\) search/);
   assert.match(source, /@Prop @Watch\('reload'\) refreshToken/);
   assert.match(home, /name: 'StudyPage',[\s\S]*?onPop:[\s\S]*?this\.返回主页后刷新\(\)/);

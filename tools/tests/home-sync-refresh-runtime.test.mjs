@@ -138,12 +138,12 @@ test('settings opens during collection work while database-only sections remain 
   let notices = 0;
   const panel = Object.assign(new Panel(), { activeSection: '', 内容滚动器: { scrollToIndex() {} },
     取本地化文本: x => x, getUIContext: () => ({ getPromptAction: () => ({ showToast: () => { notices++; } }) }) });
-  for (const section of ['scheduler', 'data', 'advanced']) { panel.openSection(section); assert.equal(panel.activeSection, ''); }
+  for (const section of ['scheduler', 'data']) { panel.openSection(section); assert.equal(panel.activeSection, ''); }
   panel.openSection('sync'); assert.equal(panel.activeSection, 'sync');
   panel.openSection('appearance'); assert.equal(panel.activeSection, 'appearance');
-  assert.equal(notices, 3);
+  assert.equal(notices, 2);
   panel.简洁模式 = true; panel.openSection('scheduler'); assert.equal(panel.activeSection, 'scheduler');
-  assert.equal(notices, 3, 'local review controls remain available in simple mode during sync');
+  assert.equal(notices, 2, 'local review controls remain available in simple mode during sync');
   panel.简洁模式 = false;
   activity.cancelReservation(); panel.openSection('scheduler'); assert.equal(panel.activeSection, 'scheduler');
 });

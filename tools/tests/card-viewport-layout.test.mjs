@@ -128,12 +128,12 @@ test('full-screen preview covers its host using the shared background and consum
   const source = readFileSync(new URL('../../entry/src/main/ets/components/browser/卡片预览页.ets', import.meta.url), 'utf8');
   const build = source.slice(source.indexOf('\n  build()'));
   assert.match(build, /Stack\(\)\s*\{\s*\/\/[^\n]*\n\s*CapturedThemeBackground\(\)/);
-  const rootAttributes = build.slice(build.lastIndexOf(".backgroundColor($r('app.color.surface_page'))"));
+  const rootAttributes = build.slice(build.lastIndexOf(".backgroundColor(insetMaterialFill($r('app.color.surface_page')))"));
   assert.match(rootAttributes, /hitTestBehavior\(HitTestMode.Default\)/,
     'Default admits descendants; Block disables every button and the Web');
   assert.match(rootAttributes, /\.onClick\(\(\): void => \{\}\)/,
     'background taps are consumed without dismissing preview');
-  assert.doesNotMatch(build, /rgba\(/, 'no translucent dismiss layer behind the full-screen page');
+  assert.doesNotMatch(rootAttributes, /rgba\(/, 'no translucent dismiss layer behind the full-screen page');
   assert.equal((build.match(/\.transition\(/g) ?? []).length, 1, 'background and controls transition as one page');
 });
 
@@ -150,7 +150,7 @@ test('narrow deck appearance drives page, deck-list and menu spacing from one de
   assert.match(deckList, /DECK_LIST_NARROW_KEY/);
   assert.match(home, /页面分组间距\(this\.narrowDeckLayout\)/);
   assert.match(deckList, /页面分组间距\(this\.narrow\)/);
-  assert.match(menu, /margin\(\{ top: this\.menuGeometry\(\)\.top/);
-  assert.match(menu, /safeMenuGeometry\(keyboardViewportHeight\(this\.viewportHeight, this\.viewportTop, this\.keyboardTop\), this\.topOffset, Math\.max\(0, this\.safeTop - this\.viewportTop\), this\.keyboardTop > 0 \? 0 : this\.safeBottom,\s*应用尺寸\.页面底部间距\(this\.narrowDeckLayout\)/);
+  assert.match(menu, /SharedAnchoredMenu\(\{/);
+  assert.match(menu, /bottomGap: 应用尺寸\.页面底部间距\(this\.narrow\)/);
   assert.doesNotMatch(menu, /effectiveTopOffset/);
 });

@@ -185,3 +185,5 @@ ActionIcon只映射产品材质和状态语义，Image几何、填色/描边矩�
 
 
 2026-11-04：完整菜单与弹层呈现由系列HAR拥有。[GlassPanel.ets](GlassPanel.ets)、[GlassBubblePanel.ets](GlassBubblePanel.ets)、[AnchoredMenu.ets](AnchoredMenu.ets)、[MenuItem.ets](MenuItem.ets)、[ActionMenuList.ets](ActionMenuList.ets)及[PopupSurface.ets](PopupSurface.ets)保留产品契约并转交Shared同名实现。[MenuTheme.ets](../../utils/MenuTheme.ets)只解析当前UI偏好、资源和API能力；PopupTrigger与SurfaceMaterial是通用UI依赖，不是业务服务。菜单定位、安全区、有限滚动、准备/迟到回调、图文排列和动作ID重验都在基础实现中。产品保留AppInterface声明、动作回调、路由会话和采样源引用。共享契约见[完整菜单接入](../../../../../../../记得系列基础/docs/完整菜单接入.md)。
+
+[ImageCropViewport.ets](ImageCropViewport.ets) 统一壁纸和牌组图片的裁剪视口，复用 ibest-ui 裁剪器。

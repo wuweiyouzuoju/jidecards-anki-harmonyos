@@ -77,7 +77,7 @@ test('all custom press surfaces use one native feedback owner', () => {
     'components/学习浮动工具栏.ets']) {
     const source = read('entry/src/main/ets/' + file);
     assert.doesNotMatch(source, /duration: 80/, file);
-    const surfaces = [...source.matchAll(/\.attributeModifier\(new (?:(?:Primary)?GlassSurface|StudyRatingSurface)\([^\n]+\)\)([\s\S]*?)\.onClick/g)];
+    const surfaces = [...source.matchAll(/\.attributeModifier\((?:this\.compact \? new PressFeedback\([^)]*\) : )?new (?:(?:Primary)?GlassSurface|StudyRatingSurface)\([^\n]+\)\)([\s\S]*?)\.onClick/g)];
     assert.ok(surfaces.length > 0, file);
     const buttons = surfaces;
     for (const surface of buttons) {
@@ -86,7 +86,7 @@ test('all custom press surfaces use one native feedback owner', () => {
     }
   }
   const start = read('entry/src/main/ets/components/开始学习按钮.ets');
-  assert.match(start, /SeriesVisual.control\(/, 'start study keeps shared material and border');
+  assert.match(start, /new StudyRatingSurface\(this\.surfaceMaterial/, 'start study keeps shared material and border');
   assert.match(start, /onClick\(\(\): void => \{ if \(this.isAvailable\) this\.开始学习回调\(\); \}/);
   assert.match(start, /enabled\(this\.isAvailable\)/);
 });

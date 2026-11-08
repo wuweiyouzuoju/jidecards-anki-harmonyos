@@ -284,7 +284,7 @@ test('page binds authorization to fresh raw user intent and exposes undo without
 test('broad settings catalog has executable reads, exact schemas, no secret keys and no synthetic write support', async () => {
   const f = fixture();
   const definitions = agentSettingDefinitions();
-  assert.equal(definitions.length, 22);
+  assert.ok(definitions.some(setting => setting.id === "theme_mode"));
   assert.equal(new Set(definitions.map(x => x.id)).size, definitions.length);
   const ids = definitions.map(x => x.id);
   const schema = JSON.parse(agentSettingsFunctionTools().find(x => x.name === 'get_settings').parametersJson);

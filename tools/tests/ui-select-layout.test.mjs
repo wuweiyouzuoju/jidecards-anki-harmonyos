@@ -239,7 +239,7 @@ test('shared menu surfaces distinguish dark overlays from cards and retain reada
   const instance = new Proxy({}, { get: (_target, name) => value => { attributes[name] = value; return instance; } });
   new MenuSurface().applyNormalAttribute(instance);
   assert.equal(attributes.backgroundColor, popupAppearance('flat',false).fill);
-  assert.deepEqual(attributes.border, SurfaceBorder.options());
+  assert.deepEqual(attributes.border, {width: 0}, 'menu surface omits the extra outline');
   assert.equal(attributes.shadow.radius, 0, 'flat menus use the shared border without elevation');
   new MenuSurface(false).applyNormalAttribute(instance);
   assert.equal(attributes.backgroundColor, 'transparent');
@@ -341,7 +341,7 @@ test('study more uses the measured toolbar edge without applying a second wide-s
  menu.toolbarRight=1200;assert.equal(menu.toolbarLeft()+320,1000);
  menu.toolbarRight=20;assert.equal(menu.toolbarLeft(),0);
  const study=read('pages/学习页.ets');
- assert.match(study,/studyMoreRight = Number\(area.globalPosition.x\) \+ Number\(area.width\)/);
+ assert.match(study,/onMenuAnchor: \(right: number, bottom: number\)[^\n]*this\.studyMoreRight = right/);
  assert.match(study,/toolbarRight: this.studyMoreRight/);
 });
 

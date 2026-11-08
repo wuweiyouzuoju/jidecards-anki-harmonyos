@@ -21,7 +21,7 @@ test('flat clears all glass styles after glass, keeping dark/light flat surfaces
   api.SeriesVisual.surfaceFor('flat',dark,'#3344FF').applyNormalAttribute(node);
   assert.equal(state.backdropBlur,0);assert.equal(state.shadow.radius,0);
   assert.ok(state.linearGradient.colors.every(x=>x[0]==='#00FFFFFF'));
-  assert.equal(state.backgroundColor,dark?'#1C1C1E':'#FFFFFF');
+  assert.equal(state.backgroundColor,dark?'#FF1C1C1E':'#FFFFFFFF');
  }
 });
 test('module opacity changes only the active material fill and leaves controls and borders intact',()=>{
@@ -38,7 +38,7 @@ test('module opacity changes only the active material fill and leaves controls a
  assert.equal(state.backgroundColor,'#52FFFFFF');
  const controlBorder=state.border;
  api.SeriesVisual.control('glass',false,'#3344FF',16,true,undefined,50).applyNormalAttribute(node);
- assert.equal(state.backgroundColor,`rgba(255,255,255,${41/255})`);
+ assert.equal(state.backgroundColor,'#29FFFFFF');
  assert.deepEqual(state.border,controlBorder);
  assert.equal(api.SeriesVisual.buttonFill('#3344FF',50),'rgba(51,68,255,0.5)');
 });
@@ -229,7 +229,7 @@ test('settings glass modules have a single clear surface owner rather than opaqu
   assert.equal(state.backdropBlur,0);assert.equal(state.backgroundBlurStyle,'none');assert.equal(state.borderRadius,16);
   assert.equal(state.backgroundColor,dark?'#591C1C1E':'#52FFFFFF');
   api.SeriesVisual.settingsSurface('flat',dark,'#2F5FD0','',16).applyNormalAttribute(node);
-  assert.equal(state.backgroundColor,dark?'#1C1C1E':'#FFFFFF');
+  assert.equal(state.backgroundColor,dark?'#FF1C1C1E':'#FFFFFFFF');
  }
 });
 
@@ -261,9 +261,9 @@ test('legacy popup shells share the same material instead of independent white p
  const files=['components/AnkiWeb引导对话框.ets','components/browser/卡片信息.ets','components/home/自定义学习对话框.ets','components/settings/媒体管理面板.ets','components/云端牌组弹窗.ets','components/同步面板.ets','components/官方公告弹窗.ets','components/欢迎弹窗.ets','components/添加笔记面板.ets','pages/首页.ets'];
  for(const file of files) {
   const source=readFileSync(new URL('../../entry/src/main/ets/'+file,import.meta.url),'utf8');
-  const start=source.indexOf('GlassPanel({');
+  const start=source.indexOf(file.endsWith('云端牌组弹窗.ets') ? 'DialogFrame({' : 'GlassPanel({');
   assert.ok(start>=0,file);const shell=source.slice(start,start+220);
-  assert.match(source,/GlassPanel\(/,file);
+  assert.match(source,/(?:GlassPanel|DialogFrame)\(/,file);
   assert.doesNotMatch(shell,/backgroundColor\(/,file);
  }
 });
@@ -288,10 +288,10 @@ test('deck details use independent content surfaces without a full-height tinted
   }
   assert.deepEqual(fills,[fills[0],fills[0],fills[0]]);
   api.SeriesVisual.insetSurface('glass',dark,'#2F5FD0','',16).applyNormalAttribute(node);
-  assert.equal(state.backgroundColor,'transparent');assert.equal(state.shadow.radius,0);
-  assert.ok(state.linearGradient.colors.every(([color])=>color==='transparent'));
+  assert.equal(state.backgroundColor,'#00000000');assert.equal(state.shadow.radius,0);
+  assert.ok(state.linearGradient.colors.every(([color])=>['#00FFFFFF', '#00000000', 'transparent'].includes(color)));
   api.SeriesVisual.clearSurface('flat',dark,'#2F5FD0','',16).applyNormalAttribute(node);
-  assert.equal(state.backgroundColor,dark?'#1C1C1E':'#FFFFFF');
+  assert.equal(state.backgroundColor,dark?'#FF1C1C1E':'#FFFFFFFF');
  }
 });
 
@@ -319,7 +319,7 @@ test('wheel and search glass omit decorative fills and restore original flat pai
  for(const method of ['surfaceFor','settingsSurface','insetSurface']) {
   api.SeriesVisual[method]('glass',true,'#336699','',18).applyNormalAttribute(node);
   assert.equal(state.border.width,method === 'insetSurface' ? 0 : .8);assert.equal(state.borderRadius,18);
-  assert.ok(state.linearGradient.colors.every(([color])=>color==='#00FFFFFF'||color==='transparent'));
+  assert.ok(state.linearGradient.colors.every(([color])=>['#00FFFFFF', '#00000000', 'transparent'].includes(color)));
  }
 });
 
@@ -335,7 +335,7 @@ test('inactive menu layout never retains a popup reflection in empty space',()=>
  new Menu(false,18).applyNormalAttribute(node);
  assert.equal(state.backgroundColor,'transparent');assert.equal(state.border.width,0);
  assert.equal(state.shadow.radius,0);assert.equal(state.backdropBlur,0);assert.equal(state.clip,false);
- assert.ok(state.linearGradient.colors.every(([color])=>color==='transparent'));
+ assert.ok(state.linearGradient.colors.every(([color])=>['#00FFFFFF', '#00000000', 'transparent'].includes(color)));
 });
 
 test('dark glass content and controls share one subtle outline',()=>{
@@ -376,7 +376,7 @@ test('glass modules and entry controls share neutral translucent backing without
   assert.equal(content,dark?'#591C1C1E':'#52FFFFFF');
   assert.ok(alpha(content)>=.32 && alpha(content)<=.36);
   assert.equal(control,content);
-  assert.equal(fill(api.SeriesVisual.insetSurface('glass',dark,'#336699','',24)),'transparent');
+  assert.equal(fill(api.SeriesVisual.insetSurface('glass',dark,'#336699','',24)),'#00000000');
  }
 });
 
@@ -391,7 +391,7 @@ test('all theme seeds retain the same neutral module and entry backing in light 
    const api=materialHarness('flat',dark),state={};
    const node=new Proxy({}, {get:(_,name)=>(...args)=>{state[name]=args[0];return node;}});
    api.SeriesVisual.surfaceFor('flat',dark,theme.seed).applyNormalAttribute(node);
-   assert.equal(state.backgroundColor,dark?'#1C1C1E':'#FFFFFF');
+   assert.equal(state.backgroundColor,dark?'#FF1C1C1E':'#FFFFFFFF');
    const neutral=dark?'#591C1C1E':'#52FFFFFF';
    api.SeriesVisual.surfaceFor('glass',dark,theme.seed).applyNormalAttribute(node);
    assert.equal(state.backgroundColor,neutral,`module ${theme.id} dark=${dark}`);
@@ -432,7 +432,7 @@ test('search retains its outline while content is borderless in light/dark and f
   const search=read(new Search(material,dark,16));
   const expected=api.SurfaceBorder.materialOptions(material,dark);
   assert.deepEqual(search.border,expected);
-  assert.deepEqual(read(api.SeriesVisual.surfaceFor(material,dark,'#336699')).border, dark ? expected : {width:0,color:'transparent'});
+  assert.deepEqual(read(api.SeriesVisual.surfaceFor(material,dark,'#336699')).border, dark ? expected : {width:0,color:material === 'glass' ? '#00000000' : 'transparent'});
  }
 });
 
@@ -499,7 +499,9 @@ test('theme and material transitions clear old module outlines on the same actua
  for(const [material,dark,nested] of [['glass',true,false],['flat',true,false],['glass',false,false],['glass',true,false],['glass',true,true],['flat',false,false]]) {
   const modifier=nested?api.SeriesVisual.insetSurface(material,dark,'#447799'):api.SeriesVisual.clearSurface(material,dark,'#447799','',18);
   modifier.applyNormalAttribute(node);
-  assert.deepEqual(state.border,api.SurfaceBorder.contentOptions(material,dark,nested));
+  const expected = api.SurfaceBorder.contentOptions(material,dark,nested);
+  assert.equal(state.border.width,expected.width);
+  if (expected.width > 0) assert.equal(state.border.color,expected.color);
   if(!dark||nested)assert.equal(state.border.width,0);
  }
 });

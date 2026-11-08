@@ -62,7 +62,7 @@ test('navigation accepts real semantic actions and rejects arbitrary paths, IDs 
     {action:'open_card_preview',cardId:1.5}, {action:'open_stats',name:'SettingsPage'}, {action:'open_stats',params:{apiKey:'secret'}}]) {
     assert.throws(() => validateAppNavigation(args, context));
   }
-  assert.equal(validateAppNavigation({action:'open_settings',sectionId:'advanced'}, {...context,simple:false}).surface,'settings');
+  assert.equal(validateAppNavigation({action:'open_settings',sectionId:'ai'}, {...context,agent:true}).surface,'settings');
   assert.throws(() => validateAppNavigation({action:'open_settings',sectionId:'ai'}, {...context,agent:false}), /unavailable/);
   for (const text of ['开始四级牌组学习','进入设置的外观分组','打开浏览并搜索 tag:important','帮我复习四级','Take me to settings',
     '返回首页','预览这张卡片','打开这条笔记的编辑页','Preview this card','Back to home']) assert.equal(appNavigationRequested(text), true, text);
@@ -116,14 +116,14 @@ test('deck detail and options requests require discovered targets and preserve f
 
 test('asynchronous reads recheck changed modes and stacks before queuing or navigating', async () => {
   for(const phase of ['queue','finish']) for(const change of ['section','stack']) {
-    let release,waiting=false;let current={...context,simple:false};let names=['AiCardPage'];const calls=[];
+    let release,waiting=false;let current={...context,agent:true};let names=['AiCardPage'];const calls=[];
     const session=new AgentAppNavigationSession({context:()=>current,canNavigate:()=>true,collectionBusy:()=>false,pathNames:()=>names,
       assertReadableTarget(){},readTarget:async()=>waiting?new Promise(r=>release=r):'',navigate:x=>calls.push(x)});
-    session.beginTurn('打开高级设置，返回首页');
-    const args=change==='section'?{action:'open_settings',sectionId:'advanced'}:{action:'open_home'};
+    session.beginTurn('打开 AI 设置，返回首页');
+    const args=change==='section'?{action:'open_settings',sectionId:'ai'}:{action:'open_home'};
     if(phase==='finish')await session.queue(JSON.stringify(args));
     waiting=true;const pending=phase==='queue'?session.queue(JSON.stringify(args)):session.finish(true);
-    if(change==='section')current.simple=true;else names=['EditNotePage','AiCardPage'];
+    if(change==='section')current.agent=false;else names=['EditNotePage','AiCardPage'];
     release('');await assert.rejects(pending,change==='section'?/section_unavailable/:/unsaved_page/);assert.deepEqual(calls,[]);
   }
 });
@@ -165,7 +165,7 @@ test('unknown decks, cancellation, failed replies, hidden pages, pending drafts,
   await assert.rejects(f.queue({action:'start_study',deckId:4}),/user_request_required/);
   for (const reason of ['failure','cancel','hidden','draft','busy','missing','section']) {
     const p=fixture();p.session.beginTurn('打开设置，开始学习');
-    if (reason==='section') { p.state.context.simple=false;await p.queue({action:'open_settings',sectionId:'advanced'});p.state.context.simple=true; }
+    if (reason==='section') { p.state.context.agent=true;await p.queue({action:'open_settings',sectionId:'ai'});p.state.context.agent=false; }
     else await p.queue({action:'start_study',deckId:4});
     if(reason==='cancel')p.session.cancel();
     if(reason==='hidden')p.state.visible=false;

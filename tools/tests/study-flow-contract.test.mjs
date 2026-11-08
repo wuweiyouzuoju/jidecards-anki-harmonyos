@@ -123,12 +123,12 @@ test('study keeps default cards opaque without replacing template backgrounds wh
   const page = read(STUDY_PAGE);
   assert.match(page, /构建卡片HTML\(rendered, 'question', this\.是否深色\(\), undefined,\s*this\.reviewPreferences\.hideAudioPlayButtons, this\.取文案\(\$r\('app\.string\.study_replay_sound'\)\), this\.取文案\(\$r\('app\.string\.card_script_load_error'\)\), cardScriptDiagnosticLabels\(this\.getUIContext\(\)\)\)/);
   assert.match(page, /Web\(\{ src: '', controller: this\.cardWeb\.controllerAt\(slot\) \}\)\s*\.backgroundColor\(this\.cardSurfaceBackground \|\| \$r\('app\.color\.surface_card'\)\)/);
-  assert.match(page, /\.backgroundColor\(this\.页面底色微染值\)/);
+  assert.match(page, /\.backgroundColor\(pageMaterialFill\(this\.页面底色微染值, this\.pageMaterial, this\.wallpaperPath\)\)/);
   const cardArea = page.slice(page.indexOf('private 卡片区()'), page.indexOf('private 答案条()'));
   const answerBar = page.slice(page.indexOf('private 答案条()'), page.indexOf('\n  build()'));
   for (const section of [cardArea, answerBar]) {
     assert.doesNotMatch(section, /app\.color\.surface_page/, 'a static page fill hides the shared cloud background');
-    assert.match(section, /\.backgroundColor\(this\.页面底色微染值\)\s*\}/, 'outer section consumes PAGE_SURFACE_KEY');
+    assert.match(section, /\.backgroundColor\(pageMaterialFill\(this\.页面底色微染值, this\.pageMaterial, this\.wallpaperPath\)\)\s*\}/, 'outer section consumes PAGE_SURFACE_KEY');
   }
   assert.match(page, /\.hideTitleBar\(true\)\s*\.backgroundColor\(Color\.Transparent\)/);
   assert.match(page, /\.opacity\(this\.转场透明度\)/);

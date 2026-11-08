@@ -64,7 +64,7 @@ test('small anchored menus share the restrained 150ms transition', () => {
 
 test('browser selectors retain centered flat geometry and only replace their material', () => {
  const source=read('entry/src/main/ets/components/browser/BrowserViewMenu.ets');
- assert.match(source,/DialogFrame\(\{ buttonFusion: false/);
+ assert.match(source,/DialogFrame\(\{ onDismiss:/);
  assert.doesNotMatch(source,/AnchoredMenu\(|\.transition\(/);
  const page=read('entry/src/main/ets/pages/浏览页.ets');
  const controls=page.slice(page.indexOf('private viewChoice(group:'),page.indexOf('private browserControls()'));
@@ -77,8 +77,12 @@ test('legacy dialogs delegate material-aware panel motion and preserve their bac
     'entry/src/main/ets/components/云端牌组弹窗.ets',
   ]) {
     const source = read(path);
-    assert.match(source, /GlassPanel\(/, path);
-    assert.match(source, /\.transition\(SurfaceTransition\.backdrop\(\)\)/, path);
+    if (path.endsWith('云端牌组弹窗.ets')) {
+      assert.match(source, /DialogFrame\(/, path);
+    } else {
+      assert.match(source, /GlassPanel\(/, path);
+      assert.match(source, /\.transition\(SurfaceTransition\.backdrop\(\)\)/, path);
+    }
     assert.doesNotMatch(source, /TransitionEffect\.scale|TransitionEffect\.asymmetric/, path);
   }
 });

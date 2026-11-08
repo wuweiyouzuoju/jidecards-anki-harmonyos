@@ -279,7 +279,7 @@ test('the real browser batch menu respects the current Agent capability gate', (
 
 test('settings card counts and item visibility use the UI mode and current theme, without inventing conditional states', () => {
   const simple=structure(context,'settings','scheduler');
-  assert.equal(simple.visibleSettingsSectionCount,9); assert.equal(simple.sections[0].cardCount,2);
+  assert.equal(simple.visibleSettingsSectionCount,10); assert.equal(simple.sections[0].cardCount,2);
   assert.equal(simple.sections[0].cards.find(x=>x.id==='algorithm').visible,false);
   const full=structure({...context,simple:false},'settings','scheduler');
   assert.equal(full.visibleSettingsSectionCount,10); assert.equal(full.sections[0].cardCount,4);
@@ -805,7 +805,7 @@ test('all shared settings labels have UI bindings and resources; all card branch
     assert.ok(zh.has(item.titleKey)&&en.has(item.titleKey),item.titleKey);
     const sharedHelpLink = OFFICIAL_HELP_LINKS.some(link => link.id === item.id) &&
       ui.includes('ForEach(OFFICIAL_HELP_LINKS') && ui.includes('settingsItemText(this.getUIContext(), link.id');
-    assert.ok(sharedHelpLink || (REVIEW_AUDIO_PREFERENCES.some(audio=>audio.id===item.id) && ui.includes('ForEach(REVIEW_AUDIO_PREFERENCES') && ui.includes('settingsItemText(this.getUIContext(), item.id')) || ui.includes(`'${item.id}'`)||ui.includes(`"${item.id}"`), 'missing UI binding: '+item.id);
+    assert.ok(sharedHelpLink || (REVIEW_AUDIO_PREFERENCES.some(audio=>audio.id===item.id) && ui.includes('ForEach(REVIEW_AUDIO_PREFERENCES') && ui.includes('settingsItemText(this.getUIContext(), item.id')) || ui.includes(`'${item.id}'`)||ui.includes(`"${item.id}"`)||ui.includes(`$r('app.string.${item.titleKey}')`), 'missing UI binding: '+item.id);
     if(item.settingId!==undefined)assert.ok(readableIds.has(item.settingId),'missing setting reader declaration: '+item.settingId);
   }
   assertRegisteredSettingsLabels(sources,ids);

@@ -52,7 +52,7 @@ test('menu, panel and button outlines share defaults while explicit state colors
   assert.deepEqual(Object.keys(SurfaceBorder.options()).sort(), ['color', 'width'], 'surface geometry and press state stay with the host');
 });
 
-test('the real menu surface applies the shared outline and preserves its custom radius', () => {
+test('the real menu surface avoids a duplicate outline and preserves its custom radius', () => {
   const PopupSurface=loadPlatformModule('components/common/PopupSurface.ets','PopupSurface',{popupAppearance,SurfaceBorder,AppStorage:{get:()=>undefined},themedGlassFill:fill=>fill,Color:{Transparent:'transparent'},BlurStyle:{NONE:'none'}});
   const MenuSurface=loadPlatformModule('components/common/MenuSurface.ets','MenuSurface',{
     ...materialHarness(), PopupSurface,
@@ -63,7 +63,7 @@ test('the real menu surface applies the shared outline and preserves its custom 
     const instance=Object.fromEntries(['backgroundColor','border','borderRadius','shadow','clip','backgroundBlurStyle','backdropBlur','linearGradient'].map(name=>
       [name,value=>{calls.push(name);attrs[name]=value;return instance;}]));
     new MenuSurface(active,cornerRadius).applyNormalAttribute(instance);
-    assert.equal(attrs.border.width,active?1:0);
+    assert.equal(attrs.border.width,0);
     assert.equal(attrs.borderRadius,cornerRadius??16);
     assert.ok(calls.indexOf('border')<calls.indexOf('borderRadius'),'border defaults must not override the explicit radius');
     assert.equal(attrs.backgroundColor,active?popupAppearance('flat',false).fill:'transparent');
@@ -109,7 +109,7 @@ test('ordinary outlines, form controls and separators use the common border inst
       file + ': neutral outlines and separators must use SurfaceBorder');
   }
   for (const file of ['components/牌组详情面板.ets', 'components/DeckStudyHistoryCard.ets',
-    'components/common/IconActionButton.ets', 'components/common/PopupSurface.ets',
+    'components/common/IconActionButton.ets',
     'components/common/MenuSurface.ets', 'utils/FormInputStyle.ets',
     'utils/FormTextAreaStyle.ets', 'utils/ImageSurfaceStyle.ets']) {
     assert.match(read(file), /\.border\(SurfaceBorder\.(?:options|materialOptions|contentOptions)\(/, file);
@@ -117,7 +117,9 @@ test('ordinary outlines, form controls and separators use the common border inst
   assert.match(read('components/settings/设置分组卡片.ets'), /SeriesVisual.settingsSurface\(/);
   assert.doesNotMatch(read('components/settings/设置分组卡片.ets'), /backgroundColor\(设置面板色板_取/);
   assert.match(read('components/common/DialogFrame.ets'), /GlassPanel\(/);
-  assert.match(read('components/common/GlassPanel.ets'), /attributeModifier\(new PopupSurface\(/);
+  assert.match(read('components/common/GlassPanel.ets'), /SharedGlassPanel\(/);
+  assert.match(read('components/common/PopupSurface.ets'), /extends SharedPopupSurface/);
+  assert.match(read('components/common/PopupSurface.ets'), /app\.color\.surface_border/);
   assert.doesNotMatch(read('components/common/DialogFrame.ets'), /backgroundColor\(\$r\('app.color.surface_card'\)/);
   assert.match(read('components/home/HomeDeckDetails.ets'), /IconActionButton\(\{ toolbarStyle: true/,
     'detail toolbar delegates its homepage outline to the public icon button');
@@ -126,8 +128,8 @@ test('ordinary outlines, form controls and separators use the common border inst
   const deck = read('components/牌组列表项.ets');
   assert.doesNotMatch(deck, /bindPopup\(/, 'deck rows delegate menus to the root shared surface');
   assert.match(read('components/home/HomeDeckRowMenu.ets'), /AnchoredMenu\(\{/);
-  assert.match(read('components/common/CardActionMenu.ets'), /AnchoredMenu\(\{/);
-  assert.match(read('components/common/GlassBubblePanel.ets'), /GlassPanel\(\{[\s\S]*contourPath: this.contourCommands\(\)/);
+  assert.match(read('components/common/CardActionMenu.ets'), /GlassBubblePanel\(\{/);
+  assert.match(read('components/common/GlassBubblePanel.ets'), /SharedGlassBubblePanel\(\{/);
   assert.match(read('utils/PrimaryGlassSurface.ets'), /SeriesVisual.primaryAction\(/);
   assert.match(read('utils/SeriesVisual.ets'), /SurfaceBorder.contentOptions\(/);
   assert.match(deck, /SurfaceBorder.contentOptions\(/);

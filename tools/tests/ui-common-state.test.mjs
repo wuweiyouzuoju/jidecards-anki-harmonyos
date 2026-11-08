@@ -55,8 +55,9 @@ test('form geometry and menu radius are independent of metric-card aliases', () 
   assert.equal(layout.controlHeight, 40);
   assert.deepEqual(layout.trailingConstraint, { maxWidth: '56%' });
   assert.equal(sizes.noteMediaPreviewHeight, 204);
+  const PopupSurface = loadPlatformModule('components/common/PopupSurface.ets', 'PopupSurface', {$r: resource});
   const Surface = loadPlatformModule('components/common/MenuSurface.ets', 'MenuSurface', {
-    ...materialHarness(),
+    ...materialHarness(), PopupSurface,
     应用尺寸: sizes, SurfaceBorder: { options: width => ({ width }) }, $r: resource, Color: { Transparent: 'transparent' }
   });
   const values = {}, attributes = {};

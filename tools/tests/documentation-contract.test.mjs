@@ -142,12 +142,11 @@ test('current capability documentation follows release gates and runtime constan
 
   assert.match(releaseFeatures,
     /AI_AGENT_CHANNELS_APP_STORAGE_KEY:\s*string\s*=\s*'aiAgentChannelsEnabled'/);
-  assert.match(releaseFeatures, /enableAiAgentChannels/);
+  const entryAbility = read('entry/src/main/ets/entryability/EntryAbility.ets');
+  assert.match(entryAbility, /AppStorage\.setOrCreate<boolean>\(AI_AGENT_CHANNELS_APP_STORAGE_KEY, true\)/);
   assert.match(agentPage, /searchMode:\s*'off'/);
-  assert.match(readme, /默认隐藏的功能/);
-  assert.match(readme, /开发者调试[\s\S]*AppStorage 运行时开关/);
-  assert.match(agentDesign, /默认关闭[\s\S]*全部 Agent 入口/);
-  assert.match(agentDesign, /持久化[\s\S]*AppStorage/);
+  assert.match(readme, /AI 制卡、AI 改卡及设置入口默认开放/);
+  assert.match(agentDesign, /默认开放全部 Agent 入口[\s\S]*AppStorage/);
   assert.match(cardHtml, /https:\/\/jidecards-media\.local\//);
   assert.match(architecture, /https:\/\/jidecards-media\.local\//);
   assert.match(architecture, /签名与链接器可用性以实际构建为准/);

@@ -34,7 +34,7 @@ test('create setup is an assistant-side local card instead of a fixed top form',
   assert.match(page, /buildAgentTaskVisibleText/);
   assert.doesNotMatch(setup, /AgentDisclosureCard/);
   assert.doesNotMatch(setup, /ai_agent_setup_title_create|ai_agent_setup_instruction|readinessText|onToggle/);
-  assert.match(setup, /backgroundColor\(\$r\('app\.color\.surface_card'\)\)/);
+  assert.match(setup, /backgroundColor\(insetMaterialFill\(\$r\('app\.color\.surface_card'\)\)\)/);
   assert.match(setup, /border\(SurfaceBorder\.options\(\)\)/);
   assert.match(setup, /borderRadius\(应用尺寸\.圆角_面板\)/);
   assert.match(setup, /padding\(应用尺寸\.卡片内边距\)/);
@@ -46,7 +46,7 @@ test('edit setup exposes explicit deck and note-type search scope selectors', ()
   const setup = read('entry/src/main/ets/components/agent/AgentSetupCard.ets');
   assert.match(setup, /if \(this\.mode === 'create'\)[\s\S]*this\.deckSelector\(\)[\s\S]*else \{[\s\S]*this\.deckSelector\(\)/);
   assert.match(setup, /DirectorySelect\(/);
-  assert.match(setup, /Select\(this\.editNotetypeOptions\(\)\)/);
+  assert.match(setup, /SurfaceSelect\(\{ options: this\.editNotetypeOptions\(\)/);
   assert.match(setup, /this\.onDeckSelected\(0\)/);
   assert.match(setup, /this\.onNotetypeSelected\(0\)/);
   assert.match(page, /allDecksLabel:/);
@@ -133,7 +133,7 @@ test('reasoning opens by default while tool details stay collapsed independently
 
 test('tool details use compact framed rows; reasoning is gray and independently bounded', () => {
   const disclosure = read('entry/src/main/ets/components/agent/AgentDisclosureCard.ets');
-  assert.match(disclosure, /backgroundColor\(\$r\('app.color.surface_card'\)\)/);
+  assert.match(disclosure, /backgroundColor\(insetMaterialFill\(\$r\('app\.color\.surface_card'\)\)\)/);
   assert.match(disclosure, /borderRadius\(应用尺寸.圆角_面板\)/);
   assert.match(disclosure, /SymbolGlyph\(/);
   assert.match(disclosure, /constraintSize\(\{ maxHeight: 240 \}\)/);

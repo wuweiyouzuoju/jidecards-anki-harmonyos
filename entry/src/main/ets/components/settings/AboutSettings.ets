@@ -13,6 +13,7 @@ import { 颜色键 } from '../../model/颜色主题';
 import { AboutActionDialog } from './AboutActionDialog';
 import { SettingsActionRow } from '../common/SettingsActionRow';
 import { settingsIcon } from '../../utils/SettingsIcons';
+import { PressFeedback } from '../../utils/PressFeedback';
 import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 
 /** 关于分组独占外链和反馈交互；主壳只负责目录与许可证导航。 */
@@ -81,7 +82,7 @@ export struct AboutSettings {
     Column() {
       if (this.centerCommunity) {
         Column({ space: 6 }) {
-          Button({ type: ButtonType.Normal }) {
+          Button({ type: ButtonType.Normal, stateEffect: false }) {
             Row({ space: 10 }) {
               Text($r('app.string.about_qq_group_title')).fontSize(18).fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.text_primary'))
@@ -89,9 +90,11 @@ export struct AboutSettings {
                 .fontColor($r('app.color.home_intro_link'))
             }.width('100%').justifyContent(FlexAlign.Center)
           }.width('100%').constraintSize({ minHeight: 44 }).backgroundColor(Color.Transparent)
+            .attributeModifier(new PressFeedback())
             .onClick((): void => { copyOfficialQQGroup(this.getUIContext()); })
           Text($r('app.string.home_intro_qq_details')).fontSize(12).lineHeight(18)
             .fontColor($r('app.color.text_secondary')).textAlign(TextAlign.Center).width('100%')
+            .attributeModifier(new PressFeedback())
             .onClick((): void => { copyOfficialQQGroup(this.getUIContext()); })
         }.width('100%').alignItems(HorizontalAlign.Center).padding({ bottom: 16 })
       }

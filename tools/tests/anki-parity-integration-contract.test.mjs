@@ -18,12 +18,12 @@ test('home wires the Anki deck tree, action menu, and selected-deck flows', () =
   assert.match(index, /展开的牌组ID集合/);
   assert.match(index, /创建父牌组ID/);
   assert.match(index, /this\.openCreateDeck\(''\)/);
-  assert.match(index, /this\.openCreateDeck\(this\.选中的牌组ID\)/);
+  assert.match(index, /case 'create_child': this\.openCreateDeck\(deckId\)/);
   // 创建牌组协调器 接收 父牌组ID Prop（内部转发给 创建牌组面板 的 initialParentId）
   assert.match(index, /parentId: this\.创建父牌组ID/);
   assert.match(detail, /添加卡片/);
-  assert.match(detail, /创建子牌组/);
-  assert.match(detail, /导出牌组/);
+  assert.match(detail, /deckDetailShortcuts\(/);
+  assert.match(index, /case 'export': this\.openDeckExport\(deckId\)/);
   // 首页只导航，目的地的功能组件持有牌组选项草稿与校验。
   assert.match(read('entry/src/main/ets/pages/DeckOptionsPage.ets'), /DeckOptionsFeature\(\{/);
   assert.doesNotMatch(index, /牌组配置表单|牌组配置服务实例/);

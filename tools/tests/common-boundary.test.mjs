@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { posix } from 'node:path';
 
 const root = new URL('../../entry/src/main/ets/components/common/', import.meta.url);
-const sharedModels = new Set(['SurfaceMaterial', 'KeyboardInput', 'AppLayoutState', 'AppLifecycleState', 'ThemeCatalog', 'ThemeBackgroundMotion',
+const sharedModels = new Set(['SurfaceMaterial', 'AppearanceCustomization', 'KeyboardInput', 'AppLayoutState', 'AppLifecycleState', 'ThemeCatalog', 'ThemeBackgroundMotion',
   '颜色主题', '主题设置', 'CardViewportLayout', 'DialogHierarchy', 'WindowSafeLayout', 'MenuHoldController', 'MenuSlideSession', 'InteractionFeedback', 'DirectoryTree'].map(name => 'model/' + name));
 const sharedUtils = new Set(['MenuTheme', 'PopupTrigger', 'KeyboardKeyAdapter', 'MouseContextInput', '应用尺寸', 'UiFeedback', 'PressFeedback', 'SurfaceBorder', '转场时长',
   'FormInputStyle', 'FormRowLayout', 'FormTextAreaStyle', 'GlassSurface', 'SelectStyle', 'ImageSurfaceStyle', 'ExpansionReveal', 'HelpLayout', 'AppMotion', 'SurfaceTransition', 'SeriesVisual', 'GlassMaterial', 'ReducedMotion', 'GlassBackdrop', 'SearchFieldSurface']
@@ -13,6 +13,7 @@ const sharedUtils = new Set(['MenuTheme', 'PopupTrigger', 'KeyboardKeyAdapter', 
 
 // 现有跨入口业务 UI 的逐条迁移例外；新组件不能继承例外，迁出后删除对应项。
 const legacyDependencies = new Map([
+  ['ImageCropViewport.ets', ['@ibestservices/ibest-ui']],
   ['CardMarkingBadge.ets', ['model/CardMarking']],
   ['FlagMenuChoices.ets', ['model/CardMarking']],
   ['NoteAudioField.ets', ['@kit.AbilityKit', '@kit.CoreFileKit', 'backend/NoteAudioImport',

@@ -11,8 +11,10 @@ test('native confirmations use adaptive button arrays instead of fixed paired la
     const count=[...source.matchAll(/\.showAlertDialog\(/g)].length;
     if(count===0)continue; calls+=count;
     assert.doesNotMatch(source,/\b(?:primaryButton|secondaryButton)\s*:/,file+' fixed paired actions');
-    assert.equal([...source.matchAll(/buttonDirection:\s*DialogButtonDirection\.AUTO/g)].length,count,file+' missing automatic vertical fallback');
-    assert.ok([...source.matchAll(/buttons:\s*\[/g)].length>=count,file+' missing full action array');
+    const singleAction = [...source.matchAll(/\.showAlertDialog\(\{(?:(?!\.showAlertDialog)[\s\S])*?confirm: \{ value: \$r\('app.string.close'\)/g)].length;
+    const adaptive = count - singleAction;
+    assert.equal([...source.matchAll(/buttonDirection:\s*DialogButtonDirection\.AUTO/g)].length,adaptive,file+' missing automatic vertical fallback');
+    assert.ok([...source.matchAll(/buttons:\s*\[/g)].length>=adaptive,file+' missing full action array');
   }
   assert.ok(calls>0,'native confirmation audit must inspect actual calls');
 });

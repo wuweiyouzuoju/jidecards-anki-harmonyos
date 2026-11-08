@@ -142,7 +142,7 @@ test('language failure is displayed and redundant language changes remain no-ops
 });
 
 test('application labels have one owner per locale and the form explicitly binds its storage', () => {
-  for (const [locale, expected] of [['base', '记得闪卡'], ['en_US', 'JiDe Flashcards']]) {
+  for (const [locale, expected] of [['base', '记得闪卡'], ['en_US', 'JIDE Flashcards']]) {
     const app = JSON.parse(read(`AppScope/resources/${locale}/element/string.json`)).string;
     const entry = JSON.parse(read(`entry/src/main/resources/${locale}/element/string.json`)).string;
     assert.deepEqual(app.filter(item => item.name === 'app_name'), [{ name: 'app_name', value: expected }]);

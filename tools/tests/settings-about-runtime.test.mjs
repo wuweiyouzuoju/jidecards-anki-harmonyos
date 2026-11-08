@@ -2,19 +2,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { componentMethods, settle } from './sync-panel-harness.mjs';
-const source=readFileSync(new URL('../../entry/src/main/ets/components/settings/AboutSettings.ets',import.meta.url),'utf8');
-test('About owns its dialogs, delegates rating and retains external-link clipboard fallback',async()=>{
-  const events=[],context={startAbility:async want=>{events.push(want.uri);throw Error('no browser');}};
-  const About=componentMethods(source,['aboutToDisappear','打开好评弹窗','打开AnkiWeb网址','打开Anki官方文档'],{
-    打开应用内好评:(ctx,bundle)=>{assert.equal(ctx,context);events.push(bundle);},HelpPage:{INDEX:0}
+import { componentMethods } from './sync-panel-harness.mjs';
+import { loadPlatformModule } from './platform-module-harness.mjs';
+import { OFFICIAL_HELP_LINKS } from '../../entry/src/main/ets/model/OfficialCommunity.ts';
+
+test('About owns its feedback window, delegates rating and falls back to copying shared links', async () => {
+  const source = readFileSync(new URL('../../entry/src/main/ets/components/settings/AboutSettings.ets', import.meta.url), 'utf8');
+  const events = [];
+  const context = { async startAbility(want) { events.push(['open', want.uri]); throw Error('no browser'); } };
+  const openOfficialHelpLink = loadPlatformModule('utils/OfficialHelpActions.ets', 'openOfficialHelpLink', {
+    pasteboard: { MIMETYPE_TEXT_PLAIN: 'text/plain', createData: (_type, value) => value,
+      getSystemPasteboard: () => ({ async setData(value) { events.push(['copy', value]); } }) },
+    showToastSafely() {}
   });
-  const about=Object.assign(new About(),{getUIContext:()=>({getHostContext:()=>context}),本应用包名:'com.jide.kapian',
-    AnkiWeb网址:'https://ankiweb.net/shared/decks',Anki文档网址:'https://docs.ankiweb.net',
-    链接服务实例:{获取帮助页链接:async()=>{throw Error('offline');}},
-    复制AnkiWeb网址到剪贴板:()=>events.push('copy decks'),复制Anki文档网址到剪贴板:url=>events.push(['copy docs',url])});
-  about.feedbackDialog.open(() => ({open() {},close:()=>events.push('feedback closed')}));
-  about.打开好评弹窗();about.打开AnkiWeb网址();await about.打开Anki官方文档();await settle();about.aboutToDisappear();
-  assert.deepEqual(events,['com.jide.kapian','https://ankiweb.net/shared/decks','copy decks','https://docs.ankiweb.net',
-    ['copy docs','https://docs.ankiweb.net'],'feedback closed']);
+  const About = componentMethods(source, ['aboutToDisappear', '打开好评弹窗', 'openLink'], {
+    打开应用内好评: (ctx, bundle) => { assert.equal(ctx, context); events.push(bundle); },
+    HelpPage: { INDEX: 0 }, openOfficialHelpLink
+  });
+  const about = Object.assign(new About(), {
+    getUIContext: () => ({ getHostContext: () => context }),
+    本应用包名: 'com.jide.kapian',
+    链接服务实例: { async 获取帮助页链接() { throw Error('offline'); } }
+  });
+  about.feedbackDialog.open(() => ({ open() {}, close: () => events.push('feedback closed') }));
+  about.打开好评弹窗();
+  const decks = OFFICIAL_HELP_LINKS.find(link => link.id === 'ankiweb');
+  const docs = OFFICIAL_HELP_LINKS.find(link => link.id === 'anki_documentation');
+  await about.openLink(decks);
+  await about.openLink(docs);
+  about.aboutToDisappear();
+  assert.deepEqual(events, ['com.jide.kapian', ['open', decks.url], ['copy', decks.url],
+    ['open', docs.url], ['copy', docs.url], 'feedback closed']);
 });

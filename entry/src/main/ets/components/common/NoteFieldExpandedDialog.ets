@@ -18,7 +18,7 @@ export struct NoteFieldExpandedDialog {
   }
   build() {
     DialogFrame({ nativeHost: true, maximumWidth: 960, fillBody: true,
-      header: (): void => { this.header(); }, content: this.content,
+      header: (): void => { this.header(); }, content: (): void => { this.content(); },
       onDismiss: (): void => { this.onClose(); } })
   }
 }

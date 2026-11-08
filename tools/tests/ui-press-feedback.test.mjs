@@ -37,15 +37,18 @@ test('click audit distinguishes nested child styles, strings, comments and event
 
 test('all app button and action-row click targets share one press owner', () => {
   const root = new URL('../../entry/src/main/ets/', import.meta.url), auditedPaths = new Set(), scannedPaths = new Set();
-  for (const file of readdirSync(root, { recursive: true }).filter(f => f.endsWith('.ets'))) {
+  const sources = readdirSync(root, { recursive: true }).filter(f => f.endsWith('.ets'));
+  for (const file of sources) {
     const path = file.replaceAll('\\', '/');
-    const source = readFileSync(new URL(path, root), 'utf8');
+    const adapter = readFileSync(new URL(path, root), 'utf8');
+    const source = path === 'components/common/MenuItem.ets' && adapter.includes('SharedMenuItem({') ?
+      readFileSync(new URL('../vendor/jide-foundation/src/harmony/shared/MenuItem.ets', import.meta.url), 'utf8') : adapter;
     scannedPaths.add(path);
     for (const target of arkuiClickTargets(source)) {
       if (clickFeedbackExemption(path, target)) continue;
       auditedPaths.add(path);
       const location = `${path}:${target.line} ${target.kind}`;
-      assert.match(target.modifiers, /new (?:PressFeedback|GlassSurface|PrimaryGlassSurface|StudyRatingSurface)\(/, location);
+      assert.match(target.modifiers, /new (?:SharedPressFeedback|PressFeedback|GlassSurface|PrimaryGlassSurface|StudyRatingSurface)\(/, location);
       if (target.kind === 'Button') assert.match(target.chain, /\.stateEffect\(false\)|\bstateEffect:\s*false/, location);
       let pressModifiers = target.modifiers;
       if (path === 'components/editor/NoteEditorWheel.ets') {

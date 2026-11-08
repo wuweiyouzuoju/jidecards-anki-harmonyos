@@ -110,7 +110,7 @@ test('add-note observation exposes tags in both modes and follows field/type and
     字段值列表:['PRIVATE_BODY'],标签:'PRIVATE_TAGS'});
   page.publishInterface();let view=result(tracker,'add_note');
   assert.deepEqual(view.observations[0].optionIds,['field-0','field-1','field-2']);
-  assert.equal(view.surfaces[0].items.find(x=>x.id==='tags_entry').visibility,'observed');
+  assert.equal(view.surfaces[0].items.find(x=>x.id==='tags').visibility,'observed');
   assert.equal(view.surfaces[0].items.find(x=>x.id==='save').enabled,true);
   assert.equal(view.surfaces[0].items.find(x=>x.id==='save_return').enabled,true);
   assert.equal(view.observations[0].items.find(x=>x.id==='sticky-1').selected,true);
@@ -119,7 +119,7 @@ test('add-note observation exposes tags in both modes and follows field/type and
   for(const simple of [true,false]) {
     page.isSimpleMode=simple;page.publishInterface();
     const current=buildAgentAppStructure({...context,simple},'add_note','',localize,[],[],tracker.snapshot());
-    assert.equal(current.surfaces[0].items.find(x=>x.id==='tags_entry').visibility,'observed');
+    assert.equal(current.surfaces[0].items.find(x=>x.id==='tags').opens,'tag_picker');
     assert.equal(current.surfaces[0].items.find(x=>x.id==='tags').visibility,'observed');
     page.高级已展开=false;page.publishInterface();
     assert.equal(tracker.snapshot().find(item=>item.surface==='add_note').items.some(item=>item.id==='tags'),false);

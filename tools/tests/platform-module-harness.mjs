@@ -1,3 +1,4 @@
+import { deckDetailShortcuts } from '../../entry/src/main/ets/model/DeckDetailShortcut.ts';
 import { DEFAULT_MODULE_OPACITY, DEFAULT_BUTTON_OPACITY } from '../../entry/src/main/ets/model/SurfaceMaterial.ts';
 import { AiContentExportPolicy } from '../../entry/src/main/ets/model/AiContentExportPolicy.ts';
 import { noteLinkBridgeScript } from '../../entry/src/main/ets/model/NoteLinkBridge.ts';
@@ -66,7 +67,7 @@ export function nativeDialogMembers(source, excluded = []) {
 
 function localeDependencies(dependencies) {
   return {
-    DEFAULT_MODULE_OPACITY, DEFAULT_BUTTON_OPACITY,
+    DEFAULT_MODULE_OPACITY, DEFAULT_BUTTON_OPACITY, deckDetailShortcuts,
     SharedPressFeedback, SharedPopupSurface: popupSurfaceClass(dependencies), $r: key => key, noteLinkBridgeScript, NoteLinksProxy, ...appLocales, ...localeFormatting, SUMMARY_LABEL_KEYS, DialogButtonDirection: { AUTO: 'auto' },
     MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight, AgentTaskPlan, KeyboardPressSession, StudyKeyboardSession: KeyboardPressSession,
     NativeDialogHost: nativeDialogHostClass(dependencies), aiContentExportPolicy: memoryAiContentPolicy(),

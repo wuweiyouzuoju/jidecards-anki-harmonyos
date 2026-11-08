@@ -106,7 +106,7 @@ test('all assistant prose paths share native markdown and confirmation card reus
   assert.doesNotMatch(card,/\bButton\(/);
   assert.match(card,/ai_agent_design_fields/); assert.match(card,/note_type_cloze/); assert.match(card,/note_type_basic/);
   assert.equal((card.match(/AgentStylePreview\(\{/g)||[]).length,2);
-  assert.match(card,/backgroundColor\(\$r\('app.color.surface_card'\)\)/);
+  assert.match(card,/backgroundColor\(insetMaterialFill\(\$r\('app\.color\.surface_card'\)\)\)/);
   const renderer=read('components/agent/AgentMarkdownText.ets');
   assert.match(renderer,/ScrollDirection.Horizontal/);assert.match(renderer,/this\.positionText\(ctx\)/);
   assert.doesNotMatch(renderer,/Web\(|RichText\(|maxLines\(/);

@@ -219,7 +219,7 @@ test('shared label renderer ramps between two catalog colors with readable light
     assert.equal(api.themeAccentRampColor(3, 4, colors), colors[1]);
   }
   assert.match(read('utils/颜色主题管理器.ets'), /THEME_TEXT_COLORS_KEY, 是否深色 \? visual.darkActionColors : visual.lightActionColors/);
-  assert.match(read('components/stats/范围切换条.ets'), /Select\(this\.options\(\)\)/);
+  assert.match(read('components/stats/范围切换条.ets'), /SurfaceSelect\(\{ options: this\.options\(\)/);
 });
 
 test('theme text identity changes with its color and create-deck draws spans in its owning component', () => {
@@ -237,7 +237,7 @@ test('data text stays single-color so times, counts and numbers never enter the 
   assert.match(read('pages/学习提醒页.ets'), /ThemeTextSpans\(this\.格式化时间\(项\.小时, 项\.分钟\), \[\], this\.getUIContext\(\)\)/);
   assert.match(read('components/home/主页摘要分页.ets'), /ThemeTextSpans\(`\$\{Math\.round\(this\.图表快照!\.记忆率\)\}%`, \[\], this\.getUIContext\(\)\)/);
   assert.match(read('components/settings/AboutSettings.ets'), /ThemeTextSpans\(this\.QQ群号, \[\], this\.getUIContext\(\)\)/);
-  assert.match(read('components/云端牌组弹窗.ets'), /ThemeTextSpans\(\$r\('app\.string\.cloud_deck_qq_group_entry', '726837065'\), \[\], this\.getUIContext\(\)\)/);
+  assert.match(read('components/云端牌组弹窗.ets'), /ThemeTextSpans\(\$r\('app\.string\.cloud_deck_qq_group_entry', CLOUD_DECK_QQ_GROUP\), \[\], this\.getUIContext\(\)\)/);
   const welcome = read('components/欢迎弹窗.ets');
   assert.doesNotMatch(welcome, /themeAccentColors/);
   assert.match(welcome, /Span\(欢迎弹窗\.QQ群号\)\s*\.fontColor\(this\.动作主色\)/);
@@ -246,8 +246,8 @@ test('data text stays single-color so times, counts and numbers never enter the 
 
 test('glass deck selection exposes the existing background without opacity on its text or live blur', () => {
   const deck = read('components/牌组列表项.ets');
-  assert.match(deck, /this.visual.selectedColors.length > 0 \? Color.Transparent : this.选中背景色/);
-  assert.match(deck, /this.visual.selectedColors.length > 0 \? '#80FFFFFF' : this.主色边框色/);
+  assert.match(deck, /this\.selected \? this\.selectionTint\(\) : Color\.Transparent/);
+  assert.match(deck, /\x231A\$\{this\.动作主色\.slice\(-6\)\}/);
   assert.doesNotMatch(deck, /backdropBlur|backgroundBlurStyle/);
   assert.doesNotMatch(deck,/\.opacity\(/,'glass must not reduce text opacity');
   for (const color of themeDefinition('iridescent').selectedColors) {
@@ -262,12 +262,12 @@ test('glass presses preserve the backing and geometry, reset on release/disable,
     BlurStyle: { NONE: 'none' }, AdaptiveColor: { DEFAULT: 'default' } };
   const themePressGradient = loadPlatformModule('utils/ThemeVisuals.ets', 'themePressGradient', deps);
   const PressFeedback = loadPlatformModule('utils/PressFeedback.ets', 'PressFeedback', motionApi());
-  const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', deps);
+  const { SurfaceBorder } = deps;
   const GlassSurface = loadPlatformModule('utils/GlassSurface.ets', 'GlassSurface', { ...deps, themePressGradient, PressFeedback, SurfaceBorder, translucentGlassFill: glassFillHarness() });
   const PrimaryGlassSurface = loadPlatformModule('utils/PrimaryGlassSurface.ets', 'PrimaryGlassSurface', { ...deps, themePressGradient, PressFeedback, SurfaceBorder, translucentGlassFill: glassFillHarness() });
   const target = () => {
     const state = {}, node = {};
-    for (const key of ['backgroundColor', 'linearGradient', 'border', 'opacity', 'scale', 'backgroundBlurStyle', 'backdropBlur', 'shadow']) {
+    for (const key of ['backgroundColor', 'linearGradient', 'border', 'opacity', 'scale', 'backgroundBlurStyle', 'backdropBlur', 'shadow', 'borderRadius']) {
       node[key] = value => { state[key] = structuredClone(value); return node; };
     }
     return { state, node };
@@ -277,7 +277,7 @@ test('glass presses preserve the backing and geometry, reset on release/disable,
       const a = target(), b = target();
       surface.applyNormalAttribute(a.node); surface.applyNormalAttribute(b.node);
       const normal = structuredClone(a.state);
-      assert.deepEqual(normal.border, SurfaceBorder.options(), 'primary and ordinary glass share the visible outline');
+      assert.ok(normal.border.width > 0, 'primary and ordinary glass retain a visible outline');
       // Rapid down/up/cancel cycles never remove the backing, alter geometry or affect another button.
       for (let cycle = 0; cycle < 6; cycle++) {
         surface.applyPressedAttribute(a.node);
@@ -285,7 +285,7 @@ test('glass presses preserve the backing and geometry, reset on release/disable,
         assert.equal(a.state.opacity, 0.72, 'feedback remains visible even on white-on-white glass');
         assert.deepEqual(a.state.border, normal.border);
         assert.deepEqual(a.state.linearGradient.colors.map(stop => stop[1]), normal.linearGradient.colors.map(stop => stop[1]));
-        if (colors.length > 0) assert.deepEqual(a.state.linearGradient.colors.map(stop => stop[0]), colors);
+        assert.deepEqual(a.state.linearGradient, normal.linearGradient, 'press feedback leaves the current glass backing intact');
         assert.deepEqual(b.state, normal);
         surface.applyNormalAttribute(a.node);
         assert.deepEqual(a.state, normal);

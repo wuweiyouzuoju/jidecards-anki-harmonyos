@@ -14,7 +14,7 @@ test('fixed answer footer keeps one 52vp action slot for loading, completion and
   const group = read('components/StudyAnswerActionBar.ets');
   assert.match(group, /\.height\(应用尺寸\.行动按钮高度\)/);
   assert.match(group, /private showAnswerEnabled\(\): boolean \{ return this\.stage === 'question' && !this\.busy; \}/);
-  assert.match(group, /\.enabled\(enabled\)/);
+  assert.match(group, /\.enabled\(this\.actionEnabled\(wide\)\)/);
   assert.match(group, /\$r\('app\.string\.study_show_answer'\)/);
   for (const label of ['rating_again', 'rating_hard', 'rating_good', 'rating_easy']) {
     assert.match(group, new RegExp(`app\\.string\\.${label}`), label);

@@ -132,7 +132,7 @@ test('the real deck detail publisher drives recommendations through refresh, bus
   const tracker = new AppInterfaceTracker(); tracker.showPage('home'); tracker.observe(home); tracker.showPage('agent');
   const Details = loadComponentLogic('components/牌组详情面板.ets', '牌组详情面板', {
     应用尺寸:loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{}),
-    appInterface:tracker, visibleInterfaceItems,
+    appInterface:tracker, visibleInterfaceItems, namedResourceText: (_, key) => zh.get(key) ?? key,
     interfaceItemText:(_, surface, id) => zh.get(APP_INTERFACE_SURFACES.find(x=>x.id===surface).items.find(x=>x.id===id).titleKey),
     牌组显示名:deck=>deck.name, ExpansionReveal:class {cancel(){} request(){}},
     DECK_LIST_NARROW_KEY:'narrow', THEME_TEXT_COLORS_KEY:'text', GLASS_COLORS_KEY:'glass', GLASS_HIGHLIGHT_COLORS:[],

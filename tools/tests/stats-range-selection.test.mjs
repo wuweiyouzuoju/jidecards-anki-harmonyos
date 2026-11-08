@@ -34,7 +34,7 @@ test('every chart range is controlled by its title selector and invalidates cach
   }
   const section = read('components/stats/统计图表分区.ets');
   assert.ok(section.indexOf('范围切换条({') < section.indexOf('if (this.有数据)'));
-  assert.match(read('components/stats/范围切换条.ets'), /Select\(this\.options\(\)\)/);
+  assert.match(read('components/stats/范围切换条.ets'), /SurfaceSelect\(\{ options: this\.options\(\)/);
   assert.doesNotMatch(page, /显示统计范围菜单/);
 });
 

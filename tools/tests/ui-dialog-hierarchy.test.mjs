@@ -92,8 +92,8 @@ test('every custom backdrop feeds its hierarchy size back into the visible surfa
     }
     count += calls.length;
     assert.equal([...source.matchAll(/onSize:\s*\(width: string, maximumWidth: number\)/g)].length, calls.length, file);
-    assert.match(source, /\.width\(this\.surfaceWidth\)/, file);
-    assert.match(source, /maxWidth:\s*this\.surfaceMaximumWidth/, file);
+    assert.match(source, /(?:\.width\(this\.surfaceWidth\)|panelWidth: this\.surfaceWidth)/, file);
+    assert.match(source, /max(?:imum)?Width:\s*this\.surfaceMaximumWidth/, file);
   }
   assert.ok(count >= 10, 'audit must include shared frames and legacy surfaces');
 });

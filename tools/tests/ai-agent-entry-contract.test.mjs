@@ -320,7 +320,7 @@ test('settings API key, custom endpoint and custom model inputs share one visual
   const settings = read('entry/src/main/ets/components/settings/AIAgent设置分组.ets');
   assert.equal((settings.match(/new FormInputStyle\(\)/g) ?? []).length, 3);
   const style = read('entry/src/main/ets/utils/FormInputStyle.ets');
-  assert.match(style, /backgroundColor\(\$r\('app\.color\.surface_card'\)\)/);
+  assert.match(style, /backgroundColor\(insetMaterialFill\(\$r\('app\.color\.surface_card'\)\)\)/);
   assert.match(style, /\.border\(SurfaceBorder\.options\(\)\)/);
 });
 

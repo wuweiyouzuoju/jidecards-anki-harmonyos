@@ -192,10 +192,10 @@ test('home menus use measured button bounds and the public anchored menu without
   assert.doesNotMatch(header,/bindPopup|enableArrow/);
   const page=read('entry/src/main/ets/pages/首页.ets');
   assert.equal((page.match(/AnchoredMenu\(\{/g)??[]).length,2);
-  assert.equal((page.match(/topOffset: this.homeMenuAnchor\(\).top, contentLeft: this.homeMenuAnchor\(\).left/g)??[]).length,2);
+  assert.equal((page.match(/toolbarBounds: this.homeActionAnchor/g)??[]).length,2);
   assert.match(page,/\.onAreaChange\(\(_old: Area, area: Area\): void => \{ this.homeMenuHostChanged\(area\); \}\)/);
-  assert.match(page,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: false/);
-  assert.match(page,/contentMaxWidth: this.homeActionAnchor.width, alignEnd: true/);
+  assert.match(page,/toolbarBounds: this.homeActionAnchor, alignEnd: false/);
+  assert.match(page,/toolbarBounds: this.homeActionAnchor, alignEnd: true/);
   for (const p of ['entry/src/main/ets/components/home/主页更多面板.ets','entry/src/main/ets/components/主页操作面板.ets']) {
     const menu=read(p); assert.match(menu,/ActionMenuList\(/); assert.doesNotMatch(menu,/AnchoredMenu\(|Scroll\(|topOffset|状态栏高度/);
   }
@@ -472,7 +472,7 @@ test('primary pages share one shell gutter and common visual primitives', () => 
     'settings back inherits the same theme stroke as the home buttons');
   assert.doesNotMatch(settingsPage, /private 顶部条\(\)/,
     'settings must not keep an unused second toolbar implementation');
-  assert.match(settingsCard, /settingsSurface\([\s\S]*应用尺寸.圆角_卡片\)/,
+  assert.match(settingsCard, /settingsSurface\([\s\S]*应用尺寸.圆角_卡片, this\.moduleOpacity\)/,
     'settings group cards must use the same page-card radius');
   assert.match(reminders, /统一空态\(\{[\s\S]*?reminder_list_empty[\s\S]*?reminder_list_empty_hint/,
     'reminders must use the common empty-state component');
@@ -483,7 +483,7 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   assert.match(read('entry/src/main/ets/components/common/FormSelectRow.ets'), /(?:new SelectStyle|SurfaceSelect)\(/);
   assert.equal((agentSettings.match(/FormSelectRow\(\{/g) ?? []).length, 3,
     'all Agent settings selects must match the other settings selects');
-  assert.equal((syncSettings.match(/borderRadius\(应用尺寸\.圆角_面板\)/g) ?? []).length >= 2, true,
+  assert.equal((syncSettings.match(/new FormInputStyle\(\)/g) ?? []).length >= 2, true,
     'sync inputs must use the same form-field radius as Agent settings');
   assert.match(addNote, /按下态按钮\(\{[\s\S]*?app\.string\.study_back/,
     'add-note toolbar back action must use the common pressed button');

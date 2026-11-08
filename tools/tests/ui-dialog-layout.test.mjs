@@ -226,7 +226,7 @@ test('shared chrome owns theme, scroll limits and safe areas; slots retain their
   const frame = read('components/common/DialogFrame.ets');
   assert.match(frame, /Scroll\(\)[\s\S]*maxHeight: this.bodyHeight\(\)/);
   assert.match(frame, /\.height\(this\.usableHeight\(\)\)\.alignContent\(Alignment\.Center\)/);
-  assert.match(frame, /\.width\('100%'\)\.height\('100%'\)\s*\.alignContent\(Alignment\.Top\)/,
+  assert.match(frame, /\.width\('100%'\)\.height\('100%'\)(?:\s*\.onClick\([^\n]*\))?\s*\.alignContent\(Alignment\.Top\)/,
     'keyboard-sized inner viewport must start at the root top, so the root cannot clip the lower body');
   assert.match(frame, /this.header\(\)[\s\S]*flexShrink\(0\)/);
   for (const path of readdirSync(root, { recursive: true }).filter(p => p.endsWith('.ets'))) {
@@ -288,7 +288,8 @@ test('loading deck options offers close/retry without a no-op primary action', (
 
 test('type and mapping selections reject changes while loading or submitting', () => {
   const source = read('components/browser/BrowserNotetypeFeature.ets');
-  const handlers = [...source.matchAll(/\.onSelect\((\([^\n]+=> \{[\s\S]*?)\n\s*\}\)/g)];
+  const mapping = source.slice(source.indexOf('this.state.info!.oldFieldNames'));
+  const handlers = [...mapping.matchAll(/onSelect: (\([^\n]+=> \{[\s\S]*?this\.session\?\.set(?:Field|Template)\([^\n]+\);[\s\S]*?)\n\s*\}\s*\}\)/g)];
   assert.equal(handlers.length, 2);
   let changes = 0;
   const host = { busy: true, state: { busy: false, names: [{ id: 10 }] },

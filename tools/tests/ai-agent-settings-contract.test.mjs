@@ -105,9 +105,9 @@ test('legacy compatibility facade resolves built-in URLs from provider catalog',
 test('detail settings use static sections and the data page keeps a single action list', () => {
   const shell = read('entry/src/main/ets/components/settings/设置分组卡片.ets');
   assert.match(shell, /@BuilderParam\s+内容/);
-  assert.match(shell, /设置面板色板_取\(this\.是否深色\)\.背景/);
+  assert.match(shell, /SeriesVisual\.settingsSurface\(this\.surfaceMaterial, this\.是否深色/);
   assert.match(shell, /\.padding\(\{ left: 应用尺寸\.卡片内边距, right: 应用尺寸\.卡片内边距, top: 8, bottom: 8 \}\)/);
-  assert.match(shell, /\.borderRadius\(16\)/);
+  assert.match(shell, /SeriesVisual\.settingsSurface\([^\n]*应用尺寸\.圆角_卡片/);
   assert.doesNotMatch(shell, /是否展开|切换展开回调|\.rotate\(/);
   assert.match(shell, /this\.内容\(\)/);
   assert.match(shell, /this\.打开说明回调\(this\.帮助标题/);

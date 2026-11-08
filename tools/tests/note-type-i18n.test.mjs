@@ -84,7 +84,13 @@ test('type selectors and field cards cannot bypass the shared display boundary',
   for (const path of readdirSync(root, { recursive: true }).filter(path => path.endsWith('.ets'))) {
     const source = readFileSync(new URL(path.replaceAll('\\', '/'), root), 'utf8');
     assert.doesNotMatch(source, /(?:value:|return|Text\()\s*(?:笔记类型|类型)\.name\s*[;})]/, path);
-    if (source.includes('NoteFieldCard({')) assert.match(source, /originalStockKind:\s*this\./, path);
+    if (path === 'pages/AI制卡页.ets') {
+      assert.match(source, /NoteFieldCard\(\{ value: operation.after,[\s\S]*fieldName: ctx.message.字段名列表/);
+    } else if (path === 'components/agent/AgentEditableCard.ets') {
+      assert.match(source, /NoteFieldCard\(\{\s*fieldName: 字段名, fieldIndex: 字段索引/);
+    } else if (source.includes('NoteFieldCard({')) {
+      assert.match(source, /originalStockKind:\s*this\./, path);
+    }
   }
   const card = readFileSync(new URL('components/editor/NoteFieldCard.ets', root), 'utf8');
   assert.match(card, /Text\(noteFieldText\(/);

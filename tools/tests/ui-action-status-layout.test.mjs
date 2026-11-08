@@ -145,11 +145,11 @@ test('paired composer buttons have equal final widths including both padding and
   });
   const frames = styles.map(match => {
     const capture = recorder();
-    new Function('control', '应用尺寸', 'SurfaceBorder', 'PressFeedback', 'Color', '$r',
+    new Function('control', '应用尺寸', 'SurfaceBorder', 'PressFeedback', 'Color', '$r', 'insetMaterialFill',
       stripTypeScriptTypes('function render() { return control' + match[1] + '; }', { mode: 'transform' }) +
         '; return render.call(this);')
       .call({ interfaceEnabled: () => true, 处理中: false }, capture.node, dimensions, SurfaceBorder,
-        class {}, { Transparent: 'transparent' }, key => key);
+        class {}, { Transparent: 'transparent' }, key => key, value => value);
     return capture.attrs;
   });
   for (const measuredLabelWidth of [30, 60, 96]) {

@@ -74,7 +74,7 @@ test('JIDE more menu uses shared names/icons and reuses home menu surface/list; 
   page.toggleMoreMenu();assert.equal(page.moreVisible,true);page.toggleMoreMenu();assert.equal(page.moreVisible,false);
   const top=agentInterfaceControls({history:false,processing:false,parsing:false,batchRunning:false,pendingClarification:false,canSubmit:true});
   assert.ok(top.some(item=>item.id==='more'));assert.ok(!top.some(item=>['settings','history'].includes(item.id)));
-  assert.match(source,/AnchoredMenu\([\s\S]*cornerRadius: 应用尺寸\.圆角_卡片[\s\S]*ActionMenuList\(/);
+  assert.match(source,/AnchoredMenu\([\s\S]*toolbarBounds: \{ left: this\.menuLeft, top: this\.menuTop, width: this\.menuContentWidth \}, alignEnd: true[\s\S]*ActionMenuList\(/);
   const memory=readFileSync(new URL('../../entry/src/main/ets/components/agent/AgentMemoryPanel.ets',import.meta.url),'utf8');
   assert.match(memory,/DirectorySelect\(\{ label: \$r\('app.string.agent_memory_scope'\), surfaceColor: \$r\('app.color.surface_card'\)/);
 });

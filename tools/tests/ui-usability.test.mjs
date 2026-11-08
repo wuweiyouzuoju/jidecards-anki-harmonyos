@@ -49,7 +49,7 @@ test('localized settings search respects simple and developer gates', () => {
     const simple = filterSettingsEntries('', true, false, localize).map(entry => entry.id);
     assert.ok(simple.includes('scheduler') && !simple.includes('ai'));
     assert.deepEqual(filterSettingsEntries('FSRS', true, false, localize), []);
-    assert.deepEqual(simple, ['general', 'scheduler', 'sync', 'appearance', 'data', 'help', 'redemption', 'about']);
+    assert.deepEqual(simple, ['general', 'scheduler', 'sync', 'editor', 'appearance', 'data', 'help', 'redemption', 'about']);
     for (const simpleMode of [true, false]) {
       for (const query of (locale === 'base' ? ['隐藏', '隐藏牌组', '恢复显示', '导入文件', 'CSV', '备份与恢复'] : ['hidden', 'hidden decks', 'restore', 'import file', 'CSV', 'backups and restore'])) {
         assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), query === '隐藏' ? ['appearance','data'] : ['data']);
