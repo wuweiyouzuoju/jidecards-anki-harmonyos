@@ -48,7 +48,7 @@
 | 学习会话 | 不提交选择题选项或输入题文本，不接管时间盒/调度警告确认及当前会话的自动前进弹窗 | `propose_study_command` 仅翻面、重播和四档评分；`AppAgentOperations` / 学习页拒绝选择题、恢复或被阻塞的状态。牌组选项中的自动前进配置已可改，不能与当前弹窗混同 |
 | 全部统计数据 | 没有直接读取统计页全部原始图表桶和全历史数据的工具 | `get_learning_overview` 返回概览、最多90天历史及30天预测；`get_card_statistics` 返回有界单卡历史。`AgentLearningOverview` 未输出新增、逐小时、评分分布、间隔/稳定性/难度等全部图表数据。统计偏好写入已接通 |
 | JIDE 自身设置及聊天管理 | 不代改 Provider、模型、视觉能力、批量上限、搜索服务/开关或密钥，也不代选、删除、切换历史聊天 | `agent_settings` 观察提供非敏感表单事实；手动配置归 `AgentSettingsStore` / `AgentSecretStore`，历史正文只读检索归 `AgentHistoryToolSession` / `AgentHistoryRepository`，手动恢复仍归 `AgentHistoryCoordinator`。长期记忆读写与当前任务计划已有独立工具，不能一起列为缺失 |
-| 其他面板及外部入口 | 导航只支持 `APP_NAVIGATION_ACTIONS` 的固定语义动作，没有任意弹层/控件点击、兑换码提交、外部商店/群/注册页操作工具 | `AppNavigation` 保护现有编辑与学习页面；权益与外部动作仍由原 UI 拥有。云端直链牌组的下载/导入未接入 JIDE，且当前 `ReleaseFeatures.CLOUD_DECK_CHANNEL_ENABLED=false`，不能当成当前已发布入口 |
+| 其他面板及外部入口 | 导航只支持 `APP_NAVIGATION_ACTIONS` 的固定语义动作，没有任意弹层/控件点击、兑换码提交、外部商店/群/注册页操作工具 | `AppNavigation` 保护现有编辑与学习页面；权益与外部动作仍由原 UI 拥有。云端直链牌组的可见性由 JIDE 和首页共同读取 `isCloudDeckAvailable`，仅新安装且尚有本机配额时显示；选择、下载与导入由用户在弹窗操作 |
 
 已接通但仍需要用户参与的流程：同步登录表单、同步覆盖/冲突方向、系统文件选择/保存、CSV 映射、集合覆盖及背景选图裁剪。它们返回实际完成、取消或失败状态；打开面板不等于完成，也不能把保留用户步骤全部算成“没有接入”。一般写入仍需草稿确认，高风险操作双重确认；学习操作还依赖当前有效会话，批量修改及大型内容分析保留原范围/额度边界。
 
@@ -481,3 +481,13 @@ JIDE 目标澄清的“选择”、目标弹窗的“新建笔记类型”、主
 回归：`ai-agent-fsrs-tools.test.mjs`、`deck-options-fsrs.test.mjs`、`deck-options-fsrs-protocol.test.mjs`、`ai-agent-app-structure.test.mjs`；真实 Core 见 `native/rsharmony/tests/fsrs.rs`，设备验收独立记录。
 
 牌组详情快捷入口与实时认知：名称直达真实deck_rename，计数按DeckDetailShortcut共同声明进入牌组浏览或自定义学习。详情控件观察携带实际opens，AgentAppStructure优先采用观察值，因此筛选牌组的新卡/复习计数呈现browser；普通牌组呈现custom_study。自定义学习发布真实deckId、preset、value和忙碌/确认/取消状态，初始预设由入口传入且不自动提交。名称、提示和可用性同步不授予任意点击/写入能力，真实修改仍使用原有受确认领域命令。
+
+外观自定义入口：单色 RGB/HEX 调色、浅色/深色明暗适配强度与实际强调色预览、壁纸相册/裁剪/移除及两档遮罩由 SettingsStructure 与 appearance_customization 界面状态共同登记；Agent 不读取图片路径或代操作系统相册。custom 主题复用原 propose_set_theme_color 工具；其余能力只报告手动入口和真实界面状态，不能声称可直接写入。实现和验证见 [外观](appearance.md#自定义主色与壁纸)。
+
+### AI 来源与文件导出
+
+AI新建/改写笔记以及模板写入接入公共来源记录；JIDE子集与整库导出和手动导出共用阻断入口，不能换格式或换入口绕过。`get_app_structure`的`aiContentExport`直接返回共同声明，包括旧内容不补标边界。实现和验证见[AI内容导出限制](import-data.md#ai-内容导出限制2026-11-07)。来源记录先持久化再写内容；失败时不报告未标记内容保存成功。
+
+JIDE 对简洁版和实验版默认开放，启动即显示会话、制卡、改卡和 AI 设置入口。首次调用模型仍使用用户在 AI 设置中保存的服务配置。
+
+JIDE 制卡和改卡草稿复用普通编辑器的 NoteFieldCard。字段展示、折叠和源码切换由公共组件管理，草稿仍由 JIDE 保存和确认，附件添加保留在原草稿流程。

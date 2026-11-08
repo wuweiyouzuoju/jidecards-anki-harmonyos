@@ -9,7 +9,8 @@ import { APP_INTERFACE_SURFACES, HOME_SYNC_CHOICES, NOTETYPE_MANAGEMENT_ACTIONS,
 import { appInterfaceSurfaceIds, browserInterfaceMenu, browserToolbarItems, studyInterfaceMenu } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, reminderEditorControls, reminderEditorTitle } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { stripTypeScriptTypes } from 'node:module';
-import { SETTINGS_GROUPS, settingsItem, visibleSettingsGroups } from '../../entry/src/main/ets/model/SettingsStructure.ts';
+import { OFFICIAL_HELP_LINKS } from '../../entry/src/main/ets/model/OfficialCommunity.ts';
+import { SETTINGS_GROUPS, SOFTWARE_HELP_ITEMS, settingsItem, visibleSettingsGroups } from '../../entry/src/main/ets/model/SettingsStructure.ts';
 import { buildAgentAppStructure, agentInterfaceRevision } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
 import { isDoubleColumnDeckListStyle } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 import { homeSyncIndicator, homeSyncLabelKey } from '../../entry/src/main/ets/model/HomeSyncStatusController.ts';
@@ -176,7 +177,7 @@ test('JIDE reads current Core rendering ownership and the same supported TTS par
   assert.equal(support.answerComparison,'anki-core');
   assert.equal(support.clozeTyping,'anki-core');
   assert.deepEqual(support.web, {allowHttpResources:true,mediaPlaybackRequiresGesture:false,renderAcknowledgementTimeoutMs:60000,
-    scriptFailures:'continue remaining scripts; collapsed localized diagnostics with error messages, locations and stacks; fail empty cards',
+    scriptFailures:'continue remaining scripts; localized inline notice opening the existing native alert with error messages, locations and stacks; fail empty cards',
     authorization:'provided and validated by the template author; requires author service availability'});
   assert.equal(support.tts.backend,'HarmonyOS CoreSpeechKit');
   assert.equal(support.tts.voicePrefix,'HarmonyOS_');
@@ -216,7 +217,7 @@ test('JIDE reads current Core rendering ownership and the same supported TTS par
   assert.equal(editor.modeControlWideMinWidth,480); assert.equal(editor.modeControlRailWidth,96);
   assert.equal(editor.expandControlPlacement,'inside_bottom_right_of_each_input');
   assert.deepEqual(editor.modeTools.map(tool=>[tool.id,zh.get(tool.titleKey),tool.editing]),[
-    ['visual','可视编辑','visual_mode_preserving_html'],['source_edit','源码编辑','source_mode_preserving_html']]);
+    ['visual','可视编辑','visual_mode_preserving_html'],['source_edit','源码编辑','whole_field_source_including_media_references_preserving_html']]);
   assert.deepEqual(editor.fieldOptions,['rtl','font','size','description','plainText','collapsed']);
   assert.equal(editor.plainTextMeaning,'default_html_source_preserving_formatting');
   assert.deepEqual([editor.minimumFontSize,editor.maximumFontSize],[5,300]);
@@ -321,7 +322,7 @@ test('setting knowledge and the current tool declarations remain separate from p
 
 test('real menu components enumerate the same options as JIDE and dispatch every callback exactly once', () => {
   for(const [file,name,surface,callbacks] of [
-    ['components/home/主页更多面板.ets','主页更多面板','home_more',{history:'onHistory',settings:'设置回调',stats:'统计回调',reminders:'提醒回调',intro:'onIntro',keyboard:'onKeyboard'}],
+    ['components/home/主页更多面板.ets','主页更多面板','home_more',{history:'onHistory',settings:'设置回调',stats:'统计回调',reminders:'提醒回调',software_help:'onSoftwareHelp',keyboard:'onKeyboard'}],
     ['components/主页操作面板.ets','主页操作面板','home_create',{create_deck:'创建牌组回调',filtered_deck:'onCreateFilteredDeck',import:'导入牌组回调',cloud_deck:'获取直链牌组回调'}]
   ]) {
     const tracker=new AppInterfaceTracker();
@@ -782,6 +783,15 @@ test('reminder form shares its mode labels, actual time options, draft metadata 
   form.aboutToDisappear();form.publishInterface();assert.equal(tracker.snapshot().length,0);
 });
 
+test('home More opens the shared settings links while startup intro has no menu entry', () => {
+  const menu = APP_INTERFACE_SURFACES.find(surface => surface.id === 'home_more');
+  assert.equal(menu.items.some(item => item.opens === 'intro'), false);
+  assert.equal(menu.items.find(item => item.id === 'software_help').opens, 'software_help');
+  const help = APP_INTERFACE_SURFACES.find(surface => surface.id === 'software_help');
+  assert.deepEqual(help.items.slice(0, -1).map(item => item.id), SOFTWARE_HELP_ITEMS.map(item => item.id));
+  for (const link of OFFICIAL_HELP_LINKS) assert.equal(settingsItem(link.id).titleKey, link.titleKey);
+});
+
 test('all shared settings labels have UI bindings and resources; all card branches remain implemented', () => {
   const directory=new URL('../../entry/src/main/ets/components/settings/',import.meta.url);
   const sources=readdirSync(directory,{recursive:true}).filter(x=>x.endsWith('.ets')).map(name=>{
@@ -793,7 +803,9 @@ test('all shared settings labels have UI bindings and resources; all card branch
   const readableIds=new Set(agentSettingDefinitions().map(x=>x.id));
   for(const group of SETTINGS_GROUPS) for(const item of group.items) {
     assert.ok(zh.has(item.titleKey)&&en.has(item.titleKey),item.titleKey);
-    assert.ok((REVIEW_AUDIO_PREFERENCES.some(audio=>audio.id===item.id) && ui.includes('ForEach(REVIEW_AUDIO_PREFERENCES') && ui.includes('settingsItemText(this.getUIContext(), item.id')) || ui.includes(`'${item.id}'`)||ui.includes(`"${item.id}"`), 'missing UI binding: '+item.id);
+    const sharedHelpLink = OFFICIAL_HELP_LINKS.some(link => link.id === item.id) &&
+      ui.includes('ForEach(OFFICIAL_HELP_LINKS') && ui.includes('settingsItemText(this.getUIContext(), link.id');
+    assert.ok(sharedHelpLink || (REVIEW_AUDIO_PREFERENCES.some(audio=>audio.id===item.id) && ui.includes('ForEach(REVIEW_AUDIO_PREFERENCES') && ui.includes('settingsItemText(this.getUIContext(), item.id')) || ui.includes(`'${item.id}'`)||ui.includes(`"${item.id}"`), 'missing UI binding: '+item.id);
     if(item.settingId!==undefined)assert.ok(readableIds.has(item.settingId),'missing setting reader declaration: '+item.settingId);
   }
   assertRegisteredSettingsLabels(sources,ids);

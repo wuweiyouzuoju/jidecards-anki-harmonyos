@@ -1,3 +1,4 @@
+import {menuPresentation,loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 import { glassFillHarness } from './glass-material-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
@@ -10,7 +11,7 @@ import { loadComponentLogic, loadPlatformModule } from './platform-module-harnes
 import { DIALOG_ACTION_PRESENTATION } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
-const read = path => readFileSync(new URL(path, root), 'utf8');
+const read = path => menuPresentation(path,readFileSync(new URL(path, root), 'utf8'));
 const iconsSource = read('utils/SettingsIcons.ets');
 const settingsIcon = loadPlatformModule('utils/SettingsIcons.ets', 'settingsIcon', { $r: key => key });
 
@@ -51,13 +52,13 @@ test('direct navigation keeps simple strokes while menus retain theme fills', ()
     assert.equal(button.resolvedGlyphColor(), accent);
   }
   assert.match(read('components/common/IconActionButton.ets'), /tint: this\.resolvedIconFill\(\)/);
-  const MenuItem = loadComponentLogic('components/common/MenuItem.ets', 'AnchoredMenuItem', {
+  const MenuItem = loadSharedMenu('MenuItem.ets', 'SharedMenuItem', {
     $r: key => key, TextAlign: { Center: 'center' }
   });
-  const menu = new MenuItem();
+  const menu = new MenuItem(); menu.theme.iconFill='app.color.menu_icon_fill';
   assert.equal(menu.resolvedIconTint(), 'app.color.menu_icon_fill');
   menu.selected = true;
-  menu.accent = '#2F5FD0';
+  menu.theme.accent = '#2F5FD0';
   assert.equal(menu.resolvedIconTint(), '#402F5FD0');
   menu.iconTint = 'custom-menu-fill';
   assert.equal(menu.resolvedIconTint(), 'custom-menu-fill');
@@ -98,26 +99,16 @@ test('direct navigation SVGs use unfilled round strokes with matching theme geom
   }
 });
 
-test('icon recoloring preserves alpha and uses the requested RGB independent of theme', () => {
-  const Icon = loadComponentLogic('components/common/ActionIcon.ets', 'ActionIcon', {
-    $r: key => key,
-    ColorFilter: class { constructor(matrix) { this.matrix = matrix; } }
-  });
-  const icon = new Icon();
-  const apply = (input, matrix) => Array.from({ length: 4 }, (_, row) =>
-    input.reduce((sum, channel, column) => sum + channel * matrix[row * 5 + column], matrix[row * 5 + 4]));
-  for (const color of ['#FFFFFF', '#D97A1C', '#aBcD09']) {
-    icon.strokeColor = color;
-    const expected = [1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16) / 255);
-    for (const input of [[0, 0, 0, 1], [0.9, 0.93, 0.96, 0.5], [1, 1, 1, 0]]) {
-      assert.deepEqual(apply(input, icon.iconFilter().matrix), [...expected, input[3]]);
-    }
-  }
-  for (const invalid of ['', '#1g2g3g', 'red', '#12345678']) {
-    icon.strokeColor = invalid;
-    const original = [0.3, 0.5, 0.7, 0.4];
-    assert.deepEqual(apply(original, icon.iconFilter().matrix), original);
-  }
+test('glass icons delegate outline rendering to the shared component; flat icons and status badges preserve fill', () => {
+  const Icon = loadComponentLogic('components/common/ActionIcon.ets', 'ActionIcon', {$r: key => key});
+  const icon=new Icon();assert.equal(icon.outlineOnly(),false);
+  icon.surfaceMaterial='glass';assert.equal(icon.outlineOnly(),true);
+  icon.preserveFill=true;assert.equal(icon.outlineOnly(),false);
+  icon.surfaceMaterial='flat';icon.preserveFill=false;assert.equal(icon.outlineOnly(),false);
+  const source=read('components/common/ActionIcon.ets');
+  assert.match(source,/SharedActionIcon\(\{/);assert.match(source,/outlineOnly: this.outlineOnly\(\)/);
+  assert.doesNotMatch(source,/Image\(|new ColorFilter/);
+  assert.equal((read('components/common/CardMarkingBadge.ets').match(/preserveFill: true/g)??[]).length,2);
 });
 
 test('setting action rows reject disabled late clicks and leave host values unchanged', () => {
@@ -178,7 +169,7 @@ test('directory and same-semantic setting entries have one row, icon and spacing
   assert.doesNotMatch(row, /padding\(\{ left:|margin\(|offset\(/, 'host owns horizontal gutters and safe areas');
   assert.doesNotMatch(row, /\.height\(/, 'long content must grow');
   assert.match(read('components/common/ActionIcon.ets'), /glyphSize: number = 18/);
-  assert.match(read('components/common/ActionIcon.ets'), /\.width\(this.glyphSize\)\.height\(this.glyphSize\)\.flexShrink\(0\)/);
+  assert.match(readFileSync(new URL('../../../记得系列基础/src/harmony/shared/ActionIcon.ets', import.meta.url), 'utf8'), /\.width\(this.glyphSize\)\.height\(this.glyphSize\)\.flexShrink\(0\)/);
   assert.match(read('components/common/MenuItem.ets'), /ActionIcon\(\{/);
   for (const name of readdirSync(new URL('components/settings/', root)).filter(name => name.endsWith('.ets'))) {
     const source = read('components/settings/' + name);

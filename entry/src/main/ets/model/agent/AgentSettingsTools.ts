@@ -27,7 +27,7 @@ export function agentSettingDefinitions(): AgentSettingDefinition[] {
       writable: true, writeTool: 'set_theme_mode', effect: 'immediate_and_persistent' },
     { id: 'system_dark', description: '当前系统颜色状态；theme_mode=system 时决定应用深浅色。',
       valueType: 'boolean', allowedValues: [], scope: 'device', writable: false, writeTool: '', effect: 'read_only' },
-    { id: 'color_theme', description: '应用主题色，与深浅色和闪卡模板配色独立；可用颜色及权益见 list_theme_colors。',
+    { id: 'color_theme', description: '应用主题色，与深浅色和闪卡模板配色独立；可用颜色及权益见 list_theme_colors；custom 使用用户在外观设置中保存的自定义主色。自定义色值、浅色/深色明暗适配强度、相册选图/裁剪和壁纸遮罩由外观界面操作，get_app_interface 可见当前界面状态，不提供助手直接选图或改色值工具。',
       valueType: 'enum', allowedValues: [], scope: 'device', writable: true,
       writeTool: 'propose_set_theme_color', effect: 'confirmed_persistent' },
     { id: 'fsrs_enabled', description: '整个 Anki 卡库的 FSRS 开关，不是单牌组设置；开启会重新调度卡片。',

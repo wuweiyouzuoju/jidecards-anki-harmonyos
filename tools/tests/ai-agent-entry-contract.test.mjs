@@ -5,85 +5,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { visibleInterfaceItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
-test('JIDE starts hidden, persists explicit unlocking and restores previously unlocked access', async () => {
-  const persisted = new Map(), storage = new Map([['abilityContext', {}]]);
-  let fail = false;
-  const store = { get: async (key, fallback) => persisted.get(key) ?? fallback,
-    put: async (key, value) => { if (fail) throw Error('disk'); persisted.set(key, value); }, flush: async () => {} };
-  const api = loadPlatformModule('model/ReleaseFeatures.ets',
-    '{ initializeAiAgentChannels, enableAiAgentChannels, OFFICIAL_ANKIWEB_SYNC_UI_ENABLED }', {
-      preferences: { getPreferences: async () => store },
-      AppStorage: { get: key => storage.get(key), setOrCreate: (key, value) => storage.set(key, value) }
-    });
-  assert.equal(api.OFFICIAL_ANKIWEB_SYNC_UI_ENABLED, true);
-  await api.initializeAiAgentChannels();
-  assert.equal(storage.get('aiAgentChannelsEnabled'), false);
-  assert.equal(await api.enableAiAgentChannels('invalid'), false);
-  assert.equal(storage.get('aiAgentChannelsEnabled'), false);
-  fail = true;
-  await assert.rejects(api.enableAiAgentChannels('JideCards Developer Debug + 3.0.0'));
-  assert.equal(storage.get('aiAgentChannelsEnabled'), false);
-  fail = false;
-  assert.equal(await api.enableAiAgentChannels('JideCards Developer Debug + 3.0.0'), true);
-  storage.set('aiAgentChannelsEnabled', false);
-  await api.initializeAiAgentChannels();
-  assert.equal(storage.get('aiAgentChannelsEnabled'), true, 'upgrade preserves the existing preference key');
-});
-
-test('developer debug key persistently unlocks every hidden Agent channel through one runtime gate', () => {
+test('JIDE is available at startup without a developer unlock', () => {
+  const startup = read('entry/src/main/ets/entryability/EntryAbility.ets');
   const features = read('entry/src/main/ets/model/ReleaseFeatures.ets');
-  const entryAbility = read('entry/src/main/ets/entryability/EntryAbility.ets');
-  const settings = read('entry/src/main/ets/components/设置面板.ets');
-  const developerGroup = read('entry/src/main/ets/components/settings/开发者调试分组.ets');
-  assert.match(features, /AI_AGENT_CHANNELS_APP_STORAGE_KEY:\s*string\s*=\s*'aiAgentChannelsEnabled'/);
-  assert.match(features, /DEVELOPER_DEBUG_KEY_NORMALIZED:\s*string\s*=\s*'jidecardsdeveloperdebug3\.0\.0'/);
-  assert.match(features, /isDeveloperDebugKeyValid/);
-  assert.match(features, /store\.put\(AI_AGENT_CHANNELS_PREFERENCE_KEY, true\)/);
-  assert.match(features, /await store\.flush\(\)/);
-  assert.match(features, /AppStorage\.setOrCreate<boolean>\(AI_AGENT_CHANNELS_APP_STORAGE_KEY, true\)/);
-  assert.match(entryAbility, /initializeAiAgentChannels\(\)/);
-  assert.match(developerGroup, /InputType\.Password/);
-  assert.match(developerGroup, /enableAiAgentChannels\(this\.开发者密钥\)/);
-  assert.match(developerGroup, /settingsItemText\(this\.getUIContext\(\), 'developer_contact', this\.uiLanguage\)/);
-  assert.match(developerGroup,
-    /if \(this\.Agent入口已启用\) \{[\s\S]*?'agent_enabled'[\s\S]*?\.maxLines\(1\)/);
-  assert.doesNotMatch(developerGroup, /settings_developer_debug_enabled_hint|settings_developer_debug_success/,
-    'successful activation must use the existing single-line settings status style');
-  assert.match(settings, /开发者调试分组\(/);
-  assert.match(settings,
-    /启用成功回调:[\s\S]*?this\.openSection\('ai'\);/,
-    'successful activation must collapse developer debug and reveal the Agent settings group');
-  const zh = JSON.parse(read('entry/src/main/resources/base/element/string.json')).string;
-  const en = JSON.parse(read('entry/src/main/resources/en_US/element/string.json')).string;
-  assert.equal(zh.find((item) => item.name === 'settings_developer_debug_enable')?.value, '启用开发者功能');
-  assert.equal(en.find((item) => item.name === 'settings_developer_debug_enable')?.value, 'Enable Developer Features');
-  assert.equal(zh.find((item) => item.name === 'settings_developer_debug_qq_hint')?.value,
-    '加入官方 QQ 群 726837065，获取开发者调试资格。');
-  assert.equal(en.find((item) => item.name === 'settings_developer_debug_qq_hint')?.value,
-    'Join the official QQ group 726837065 to request developer debug access.');
-
-  for (const relative of [
-    'entry/src/main/ets/pages/首页.ets',
-    'entry/src/main/ets/pages/学习页.ets',
-    'entry/src/main/ets/components/browser/批量操作栏.ets',
-    'entry/src/main/ets/components/设置面板.ets',
-  ]) {
-    const source = read(relative);
-    assert.match(source, /AI_AGENT_CHANNELS_APP_STORAGE_KEY/);
-    if (relative.includes('首页')) {
-      assert.match(source, /@StorageProp\(AI_AGENT_CHANNELS_APP_STORAGE_KEY\)[^\n]*homeAgentEnabled: boolean = false/);
-      assert.match(source, /agentEnabled: this.homeAgentEnabled/);
-    } else assert.match(source, /@StorageLink\(AI_AGENT_CHANNELS_APP_STORAGE_KEY\)[^\n]*Agent入口已启用:\s*boolean\s*=\s*false/);
-    if (relative.includes('首页')) assert.match(source, /onAgent:[\s\S]*?if \(this.homeAgentEnabled\)/);
-    else if (relative.includes('设置面板')) assert.match(source, /visibleSettingsGroups\(this\.activeSection, this\.简洁模式, this\.Agent入口已启用\)/);
-    else if (relative.includes('学习页')) assert.match(source, /studyInterfaceMenu\([\s\S]*agent: this\.Agent入口已启用/);
-    else assert.match(source, /visibleInterfaceItems\('browser_batch',[\s\S]*?agent: this\.Agent入口已启用/);
+  assert.match(startup, /AppStorage\.setOrCreate<boolean>\(AI_AGENT_CHANNELS_APP_STORAGE_KEY, true\)/);
+  assert.doesNotMatch(features, /developer_debug_agent_enabled|enableAiAgentChannels/);
+  for (const simple of [false, true]) {
+    const context = {simple,agent:true,cloudDeck:false,themeHasTextures:false};
+    assert.ok(visibleInterfaceItems('home',context).some(item=>item.id==='agent'));
   }
 });
 

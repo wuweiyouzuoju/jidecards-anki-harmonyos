@@ -28,7 +28,7 @@ import { NoteDuplicateSession, initialDuplicateScanState } from '../../entry/src
 import { DataTransferSession } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 
 function coreFixture() {
-  const s={writes:[],version:1,templateRevision:0,saved:'{}',labels:'{}',notes:[{id:11,notetypeId:5,fields:['A','B'],tags:['source']},{id:12,notetypeId:5,fields:['A','C'],tags:[]}],
+  const s={writes:[],version:1,templateRevision:0,saved:'{}',labels:'{}',notes:[{id:11,guid:'note-11',notetypeId:5,fields:['A','B'],tags:['source']},{id:12,guid:'note-12',notetypeId:5,fields:['A','C'],tags:[]}],
     cards:[{id:21,noteId:11,deckId:1,ctype:0,queue:0,due:10,flags:128},{id:22,noteId:12,deckId:1,ctype:0,queue:-1,due:20,flags:0},{id:23,noteId:12,deckId:1,ctype:2,queue:-2,due:10,flags:0}],
     type:JSON.stringify({id:5,name:'Basic',mod:1,usn:0,sortf:0,flds:[{ord:0,name:'Front',id:91,sticky:true},{ord:1,name:'Back',id:92}],tmpls:[{ord:0,name:'Card',qfmt:'{{Front}}',afmt:'{{Back}}'}],css:'preserved',unknown:{x:1}})};
   const config=id=>({id,name:'Preset '+id,mtimeSecs:0,usn:0,config:emptyDeckConfigSettings()});

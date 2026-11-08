@@ -4,7 +4,7 @@ import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialo
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { agentOperationHosts } from '../../model/agent/AgentOperationHost';
-import { SurfaceBorder } from '../../utils/SurfaceBorder';
+import { FormInputStyle } from '../../utils/FormInputStyle';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { OFFICIAL_ANKIWEB_SYNC_UI_ENABLED } from '../../model/ReleaseFeatures';
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -483,29 +483,13 @@ export struct 同步分组 {
     }
     TextInput({ placeholder: this.savedServer === '' ? settingsItemText(this.getUIContext(), 'sync_username', this.uiLanguage) :
       $r('app.string.sync_custom_username_hint'), text: this.用户名输入 })
-      .border(SurfaceBorder.options())
-      .width('100%')
-      .height(44)
-      .fontSize(14)
-      .fontColor(色板.主文字)
-      .placeholderColor(色板.弱化文字)
-      .backgroundColor(色板.标签背景)
-      .borderRadius(应用尺寸.圆角_面板)
-      .padding({ left: 12, right: 12 })
+      .attributeModifier(new FormInputStyle())
       .enabled(!this.登录中)
       .onChange((值: string) => {
         this.用户名输入 = 值;
       })
     TextInput({ placeholder: settingsItemText(this.getUIContext(), 'sync_password', this.uiLanguage), text: this.密码输入 })
-      .border(SurfaceBorder.options())
-      .width('100%')
-      .height(44)
-      .fontSize(14)
-      .fontColor(色板.主文字)
-      .placeholderColor(色板.弱化文字)
-      .backgroundColor(色板.标签背景)
-      .borderRadius(应用尺寸.圆角_面板)
-      .padding({ left: 12, right: 12 })
+      .attributeModifier(new FormInputStyle())
       .type(InputType.Password)
       .enabled(!this.登录中)
       .onChange((值: string) => {
@@ -754,13 +738,7 @@ struct 自定义服务器弹窗 {
       .fontColor(色板.次文字)
       .width('100%')
     TextInput({ text: this.serverInput, placeholder: OFFICIAL_ANKIWEB_SYNC_UI_ENABLED ? $r('app.string.sync_server_placeholder') : $r('app.string.sync_custom_server_placeholder') })
-      .border(SurfaceBorder.options())
-      .fontSize(14)
-      .fontColor(色板.主文字)
-      .placeholderColor(色板.弱化文字)
-      .backgroundColor(色板.标签背景)
-      .borderRadius(应用尺寸.圆角_面板)
-      .height(44)
+      .attributeModifier(new FormInputStyle())
       .enabled(this.当前状态 === '未登录' && !this.登录中 && !this.settingsSaving)
       .onChange((value: string): void => { this.serverInput = value; })
   }

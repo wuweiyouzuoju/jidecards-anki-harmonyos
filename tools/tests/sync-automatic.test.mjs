@@ -623,7 +623,8 @@ test('centered server dialog opens on the persisted value, cancels drafts, and b
   const previous = group.serverDialogController.current();
   motion.setStyle('lively'); group.openServerDialog();
   assert.notEqual(group.serverDialogController.current(), previous);
-  assert.equal(group.serverDialogController.current().options.openAnimation.duration, 290);
+  assert.equal(group.serverDialogController.current().options.openAnimation.duration, 0, 'the content shell owns entrance animation; the native window must not animate twice');
+  assert.deepEqual(group.serverDialogController.current().options.closeAnimation, motion.SurfaceTransition.dialogExitAnimation());
   assert.equal(group.serverDialogController.current().options.builder.serverInput, group.savedServer);
   assert.equal(opened, 2);
   assert.equal(closed, 1, 'closing releases the reference, so reopening does not close the same window twice');

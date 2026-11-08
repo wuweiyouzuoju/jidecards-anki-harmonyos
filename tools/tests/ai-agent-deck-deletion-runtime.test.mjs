@@ -7,6 +7,8 @@ import { decodeAgentToolArguments } from '../../entry/src/main/ets/model/agent/A
 import { buildFailedOperationsRetryDraft } from '../../entry/src/main/ets/model/agent/AgentDraftRetry.ts';
 
 const stub=`
+export const aiContentExportPolicy = {recordNotes:async()=>{},recordNotetypes:async()=>{},assertExport:async()=>{}};
+
 export const common={};
 export class AgentStreamObserver {} export class AgentTransportError extends Error {} export class AgentTransportSession {}
 export class DeepSeekAdapter {} export class OpenAIAdapter {} export class CustomAdapter {}
@@ -31,7 +33,7 @@ export async function saveAgentSettingValue() { throw Error("unexpected setting 
 export class WikimediaImageService {}
 `;
 const stubUrl='data:text/javascript;base64,'+Buffer.from(stub).toString('base64');
-const names=['牌组服务','搜索服务','卡片服务','笔记服务','笔记类型服务','媒体服务','AppAgentOperations','AgentSettingCommands','WikimediaImageService',
+const names=['AiContentExportService','牌组服务','搜索服务','卡片服务','笔记服务','笔记类型服务','媒体服务','AppAgentOperations','AgentSettingCommands','WikimediaImageService',
  'AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter'];
 register('data:text/javascript;base64,'+Buffer.from(`export function resolve(s,c,next){
  if(s==='@kit.AbilityKit'||${JSON.stringify(names)}.some(n=>s.endsWith('/'+n)))return {url:${JSON.stringify(stubUrl)},shortCircuit:true};

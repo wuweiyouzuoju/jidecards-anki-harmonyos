@@ -259,7 +259,7 @@ export struct NotetypeTemplatePreview {
       ForEach(this.webSlots, (slot: number) => {
       Web({ src: '', controller: this.cardWeb.controllerAt(slot) })
         .javaScriptAccess(true).fileAccess(true).domStorageAccess(true).zoomAccess(true)
-        .attributeModifier(new CardWebAttributes())
+        .attributeModifier(new CardWebAttributes(this.getUIContext()))
         .backgroundColor(this.cardSurfaceBackground || $r('app.color.surface_card'))
         .onControllerAttached((): void => { this.attach(slot); })
         .onInterceptRequest((event: OnInterceptRequestEvent): WebResourceResponse | null =>

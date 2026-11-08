@@ -14,6 +14,8 @@ import { decodeExtensionArguments } from '../../entry/src/main/ets/model/agent/A
 
 // 仅替换平台 IO；执行真实 Runner、Registry、Session、卡库工具和确认执行器。
 const stub = `
+export const aiContentExportPolicy = {recordNotes:async()=>{},recordNotetypes:async()=>{},assertExport:async()=>{}};
+
 export class AgentStreamObserver {} export class AgentTransportError extends Error {} export class AgentTransportSession {}
 export class DeepSeekAdapter {} export class OpenAIAdapter {} export class CustomAdapter {}
 export class AgentWorkspaceStore {} export const agentOperationCoordinator = {};
@@ -71,7 +73,7 @@ export async function saveBrowserPreferences() {throw Error('unexpected browser 
 export class AnkiBrowserSearch {async columns(){throw Error('unexpected browser column read');}}
 `;
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
-const names = ['AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter','AgentWorkspaceStore','AppAgentOperations','AgentSettingCommands','WikimediaImageService',
+const names = ['AiContentExportService','AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter','AgentWorkspaceStore','AppAgentOperations','AgentSettingCommands','WikimediaImageService',
  '牌组服务','笔记类型服务','搜索服务','笔记服务','卡片服务','标签服务','统计服务','AppThemeService','FSRS控制器',
  'CardTextSizeStore','DeckListAppearanceStore','MotionStyleStore','StudyHaptics','LocalPreferenceWrite','牌组顺序存储',
  'ReviewPreferencesService','StudyControlsService','数据迁移服务','FsrsService','AnkiDeckOptions','FilteredDeckService','BrowserPreferencesStore','AnkiBrowserSearch'];

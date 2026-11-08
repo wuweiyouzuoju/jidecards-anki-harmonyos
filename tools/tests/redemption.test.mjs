@@ -180,7 +180,7 @@ test('animation lifecycle and entitlement gating remain connected', () => {
   assert.match(background, /duration: this\.cycleDuration/);
   assert.match(background, /generation === this\.generation/);
   const settings = readFileSync(new URL('../../entry/src/main/ets/components/设置面板.ets', import.meta.url), 'utf8');
-  assert.ok(settings.lastIndexOf('RedemptionPanel({') > settings.indexOf('开发者调试分组({'));
+  assert.ok(settings.lastIndexOf('RedemptionPanel({') > settings.indexOf('AboutSettings({'));
   const appearance = readFileSync(new URL('../../entry/src/main/ets/components/settings/外观分组.ets', import.meta.url), 'utf8');
   assert.match(appearance, /isThemeAvailable\(theme, this\.unlockedContents\)/);
 });

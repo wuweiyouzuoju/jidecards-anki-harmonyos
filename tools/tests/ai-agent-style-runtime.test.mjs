@@ -10,6 +10,8 @@ import { buildAgentNotetypeJson } from '../../entry/src/main/ets/model/agent/Age
 import { buildFailedOperationsRetryDraft } from '../../entry/src/main/ets/model/agent/AgentDraftRetry.ts';
 
 const stub = `
+export const aiContentExportPolicy = {recordNotes:async()=>{},recordNotetypes:async()=>{},assertExport:async()=>{}};
+
 export const common = {};
 export const fixture = { json: '', count: 2507, writes: [], queries: [], failure: false, ignoreWrite: false };
 export class 笔记类型服务 {
@@ -27,7 +29,7 @@ export async function saveAgentSettingValue() { throw Error("unexpected setting 
 export class WikimediaImageService {}
 `;
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
-const names = ['笔记类型服务','搜索服务','笔记服务','卡片服务','牌组服务','媒体服务','AppAgentOperations','AgentSettingCommands','WikimediaImageService'];
+const names = ['AiContentExportService','笔记类型服务','搜索服务','笔记服务','卡片服务','牌组服务','媒体服务','AppAgentOperations','AgentSettingCommands','WikimediaImageService'];
 register('data:text/javascript;base64,' + Buffer.from(`export function resolve(s,c,next) {
  if(s==='@kit.AbilityKit'||${JSON.stringify(names)}.some(n=>s.endsWith('/'+n)))return {url:${JSON.stringify(stubUrl)},shortCircuit:true};
  return next(s,c);

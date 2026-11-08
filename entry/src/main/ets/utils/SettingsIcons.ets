@@ -19,6 +19,8 @@ export function settingsIcon(id: string): Resource {
     case 'data':
       return $r('app.media.ic_settings_data');
     case 'help':
+    case 'getting_started':
+    case 'ankidroid_manual':
     case 'anki_documentation':
       return $r('app.media.ic_settings_help');
     case 'redemption':
@@ -68,6 +70,7 @@ export function settingsIcon(id: string): Resource {
       return $r('app.media.ic_settings_community');
     case 'licenses':
       return $r('app.media.ic_settings_licenses');
+    case 'website':
     case 'ankiweb':
     case 'ai_web_enabled':
       return $r('app.media.ic_settings_web');

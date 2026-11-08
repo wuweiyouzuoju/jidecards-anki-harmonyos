@@ -81,10 +81,10 @@ test('all Agent text areas share appearance; options have explicit selection and
   }
   assert.equal(count, 2);
   const draft = read('components/agent/AgentEditableCard.ets');
-  assert.match(draft, /NoteFieldEditor\(\{[\s\S]*value: this.card.fields/);
+  assert.match(draft, /NoteFieldCard\(\{[\s\S]*value: this.card.fields/);
   assert.match(draft, /disabled: this.busy \|\| this.card.状态 === 'saved'/);
   const page = read('pages/AI制卡页.ets');
-  assert.match(page, /NoteFieldEditor\(\{ value: operation.after/);
+  assert.match(page, /NoteFieldCard\(\{ value: operation.after/);
   assert.match(page, /disabled: ctx.message.变更草稿列表\[ctx.itemIndex\].status !== 'pending'/);
   const card = read(file);
   assert.match(card, /Radio\(\{ value: option.id, group: this.clarification.request.id \}\)/);

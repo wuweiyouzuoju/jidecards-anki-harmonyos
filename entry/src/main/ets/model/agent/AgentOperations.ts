@@ -118,7 +118,7 @@ export function agentOperationDefinitions(): AgentOperationDefinition[] {
     definition('data', 'propose_create_backup', 'agent_operation_tool_propose_create_backup', '立即创建本机集合备份，不包含媒体；返回 Core 实际创建状态和备份列表。', {}, []),
     definition('data', 'propose_restore_backup', 'agent_operation_tool_propose_restore_backup', '恢复 get_backups 中的备份，恢复前自动备份当前集合；覆盖当前集合，双重确认。', { name: NAME }, ['name'], 'high_risk'),
     definition('data', 'propose_import_data', 'agent_operation_tool_propose_import_data', '确认后打开现有系统文件选择及导入流程，format=apkg/csv/collection。CSV 映射与集合覆盖方向仍在原流程确认，取消不报告导入完成。', { format: choice(['apkg','csv','collection']) }, ['format'], 'high_risk'),
-    definition('data', 'propose_export_collection', 'agent_operation_tool_propose_export_collection', '完整集合导出 COLPKG，withMedia 控制媒体，legacy 控制兼容格式；确认后使用系统保存选择器。', { withMedia: BOOL, legacy: BOOL }, ['withMedia','legacy']),
+    definition('data', 'propose_export_collection', 'agent_operation_tool_propose_export_collection', '完整集合导出 COLPKG；包含本应用记录的AI生成/改写内容时会拒绝导出，不得绕过。withMedia 控制媒体，legacy 控制兼容格式；确认后使用系统保存选择器。', { withMedia: BOOL, legacy: BOOL }, ['withMedia','legacy']),
     definition('sync', 'get_sync_status', 'agent_operation_tool_get_sync_status', '读取脱敏同步状态、端点与是否忙碌，不读取用户名、密码或 token。', {}, [], 'read'),
     definition('sync', 'propose_sync', 'agent_operation_tool_propose_sync', '使用原同步会话发起同步；冲突与覆盖方向交给原面板确认，取消和等待冲突不等于完成。', {}, []),
     definition('sync', 'propose_sync_account', 'agent_operation_tool_propose_sync_account', '登录/注销或修改服务器；operation=login/logout/server。登录使用原安全表单，模型不接收凭证；server 的 value 是基础地址。', { operation: choice(['login','logout','server']), value: TEXT }, ['operation'], 'high_risk'),

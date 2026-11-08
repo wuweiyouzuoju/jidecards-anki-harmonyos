@@ -37,7 +37,8 @@ import type { ProviderFunctionTool } from '../../model/agent/ProviderProtocol';
 import { buildAgentAppStructure } from '../../model/agent/AgentAppStructure';
 import type { AgentNavigationReadiness } from '../../model/agent/AgentAppNavigation';
 import { appInterface } from '../AppInterfaceService';
-import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, CLOUD_DECK_CHANNEL_ENABLED } from '../../model/ReleaseFeatures';
+import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../../model/ReleaseFeatures';
+import { isCloudDeckAvailable } from '../../model/云端牌组引导存储';
 import { themeDefinition } from '../../model/ThemeCatalog';
 
 interface SettingsReadResult {
@@ -136,7 +137,7 @@ export class AgentAppSettingsTools {
       const savedSimple: boolean = simple === undefined ? (await readAgentPreference('simple_mode')).value === true : simple;
       return JSON.stringify(buildAgentAppStructure({ simple: savedSimple,
         agent: AppStorage.get<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY) ?? false,
-        cloudDeck: CLOUD_DECK_CHANNEL_ENABLED, themeHasTextures: themeDefinition(activeColor).backgroundTextures.length > 0 },
+        cloudDeck: await isCloudDeckAvailable(), themeHasTextures: themeDefinition(activeColor).backgroundTextures.length > 0 },
         args.surface, args.sectionId, (key: string): string => context.resourceManager.getStringByNameSync(key),
         agentSettingDefinitions(), this.interfaceTools, appInterface.snapshot(),
         AppStorage.get<boolean>(APP_FOREGROUND_KEY) === false ? '' : appInterface.currentPage(),

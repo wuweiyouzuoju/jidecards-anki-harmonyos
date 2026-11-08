@@ -1,3 +1,5 @@
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY, moduleOpacityPercent } from '../model/SurfaceMaterial';
+import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
 import { EditorSettings } from './settings/EditorSettings';
 import { GlassSource } from './common/GlassSource';
@@ -47,7 +49,6 @@ import { 查找重复对话框 } from './settings/查找重复对话框';
 import { 笔记类型管理面板 } from './settings/笔记类型管理面板';
 import { 笔记类型编辑器 } from './settings/笔记类型编辑器';
 import { AIAgent设置分组 } from './settings/AIAgent设置分组';
-import { 开发者调试分组 } from './settings/开发者调试分组';
 import { 设置分组卡片 } from './settings/设置分组卡片';
 import { 简洁模式AppStorage键, 加载简洁模式, 保存简洁模式 } from '../model/简洁模式存储';
 import { 字段帮助面板 } from './字段帮助面板';
@@ -81,7 +82,9 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 // ========================================================
 @Component
 export struct 设置面板 {
-  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp('surface_material') @Watch('publishInterface') private surfaceMaterial: string = 'flat';
+  @StorageProp(MODULE_OPACITY_KEY) @Watch('publishInterface') private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
+  @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
   @State private notetypeEditorBackRequest: number = 0;
@@ -99,7 +102,7 @@ export struct 设置面板 {
     if (this.显示空卡列表) { this.emptyCardsBackRequest++; return; }
     if (this.显示媒体管理) { this.mediaBackRequest++; return; }
     if (this.显示备份管理) { this.backupBackRequest++; return; }
-    if (this.显示模式菜单) { this.显示模式菜单 = false; return; }
+    if (this.显示模式菜单) { this.modeMenuCloseRequest++; return; }
     if (this.显示说明浮层) { this.显示说明浮层 = false; return; }
     this.navigateBack();
   }
@@ -125,6 +128,7 @@ export struct 设置面板 {
   @StorageProp(颜色键.主色容器) private 主色容器色: string = '#E8EEFC';
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
   @State private modeButtonRight: number | undefined = undefined;
+  @State private modeButtonBottom: number | undefined = undefined;
   @StorageProp(WINDOW_SAFE_TOP_KEY) private toolbarSafeTop: number = 0;
   // 手势导航条高度（列表滚到底时最后分组需完整滚出导航条区域）
   @StorageProp('导航条高度') private 导航条高度: number = 0;
@@ -157,6 +161,7 @@ export struct 设置面板 {
 
   // 右上角模式切换菜单：顶栏「当前模式」按钮触发，弹出 简洁版/实验版 选择
   @State @Watch('publishInterface') private 显示模式菜单: boolean = false;
+  @State private modeMenuCloseRequest: number = 0;
   @State private maintenance: CollectionMaintenanceState = new CollectionMaintenanceState();
   private readonly maintenanceSession: CollectionMaintenanceSession = new CollectionMaintenanceSession();
   // 子分组（FSRS / 语音朗读）ⓘ 按钮上抛的说明请求：统一在本面板根 Stack 浮层显示，
@@ -236,7 +241,7 @@ export struct 设置面板 {
 
   /** 目录导航只改变展示位置，设置的保存仍交给原有组件。 */
   private openSection(id: string): void {
-    if (((id === 'scheduler' && !this.简洁模式) || id === 'data' || id === 'advanced') && syncActivity.isCollectionBusy()) {
+    if (((id === 'scheduler' && !this.简洁模式) || id === 'data') && syncActivity.isCollectionBusy()) {
       showToastSafely(this.getUIContext(), { message: this.取本地化文本($r('app.string.sync_wait_operation')) });
       return;
     }
@@ -261,7 +266,11 @@ export struct 设置面板 {
   private publishInterface(): void {
     appInterface.observe({ surface: 'settings', sectionId: this.activeSection, selectedId: '',
       optionIds: [], optionLabels: [], busy: false,
-      items: settingsHeaderControls(this.简洁模式, this.显示模式菜单) });
+      items: settingsHeaderControls(this.简洁模式, this.显示模式菜单),
+      values: this.activeSection === 'appearance' ? [
+        { id: 'surface_material', value: this.surfaceMaterial },
+        { id: 'module_opacity', value: String(moduleOpacityPercent(this.moduleOpacity, this.surfaceMaterial, this.是否深色)) }
+      ] : [] });
   }
 
   private sectionChanged(): void {
@@ -320,7 +329,7 @@ export struct 设置面板 {
             .fontColor($r('app.color.text_secondary')).padding(20)
         }
       }.width('100%')
-        .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.动作主色链接, this.页面底色微染值, 应用尺寸.圆角_卡片)).clip(true)
+        .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.动作主色链接, this.页面底色微染值, 应用尺寸.圆角_卡片, this.moduleOpacity)).clip(true)
     }.width('100%')
   }
 
@@ -461,11 +470,10 @@ Column() {
             IconActionButton({ toolbarStyle: true,
               source: interfaceControlIcon(settingsHeaderItems(this.简洁模式), 'mode'),
               label: interfaceControlText(this.getUIContext(), settingsHeaderItems(this.简洁模式), 'mode', this.uiLanguage),
+              onMenuAnchor: (right: number, bottom: number): void => { this.modeButtonRight = right; this.modeButtonBottom = bottom; },
               slideMenu: true, onHoldOpen: (): void => { this.显示模式菜单 = true; },
               onHoldCancel: (): void => { this.显示模式菜单 = false; },
               onAction: (): void => { this.显示模式菜单 = true; }
-            }).onAreaChange((_old: Area, area: Area): void => {
-              this.modeButtonRight = Number(area.globalPosition.x) + Number(area.width);
             })
           }
           .width('100%')
@@ -479,7 +487,7 @@ Column() {
           top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
           bottom: 0
         })
-        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial))
+        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial, this.wallpaperPath))
         .alignContent(Alignment.Center)
 
         // 搜索框属于设置面板公共壳，进入二级/三级设置仍保持在顶栏下方。
@@ -655,19 +663,6 @@ Column() {
                 }
               }
             }
-            else if (group.id === 'advanced') {
-              ListItem() {
-                开发者调试分组({
-                  是否深色: this.是否深色,
-                  启用成功回调: (): void => {
-                    this.openSection('ai');
-                    setTimeout((): void => {
-                      this.内容滚动器.scrollToIndex(0);
-                    }, 50);
-                  }
-                })
-              }
-            }
             else if (group.id === 'redemption') {
               ListItem() {
                 RedemptionPanel({
@@ -685,7 +680,7 @@ Column() {
           top: 0,
           bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout) + this.导航条高度
         })
-        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial))
+        .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial, this.wallpaperPath))
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
         .alignListItem(ListItemAlign.Center)
@@ -694,7 +689,7 @@ Column() {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial))
+      .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial, this.wallpaperPath))
       }
       
 
@@ -714,7 +709,8 @@ Column() {
 
       // 右上角模式切换菜单：顶栏「当前模式」按钮触发，挂在根 Stack 顶层
       if (this.显示模式菜单) {
-        模式切换菜单({ toolbarRight: this.modeButtonRight,
+        模式切换菜单({ toolbarRight: this.modeButtonRight, toolbarBottom: this.modeButtonBottom,
+          closeRequest: this.modeMenuCloseRequest,
           当前简洁模式: this.简洁模式,
           主色: this.解析主色(),
           顶部偏移: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),

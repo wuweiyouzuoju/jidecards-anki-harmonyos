@@ -1,3 +1,4 @@
+import { AI_CONTENT_EXPORT_SUPPORT } from '../AiContentExportPolicy';
 import { NOTE_LINK_SUPPORT } from '../NoteLinks';
 import { INTERACTION_FEEDBACK_SUPPORT } from '../InteractionFeedback';
 import type { InteractionFeedbackSupport } from '../InteractionFeedback';
@@ -34,7 +35,7 @@ export interface AgentPageDestination {
 /** 指纹覆盖共同声明与本轮能力；不是持久缓存，也不把用户状态写入长期记忆。 */
 export function agentInterfaceRevision(tools: ProviderFunctionTool[]): string {
   const source: string = JSON.stringify([APP_PAGE_ROUTES, APP_INTERFACE_SURFACES, SETTINGS_ENTRIES,
-    SETTINGS_GROUPS, SETTINGS_HEADER_ITEMS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_LINK_SUPPORT, AGENT_SEARCH_PROVIDERS, NOTE_FIELD_EDITING_SUPPORT, INTERACTION_FEEDBACK_SUPPORT, EXTERNAL_DECK_OPEN_SUPPORT, tools]);
+    SETTINGS_GROUPS, SETTINGS_HEADER_ITEMS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_LINK_SUPPORT, AGENT_SEARCH_PROVIDERS, NOTE_FIELD_EDITING_SUPPORT, INTERACTION_FEEDBACK_SUPPORT, EXTERNAL_DECK_OPEN_SUPPORT, AI_CONTENT_EXPORT_SUPPORT, tools]);
   let hash: number = 2166136261;
   for (let index: number = 0; index < source.length; index++) { hash = Math.imul(hash ^ source.charCodeAt(index), 16777619); }
   return (hash >>> 0).toString(16);
@@ -71,6 +72,7 @@ export interface AgentAppStructure {
   cardRendering: CardRenderingSupport;
   noteLinks: Object;
   noteEditing: NoteFieldEditingSupport;
+  aiContentExport: Object;
   revision: string; destinations: AgentPageDestination[]; actions: AgentNavigationCapability[];
   source: string; coverage: string[]; limitation: string; simpleMode: boolean;
   observations: AppInterfaceObservation[]; tools: AgentInterfaceTool[];
@@ -172,7 +174,7 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
       execution: 'Use declared web_search/read_webpage tools; DeepSeek uses Search/Fetch with its saved model key. ' +
         'Chat requests do not automatically search. Availability follows the app web switch and this turn; ' +
         'tool success supplies evidence, not links in generated text. Fetch is separately billed by DeepSeek.' },
-    noteEditing: NOTE_FIELD_EDITING_SUPPORT,
+    noteEditing: NOTE_FIELD_EDITING_SUPPORT, aiContentExport: AI_CONTENT_EXPORT_SUPPORT,
     settingsHeader: surfaceId === 'app' || surfaceId === 'settings' ? settingsHeaderItems(context.simple).map((item): AgentInterfaceItem => {
       const control = views.find((view): boolean => view.surface === 'settings')?.items?.find((entry): boolean => entry.id === item.id);
       return { id: item.id, title: control?.title ?? localize(item.titleKey), iconKey: control?.iconKey ?? item.iconKey,

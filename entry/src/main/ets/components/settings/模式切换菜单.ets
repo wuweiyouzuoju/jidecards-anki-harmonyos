@@ -37,11 +37,14 @@ export struct 模式切换菜单 {
   @Prop 主色: ResourceColor = $r('app.color.action_primary');
   @Prop 顶部偏移: number = 68;
   @Prop toolbarRight: number | undefined = undefined;
+  @Prop toolbarBottom: number | undefined = undefined;
+  @Prop closeRequest: number = 0;
   选择回调: (简洁: boolean) => void = (_简洁: boolean): void => {};
   关闭回调: () => void = (): void => {};
 
   build() {
-    AnchoredMenu({ anchorRight: this.toolbarRight, topOffset: this.顶部偏移, slideScope: this.slideScope, onClose: (): void => { this.关闭回调(); } }) {
+    AnchoredMenu({ anchorRight: this.toolbarRight, anchorBottom: this.toolbarBottom, closeRequest: this.closeRequest,
+      topOffset: this.顶部偏移, slideScope: this.slideScope, onClose: (): void => { this.关闭回调(); } }) {
       SelectionOptions({ items: [
         { id: 'simple', label: $r('app.string.settings_simple_mode_simple'), selected: this.当前简洁模式 },
         { id: 'full', label: $r('app.string.settings_simple_mode_full'), selected: !this.当前简洁模式 }
