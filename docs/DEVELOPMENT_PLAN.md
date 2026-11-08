@@ -63,7 +63,7 @@ Core”或“兼容常用 Anki 数据与学习流程”，不要使用未经差�
 
 ## 当前发布开关与限制
 
-- 当前发布包的 AI 制卡、AI 改卡及设置入口默认关闭，可通过设置页的开发者调试功能统一解锁；
+- 当前源码默认开放 AI 制卡、AI 改卡及设置入口，实际调用需配置模型服务；
   实现没有删除，运行时开关由 `entry/src/main/ets/model/ReleaseFeatures.ets` 管理。
 - Agent 页面保持 Provider `searchMode: 'off'`；应用端 `web_search` / `read_webpage`
   由独立默认关闭的联网开关控制，配置豆包（默认）或 Brave 密钥后可启用。详见[应用内 Agent](development/agent.md)。

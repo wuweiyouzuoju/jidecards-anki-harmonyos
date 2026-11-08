@@ -1,8 +1,6 @@
 # 应用内 Agent 当前设计
 
-> 当前发布状态：Agent 实现仍在源码中，发布配置默认关闭首页、学习页、浏览页和设置页
-> 的全部 Agent 入口。开发者在设置页输入版本密钥后，`ReleaseFeatures.ets` 会持久化
-> 解锁状态并通过 AppStorage 统一开放入口；普通用户仍不会默认看到这些功能。
+> 当前源码默认开放全部 Agent 入口。启动时由 EntryAbility 通过 AppStorage 发布统一开关。
 
 ## 产品行为
 

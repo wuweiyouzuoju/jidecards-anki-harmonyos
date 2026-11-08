@@ -33,7 +33,7 @@
 - [功能状态与兼容边界](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/FEATURE_STATUS.md)
 - [JIDE 实现与验证](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/agent.md)
 
-当前 JIDE 为开发者调试功能，发布配置默认隐藏入口。需解锁并配置模型服务后使用；联网检索另需开启应用端联网并配置搜索凭据。具体能力以当前应用、工具与发布说明为准。
+当前源码默认开放 JIDE 入口。配置模型服务后即可使用，联网检索另需开启应用端联网并配置搜索凭据。具体能力以当前应用、工具与发布说明为准。
 
 ## 机器可读入口
 
