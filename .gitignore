@@ -62,3 +62,6 @@ entry/.test/
 *.pfx
 *.jks
 *.keystore
+
+# Contest submissions belong on AtomGit, not in the GitHub source repository.
+/参赛材料/
