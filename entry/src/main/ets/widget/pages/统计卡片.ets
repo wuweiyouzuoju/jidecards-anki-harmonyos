@@ -1022,10 +1022,11 @@ struct 统计卡片 {
         // 顶部翻页指示点
         Row({ space: 4 }) {
           ForEach([0, 1, 2, 3, 4, 5, 6, 7], (i: number) => {
-            Circle()
+            Row()
+              .borderRadius(3)
               .width(i === this.当前页索引 ? 5 : 3)
               .height(i === this.当前页索引 ? 5 : 3)
-              .fill(i === this.当前页索引 ? this.数据.主题色.主色按钮背景 : this.数据.主题色.文字次)
+              .backgroundColor(i === this.当前页索引 ? this.数据.主题色.主色按钮背景 : this.数据.主题色.文字次)
               .opacity(i === this.当前页索引 ? 1 : 0.4)
           }, (i: number) => `${i}`)
         }
