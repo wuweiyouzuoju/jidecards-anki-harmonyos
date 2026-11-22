@@ -919,3 +919,181 @@ fn audit_malformed_metadata_is_rejected_before_collection_writes() {
         assert_eq!(b.query("select * from cards order by id"), before);
     }
 }
+
+#[test]
+fn cloud_media_cache_is_validated_before_committing() {
+    let root = tempfile::tempdir().unwrap();
+    let (a, b) = peers(root.path());
+    sync(&a, &b, "merge");
+    a.media("cloud.png", b"initial");
+    let snapshot = a.capture();
+    let remote = b.receive(&a, &snapshot);
+    let packet = token();
+    b.rpc(2, json!({"token":packet})).unwrap();
+    std::fs::write(b.file(&packet), [0_u8; 8]).unwrap();
+    let manifest: Value =
+        serde_json::from_slice(&std::fs::read(a.file(&snapshot)).unwrap()).unwrap();
+    let hash = manifest["media"]["cloud.png"]["version"]["hash"]
+        .as_str()
+        .unwrap();
+    let cache = b.root.join(".device-collection/blobs");
+    std::fs::create_dir_all(&cache).unwrap();
+    let request = json!({"token":remote,"payload":packet,"mode":"cloud"});
+    std::fs::write(cache.join(hash), b"corrupt").unwrap();
+    assert!(b.rpc(1, request.clone()).is_err());
+    assert!(!b.root.join("collection.media/cloud.png").exists());
+    std::fs::write(cache.join(hash), b"initial").unwrap();
+    b.rpc(1, request.clone()).unwrap();
+    assert_eq!(
+        std::fs::read(b.root.join("collection.media/cloud.png")).unwrap(),
+        b"initial"
+    );
+    b.media("cloud.png", b"newer local image");
+    b.capture();
+    let applied = b.rpc(1, request).unwrap();
+    assert_eq!(applied["updated_media"], 0);
+    assert_eq!(
+        std::fs::read(b.root.join("collection.media/cloud.png")).unwrap(),
+        b"newer local image"
+    );
+}
+
+#[test]
+fn cloud_backup_restore_recovers_cards_and_media_after_a_newer_local_deletion() {
+    let root = tempfile::tempdir().unwrap();
+    let (a, b) = peers(root.path());
+    a.media("restore.png", b"backup image");
+    let backup = a.capture();
+    a.rpc(5, json!({"token":backup})).unwrap();
+    std::fs::remove_file(a.root.join("collection.media/restore.png")).unwrap();
+    a.query("delete from cards");
+    a.query("delete from notes");
+    let deleted = a.capture();
+    let wanted = token();
+    a.rpc(
+        3,
+        json!({"token":backup,"local":deleted,"out":wanted,"mode":"cloud_replace"}),
+    )
+    .unwrap();
+    let wanted: Value = serde_json::from_slice(&std::fs::read(a.file(&wanted)).unwrap()).unwrap();
+    assert!(wanted["files"].get("restore.png").is_some());
+    let manifest: Value = serde_json::from_slice(&std::fs::read(a.file(&backup)).unwrap()).unwrap();
+    let hash = manifest["media"]["restore.png"]["version"]["hash"]
+        .as_str()
+        .unwrap();
+    let cache = a.root.join(".device-collection/blobs");
+    std::fs::create_dir_all(&cache).unwrap();
+    std::fs::write(cache.join(hash), b"backup image").unwrap();
+    let packet = token();
+    a.rpc(2, json!({"token":packet})).unwrap();
+    std::fs::write(a.file(&packet), [0_u8; 8]).unwrap();
+    let applied = a
+        .rpc(
+            1,
+            json!({"token":backup,"payload":packet,"mode":"cloud_replace"}),
+        )
+        .unwrap();
+    assert_eq!(applied["updated_media"], 1);
+    assert_eq!(a.query("select count(*) from cards")[0][0], 3);
+    assert_eq!(
+        std::fs::read(a.root.join("collection.media/restore.png")).unwrap(),
+        b"backup image"
+    );
+    // 恢复创建新的媒体版本，旧删除不能在下一轮合并中再次吞掉它。
+    let restored = a.capture();
+    let restored: Value =
+        serde_json::from_slice(&std::fs::read(a.file(&restored)).unwrap()).unwrap();
+    let deleted: Value = serde_json::from_slice(&std::fs::read(a.file(&deleted)).unwrap()).unwrap();
+    assert!(
+        restored["media"]["restore.png"]["version"]["clock"]
+            .as_u64()
+            .unwrap()
+            > deleted["media"]["restore.png"]["version"]["clock"]
+                .as_u64()
+                .unwrap()
+    );
+    drop(b);
+}
+
+#[test]
+fn complete_colpkg_roundtrip_preserves_decks_templates_reviews_and_media() {
+    use anki_proto::import_export::{
+        ExportCollectionPackageRequest, ImportCollectionPackageRequest,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let (a, b) = peers(root.path());
+    a.edit(|col| {
+        let deck = col
+            .get_or_create_normal_deck("Cloud::Full backup")
+            .unwrap()
+            .id;
+        let mut nt = (*col.get_notetype_by_name("Basic").unwrap().unwrap()).clone();
+        nt.id = Default::default();
+        nt.name = "Backup template".into();
+        nt.templates[0].config.q_format = "<b>{{Front}}</b>".into();
+        col.add_notetype(&mut nt, false).unwrap();
+        let mut note = nt.new_note();
+        note.set_field(0, "完整备份 <img src=\"cloud.png\">")
+            .unwrap();
+        note.set_field(1, "[sound:cloud.mp3]").unwrap();
+        col.add_note(&mut note, deck).unwrap();
+    });
+    a.media("cloud.png", b"image bytes");
+    a.media("cloud.mp3", b"audio bytes");
+    a.answer(true, 1790000000123);
+    let expected: Vec<_> = [
+        "select id,name from decks order by id",
+        "select id,flds,tags from notes order by id",
+        "select id,nid,did,ord,queue,type,reps from cards order by id",
+        "select * from revlog order by id",
+        "select ntid,ord,config from templates order by ntid,ord",
+    ]
+    .iter()
+    .map(|sql| (*sql, a.query(sql)))
+    .collect();
+    let package = root.path().join("full.colpkg");
+    call(
+        &a.backend,
+        "export_collection_package",
+        &ExportCollectionPackageRequest {
+            out_path: package.to_string_lossy().into(),
+            include_media: true,
+            legacy: false,
+        }
+        .encode_to_vec(),
+    );
+    b.media("cloud.png", b"different local image");
+    call(&b.backend, "close_collection", &[]);
+    call(
+        &b.backend,
+        "import_collection_package",
+        &ImportCollectionPackageRequest {
+            col_path: b.root.join("collection.anki2").to_string_lossy().into(),
+            backup_path: package.to_string_lossy().into(),
+            media_folder: b.root.join("collection.media").to_string_lossy().into(),
+            media_db: b.root.join("collection.mdb").to_string_lossy().into(),
+        }
+        .encode_to_vec(),
+    );
+    call(
+        &b.backend,
+        "open_collection",
+        &OpenCollectionRequest {
+            collection_path: b.root.join("collection.anki2").to_string_lossy().into(),
+            media_folder_path: b.root.join("collection.media").to_string_lossy().into(),
+            media_db_path: b.root.join("collection.mdb").to_string_lossy().into(),
+        }
+        .encode_to_vec(),
+    );
+    for (sql, value) in expected {
+        assert_eq!(b.query(sql), value, "{sql}");
+    }
+    assert_eq!(
+        std::fs::read(b.root.join("collection.media/cloud.png")).unwrap(),
+        b"image bytes"
+    );
+    assert_eq!(
+        std::fs::read(b.root.join("collection.media/cloud.mp3")).unwrap(),
+        b"audio bytes"
+    );
+}

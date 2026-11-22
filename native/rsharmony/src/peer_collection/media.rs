@@ -200,7 +200,11 @@ pub(super) fn plan(root: &Path, request: &Request) -> Result<Summary> {
     {
         return Err(fail("device_collection_full_required"));
     }
-    let entries = selected(&local.media, &incoming.media);
+    let entries = if request.mode == "cloud_replace" {
+        incoming.media.clone()
+    } else {
+        selected(&local.media, &incoming.media)
+    };
     let mut files = BTreeMap::new();
     for (name, winner) in entries {
         let local_hash = local
@@ -229,8 +233,8 @@ pub(super) fn plan(root: &Path, request: &Request) -> Result<Summary> {
 }
 
 pub(super) fn pack(root: &Path, request: &Request) -> Result<Summary> {
-    let wanted: Wanted = read_json(&packet(root, &request.token)?)?;
     let source = super::snapshot::read_snapshot(&packet(root, &request.local)?)?;
+    let wanted: Wanted = read_json(&packet(root, &request.token)?)?;
     if wanted.files.len() > 100_000 {
         return Err(fail("device_collection_invalid"));
     }
@@ -288,9 +292,14 @@ pub(super) fn prepare(
     incoming: &Snapshot,
     payload: &Path,
     own: &str,
+    replace: bool,
 ) -> Result<Commit> {
     let local = capture(root, own)?;
-    let entries = selected(&local, &incoming.media);
+    let mut entries = if replace {
+        incoming.media.clone()
+    } else {
+        selected(&local, &incoming.media)
+    };
     let folder = root.join(".device-collection/blobs");
     fs::create_dir_all(&folder)?;
     if fs::metadata(payload)?.len() > MAX_PACKET {
@@ -323,7 +332,7 @@ pub(super) fn prepare(
             || incoming
                 .media
                 .get(&name)
-                .is_none_or(|v| v.version != record.version)
+                .is_none_or(|v| v.version != record.version || v.bytes != record.bytes)
         {
             return Err(fail("device_collection_invalid"));
         }
@@ -346,6 +355,27 @@ pub(super) fn prepare(
     let saved = state(root)?;
     let mut clock = saved.clock;
     let mut confirmed = saved.confirmed;
+    if replace {
+        // 显式云备份恢复以备份内容为准，不能被本机较新的删除记录吞掉。
+        clock = clock.max(entries.values().map(|v| v.version.clock).max().unwrap_or(0));
+        for (name, old) in &local {
+            entries
+                .entry(name.clone())
+                .or_insert(MediaRecord {
+                    version: old.version.clone(),
+                    bytes: 0,
+                })
+                .version
+                .hash = incoming
+                .media
+                .get(name)
+                .map(|v| v.version.hash.clone())
+                .unwrap_or_default();
+        }
+        for record in entries.values_mut() {
+            record.version = revision(&mut clock, own, record.version.hash.clone())?;
+        }
+    }
     for (name, winner) in &entries {
         clock = clock.max(winner.version.clock);
         if incoming.media.get(name).is_some_and(|remote| {

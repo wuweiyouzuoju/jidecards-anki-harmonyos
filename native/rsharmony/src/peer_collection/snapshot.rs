@@ -680,18 +680,28 @@ fn pending_value(table: &str, object: &Object, old: Option<&Object>) -> Value {
 }
 
 pub(super) fn apply(col: &mut Collection, root: &Path, request: &Request) -> Result<Summary> {
-    if !["merge", "final", "replace", "media"].contains(&request.mode.as_str()) {
+    if ![
+        "merge",
+        "final",
+        "replace",
+        "media",
+        "cloud",
+        "cloud_replace",
+    ]
+    .contains(&request.mode.as_str())
+    {
         return Err(fail("device_collection_invalid"));
     }
     let incoming = read_snapshot(&packet(root, &request.token)?)?;
     let mut local = read_core(col)?;
-    let replace = request.mode == "replace";
+    let replace = request.mode == "replace" || request.mode == "cloud_replace";
     if request.mode == "media" {
         let media = super::media::prepare(
             root,
             &incoming,
             &packet(root, &request.payload)?,
             &request.own,
+            false,
         )?;
         let (updated_media, deleted_media) = super::media::commit(root, media)?;
         return Ok(Summary {
@@ -729,6 +739,7 @@ pub(super) fn apply(col: &mut Collection, root: &Path, request: &Request) -> Res
         &incoming,
         &packet(root, &request.payload)?,
         &request.own,
+        request.mode == "cloud_replace",
     )?;
     if replace {
         // Also create a standard archive visible in the existing local-backup restore UI.
