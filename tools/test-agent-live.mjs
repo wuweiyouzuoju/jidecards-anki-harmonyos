@@ -78,7 +78,7 @@ for(const scenario of cases) {
  try {
   const result=await runner.run('deepseek',{apiKey,baseUrl,model,instructions:buildAgentSessionInstructions(setup,100),
    input:[{kind:'message',role:'user',content:scenario.prompt,callId:'',name:'',argumentsJson:'',output:''}],
-   functionTools:agentFunctionTools(100,'create').filter(t=>['create_flashcards','request_clarification'].includes(t.name)),
+   functionTools:agentFunctionTools('create').filter(t=>['create_flashcards','request_clarification'].includes(t.name)),
    searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,requiresDraft:true,
    expectedDraftCount:scenario.count,reasoningEffort:'low',maxOutputTokens:32768},{onEvent:e=>events.push(e)});
   const notes=new Map();

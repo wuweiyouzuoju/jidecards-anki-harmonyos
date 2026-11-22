@@ -7,9 +7,9 @@
     "enums": 49,
     "backendServices": 23,
     "backendMethods": 239,
-    "domainMethods": 138,
+    "domainMethods": 141,
     "contractMethods": 5,
-    "unconnectedMethods": 96,
+    "unconnectedMethods": 93,
     "migrations": 208
   },
   "capabilityPolicy": "生成覆盖不等于产品接入；无领域调用为未接入。有调用也须经过原有 UI/JIDE 能力目录、权限与确认流程。",
@@ -1633,7 +1633,9 @@
       "generatedSources": [
         "anki.decks.GetDeckNamesRequest"
       ],
-      "callers": [],
+      "callers": [
+        "entry/src/main/ets/backend/牌组服务.ts"
+      ],
       "evidence": {
         "oracleInputs": 2,
         "successfulInputs": 2,
@@ -1702,7 +1704,9 @@
         "anki.decks.DeckNameId",
         "anki.decks.DeckNames"
       ],
-      "callers": [],
+      "callers": [
+        "entry/src/main/ets/backend/牌组服务.ts"
+      ],
       "evidence": {
         "oracleInputs": 1,
         "successfulInputs": 1,
@@ -2278,12 +2282,14 @@
         "anki.import_export.ImportAnkiPackageRequest"
       ],
       "callers": [
+        "entry/src/main/ets/backend/agent/AgentFileImportService.ets",
         "entry/src/main/ets/backend/数据迁移服务.ts"
       ],
       "evidence": {
         "oracleInputs": 1,
         "successfulInputs": 1,
         "tests": [
+          "tools/tests/ai-agent-file-import.test.mjs",
           "tools/tests/data-transfer-contract.test.mjs",
           "tools/tests/proto-messages.test.mjs"
         ],
@@ -2348,13 +2354,15 @@
         "anki.import_export.ExportCollectionPackageRequest"
       ],
       "callers": [
+        "entry/src/main/ets/backend/cloud-sync/AnkiCollectionBackup.ets",
         "entry/src/main/ets/backend/数据迁移服务.ts"
       ],
       "evidence": {
         "oracleInputs": 2,
         "successfulInputs": 2,
         "tests": [
-          "tools/tests/data-transfer-contract.test.mjs"
+          "tools/tests/data-transfer-contract.test.mjs",
+          "tools/tests/huawei-cloud-sync.test.mjs"
         ],
         "differential": "tools/tests/protocol-generation.test.mjs",
         "expandedDifferential": "tools/tests/protocol-equivalence.test.mjs",
@@ -2414,6 +2422,7 @@
       ],
       "callers": [
         "entry/src/main/ets/backend/AnkiDataTransfer.ets",
+        "entry/src/main/ets/backend/agent/AgentFileImportService.ets",
         "entry/src/main/ets/backend/数据迁移服务.ts",
         "entry/src/main/ets/components/import/ImportResult.ets"
       ],
@@ -2421,6 +2430,7 @@
         "oracleInputs": 1,
         "successfulInputs": 1,
         "tests": [
+          "tools/tests/ai-agent-file-import.test.mjs",
           "tools/tests/import-options-runtime.test.mjs",
           "tools/tests/import-results.test.mjs",
           "tools/tests/proto-messages.test.mjs"
@@ -5962,9 +5972,13 @@
       "input": "anki.decks.GetDeckNamesRequest",
       "output": "anki.decks.DeckNames",
       "wrapper": "Decks_get_deck_names",
-      "status": "未接入",
-      "callers": [],
-      "wrapperCallers": [],
+      "status": "领域 Service 已调用",
+      "callers": [
+        "entry/src/main/ets/backend/牌组服务.ts"
+      ],
+      "wrapperCallers": [
+        "entry/src/main/ets/backend/牌组服务.ts"
+      ],
       "contractCallers": []
     },
     {
@@ -7251,9 +7265,13 @@
       "input": "anki.generic.Json",
       "output": "anki.generic.Json",
       "wrapper": "Ankidroid_run_db_command",
-      "status": "未接入",
-      "callers": [],
-      "wrapperCallers": [],
+      "status": "领域 Service 已调用",
+      "callers": [
+        "entry/src/main/ets/backend/cloud-sync/AnkiCollectionBackup.ets"
+      ],
+      "wrapperCallers": [
+        "entry/src/main/ets/backend/cloud-sync/AnkiCollectionBackup.ets"
+      ],
       "contractCallers": []
     },
     {
@@ -8271,9 +8289,13 @@
       "input": "anki.card_rendering.HtmlToTextLineRequest",
       "output": "anki.generic.String",
       "wrapper": "CardRendering_html_to_text_line",
-      "status": "未接入",
-      "callers": [],
-      "wrapperCallers": [],
+      "status": "领域 Service 已调用",
+      "callers": [
+        "entry/src/main/ets/backend/NoteSpeech.ets"
+      ],
+      "wrapperCallers": [
+        "entry/src/main/ets/backend/NoteSpeech.ets"
+      ],
       "contractCallers": []
     },
     {
@@ -8810,9 +8832,11 @@
       "wrapper": "ImportExport_export_collection_package",
       "status": "领域 Service 已调用",
       "callers": [
+        "entry/src/main/ets/backend/cloud-sync/AnkiCollectionBackup.ets",
         "entry/src/main/ets/backend/数据迁移服务.ts"
       ],
       "wrapperCallers": [
+        "entry/src/main/ets/backend/cloud-sync/AnkiCollectionBackup.ets",
         "entry/src/main/ets/backend/数据迁移服务.ts"
       ],
       "contractCallers": []
@@ -8829,9 +8853,11 @@
       "wrapper": "ImportExport_import_anki_package",
       "status": "领域 Service 已调用",
       "callers": [
+        "entry/src/main/ets/backend/agent/AgentFileImportService.ets",
         "entry/src/main/ets/backend/数据迁移服务.ts"
       ],
       "wrapperCallers": [
+        "entry/src/main/ets/backend/agent/AgentFileImportService.ets",
         "entry/src/main/ets/backend/数据迁移服务.ts"
       ],
       "contractCallers": []
@@ -8924,9 +8950,11 @@
       "wrapper": "ImportExport_export_note_csv",
       "status": "领域 Service 已调用",
       "callers": [
+        "entry/src/main/ets/backend/agent/AgentFileImportService.ets",
         "entry/src/main/ets/backend/数据迁移服务.ts"
       ],
       "wrapperCallers": [
+        "entry/src/main/ets/backend/agent/AgentFileImportService.ets",
         "entry/src/main/ets/backend/数据迁移服务.ts"
       ],
       "contractCallers": []

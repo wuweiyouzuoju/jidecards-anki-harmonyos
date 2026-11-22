@@ -15,7 +15,7 @@ const instructions = `你是记得闪卡应用内的改卡 Agent。只能调用�
 // —— 复刻 taskSnapshot + buildAgentTaskProviderText（edit 分支）——
 const configuration = {
   mode: 'edit', deckId: 0, deckName: '', notetypeId: 0, notetypeName: '',
-  fieldNames: [], noteTypeKind: 0, clozeFieldOrds: [], batchLimit: 100
+  fieldNames: [], noteTypeKind: 0, clozeFieldOrds: []
 };
 const localContext = [
   'card=1703533239123 note=1703533239456 deck=1686246656 template=0',
@@ -25,7 +25,7 @@ const providerText =
   `任务配置：${JSON.stringify(configuration)}\n用户要求：把这几张卡片背面例句里的 "eg." 改成 "例如"` +
   `\n应用内本地上下文（稳定 ID，仅限本轮）：\n${localContext}`;
 
-const tools = agentFunctionTools(100, 'edit');
+const tools = agentFunctionTools('edit');
 console.log('edit 模式工具清单:', tools.map((t) => t.name).join(', '));
 
 const body = buildResponsesPayload({
