@@ -40,6 +40,8 @@ export function clickFeedbackExemption(file, target) {
   if (file.startsWith('widget/')) return 'system-hosted widget';
   if (target.kind === 'Span') return 'inline rich-text link, not a CommonAttribute node';
   if (target.kind === 'DialogBackdrop') return 'dismiss-only scrim';
+  // 可编辑输入的点击反馈是系统焦点与光标；onClick 只用于记录交互，不能再叠加按压缩放。
+  if (['TextInput', 'TextArea', 'Search'].includes(target.kind)) return 'editable field with native focus and caret feedback';
   const handler = target.handler.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');
   if (/=>\s*\{\s*\}\s*\)$/.test(handler)) return 'event barrier without an action';
   if (target.kind === 'Column' && /this\.(?:onClose|backgroundClicked)\(/.test(handler) &&
@@ -47,6 +49,6 @@ export function clickFeedbackExemption(file, target) {
   if (target.kind === 'Stack' && [
     'components/common/DialogFrame.ets', 'components/common/AnchoredMenu.ets',
     'components/home/HomeDeckRowMenu.ets', 'components/home/自定义学习对话框.ets'
-  ].includes(file) && /this\.(?:dismiss|backgroundClicked|handleBackRequest)\(/.test(handler)) return 'dismiss-only overlay root';
+  ].includes(file) && /this\.(?:dismiss|dismissFromClick|backgroundClicked|handleBackRequest)\(/.test(handler)) return 'dismiss-only overlay root';
   return '';
 }

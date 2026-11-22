@@ -6,7 +6,7 @@ import { join } from 'node:path';
 export const SUITES = {
   release: /^(release-export|signing-config)/,
   tooling: /^(protocol-|rpc-index|core-integration|core-interop|doctor|tooling|change-impact|build-(?:app|native)-wrapper|build-warnings|release-export|signing-config|documentation-contract|architecture-boundaries|common-boundary)/,
-  home: /^(keyboard-alignment|home-|page-(?:operation|domain|repositories)|external-deck|cloud-deck|official-announcement|deck-media|deck-options|deck-config|sync-automatic)/,
+  home: /^(keyboard-alignment|home-|page-(?:operation|domain|repositories)|external-deck|cloud-deck|official-announcement|deck-media|deck-options|deck-config|deck-hierarchy-contract|deck-preview-session|deck-study-history|iridescent-rendering|sync-automatic)/,
   study: /^(note-links|note-references|keyboard-alignment|interaction-recovery|page-domain|page-repositories|study-|custom-scheduling|note-editor|editor-page|jide-choice|choice-package|bury-congrats|audio-|card-audio|native-audio|undo-|proto-study|deck-config|review-|tap-zone)/,
   sync: /sync|device-pairing|device-link|backup|collection-history|maintenance-ui|core-interop|backend-session|data-transfer|text-export|home-transfer|import-options|import-flow|study-session|page-(?:operation|domain|repositories)|native-bridge/,
   browser: /keyboard-alignment|browser|page-(?:operation|domain|repositories)|preview|search|note|editor-page|card-info/,

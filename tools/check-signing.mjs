@@ -11,7 +11,8 @@ try {
   if (!existsSync(path)) throw new Error('Create .local/signing.json from config/signing.example.json, or set JIDECARDS_SIGNING_CONFIG');
   const local = parseLocalSigning(readFileSync(path, 'utf8'));
   const profile = applyLocalSigning(JSON5.parse(readFileSync(resolve(root, 'build-profile.json5'), 'utf8')), local);
-  if (!profile.app.products.some(product => product.name === 'default' && product.signingConfig)) throw new Error('Default product has no signing configuration');
+  const productName = process.argv[2] ?? 'default';
+  if (!profile.app.products.some(product => product.name === productName && product.signingConfig)) throw new Error(`Product ${productName} has no signing configuration`);
   for (const config of local.signingConfigs) {
     for (const key of ['certpath', 'profile', 'storeFile']) {
       if (!existsSync(resolve(root, config.material[key]))) throw new Error(`Signing material file missing: ${key}`);
