@@ -18,3 +18,13 @@ npm run build:app -- --unsigned
 迁移后的测试失配、SDK 诊断与实际验证见 [Mac 回归诊断](../archive/development/mac-regression-2026-10-25.md)。
 
 鸿蒙电脑专用产物见[记得闪卡 PC 构建](pc-build.md)。
+
+
+## 干净检出验收记录
+
+2026-11-22 从提交 `18baa1a1` 新检出，在空构建目录检出 Anki `e64c6b1` 及两个 FTL 子模块。按 [README 构建入口](../../README.md#从源码构建)准备公共 HAR 和本机签名后，`ohpm install`、`npm ci` 均成功。Mac JBR 路径识别已补入 `npm run doctor` 并在同一检出验证通过。随后 `npm run build:app` 及显式 `npm run build:app -- --clean` 均通过。
+
+- 签名包版本为 `26.11.22.19`（3159），双架构为 arm64-v8a 和 x86_64。
+- clean 构建警告门禁接受 268 条基线警告，新增未接受警告为 0。
+- SDK `hap-sign-tool verify-app` 验签通过，产物 SHA-256 为 `dd71e67616d0167a3fb75b5f9c9c878741b13e1fe2657d0839f4b534874d7c97`。
+- 设备验证按独立包版本与哈希查阅[鸿蒙真机验收](device-acceptance.md)。

@@ -127,6 +127,8 @@ export function discoverEnvironment() {
     devEcoRoot,
     harmonyApi,
     java: firstExisting([
+      process.env.JAVA_HOME && path.join(process.env.JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java'),
+      devEcoRoot && path.join(devEcoRoot, 'jbr', 'Contents', 'Home', 'bin', 'java'),
       devEcoRoot && path.join(devEcoRoot, 'jbr', 'bin', 'java.exe'),
       devEcoRoot && path.join(devEcoRoot, 'jbr', 'bin', 'java')
     ]),
@@ -153,8 +155,8 @@ export function discoverEnvironment() {
       nativeRoot && path.join(nativeRoot, 'build-tools', 'cmake', 'bin', 'ninja')
     ]),
     hvigor: firstExisting([
-      devEcoRoot && path.join(devEcoRoot, 'tools', 'hvigor', 'bin', 'hvigorw.bat'),
-      devEcoRoot && path.join(devEcoRoot, 'tools', 'hvigor', 'bin', 'hvigorw')
+      devEcoRoot && path.join(devEcoRoot, 'tools', 'hvigor', 'bin',
+        process.platform === 'win32' ? 'hvigorw.bat' : 'hvigorw.js')
     ])
   };
 }

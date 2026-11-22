@@ -193,7 +193,9 @@ git -C third_party/anki rev-parse --short=7 HEAD
 git -C third_party/anki submodule update --init --depth 1 -- ftl/core-repo ftl/qt-repo
 ```
 
-### 2. 配置签名
+### 2. 准备公共 HAR 和签名
+
+将「记得系列基础」源码放在本仓库的同级目录，目录名为 `记得系列基础`。在基础库执行 `npm run build:harmony`，或从维护者取得与当前源码匹配的 `jide_foundation.har`，放到基础库的 `.local/packages/`。闪卡从 [模块依赖配置](entry/oh-package.json5) 引用该 HAR，从新检出开始时需先准备它，再执行 `ohpm install`。
 
 公共 [build-profile.json5](build-profile.json5) 不保存个人签名材料。复制 [config/signing.example.json](config/signing.example.json) 为 `.local/signing.json` 并填入本机签名，或用环境变量 `JIDECARDS_SIGNING_CONFIG` 指向外部 JSON。覆盖安装必须沿用原签名身份，详见[签名文档](docs/development/signing.md)。
 
@@ -215,7 +217,7 @@ npm run verify -- native   # Rust 主机测试与原生门禁
 npm run verify             # 完整测试、双架构构建与签名 HAP
 ```
 
-设备验收只能用 `hdc -t <connect-key> install -r <signed-hap>` 覆盖安装，不要卸载应用或清除用户数据。Mac 环境见 [Mac 构建](docs/development/mac-build.md)。
+设备验收只能用 `hdc -t <connect-key> install -r <signed-hap>` 覆盖安装，不要卸载应用或清除用户数据。Mac 环境与干净检出记录见 [Mac 构建](docs/development/mac-build.md)。
 
 ## 架构与工程质量
 
@@ -231,7 +233,7 @@ ArkUI 页面 / 组件          entry/src/main/ets/pages、components
 
 | 方面 | 做法与证据 |
 | --- | --- |
-| 代码规范 | DevEco Code Linter（`@performance`、`@typescript-eslint` 推荐规则集），配置见 [code-linter.json5](code-linter.json5)，结果与规则调整依据见[代码检查记录](docs/quality/code-linter.md) |
+| 代码规范 | DevEco Code Linter（`@performance`、`@typescript-eslint` 推荐规则集），通过 `npm run lint:arkts` 复核，配置见 [code-linter.json5](code-linter.json5)，结果与规则调整依据见[代码检查记录](docs/quality/code-linter.md) |
 | 编码约定 | [编码规范](docs/development/coding-standards.md)：分层、命名、ArkTS 约束、资源、统一日志、注释与测试 |
 | 分层与依赖 | [architecture-boundaries 测试](tools/tests/architecture-boundaries.test.mjs)：导入可解析、无循环依赖、下层不依赖 UI、纯模型隔离平台能力 |
 | 自动化测试 | `npm test` 约 4000 个用例，覆盖调度、同步、导入、浏览、学习和 JIDE；Rust 侧另有 FFI 单元测试和真实 Anki Core 集成测试 |
