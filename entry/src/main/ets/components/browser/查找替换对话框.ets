@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { SurfaceSelect } from '../common/SurfaceSelect';
 import { DialogFrame } from '../common/DialogFrame';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -48,6 +49,7 @@ import { 颜色键 } from '../../model/颜色主题';
 
 @Component
 export struct 查找替换对话框 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
@@ -209,10 +211,10 @@ export struct 查找替换对话框 {
         Column({ space: 应用尺寸.间距_5 }) {
           Text($r('app.string.browser_find_find'))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .width('100%')
           TextInput({ placeholder: $r('app.string.browser_find_find_placeholder'), text: this.查找文本 })
-            .attributeModifier(new FormInputStyle())
+            .attributeModifier(new FormInputStyle( undefined, this.appearanceElements))
             .enabled(!this.busy)
             .onChange((value: string): void => {
               this.查找文本 = value;
@@ -224,10 +226,10 @@ export struct 查找替换对话框 {
         Column({ space: 应用尺寸.间距_5 }) {
           Text($r('app.string.browser_find_replace_with'))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .width('100%')
           TextInput({ placeholder: $r('app.string.browser_find_replace_placeholder'), text: this.替换文本 })
-            .attributeModifier(new FormInputStyle())
+            .attributeModifier(new FormInputStyle( undefined, this.appearanceElements))
             .enabled(!this.busy)
             .onChange((value: string): void => {
               this.替换文本 = value;
@@ -239,7 +241,7 @@ export struct 查找替换对话框 {
         Column({ space: 应用尺寸.间距_5 }) {
           Text($r('app.string.browser_find_field'))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .width('100%')
           SurfaceSelect({ options: this.targetOptions(),
             selectedIndex: this.targetIndex,
@@ -248,7 +250,7 @@ export struct 查找替换对话框 {
             onSelect: (index: number): void => {
               this.targetIndex = index; this.字段名 = index >= 2 ? this.fieldNames[index - 2] : '';
             } }).width('100%')
-          if (this.fieldsLoading) { Text($r('app.string.browser_loading')).fontColor($r('app.color.text_secondary')) }
+          if (this.fieldsLoading) { Text($r('app.string.browser_loading')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))) }
           if (this.fieldsError) {
             Text($r('app.string.browser_field_names_error')).fontColor($r('app.color.error_text'))
             Button($r('app.string.common_retry')).attributeModifier(new PressFeedback()).stateEffect(false)
@@ -282,7 +284,7 @@ export struct 查找替换对话框 {
               })
             Text($r('app.string.browser_find_match_case')).flexShrink(1)
               .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }.layoutWeight(1)
         }
         .width('100%')
@@ -302,8 +304,8 @@ export struct 查找替换对话框 {
             Text($r('app.string.browser_find_scope_selected'))
               .fontSize(应用尺寸.字号_正文)
               .fontColor(this.有选中笔记
-                ? $r('app.color.text_primary')
-                : $r('app.color.text_tertiary'))
+                ? appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))
+                : appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           }
 
           Row({ space: 应用尺寸.间距_5 }) {
@@ -318,7 +320,7 @@ export struct 查找替换对话框 {
               })
             Text($r('app.string.browser_find_scope_all'))
               .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
         }
         .width('100%')

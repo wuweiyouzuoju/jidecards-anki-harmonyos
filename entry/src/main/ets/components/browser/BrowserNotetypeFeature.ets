@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { SurfaceSelect } from '../common/SurfaceSelect';
 import { noteTypeText } from '../../utils/NoteTypeText';
 import { DialogFrame } from '../common/DialogFrame';
@@ -13,6 +14,7 @@ import { AnkiBrowserNotetype } from '../../backend/AnkiBrowserNotetype';
 
 @Component
 export struct BrowserNotetypeFeature {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
@@ -76,7 +78,7 @@ export struct BrowserNotetypeFeature {
     if (this.state.busy) {
       Text($r('app.string.browser_action_change_notetype_loading'))
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .width('100%')
     } else {
       // 选择新笔记类型
@@ -94,14 +96,14 @@ export struct BrowserNotetypeFeature {
       if (this.state.info !== null) {
         Text($r('app.string.browser_action_change_notetype_field_map'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           .fontWeight(FontWeight.Medium)
           .width('100%')
         ForEach(this.state.info.newFieldNames, (字段名: string, 索引: number) => {
           Row({ space: 应用尺寸.间距_8 }) {
             Text(字段名)
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
               .layoutWeight(1)
             SurfaceSelect({ options: this.构建映射选项列表(this.state.info!.oldFieldNames),
               selectedIndex: this.state.fields[索引] === -1 ? 0 : this.state.fields[索引] + 1,
@@ -123,14 +125,14 @@ export struct BrowserNotetypeFeature {
         if (this.state.info!.newTemplateNames.length > 0) {
           Text($r('app.string.browser_action_change_notetype_template_map'))
             .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             .fontWeight(FontWeight.Medium)
             .width('100%')
           ForEach(this.state.info!.newTemplateNames, (模板名: string, 索引: number) => {
             Row({ space: 应用尺寸.间距_8 }) {
               Text(模板名)
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_primary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                 .layoutWeight(1)
               SurfaceSelect({ options: this.构建映射选项列表(this.state.info!.oldTemplateNames),
                 selectedIndex: this.state.templates[索引] === -1 ? 0 : this.state.templates[索引] + 1,

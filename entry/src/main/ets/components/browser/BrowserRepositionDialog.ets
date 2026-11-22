@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { DialogFrame } from '../common/DialogFrame';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DialogHeader } from '../common/DialogHeader';
@@ -13,6 +14,7 @@ import { visibleInterfaceItems, AppInterfaceControl } from '../../model/AppInter
 export interface BrowserRepositionInput { start: number; step: number; random: boolean; shift: boolean; }
 @Component
 export struct BrowserRepositionDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
@@ -78,7 +80,7 @@ export struct BrowserRepositionDialog {
   @Builder
   private dialogContent() {
     Text(resourceText(this.getUIContext(), $r('app.string.browser_reposition_scope'), this.scope.ids.length,
-      this.scope.unsupported, this.scope.minimum, this.scope.maximum)).fontColor($r('app.color.text_secondary')).width('100%')
+      this.scope.unsupported, this.scope.minimum, this.scope.maximum)).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     if (this.defaultsError !== '') {
       Text(this.defaultsError).fontColor($r('app.color.error_text')).width('100%')
       Button($r('app.string.common_retry')).attributeModifier(new PressFeedback()).stateEffect(false)
@@ -87,16 +89,16 @@ export struct BrowserRepositionDialog {
     Row({ space: 应用尺寸.间距_12 }) {
       Text($r('app.string.browser_action_reposition_start'))
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .layoutWeight(1)
       TextInput({ text: this.重新定位起始.toString() })
-        .border(SurfaceBorder.options())
+        .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
         .width(80)
         .height(应用尺寸.按钮高度)
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
-        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-        .borderRadius(应用尺寸.圆角_面板)
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
+        .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+        .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         .enabled(!(this.busy || this.loading))
         .type(InputType.Number)
         .onChange((值: string): void => {
@@ -109,16 +111,16 @@ export struct BrowserRepositionDialog {
     Row({ space: 应用尺寸.间距_12 }) {
       Text($r('app.string.browser_action_reposition_step'))
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .layoutWeight(1)
       TextInput({ text: this.重新定位步长.toString() })
-        .border(SurfaceBorder.options())
+        .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
         .width(80)
         .height(应用尺寸.按钮高度)
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
-        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-        .borderRadius(应用尺寸.圆角_面板)
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
+        .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+        .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         .enabled(!(this.busy || this.loading))
         .type(InputType.Number)
         .onChange((值: string): void => {
@@ -131,7 +133,7 @@ export struct BrowserRepositionDialog {
     Row({ space: 应用尺寸.间距_12 }) {
       Text($r('app.string.browser_action_reposition_random'))
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: this.重新定位随机 })
         .enabled(!(this.busy || this.loading))
@@ -142,7 +144,7 @@ export struct BrowserRepositionDialog {
     Row({ space: 应用尺寸.间距_12 }) {
       Text($r('app.string.browser_action_reposition_shift'))
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: this.重新定位顺移 })
         .enabled(!(this.busy || this.loading))

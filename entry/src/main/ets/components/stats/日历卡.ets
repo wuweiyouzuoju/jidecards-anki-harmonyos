@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { IconActionButton } from '../common/IconActionButton';
 import { PressFeedback } from '../../utils/PressFeedback';
 
@@ -48,6 +49,7 @@ function 取日期(距今天数: number): Date {
 
 @Component
 export struct 日历卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('重算格子') 复习计数: Map<number, ReviewKindCounts> | null = null;
   @Prop @Watch('重算格子') 周首日: Weekday = Weekday.SUNDAY;
@@ -180,7 +182,7 @@ export struct 日历卡 {
         Text(`${this.目标年份}`)
           .fontSize(应用尺寸.字号_正文)
           .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         IconActionButton({ source: $r('app.media.ic_common_arrow_right'), label: $r('app.string.icon_year_next'),
           glyphColor: this.主色, isInteractive: this.目标年份 < new Date().getFullYear(),
           onAction: (): void => {
@@ -193,7 +195,7 @@ export struct 日历卡 {
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -205,7 +207,7 @@ export struct 日历卡 {
           Row() {
             Blank().width(12)
             ForEach([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], (month: number) => {
-              Text(`${month + 1}`).fontSize(11).fontColor($r('app.color.text_secondary'))
+              Text(`${month + 1}`).fontSize(11).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .layoutWeight(new Date(this.目标年份, month + 1, 0).getDate())
             })
           }.width('100%').height(20)
@@ -267,15 +269,15 @@ export struct 日历卡 {
             this.alignCalendarToLatestDay();
           })
         Row({ space: 6 }) {
-          Text($r('app.string.stats_calendar_less')).fontSize(11).fontColor($r('app.color.text_secondary'))
+          Text($r('app.string.stats_calendar_less')).fontSize(11).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           ForEach([0, 0.1, 0.3, 0.6, 1], (amount: number) => {
             Column().width(10).height(10).borderRadius(2)
               .backgroundColor(this.取格色(amount * this.最大计数))
           })
-          Text($r('app.string.stats_calendar_more')).fontSize(11).fontColor($r('app.color.text_secondary'))
+          Text($r('app.string.stats_calendar_more')).fontSize(11).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         }.width('100%').justifyContent(FlexAlign.End)
         Text(this.selectedDay === '' ? $r('app.string.stats_calendar_select') : this.selectedDay)
-          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+          .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
     }
     .width('100%')

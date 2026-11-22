@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { CARD_FLAGS, CardFlagDefinition, FlagLabels, FlagLabelChange, parseFlagLabels,
   customFlagLabel, saveCardFlagLabels } from '../../model/CardMarking';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -15,6 +16,7 @@ import { PressFeedback } from '../../utils/PressFeedback';
 
 @Component
 export struct FlagNamesDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBack') backRequest: number = 0;
   onClose: () => void = (): void => {};
@@ -77,13 +79,13 @@ export struct FlagNamesDialog {
   @Builder
   private content() {
     Text($r('app.string.card_mark_flag_names_help')).fontSize(应用尺寸.字号_正文_小)
-      .fontColor($r('app.color.text_secondary')).width('100%')
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     ForEach(CARD_FLAGS.filter((flag: CardFlagDefinition): boolean => flag.value > 0), (flag: CardFlagDefinition) => {
       Row({ space: 应用尺寸.间距_8 }) {
         Text(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, flag.labelKey)).fontSize(应用尺寸.字号_正文_小)
           .fontColor(flag.color).width(56)
         TextInput({ text: this.drafts[flag.value], placeholder: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, flag.labelKey) })
-          .border(SurfaceBorder.options())
+          .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
           .layoutWeight(1).height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
           .enabled(!this.isBusy && this.loaded).onChange((name: string): void => {
             const next: string[] = this.drafts.slice(); next[flag.value] = name; this.drafts = next;
@@ -95,8 +97,8 @@ export struct FlagNamesDialog {
       Text(this.errorText).fontColor($r('app.color.error_text')).fontSize(应用尺寸.字号_正文_小)
       Button($r('app.string.card_mark_retry')).enabled(!this.isBusy)
         .height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary')).backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-        .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_胶囊)
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).backgroundColor(insetMaterialFill($r('app.color.surface_card')))
+        .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_胶囊))
         .attributeModifier(new PressFeedback()).stateEffect(false).onClick((): void => {
         this.errorText = ''; if (this.loaded) this.save(); else { this.isBusy = true; this.load(); }
       })

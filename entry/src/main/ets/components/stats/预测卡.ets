@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 预测卡：渲染 GraphsView.futureDue 为绿色渐变柱状图（对齐 Anki FutureDue）。
 // 色带 Greens t∈[0.3,0.7]：积压/最近深绿 → 最远浅绿；范围切换 1月/3月/1年/全部；
@@ -23,6 +24,7 @@ interface 预测柱 {
 
 @Component
 export struct 预测卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('更新缓存') 预测数据: FutureDue | null = null;
   @Prop @Watch('更新缓存') 显示积压: boolean = false;
   @Prop 是否显示全部: boolean = false;
@@ -201,7 +203,7 @@ export struct 预测卡 {
             })
           Text($r('app.string.stats_forecast_backlog'))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         }
         .alignItems(VerticalAlign.Center)
         .width('100%')
@@ -211,7 +213,7 @@ export struct 预测卡 {
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -257,41 +259,41 @@ export struct 预测卡 {
           Row() {
             Text($r('app.string.stats_total_label'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Blank()
             Text($r('app.string.stats_forecast_total', this.取总计()))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
           .width('100%')
           Row() {
             Text($r('app.string.stats_average_label'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Blank()
             Text($r('app.string.stats_forecast_average', forecastAverage(this.取总计(), this.取期间天数())))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
           .width('100%')
           Row() {
             Text($r('app.string.stats_forecast_due_tomorrow_label'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Blank()
             Text($r('app.string.stats_forecast_due_tomorrow', this.取明日到期()))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
           .width('100%')
           Row() {
             Text($r('app.string.stats_forecast_daily_load_label'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Blank()
             Text($r('app.string.stats_forecast_daily_load_value', this.预测数据 !== null ? this.预测数据.dailyLoad : 0))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
           .width('100%')
         }

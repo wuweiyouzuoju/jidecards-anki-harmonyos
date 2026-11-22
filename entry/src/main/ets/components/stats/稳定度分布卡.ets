@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 稳定度分布卡：渲染 GraphsView.stability 为蓝色渐变直方图（对齐 Anki StabilityGraph）。
 // 仅 FSRS 启用时由统计页渲染本卡；色带 Blues t∈[0.3,0.7]；
@@ -14,6 +15,7 @@ import { 纵轴刻度, 纵轴宽 } from './图表轴';
 
 @Component
 export struct 稳定度分布卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('更新缓存') 稳定度数据: Intervals | null = null;
   @Prop @Watch('更新缓存') 范围索引: number = 2;
   @State private 柱缓存: number[] = [];
@@ -98,7 +100,7 @@ export struct 稳定度分布卡 {
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -133,12 +135,12 @@ export struct 稳定度分布卡 {
         Row() {
           Text('0')
             .fontSize(应用尺寸.字号_说明_小)
-            .fontColor($r('app.color.text_tertiary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
             .layoutWeight(1)
             .textAlign(TextAlign.Start)
           Text(`${this.显示上限}`)
             .fontSize(应用尺寸.字号_说明_小)
-            .fontColor($r('app.color.text_tertiary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
             .layoutWeight(1)
             .textAlign(TextAlign.End)
         }
@@ -149,11 +151,11 @@ export struct 稳定度分布卡 {
         Row() {
           Text($r('app.string.stats_stability_median'))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           Blank()
           Text($r('app.string.stats_interval_median_days', this.取中位稳定度()))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         }
         .width('100%')
       }

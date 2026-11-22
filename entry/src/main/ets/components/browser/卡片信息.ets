@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { GlassPanel } from '../common/GlassPanel';
 import { noteTypeText } from '../../utils/NoteTypeText';
 import { localeDate, localeNumber } from '../../utils/LocaleFormatting';
@@ -17,6 +18,7 @@ import { ReviewKind } from '../../proto/messages/StatsMessages';
 
 @Component
 export struct 卡片信息 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @State private surfaceWidth: string = '88%';
   @State private surfaceMaximumWidth: number = 应用尺寸.dialogMaxWidth;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -171,7 +173,7 @@ Column({ space: 应用尺寸.间距_14 }) {
           // 加载/错误态
           Text(this.errorMessage !== '' ? this.errorMessage : '...')
             .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .padding(应用尺寸.间距_16)
         } else {
           Scroll() {
@@ -183,7 +185,7 @@ Column({ space: 应用尺寸.间距_14 }) {
                 Text($r('app.string.browser_info_section_schedule'))
                   .fontSize(应用尺寸.字号_正文)
                   .fontWeight(FontWeight.Bold)
-                  .fontColor($r('app.color.text_primary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                   .width('100%')
 
                 this.信息行($r('app.string.browser_info_added'), this.格式化时间(this.stats.added))
@@ -224,7 +226,7 @@ Column({ space: 应用尺寸.间距_14 }) {
                   Text($r('app.string.browser_info_section_history'))
                     .fontSize(应用尺寸.字号_正文)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor($r('app.color.text_primary'))
+                    .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                     .width('100%')
 
                   ForEach(this.stats.revlog, (条目: StatsRevlogEntry, index: number) => {
@@ -232,7 +234,7 @@ Column({ space: 应用尺寸.间距_14 }) {
                       // 时间
                       Text(this.格式化时间(条目.time))
                         .fontSize(应用尺寸.字号_正文_小)
-                        .fontColor($r('app.color.text_secondary'))
+                        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                         .layoutWeight(1)
                         .maxLines(1)
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -240,19 +242,19 @@ Column({ space: 应用尺寸.间距_14 }) {
                       // 类型
                       Text(this.复习类型文案(条目.reviewKind))
                         .fontSize(应用尺寸.字号_正文_小)
-                        .fontColor($r('app.color.text_secondary'))
+                        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                         .maxLines(1)
 
                       // 评分
                       Text(this.评分文案(条目.buttonChosen))
                         .fontSize(应用尺寸.字号_正文_小)
-                        .fontColor($r('app.color.text_primary'))
+                        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                         .maxLines(1)
 
                       // 用时
                       Text(this.格式化用时(条目.takenSecs))
                         .fontSize(应用尺寸.字号_正文_小)
-                        .fontColor($r('app.color.text_secondary'))
+                        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                         .maxLines(1)
                     }
                     .width('100%')
@@ -260,7 +262,7 @@ Column({ space: 应用尺寸.间距_14 }) {
                       top: 应用尺寸.间距_4,
                       bottom: 应用尺寸.间距_4
                     })
-                    .border(SurfaceBorder.options(index < this.stats!.revlog.length - 1 ? { bottom: 0.5 } : 0))
+                    .border(SurfaceBorder.options(index < this.stats!.revlog.length - 1 ? { bottom: 0.5 } : 0, undefined, this.appearanceElements))
                   }, (条目: StatsRevlogEntry, index: number): string => `${条目.time}-${index}`)
                 }
                 .width('100%')
@@ -310,12 +312,12 @@ Column({ space: 应用尺寸.间距_14 }) {
     Row({ space: 应用尺寸.间距_8 }) {
       Text(标签)
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .width(90)
 
       Text(值)
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .layoutWeight(1)
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })

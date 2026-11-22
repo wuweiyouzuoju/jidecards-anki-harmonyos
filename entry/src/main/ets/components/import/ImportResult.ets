@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { ImportSummary, decodeImportResponse } from '../../proto/messages/ImportExportMessages';
 import { ImportResultCategory, importResultCategories, importResultBatch } from '../../model/ImportResults';
 import { AppInterfaceControl, AppInterfaceValue } from '../../model/AppInterface';
@@ -10,6 +11,7 @@ import { 按下态按钮 } from '../common/按下态按钮';
 
 @Component
 export struct ImportResult {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('resetResult') summary: ImportSummary = decodeImportResponse(new Uint8Array(0));
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = '';
   @State private selectedCategory: string = '';
@@ -51,9 +53,9 @@ export struct ImportResult {
   }
   build() {
     Column({ space: 应用尺寸.间距_12 }) {
-      Text($r('app.string.transfer_result_title')).fontSize(应用尺寸.字号_标题).fontColor($r('app.color.text_primary'))
+      Text($r('app.string.transfer_result_title')).fontSize(应用尺寸.字号_标题).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
       Text(resourceText(this.getUIContext(), $r('app.string.transfer_result_found_count'), this.summary.foundNotes))
-        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       ForEach(importResultCategories(this.summary), (category: ImportResultCategory) => {
         DataActionRow({ title: `${this.text(category.titleKey)} · ${category.count}`,
           hint: category.noteIds.length > 0 ? this.text('transfer_result_browse') :
@@ -62,7 +64,7 @@ export struct ImportResult {
           onAction: (): void => { this.select(category); } })
       }, (category: ImportResultCategory): string => category.id)
       if (this.selectedCategory !== '') {
-        Text(this.batchLabel()).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        Text(this.batchLabel()).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         Row({ space: 应用尺寸.间距_12 }) {
           按下态按钮({ 文案: $r('app.string.transfer_result_previous'), 是否启用: this.resultPage > 0,
             点击回调: (): void => { this.changePage(-1); } })
@@ -71,7 +73,7 @@ export struct ImportResult {
             点击回调: (): void => { this.changePage(1); } })
         }
       }
-      Text($r('app.string.transfer_result_browse_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+      Text($r('app.string.transfer_result_browse_hint')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     }.width('100%')
   }
 }

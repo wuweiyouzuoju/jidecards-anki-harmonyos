@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 记忆率卡：渲染 GraphsView.retrievability 为直方图（对齐 Anki RetrievabilityGraph）。
 // 色带 RdYlGn domain [0,100]：低可提取性红 → 高可提取性绿；约 20 柱。
@@ -18,6 +19,7 @@ import { 纵轴刻度, 纵轴宽 } from './图表轴';
 
 @Component
 export struct 记忆率卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('更新缓存') 记忆率数据: RetrievabilitySummary | null = null;
   @Prop @Watch('更新缓存') 范围索引: number = 0;
@@ -122,7 +124,7 @@ export struct 记忆率卡 {
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -158,12 +160,12 @@ export struct 记忆率卡 {
           Row() {
             Text(`${Math.round(this.域下限)}%`)
               .fontSize(应用尺寸.字号_说明_小)
-              .fontColor($r('app.color.text_tertiary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               .layoutWeight(1)
               .textAlign(TextAlign.Start)
             Text(`${Math.ceil(this.域上限)}%`)
               .fontSize(应用尺寸.字号_说明_小)
-              .fontColor($r('app.color.text_tertiary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               .layoutWeight(1)
               .textAlign(TextAlign.End)
           }
@@ -174,12 +176,12 @@ export struct 记忆率卡 {
           Row() {
             Text($r('app.string.stats_retrievability_average_label'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Blank()
             Text($r('app.string.stats_retrievability_average_value',
               localePercent((this.记忆率数据 as RetrievabilitySummary).average / 100, this.uiLanguage)))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
           .width('100%')
 
@@ -187,13 +189,13 @@ export struct 记忆率卡 {
           Row() {
             Text($r('app.string.stats_retrievability_knowledge_label'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Blank()
             Text($r('app.string.stats_retrievability_knowledge',
               Math.round((this.记忆率数据 as RetrievabilitySummary).sumByCard),
               Math.round((this.记忆率数据 as RetrievabilitySummary).sumByNote)))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
           .width('100%')
         }

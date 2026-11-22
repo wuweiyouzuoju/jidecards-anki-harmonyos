@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
 import { WALLPAPER_KEY } from '../../model/AppearanceCustomization';
 import { pageMaterialFill } from '../../utils/GlassMaterial';
 import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { GlassSource } from '../common/GlassSource';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteLinksPanel } from '../links/NoteLinksPanel';
 import { noteLinksService } from '../../backend/NoteLinksService';
 import { noteLinkBridgeScript } from '../../model/NoteLinkBridge';
@@ -91,8 +92,9 @@ import { studyKeyName } from '../../utils/StudyKeyAdapter';
 import { PAGE_SURFACE_KEY } from '../../model/ThemeCatalog';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 import { CapturedThemeBackground } from '../common/CapturedThemeBackground';
+import { AppLog } from '../../model/AppLog';
 
-interface LinkedPreviewReturn { ids: number[]; index: number; side: string; panel: boolean; scroll: number; }
+interface LinkedPreviewReturn { ids: number[]; index: number; side: string; panel: boolean; scroll: number; noteId: number; query: string; graphCenter: number; panelChanged: boolean; }
 
 /** 仅向预览转发显示操作，文档版本由组件校验。 */
 class PreviewActionProxy {
@@ -107,6 +109,7 @@ type 预览面 = 'question' | 'answer';
 
 @Component
 export struct 卡片预览页 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -188,8 +191,12 @@ export struct 卡片预览页 {
   @StorageProp(颜色键.主色容器) @Watch('referenceThemeChanged') private 主色容器色: string = '#E8EEFC';
   @StorageProp(颜色键.主色文字) @Watch('referenceThemeChanged') private referenceText: string = '#183B8F';
   private referenceThemeChanged(): void {
-    if (this.mounted && this.控制器已挂载) this.网页控制器.runJavaScript(noteLinkBridgeScript(this.documentVersion,
-      undefined, { surface: this.主色容器色, text: this.referenceText })).catch((error: Object): void => { console.info(`Note reference theme: ${error}`); });
+    if (!this.mounted || !this.控制器已挂载) return;
+    try {
+      this.网页控制器.runJavaScript(noteLinkBridgeScript(this.documentVersion,
+        undefined, { surface: this.主色容器色, text: this.referenceText }))
+        .catch((error: Object): void => { AppLog.info('CardPreview', `Note reference theme: ${error}`); });
+    } catch (error) { AppLog.info('CardPreview', `Note reference theme: ${error}`); }
   }
   // 状态栏高度（沉浸式全屏下，预览层全屏铺开，顶部条需让出状态栏区域，与主页顶栏同一水平面）
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
@@ -200,6 +207,8 @@ export struct 卡片预览页 {
   @State private noteLinksOpen: boolean = false;
   @State private noteLinksNoteId: number = 0;
   @State private noteLinksBack: number = 0;
+  private noteLinksQuery: string = '';
+  private linkGraphCenter: number = 0;
   private linkedReturns: LinkedPreviewReturn[] = [];
   private currentLinkScroll: number = 0;
   private noteLinksChanged: boolean = false;
@@ -214,12 +223,13 @@ export struct 卡片预览页 {
       if (!this.mounted || version !== this.loadVersion) return;
       this.currentLinkScroll = Number(await this.cardWeb.controllerAt(this.visibleWebSlot).runJavaScript('String(window.scrollY)')) || 0;
       if (!this.mounted || version !== this.loadVersion || !this.foreground || !this.interactionEnabled) return;
-      this.noteLinksNoteId = card.noteId; this.noteLinksChanged = false; this.noteLinksOpen = true; this.stopAudio();
-    } catch (error) { console.info(`NoteLinks: ${error}`); }
+      this.noteLinksNoteId = card.noteId; this.noteLinksQuery = ''; this.linkGraphCenter = 0; this.noteLinksChanged = false; this.noteLinksOpen = true; this.stopAudio();
+    } catch (error) { AppLog.info('CardPreview', `NoteLinks: ${error}`); }
   }
-  private pushLinkedPreview(ids: number[]): void {
+  private pushLinkedPreview(ids: number[], query: string = '', graphCenter: number = 0): void {
     if (ids.length === 0 || this.linkedReturns.length >= 32) return;
-    this.linkedReturns.push({ ids: this.previewIds.slice(), index: this.当前索引值, side: this.当前面, panel: this.noteLinksOpen, scroll: this.currentLinkScroll });
+    this.linkedReturns.push({ ids: this.previewIds.slice(), index: this.当前索引值, side: this.当前面, panel: this.noteLinksOpen,
+      scroll: this.currentLinkScroll, noteId: this.noteLinksNoteId, query: query, graphCenter, panelChanged: this.noteLinksChanged });
     this.linkedReturnSide = 'answer';
     this.previewIds = ids.slice(); this.当前索引值 = 0; this.当前面 = 'answer'; this.noteLinksOpen = false;
     this.加载当前卡();
@@ -239,7 +249,9 @@ export struct 卡片预览页 {
     if (this.noteLinksOpen) { this.noteLinksBack++; return true; }
     const prior: LinkedPreviewReturn | undefined = this.linkedReturns.pop();
     if (prior === undefined) return false;
-    this.linkedReturnSide = prior.side; this.linkedReturnScroll = prior.scroll; this.noteLinksOpen = prior.panel;
+    this.linkedReturnSide = prior.side; this.linkedReturnScroll = prior.scroll;
+    this.noteLinksNoteId = prior.noteId; this.noteLinksQuery = prior.query; this.linkGraphCenter = prior.graphCenter;
+    this.noteLinksChanged = prior.panelChanged; this.noteLinksOpen = prior.panel;
     this.previewIds = prior.ids; this.当前索引值 = prior.index; this.当前面 = prior.side === 'question' ? 'question' : 'answer';
     this.加载当前卡(); return true;
   }
@@ -294,8 +306,10 @@ export struct 卡片预览页 {
       this.audioRefreshPending = this.已渲染 !== null;
       this.stopAudio();
       if (this.控制器已挂载) {
-        this.网页控制器.runJavaScript('document.querySelectorAll("audio,video").forEach(function(m){m.pause();});')
-          .catch((error: Object): void => { console.info(`Preview media pause: ${error}`); });
+        try {
+          this.网页控制器.runJavaScript('document.querySelectorAll("audio,video").forEach(function(m){m.pause();});')
+            .catch((error: Object): void => { AppLog.info('CardPreview', `Preview media pause: ${error}`); });
+        } catch (error) { AppLog.info('CardPreview', `Preview media pause: ${error}`); }
       }
     } else if (this.audioRefreshPending) {
       this.playCurrentAudio(false);
@@ -334,7 +348,7 @@ export struct 卡片预览页 {
     } catch (error) {
       if (!this.mounted || version !== this.documentVersion) return;
       this.audioError = this.取本地化文案($r('app.string.browser_preview_audio_error'));
-      console.info(`Preview audio: ${error}`);
+      AppLog.info('CardPreview', `Preview audio: ${error}`);
     }
   }
 
@@ -424,7 +438,7 @@ export struct 卡片预览页 {
       if (!this.mounted || version !== this.loadVersion) return;
       let linkMirror: string = '';
       try { linkMirror = await noteLinksService.mirror((await this.卡片服务实例.获取卡片(卡片ID)).noteId); }
-      catch (error) { console.info(`NoteLinks preview mirror: ${error}`); }
+      catch (error) { AppLog.info('CardPreview', `NoteLinks preview mirror: ${error}`); }
       if (!this.mounted || version !== this.loadVersion) return;
       this.currentLinkMirror = linkMirror;
       this.已渲染 = rendered;
@@ -436,7 +450,7 @@ export struct 卡片预览页 {
     } catch (错误) {
       if (!this.mounted || version !== this.loadVersion) return;
       this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
-      console.info(`卡片预览页: 加载卡片失败 cid=${卡片ID} 错误=${错误}`);
+      AppLog.info('CardPreview', `卡片预览页: 加载卡片失败 cid=${卡片ID} 错误=${错误}`);
     } finally {
       if (this.mounted && version === this.loadVersion) this.忙碌 = false;
     }
@@ -462,7 +476,7 @@ export struct 卡片预览页 {
       } catch (错误) {
         this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
         this.stopAudio();
-        console.info(`卡片预览页: loadData 失败 错误=${错误}`);
+        AppLog.info('CardPreview', `卡片预览页: loadData 失败 错误=${错误}`);
       }
     } else {
       this.待加载HTML = document;
@@ -524,7 +538,7 @@ export struct 卡片预览页 {
         this.cardWeb.show(缓存, this.loadVersion, this.当前面);
       } catch (错误) {
         this.错误详情 = this.取本地化文案($r('app.string.browser_preview_load_error'));
-        console.info(`卡片预览页: onControllerAttached loadData 失败 错误=${错误}`);
+        AppLog.info('CardPreview', `卡片预览页: onControllerAttached loadData 失败 错误=${错误}`);
       }
     }
   }
@@ -602,16 +616,19 @@ export struct 卡片预览页 {
       this.网页控制器.requestFocus();
       this.initialFocusPending = false;
     } catch (error) {
-      console.info(`Preview focus: ${error}`);
+      AppLog.info('CardPreview', `Preview focus: ${error}`);
     }
   }
 
   private previewCardShown(background: string, appearanceOnly: boolean = false): void {
+    if (!this.mounted) return;
     if (this.linkedReturnScroll > 0) {
       const scroll: number = this.linkedReturnScroll; this.linkedReturnScroll = 0;
-      this.cardWeb.controllerAt(this.visibleWebSlot).runJavaScript('window.scrollTo(0,' + scroll + ')').catch((): void => {});
+      try {
+        this.cardWeb.controllerAt(this.visibleWebSlot).runJavaScript('window.scrollTo(0,' + scroll + ')')
+          .catch((error: Object): void => { AppLog.info('CardPreview', `Preview restore scroll: ${error}`); });
+      } catch (error) { AppLog.info('CardPreview', `Preview restore scroll: ${error}`); }
     }
-    if (!this.mounted) return;
     this.hasRenderedCard = true;
     if (background !== '') this.cardSurfaceBackground = background;
     if (appearanceOnly) return;
@@ -712,7 +729,7 @@ export struct 卡片预览页 {
       Text(this.取位置文案())
         .fontSize(应用尺寸.字号_标题)
         .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .maxLines(1)
         .textAlign(TextAlign.Center)
         .hitTestBehavior(HitTestMode.None)
@@ -823,7 +840,7 @@ export struct 卡片预览页 {
     .layoutWeight(1)
     .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
     .clip(true)
-    .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
     }
     .width('100%')
     .layoutWeight(1)
@@ -841,7 +858,7 @@ export struct 卡片预览页 {
     Column({ space: 应用尺寸.间距_8 }) {
       Text(this.当前面 === 'question' ? $r('app.string.browser_preview_front') : $r('app.string.browser_preview_back'))
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       // 不放按钮：点击卡片看答案、左右滑上一步/下一步（Anki 预览 "<" ">" 的等价语义，见 PreviewInteraction 注入脚本）。
       if (this.audioError !== '') {
         Text(this.audioError)
@@ -850,7 +867,7 @@ export struct 卡片预览页 {
       }
       Text(this.desktopPreview ? $r('app.string.browser_preview_keyboard_hint') : $r('app.string.browser_preview_hint'))
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
 
     }
     .width('100%')
@@ -887,13 +904,14 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
       .backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial, this.wallpaperPath))
       }
       if (this.noteLinksOpen) {
-        NoteLinksPanel({ noteId: this.noteLinksNoteId, readOnly: this.linksReadOnly, backRequest: this.noteLinksBack, onClose: (): void => {
+        NoteLinksPanel({ noteId: this.noteLinksNoteId, readOnly: this.linksReadOnly, backRequest: this.noteLinksBack,
+          initialQuery: this.noteLinksQuery, initialGraphCenter: this.linkGraphCenter, onClose: (): void => {
             this.noteLinksOpen = false;
             if (this.noteLinksChanged) {
               this.linkedReturnSide = this.当前面; this.linkedReturnScroll = this.currentLinkScroll; this.加载当前卡();
             }
           }, onChanged: (): void => { this.noteLinksChanged = true; },
-          onPreview: (ids: number[]): void => { this.pushLinkedPreview(ids); } })
+          onPreview: (ids: number[], query: string, center?: number): void => { this.pushLinkedPreview(ids, query, center ?? 0); } })
       }
       if (this.moreMenuOpen) {
         CardActionMenu({ items: this.预览更多菜单(), toolbarRight: this.moreMenuRight, toolbarBottom: this.moreMenuBottom,
@@ -906,7 +924,7 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
+    .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
     // Block 会连同关闭、更多和 Web 一起屏蔽；此处只隔离宿主页面。
     .hitTestBehavior(HitTestMode.Default)
     .onClick((): void => {})

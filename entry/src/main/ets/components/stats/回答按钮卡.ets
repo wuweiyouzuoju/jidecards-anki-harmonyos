@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 回答按钮卡：渲染 GraphsResponse.buttons 为分组柱状图（对齐 Anki ButtonsGraph）。
 // 3 组（学习中/年轻/成熟）× 4 柱（评分按钮 1-4），柱色按按钮号取 RdYlGn：
@@ -12,6 +13,7 @@ import { 取按钮色 } from '../../model/统计色板';
 
 @Component
 export struct 回答按钮卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('更新缓存') 按钮数据: Buttons | null = null;
   @Prop 是否显示全部: boolean = false;
@@ -106,7 +108,7 @@ export struct 回答按钮卡 {
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -139,13 +141,13 @@ export struct 回答按钮卡 {
               Text(类别 === 0 ? $r('app.string.stats_cards_learn')
                 : (类别 === 1 ? $r('app.string.stats_cards_young') : $r('app.string.stats_cards_mature')))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               // 各类正确率（Anki 手册：percentage of correct reviews for each type of card）
               if (this.取组正确率(this.组缓存[0], 类别) >= 0) {
                 Text($r('app.string.stats_buttons_correct_rate',
                   localePercent(this.取组正确率(this.组缓存[0], 类别) / 100, this.uiLanguage)))
                   .fontSize(应用尺寸.字号_说明_小)
-                  .fontColor($r('app.color.text_tertiary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               }
             }
             .layoutWeight(1)

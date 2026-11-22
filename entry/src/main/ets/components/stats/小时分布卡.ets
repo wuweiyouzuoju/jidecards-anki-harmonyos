@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 小时分布卡：渲染 GraphsView.hours 为 24 小时垂直柱状图。
 // 支持 4 个时间段切换（1月/3月/1年/全部）；窗口选择持久化并由统计页管理，
@@ -20,6 +21,7 @@ import { 纵轴刻度, 纵轴宽 } from './图表轴';
 
 @Component
 export struct 小时分布卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop 小时数据: Hours | null = null;
   @Prop 时间段索引: number = 0;
   /** 是否深色主题（正确率面积叠加色对齐 Anki CumulativeOverlay 深浅两套） */
@@ -104,7 +106,7 @@ export struct 小时分布卡 {
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -175,27 +177,27 @@ export struct 小时分布卡 {
           Row() {
             Text('0')
               .fontSize(应用尺寸.字号_说明_小)
-              .fontColor($r('app.color.text_tertiary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               .layoutWeight(1)
               .textAlign(TextAlign.Center)
             Text('6')
               .fontSize(应用尺寸.字号_说明_小)
-              .fontColor($r('app.color.text_tertiary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               .layoutWeight(1)
               .textAlign(TextAlign.Center)
             Text('12')
               .fontSize(应用尺寸.字号_说明_小)
-              .fontColor($r('app.color.text_tertiary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               .layoutWeight(1)
               .textAlign(TextAlign.Center)
             Text('18')
               .fontSize(应用尺寸.字号_说明_小)
-              .fontColor($r('app.color.text_tertiary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               .layoutWeight(1)
               .textAlign(TextAlign.Center)
             Text('23')
               .fontSize(应用尺寸.字号_说明_小)
-              .fontColor($r('app.color.text_tertiary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               .layoutWeight(1)
               .textAlign(TextAlign.Center)
           }

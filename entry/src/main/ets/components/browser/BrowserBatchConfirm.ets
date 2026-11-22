@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -6,6 +7,7 @@ import { resourceText, namedResourceText } from '../../utils/UiFeedback';
 
 @Component
 export struct BrowserBatchConfirm {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
   private handleBackRequest(): void {
@@ -38,7 +40,7 @@ export struct BrowserBatchConfirm {
   private dialogContent() {
     Text(this.message)
       .fontSize(应用尺寸.字号_正文)
-      .fontColor($r('app.color.text_primary'))
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
       .width('100%')
   }
 

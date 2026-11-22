@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DirectorySelect } from '../common/DirectorySelect';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../../model/DirectoryTree';
 import { appInterface } from '../../backend/AppInterfaceService';
@@ -12,6 +13,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct CsvImportOptions {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('loadPreview') preview: CsvImportPreview = { metadata: emptyCsvMetadata(), notetypes: [] };
   @Prop decks: 导出牌组选项[] = [];
@@ -65,12 +67,12 @@ export struct CsvImportOptions {
         labels: [this.text($r('app.string.transfer_csv_tab')), '|', ';', ':', ',', this.text($r('app.string.transfer_csv_space'))],
         selectedIndex: this.draft.delimiter, isInteractive: this.isInteractive,
         onSelect: (index: number): void => { this.onReparse(index, this.draft.notetypeId); } })
-      Text($r('app.string.transfer_csv_preview')).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+      Text($r('app.string.transfer_csv_preview')).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
       ForEach(this.draft.preview.slice(0, 5), (row: string[], index: number) => {
         Text(`${index + 1}. ${row.join('  |  ')}`).width('100%').maxLines(4)
-          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+          .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       })
-      Text($r('app.string.transfer_csv_utf8_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+      Text($r('app.string.transfer_csv_utf8_hint')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       DirectorySelect({ label: $r('app.string.transfer_label_deck'), rows: this.deckRows(), value: this.deckValue(),
         isInteractive: this.isInteractive, onSelect: (id: string): void => { this.selectDeck(id); },
         onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('csv_target_deck', view); } })
@@ -80,7 +82,7 @@ export struct CsvImportOptions {
           this.onReparse(this.draft.delimiter, index === 0 ? 0 : this.preview.notetypes[index - 1].id);
         } })
       if (this.draft.notetypeColumn > 0) {
-        Text($r('app.string.transfer_csv_row_notetype')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        Text($r('app.string.transfer_csv_row_notetype')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       } else {
         ForEach(this.fields(), (field: string, index: number) => {
           ImportSelect({ label: field, labels: this.columns(), selectedIndex: this.draft.fieldColumns[index] ?? 0,

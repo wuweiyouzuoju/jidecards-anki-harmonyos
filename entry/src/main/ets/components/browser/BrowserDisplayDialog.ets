@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { SurfaceSelect } from '../common/SurfaceSelect';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
@@ -15,6 +16,7 @@ import { appInterface } from '../../backend/AppInterfaceService';
 import { visibleInterfaceItems, AppInterfaceControl } from '../../model/AppInterface';
 @Component
 export struct BrowserDisplayDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @Prop kind: string = 'search';
@@ -98,7 +100,7 @@ export struct BrowserDisplayDialog {
   }
   @Builder
   private columnsContent() {
-    Text(this.minimumColumns > 0 ? $r('app.string.browser_traditional_columns_hint') : $r('app.string.browser_columns_hint')).fontColor($r('app.color.text_secondary')).width('100%')
+    Text(this.minimumColumns > 0 ? $r('app.string.browser_traditional_columns_hint') : $r('app.string.browser_columns_hint')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     ForEach(this.draftColumns, (key: string, index: number) => {
       Row({ space: 8 }) {
         Text(this.columnLabel(key)).layoutWeight(1)
@@ -128,17 +130,17 @@ export struct BrowserDisplayDialog {
       Toggle({ type: ToggleType.Switch, isOn: this.ignoreAccents }).selectedColor(this.actionColor).enabled(!this.busy)
         .onChange((value: boolean): void => { this.onIgnoreAccents(value); })
     }.width('100%')
-    Text($r('app.string.browser_search_builder')).fontColor($r('app.color.text_secondary')).width('100%')
+    Text($r('app.string.browser_search_builder')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     SurfaceSelect({ options: this.searchKinds(),
       selectedIndex: this.searchKind,
       value: this.searchKinds()[this.searchKind].value,
       isInteractive: !this.busy,
       onSelect: (index: number): void => { this.searchKind = index; } }).width('100%')
     if (this.searchKind === 4) {
-      TextInput({ text: this.field, placeholder: $r('app.string.browser_find_field') }).attributeModifier(new FormInputStyle())
+      TextInput({ text: this.field, placeholder: $r('app.string.browser_find_field') }).attributeModifier(new FormInputStyle( undefined, this.appearanceElements))
         .enabled(!this.busy).onChange((value: string): void => { this.field = value; })
     }
-    TextInput({ text: this.term, placeholder: $r('app.string.browser_search_term') }).attributeModifier(new FormInputStyle())
+    TextInput({ text: this.term, placeholder: $r('app.string.browser_search_term') }).attributeModifier(new FormInputStyle( undefined, this.appearanceElements))
       .enabled(!this.busy).onChange((value: string): void => { this.term = value; })
     SurfaceSelect({ options: this.joinOptions(),
       selectedIndex: this.joinIndex,
@@ -156,7 +158,7 @@ export struct BrowserDisplayDialog {
   @Builder
   private recentContent() {
     if (this.recentSearches.length === 0) {
-      Text($r('app.string.browser_recent_searches_empty')).fontColor($r('app.color.text_secondary')).width('100%')
+      Text($r('app.string.browser_recent_searches_empty')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     }
     ForEach(this.recentSearches, (text: string) => {
       按下态按钮({ 文案: text, fillWidth: true, 是否启用: !this.busy,
@@ -166,7 +168,7 @@ export struct BrowserDisplayDialog {
   @Builder
   private bodyContent() {
     if (this.kind === 'replace') {
-      Text($r('app.string.browser_replace_column_hint')).fontColor($r('app.color.text_secondary')).width('100%')
+      Text($r('app.string.browser_replace_column_hint')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       ForEach(this.columnCandidates(), (column: BrowserColumn) => {
         按下态按钮({ 文案: this.columnLabel(column.key), fillWidth: true,
           是否启用: !this.busy && column.key !== this.replacementColumn,

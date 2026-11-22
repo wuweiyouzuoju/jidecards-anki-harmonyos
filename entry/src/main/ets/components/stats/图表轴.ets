@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // ========================================================
 // @名称 图表轴
@@ -31,6 +32,7 @@ export const 右轴宽: number = 30;
 
 @Component
 export struct 纵轴刻度 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   /** 绑定刻度（取轴域 产出，等差、端点 0 与上限）：与柱高归一化的上限必须同源，
    *  否则刻度位置与柱高错位 */
@@ -69,7 +71,7 @@ export struct 纵轴刻度 {
       ForEach(this.取倒序刻度(), (值: number) => {
         Text(this.是否时长 ? this.缩写分钟(值) : this.缩写次数(值))
           .fontSize(应用尺寸.字号_说明_小)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .maxLines(1)
       }, (值: number) => `${值}`)
     }
@@ -84,6 +86,7 @@ export struct 纵轴刻度 {
  *  → [0,25,50,75,100]%，0% 底、100% 顶）。正确率叠加面积对着本轴读数。 */
 @Component
 export struct 右轴百分比 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   /** 与柱区同高 */
   @Prop 高度: number = 108;
 
@@ -92,7 +95,7 @@ export struct 右轴百分比 {
       ForEach([100, 75, 50, 25, 0], (值: number) => {
         Text(`${值}%`)
           .fontSize(应用尺寸.字号_说明_小)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .maxLines(1)
       }, (值: number) => `${值}`)
     }
@@ -105,6 +108,7 @@ export struct 右轴百分比 {
 
 @Component
 export struct 横轴日期条 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   /** 左端刻度相对今天的天数（过去为负，未来为正） */
   @Prop 左端偏移天: number = -30;
@@ -125,17 +129,17 @@ export struct 横轴日期条 {
       Column().width(this.轴左宽)
       Text(this.取日期(this.左端偏移天))
         .fontSize(应用尺寸.字号_说明_小)
-        .fontColor($r('app.color.text_tertiary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
         .layoutWeight(1)
         .textAlign(TextAlign.Start)
       Text(this.取日期(Math.round((this.左端偏移天 + this.右端偏移天) / 2)))
         .fontSize(应用尺寸.字号_说明_小)
-        .fontColor($r('app.color.text_tertiary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
         .layoutWeight(1)
         .textAlign(TextAlign.Center)
       Text(this.取日期(this.右端偏移天))
         .fontSize(应用尺寸.字号_说明_小)
-        .fontColor($r('app.color.text_tertiary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
         .layoutWeight(1)
         .textAlign(TextAlign.End)
     }

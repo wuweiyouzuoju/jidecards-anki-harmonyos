@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { ShapePaint } from '../common/ShapePaint';
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { SurfaceSelect } from '../common/SurfaceSelect';
 import { common } from '@kit.AbilityKit';
 import { image } from '@kit.ImageKit';
@@ -29,6 +31,7 @@ import { SelectStyle } from '../../utils/SelectStyle';
 /** 制卡草稿独占底图、文字和笔迹；完成生成新图片，不覆盖图库或共享媒体。 */
 @Component
 export struct NoteDrawingEditor {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   source: string = '';
   onApply: (uri: string) => void = (_uri: string): void => {};
@@ -53,6 +56,7 @@ export struct NoteDrawingEditor {
   @State private canvasHeight: number = 300;
   @State private frameWidth: number = 400;
   @State private frameHeight: number = 300;
+  @State private wideBody: boolean = false;
   @State private bodyViewportHeight: number = 400;
   @State private textDragX: number = 0;
   @State private textDragY: number = 0;
@@ -585,7 +589,7 @@ export struct NoteDrawingEditor {
 
   @Builder
   private colorPreview() {
-    Circle().width(12).height(12).fill(this.color).hitTestBehavior(HitTestMode.None)
+    Circle().width(12).height(12).attributeModifier(new ShapePaint(this.color)).hitTestBehavior(HitTestMode.None)
   }
 
   @Builder
@@ -611,7 +615,7 @@ export struct NoteDrawingEditor {
         按下态按钮({ 文案: $r('app.string.note_drawing_text'), compact: true, 字号: 14, selectable: true, selected: this.textMode,
           是否启用: this.ready && !this.working && !this.failed && !this.textDragging,
           点击回调: (): void => { this.textMode = true; this.selectedText = -1; this.publish(); } })
-      }.border({ width: 0.5, color: $r('app.color.surface_border') }).borderRadius(8)
+      }.border({ width: 0.5, color: appearanceElementColor(this.appearanceElements, 'surface_border', $r('app.color.surface_border')) }).borderRadius(8)
       Blank()
       // 华为画笔自带颜色和编辑工具；文字颜色与原版回退才由应用提供。
       if (this.textMode || !this.official) { this.colorPicker() }
@@ -645,11 +649,11 @@ export struct NoteDrawingEditor {
           onAction: (): void => { this.texts = this.texts.filter((text: DrawingText): boolean => text.id !== this.selectedText);
             this.selectedText = -1; this.publish(); } })
       }.width('100%')
-      Text($r('app.string.note_drawing_transform_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+      Text($r('app.string.note_drawing_transform_hint')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
     }
     if (this.source === '' && this.document.base === '') {
       Row({ space: 8 }) {
-      Text($r('app.string.note_drawing_canvas_size')).fontSize(12).fontColor($r('app.color.text_secondary'))
+      Text($r('app.string.note_drawing_canvas_size')).fontSize(12).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       Blank()
       SurfaceSelect({ options: [{ value: '1200 × 900' }, { value: '900 × 1200' }, { value: '1200 × 1200' }],
         selectedIndex: this.document.width === 900 ? 1 : this.document.height === 1200 ? 2 : 0,
@@ -665,7 +669,7 @@ export struct NoteDrawingEditor {
 
   @Builder
   private bodyContent() {
-    Column({ space: 8 }) {
+    Flex({ direction: this.wideBody ? FlexDirection.Row : FlexDirection.Column, alignItems: ItemAlign.Stretch }) {
       Scroll() {
         Column({ space: 8 }) {
           this.tools()
@@ -673,9 +677,12 @@ export struct NoteDrawingEditor {
             Text(this.errorMessage).fontColor($r('app.color.error_text')).fontSize(应用尺寸.字号_正文_小)
           }
           if (this.working) { LoadingProgress().width(32).height(32) }
-          Text($r('app.string.note_drawing_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+          Text($r('app.string.note_drawing_hint')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         }.width('100%')
-      }.width('100%').constraintSize({ maxHeight: this.toolScrollHeight() }).flexShrink(0).scrollBar(BarState.Auto)
+      }.width(this.wideBody ? 300 : '100%').height(this.wideBody ? '100%' : 'auto')
+        .align(Alignment.TopStart)
+        .constraintSize({ maxHeight: this.toolScrollHeight() }).flexShrink(0).scrollBar(BarState.Auto)
+        .margin({ right: this.wideBody ? 12 : 0, bottom: this.wideBody ? 0 : 8 })
       Stack({ alignContent: Alignment.Center }) {
         Stack({ alignContent: Alignment.TopStart }) {
           if (this.baseImage !== null) { Image(this.baseImage).width('100%').height('100%').objectFit(ImageFit.Fill) }
@@ -739,15 +746,19 @@ export struct NoteDrawingEditor {
             }
           }, (entry: DrawingText): string => `${entry.id}-${entry.text}-${entry.x}-${entry.y}-${entry.color}-${entry.size}-${entry.scaleX ?? 1}-${entry.scaleY ?? 1}`)
         }.width(this.canvasWidth).height(this.canvasHeight).backgroundColor(this.document.background).clip(true)
-      }.width('100%').layoutWeight(1).attributeModifier(new ImageSurfaceStyle())
+      }.width(this.wideBody ? 0 : '100%').height(this.wideBody ? '100%' : 0).flexGrow(1)
+        .attributeModifier(new ImageSurfaceStyle(this.appearanceElements))
         .onAreaChange((_old: Area, area: Area): void => { this.frameWidth = Number(area.width); this.frameHeight = Number(area.height); this.fitCanvas(); })
     }.width('100%').height('100%')
-      .onAreaChange((_old: Area, area: Area): void => { this.bodyViewportHeight = Number(area.height); })
+      .onAreaChange((_old: Area, area: Area): void => {
+        this.bodyViewportHeight = Number(area.height);
+        this.wideBody = Number(area.width) >= 680;
+      })
   }
 
   private toolScrollHeight(): number {
     // 工具区限高滚动，画布至少保留正文剩余空间的四成；画布本身不进入 Scroll。
-    return Math.max(0, this.bodyViewportHeight - 8) * 0.6;
+    return this.wideBody ? this.bodyViewportHeight : Math.max(0, this.bodyViewportHeight - 8) * 0.6;
   }
 
   build() {

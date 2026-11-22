@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { localeNumber, localePercent } from '../../utils/LocaleFormatting';
 
 // 复习卡：渲染 GraphsResponse.reviews.count（次数）或 reviews.time（用时）为
@@ -30,6 +31,7 @@ interface 复习柱 {
 
 @Component
 export struct 复习卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('更新缓存') 复习计数: Map<number, ReviewKindCounts> | null = null;
   /** 每日答题用时（毫秒）：「时间」模式数据源（Anki ReviewsGraph reviewTime） */
@@ -126,7 +128,7 @@ export struct 复习卡 {
       const v: ReviewKindCounts | undefined = 源.get(首键[0]);
       样例 = `天${首键[0]}:成熟${v !== undefined ? v.mature : 'undef'}年轻${v !== undefined ? v.young : 'undef'}`;
     }
-    hilog.info(0xFFFE, '复习卡', `缓存重算 源键数=${源 !== null ? 源.size : -1} 柱数=${柱.length} 总计=${this.取总计()} ${样例}`);
+    hilog.info(0x4342, '复习卡', `缓存重算 源键数=${源 !== null ? 源.size : -1} 柱数=${柱.length} 总计=${this.取总计()} ${样例}`);
   }
 
   private 取柱总量(柱: 复习柱): number {
@@ -262,7 +264,7 @@ export struct 复习卡 {
           })
         Text($r('app.string.stats_reviews_time_checkbox'))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }
       .alignItems(VerticalAlign.Center)
       .width('100%')
@@ -271,7 +273,7 @@ export struct 复习卡 {
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -326,12 +328,12 @@ export struct 复习卡 {
           Row() {
             Text($r('app.string.stats_reviews_days_studied'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Blank()
             Text($r('app.string.stats_reviews_days_of_total', this.取学习天数(),
               this.取期间天数(), localePercent(this.取学习天数() / this.取期间天数(), this.uiLanguage)))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
           .width('100%')
 
@@ -339,34 +341,34 @@ export struct 复习卡 {
             Row() {
               Text($r('app.string.stats_total_label'))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               Blank()
               Text(this.格式化时长(this.取总计()))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_primary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             }
             .width('100%')
             Row() {
               Text($r('app.string.stats_reviews_avg_period'))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               Blank()
               Text($r('app.string.stats_reviews_minutes_per_day',
                 Math.round(this.取总计() / 1000 / 60 / this.取期间天数())))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_primary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             }
             .width('100%')
             if (this.取学习天数() > 0 && this.取学习天数() < this.取期间天数()) {
               Row() {
                 Text($r('app.string.stats_reviews_avg_studied'))
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_secondary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 Blank()
                 Text($r('app.string.stats_reviews_minutes_per_day',
                   Math.round(this.取总计() / 1000 / 60 / this.取学习天数())))
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_primary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
               }
               .width('100%')
             }
@@ -374,13 +376,13 @@ export struct 复习卡 {
               Row() {
                 Text($r('app.string.stats_average_answer_time_label'))
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_secondary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 Blank()
                 Text($r('app.string.stats_average_answer_time',
                   localeNumber(this.取平均答题秒(), this.uiLanguage, 1),
                   localeNumber(this.取每分钟卡数(), this.uiLanguage, 1)))
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_primary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
               }
               .width('100%')
             }
@@ -388,32 +390,32 @@ export struct 复习卡 {
             Row() {
               Text($r('app.string.stats_total_label'))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               Blank()
               Text($r('app.string.stats_reviews_total_count', this.取总计()))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_primary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             }
             .width('100%')
             Row() {
               Text($r('app.string.stats_reviews_avg_period'))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               Blank()
               Text($r('app.string.stats_reviews_per_day', Math.round(this.取总计() / this.取期间天数())))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_primary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             }
             .width('100%')
             if (this.取学习天数() > 0 && this.取学习天数() < this.取期间天数()) {
               Row() {
                 Text($r('app.string.stats_reviews_avg_studied'))
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_secondary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 Blank()
                 Text($r('app.string.stats_reviews_per_day', Math.round(this.取总计() / this.取学习天数())))
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_primary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
               }
               .width('100%')
             }
@@ -448,7 +450,7 @@ export struct 复习卡 {
         .backgroundColor(颜色)
       Text(标签)
         .fontSize(应用尺寸.字号_说明_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
     }
     .alignItems(VerticalAlign.Center)
     .margin({ right: 应用尺寸.间距_10, bottom: 应用尺寸.间距_4 })

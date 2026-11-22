@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 今日计数卡：渲染 GraphsView.today 为 4 行文字列表（对齐 Anki TodayStats）。
 // 行 1 今天学习了 N 张，用时 X（Y 秒/张）；行 2 重来次数 N (P%)；
@@ -14,6 +15,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 今日计数卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('数据已变') 今日数据: TodayCounts | null = null;
   /** 渲染哨兵：@Prop 变化经 @Watch 递增，驱动本组件重新渲染
@@ -96,38 +98,38 @@ export struct 今日计数卡 {
         Column({ space: 4 }) {
           Text(this.今日数据 === null ? '—' : $r('app.string.stats_summary_answers', this.今日数据.answerCount))
             .fontSize(应用尺寸.字号_指标).fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary')).maxLines(1)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).maxLines(1)
             .minFontSize(12).maxFontSize(应用尺寸.字号_指标).height(32)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           Text($r('app.string.stats_summary_studied')).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary')).maxLines(2)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).maxLines(2)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         Column({ space: 4 }) {
           Text(this.dueLabel(false))
             .fontSize(应用尺寸.字号_指标).fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary')).maxLines(1)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).maxLines(1)
             .minFontSize(12).maxFontSize(应用尺寸.字号_指标).height(32)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           Text($r('app.string.stats_summary_due')).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary')).maxLines(2)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).maxLines(2)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         Column({ space: 4 }) {
           Text(this.dueLabel(true))
             .fontSize(应用尺寸.字号_指标).fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary')).maxLines(1)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).maxLines(1)
             .minFontSize(12).maxFontSize(应用尺寸.字号_指标).height(32)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           Text($r('app.string.stats_summary_overdue')).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary')).maxLines(2)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).maxLines(2)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         Column({ space: 4 }) {
           Text(this.今日数据 === null ? '—' : this.格式化用时(this.今日数据.answerMillis))
             .fontSize(应用尺寸.字号_指标).fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary')).maxLines(1)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).maxLines(1)
             .minFontSize(12).maxFontSize(应用尺寸.字号_指标).height(32)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           Text($r('app.string.stats_summary_time')).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary')).maxLines(2)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).maxLines(2)
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
       }.width('100%').alignItems(VerticalAlign.Top)
       if (this.showDetails && this.今日数据 !== null && this.今日数据.answerCount > 0) {
@@ -137,21 +139,21 @@ export struct 今日计数卡 {
             this.格式化用时((this.今日数据 as TodayCounts).answerMillis),
             this.取每卡秒(this.今日数据 as TodayCounts)))
             .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             .width('100%')
             .textAlign(TextAlign.Center)
           Text($r('app.string.stats_today_again',
             this.取重来次数(this.今日数据 as TodayCounts),
             this.取重来百分比(this.今日数据 as TodayCounts)))
             .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             .width('100%')
             .textAlign(TextAlign.Center)
           Text($r('app.string.stats_today_types', (this.今日数据 as TodayCounts).learnCount,
             (this.今日数据 as TodayCounts).reviewCount, (this.今日数据 as TodayCounts).relearnCount,
             (this.今日数据 as TodayCounts).earlyReviewCount))
             .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             .width('100%')
             .textAlign(TextAlign.Center)
           if ((this.今日数据 as TodayCounts).matureCount > 0) {
@@ -160,13 +162,13 @@ export struct 今日计数卡 {
               (this.今日数据 as TodayCounts).matureCount,
               this.取成熟正确率(this.今日数据 as TodayCounts)))
               .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
               .width('100%')
               .textAlign(TextAlign.Center)
           } else {
             Text($r('app.string.stats_today_no_mature'))
               .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               .width('100%')
               .textAlign(TextAlign.Center)
           }

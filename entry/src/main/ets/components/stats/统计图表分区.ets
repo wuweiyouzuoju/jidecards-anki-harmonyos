@@ -1,5 +1,7 @@
-import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceElementRadius, appearanceElementColor, appearanceModuleBorder, appearanceModuleRadius } from '../../utils/AppearanceElements';
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 import { HelpLabel } from '../common/HelpLabel';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { 按下态按钮 } from '../common/按下态按钮';
@@ -20,6 +22,7 @@ import { localizedNamedResourceText, resourceText, namedResourceText } from '../
 
 @Component
 export struct 统计图表分区 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -72,6 +75,11 @@ export struct 统计图表分区 {
   @Builder
   private 默认内容(): void {}
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
       Row({ space: 应用尺寸.间距_12 }) {
@@ -100,7 +108,7 @@ export struct 统计图表分区 {
       } else {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -109,9 +117,13 @@ export struct 统计图表分区 {
     .width('100%')
     .padding(应用尺寸.卡片内边距)
     .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_指标卡)
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_指标卡))
     .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
-      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity))
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements))
+    .background(this.renderGlassBackground(SeriesVisual.surfaceFor(this.surfaceMaterial, this.themeMode === 'dark' ||
+      (this.themeMode !== 'light' && this.systemDark), this.actionColor, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
   }
 }

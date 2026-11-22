@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { insetMaterialFill } from '../../utils/GlassMaterial';
-// SPDX-License-Identifier-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { mouseContextPoint } from '../../utils/MouseContextInput';
 import { currentMotionProfile, motionAnimation } from '../../utils/AppMotion';
@@ -110,11 +111,14 @@ export type { BrowserDisplayRow as 浏览行数据 } from '../../model/BrowserSe
 
 @Component
 export struct 卡片表格 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Prop @Watch('同步行数据源') 行列表: 浏览行数据[] = [];
   @Prop 结果总数: number = 0;
+  @Prop @Watch('notifyResultsLaidOut') resultFocusVersion: number = 0;
+  onResultsLaidOut: (version: number) => void = (_version: number): void => {};
   @Prop 已加载行数: number = 0;
   @Prop subtitleIndex: number = 1;
   @Prop notesMode: boolean = false;
@@ -148,6 +152,17 @@ export struct 卡片表格 {
   @State private 加载中: boolean = false;
   private readonly 行数据源: 浏览行数据源 = new 浏览行数据源();
   private readonly listScroller: Scroller = new Scroller();
+  private listLaidOut: boolean = false;
+
+  private resultListAreaChanged(area: Area): void {
+    this.listLaidOut = Number(area.width) > 0 && Number(area.height) > 0;
+    this.notifyResultsLaidOut();
+  }
+
+  private notifyResultsLaidOut(): void {
+    // 同一帧内切换查询时，ArkUI 可能保留已布局的 List，不会再次触发布局回调。
+    if (this.listLaidOut && this.resultFocusVersion !== 0) this.onResultsLaidOut(this.resultFocusVersion);
+  }
   private scrollToFocusedRow(): void {
     const index: number = this.行列表.findIndex((row: 浏览行数据): boolean => row.id === this.focusedId);
     if (index >= 0) this.listScroller.scrollToIndex(index, false, ScrollAlign.AUTO);
@@ -204,27 +219,30 @@ export struct 卡片表格 {
     return CARD_FLAGS[browserRowFlag(行.color)].color;
   }
 
-  /** 旗标只覆盖左侧色条，四周中性轮廓始终保留。 */
+  private rowHasSelectionOutline(rowId: number): boolean {
+    return rowId === this.focusedId || (this.traditionalLayout && this.选中IDs.includes(rowId));
+  }
+
+  /** 两种布局共用选中描边，保留左侧旗标色。 */
   private rowBorder(row: 浏览行数据): BorderOptions {
-    if (this.traditionalLayout) return SurfaceBorder.options({ bottom: 0.5 });
     const flagColor: string = this.取行标志色(row);
-    if (row.id === this.focusedId) {
+    if (this.rowHasSelectionOutline(row.id)) {
       const widths: EdgeWidths = { top: 2, right: 2, bottom: 2, left: flagColor === 'transparent' ? 2 : 4 };
       const colors: EdgeColors = { top: this.actionColor, right: this.actionColor, bottom: this.actionColor,
         left: flagColor === 'transparent' ? this.actionColor : flagColor };
-      return SurfaceBorder.options(widths, colors);
+      return SurfaceBorder.options(widths, colors, this.appearanceElements);
     }
-    if (flagColor === 'transparent') return SurfaceBorder.options();
+    if (this.traditionalLayout) return SurfaceBorder.options({ bottom: 0.5 }, undefined, this.appearanceElements);
+    if (flagColor === 'transparent') return SurfaceBorder.options( undefined, undefined, this.appearanceElements);
     const outline: ResourceColor = SurfaceBorder.color();
     const widths: EdgeWidths = { top: 应用尺寸.卡片边框, right: 应用尺寸.卡片边框,
       bottom: 应用尺寸.卡片边框, left: 4 };
     const colors: EdgeColors = { top: outline, right: outline, bottom: outline, left: flagColor };
-    return SurfaceBorder.options(widths, colors);
+    return SurfaceBorder.options(widths, colors, this.appearanceElements);
   }
 
   private rowBackground(row: 浏览行数据): ResourceColor {
     if (!this.traditionalLayout) return insetMaterialFill($r('app.color.surface_card'), this.surfaceMaterial);
-    if (row.id === this.focusedId || this.选中IDs.includes(row.id)) return $r('app.color.surface_selected');
     const flag: string = this.取行标志色(row);
     if (flag !== 'transparent') return `#33${flag.substring(1)}`;
     if (row.color === BrowserRowColor.COLOR_MARKED) return $r('app.color.browser_row_marked');
@@ -294,7 +312,7 @@ export struct 卡片表格 {
             Row() {
               ForEach(this.displayKeys, (key: string) => {
                 Text(this.columnLabel(key)).fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_secondary')).width(this.traditionalLayout ? undefined : 160)
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width(this.traditionalLayout ? undefined : 160)
                   .layoutWeight(this.traditionalLayout ? 1 : 0).constraintSize({ minHeight: this.traditionalLayout ? 44 : 0 }).padding(this.traditionalLayout ? { left: 8, right: 8 } : 0).maxLines(1)
                   .focusable(this.traditionalLayout).enabled(!this.busy).attributeModifier(new PressFeedback())
                   .onClick((): void => { if (this.traditionalLayout && !this.busy) this.onColumnClick(key); })
@@ -326,7 +344,7 @@ export struct 卡片表格 {
                     ForEach(this.displayKeys, (key: string) => {
                       Text(行.cells[this.activeKeys.indexOf(key)]?.text ?? '').width(this.traditionalLayout ? undefined : 160)
                         .layoutWeight(this.traditionalLayout ? 1 : 0).padding(this.traditionalLayout ? { left: 8, right: 8 } : 0)
-                        .fontSize(应用尺寸.字号_正文).fontColor(this.是否挂起行(行) ? $r('app.color.text_secondary') : $r('app.color.text_primary')).maxLines(this.traditionalLayout ? 3 : 2)
+                        .fontSize(应用尺寸.字号_正文).fontColor(this.是否挂起行(行) ? appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')) : appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).maxLines(this.traditionalLayout ? 3 : 2)
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
                     }, (key: string): string => key)
                   }.layoutWeight(1)
@@ -335,7 +353,7 @@ export struct 卡片表格 {
                   Text(this.取行主文案(行))
                     .fontSize(应用尺寸.字号_正文)
                     .fontWeight(FontWeight.Medium)
-                    .fontColor(this.是否挂起行(行) ? $r('app.color.text_secondary') : $r('app.color.text_primary'))
+                    .fontColor(this.是否挂起行(行) ? appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')) : appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                     .maxLines(2)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                     .textAlign(TextAlign.Start)
@@ -344,13 +362,13 @@ export struct 卡片表格 {
                   if (this.displayKeys.length > 0) {
                     ForEach(this.displayKeys.slice(1), (key: string) => {
                       Text(this.displayColumnText(行, key)).fontSize(应用尺寸.字号_正文_小)
-                        .fontColor($r('app.color.text_secondary')).maxLines(2)
+                        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).maxLines(2)
                         .textOverflow({ overflow: TextOverflow.Ellipsis }).width('100%')
                     }, (key: string): string => key)
                   } else if (this.取行副文案(行) !== '') {
                     Text(this.取行副文案(行))
                       .fontSize(应用尺寸.字号_正文_小)
-                      .fontColor($r('app.color.text_secondary'))
+                      .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                       .maxLines(1)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                       .textAlign(TextAlign.Start)
@@ -360,10 +378,10 @@ export struct 卡片表格 {
                     Text(this.notesMode ? $r('app.string.browser_contains_suspended') :
                       $r('app.string.stats_cards_suspended'))
                       .fontSize(应用尺寸.字号_正文_小)
-                      .fontColor($r('app.color.text_primary'))
+                      .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                       .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                       .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-                      .border(SurfaceBorder.options(0.5))
+                      .border(SurfaceBorder.options(0.5, undefined, this.appearanceElements))
                       .borderRadius(4)
                   }
                 }
@@ -393,7 +411,7 @@ export struct 卡片表格 {
               })
               .backgroundColor(this.rowBackground(行))
               .border(this.rowBorder(行))
-              .borderRadius(this.traditionalLayout ? 0 : 应用尺寸.圆角_指标卡)
+              .borderRadius(this.traditionalLayout && !this.rowHasSelectionOutline(行.id) ? 0 : 应用尺寸.圆角_指标卡)
               .attributeModifier(new PressFeedback())
               .onMouse((event: MouseEvent): void => { this.handleRowMouse(行.id, event); })
               .onClick((event: ClickEvent): void => {
@@ -414,6 +432,8 @@ export struct 卡片表格 {
         .focusable(true)
         .defaultFocus(true)
         .focusOnTouch(true)
+        .onAreaChange((_old: Area, area: Area): void => { this.resultListAreaChanged(area); })
+        .onDisAppear((): void => { this.listLaidOut = false; })
         .padding({ left: this.traditionalLayout ? 0 : 应用尺寸.页面内边距_水平, right: this.traditionalLayout ? 0 : 应用尺寸.页面内边距_水平 })
         .layoutWeight(1)
         .edgeEffect(EdgeEffect.Spring)

@@ -14,6 +14,7 @@ import { NoteDraftPreviewPageParams } from '../../model/navigation/PageParams';
 import { resourceText } from '../../utils/UiFeedback';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { PressFeedback } from '../../utils/PressFeedback';
+import { AppLog } from '../../model/AppLog';
 @Component
 export struct BrowserEditorPane {
   @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
@@ -31,6 +32,9 @@ export struct BrowserEditorPane {
   onSaved: () => void = (): void => {};
   private active: boolean = false;
   private linksVisible: boolean = false;
+  private previewOpen: boolean = false;
+  private previewVersion: number = 0;
+  private previewReturnHandler: (() => void) | null = null;
   private readonly writer: AnkiNoteUpdate = new AnkiNoteUpdate();
   private readonly operations: BrowserOperationController = new BrowserOperationController();
   private readonly session: NoteEditorSession = new NoteEditorSession(new AnkiNoteEditor(), (state: NoteEditorState): void => {
@@ -39,9 +43,14 @@ export struct BrowserEditorPane {
   aboutToAppear(): void { this.active = true; this.setVisible(); this.load(); }
   aboutToDisappear(): void {
     this.active = false; this.wheelSession.setVisible(false); this.session.dispose(); this.operations.dispose();
+    this.previewVersion++; this.previewOpen = false; this.previewReturnHandler = null;
     appInterface.leave('browser_editor');
   }
-  private setVisible(): void { this.wheelSession.setVisible(this.active && this.visible && !this.linksVisible); }
+  private setVisible(): void {
+    if (this.active && this.visible) this.restoreAfterPreview(this.previewVersion);
+    this.wheelSession.setVisible(this.active && this.visible && !this.linksVisible && !this.previewOpen);
+    this.publishInterface();
+  }
   private setLinksVisible(visible: boolean): void {
     if (!this.active) return;
     this.linksVisible = visible; this.setVisible(); this.onBusy(this.editor.busy || visible); this.publishInterface();
@@ -55,13 +64,35 @@ export struct BrowserEditorPane {
         { id: 'form', titleKey: 'note_editor_edit_title', title: '', selected: false, enabled: this.editor.note !== null }],
       values: [{ id: 'target_kind', value: this.isNote ? 'note' : 'card' }, { id: 'visible', value: String(this.visible) }] });
   }
-  private async load(): Promise<void> { await this.session.open(this.targetId, this.isNote, (): boolean => this.active); }
+  private async load(): Promise<void> {
+    const started: number = Date.now();
+    await this.session.open(this.targetId, this.isNote, (): boolean => this.active);
+    if (this.active) AppLog.info('BrowserEditor', `[BrowserPerf] editor ready ms=${Date.now() - started} loaded=${this.editor.note !== null}`);
+  }
   private openPreview(input: NoteDraftPreviewInput, onReturn: () => void): boolean {
-    if (!this.active || this.editor.busy) return false;
+    if (!this.active || !this.visible || this.editor.busy || this.linksVisible || this.previewOpen) return false;
     const params: NoteDraftPreviewPageParams = { input: input };
+    const version: number = ++this.previewVersion;
+    this.previewOpen = true; this.previewReturnHandler = onReturn;
+    this.wheelSession.setVisible(false);
     try {
-      this.pathStack.pushPath({ name: 'NoteDraftPreviewPage', param: params, onPop: (): void => { this.previewReturn++; onReturn(); } }); return true;
-    } catch (error) { return false; }
+      this.pathStack.pushPath({ name: 'NoteDraftPreviewPage', param: params,
+        onPop: (): void => { this.restoreAfterPreview(version); } }); return true;
+    } catch (error) {
+      this.previewOpen = false; this.previewReturnHandler = null;
+      this.setVisible();
+      AppLog.info('BrowserEditor', `Browser editor preview navigation: ${error}`);
+      return false;
+    }
+  }
+  private restoreAfterPreview(version: number): void {
+    if (!this.active || !this.previewOpen || version !== this.previewVersion) return;
+    this.previewOpen = false;
+    const onReturn: (() => void) | null = this.previewReturnHandler;
+    this.previewReturnHandler = null;
+    this.previewReturn++;
+    onReturn?.();
+    this.wheelSession.setVisible(this.visible && !this.linksVisible);
   }
   private async save(fields: string[], tags: string[], images: NoteFieldImage[], audios: NoteFieldAudio[]): Promise<boolean> {
     const attachments: NoteFieldImage[] = images.slice(); const audio: NoteFieldAudio[] = audios.slice();

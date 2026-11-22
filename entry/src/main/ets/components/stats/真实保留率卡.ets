@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 真实保留率卡：渲染 GraphsView.trueRetention 为周期表格（对齐 Anki TrueRetention）。
 // 视图切换（Anki DisplayMode，默认汇总=全部）：年轻单列 / 成熟单列 / 汇总表。
@@ -23,6 +24,7 @@ interface 保留率行 {
 
 @Component
 export struct 真实保留率卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 保留率数据: TrueRetentionStats | null = null;
   /** 统计天数=0（全部）时显示"全部时间"行 */
@@ -80,7 +82,7 @@ export struct 真实保留率卡 {
       if (this.保留率数据 === null) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -129,7 +131,7 @@ export struct 真实保留率卡 {
     Row() {
       Text(行.标题)
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .layoutWeight(1)
       if (行.数据 === null) {
         this.空格(56)
@@ -144,7 +146,7 @@ export struct 真实保留率卡 {
     }
     .width('100%')
     .padding({ top: 应用尺寸.间距_5, bottom: 应用尺寸.间距_5 })
-    .border(SurfaceBorder.options({ bottom: 0.5 }))
+    .border(SurfaceBorder.options({ bottom: 0.5 }, undefined, this.appearanceElements))
   }
 
   @Builder
@@ -174,7 +176,7 @@ export struct 真实保留率卡 {
   private 表头格(标签: Resource, 颜色: string) {
     Text(标签)
       .fontSize(应用尺寸.字号_说明)
-      .fontColor(颜色 === '' ? $r('app.color.text_secondary') : 颜色)
+      .fontColor(颜色 === '' ? appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')) : 颜色)
       .fontWeight(FontWeight.Medium)
       .width(56)
       .textAlign(TextAlign.End)
@@ -185,7 +187,7 @@ export struct 真实保留率卡 {
     Row() {
       Text(行.标题)
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .layoutWeight(1)
       if (行.数据 === null) {
         this.空格(56)
@@ -201,7 +203,7 @@ export struct 真实保留率卡 {
     }
     .width('100%')
     .padding({ top: 应用尺寸.间距_5, bottom: 应用尺寸.间距_5 })
-    .border(SurfaceBorder.options({ bottom: 0.5 }))
+    .border(SurfaceBorder.options({ bottom: 0.5 }, undefined, this.appearanceElements))
   }
 
   /** 空数据占位格（—） */
@@ -209,7 +211,7 @@ export struct 真实保留率卡 {
   private 空格(宽度: number) {
     Text('—')
       .fontSize(应用尺寸.字号_正文_小)
-      .fontColor($r('app.color.text_tertiary'))
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
       .width(宽度)
       .textAlign(TextAlign.End)
   }
@@ -219,7 +221,7 @@ export struct 真实保留率卡 {
   private 数值格(内容: string, 颜色: string) {
     Text(内容)
       .fontSize(应用尺寸.字号_正文_小)
-      .fontColor(颜色 === '' ? $r('app.color.text_primary') : 颜色)
+      .fontColor(颜色 === '' ? appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')) : 颜色)
       .width(56)
       .textAlign(TextAlign.End)
   }

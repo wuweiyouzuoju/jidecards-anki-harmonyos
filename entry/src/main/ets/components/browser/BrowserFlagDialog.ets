@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DialogFrame } from '../common/DialogFrame';
@@ -11,6 +12,7 @@ import { 颜色键 } from '../../model/颜色主题';
 
 @Component
 export struct BrowserFlagDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
@@ -47,7 +49,7 @@ export struct BrowserFlagDialog {
   @Builder
   private dialogContent() {
     Text(this.noteScope ? $r('app.string.card_mark_flag_note_scope') : $r('app.string.card_mark_flag_scope'))
-      .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+      .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     ForEach(CARD_FLAGS, (definition: CardFlagDefinition) => {
       Row({ space: 应用尺寸.间距_12 }) {
         // 标志色块：0=无（透明圆环）/1=红/2=橙/3=绿/4=蓝
@@ -55,21 +57,21 @@ export struct BrowserFlagDialog {
           .width(16)
           .height(16)
           .backgroundColor(this.标志颜色(definition.value))
-          .border(SurfaceBorder.options(definition.value === 0 ? 1 : 0)).borderRadius(8)
+          .border(SurfaceBorder.options(definition.value === 0 ? 1 : 0, undefined, this.appearanceElements)).borderRadius(8)
         Text(this.标志文案(definition.value))
           .fontSize(应用尺寸.字号_按钮)
-          .fontColor($r('app.color.text_primary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           .layoutWeight(1)
         if (this.currentFlag === definition.value) {
           Text($r('app.string.card_mark_selected_symbol'))
-            .fontColor(definition.value === 0 ? $r('app.color.text_primary') : this.actionColor)
+            .fontColor(definition.value === 0 ? appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')) : this.actionColor)
         }
       }
       .width('100%')
       .height(应用尺寸.按钮高度)
       .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16 })
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_胶囊)
-      .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
+      .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_胶囊))
+      .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
       .enabled(!this.busy)
       .attributeModifier(new PressFeedback())
       .onClick((): void => { this.onSubmit(definition.value); })

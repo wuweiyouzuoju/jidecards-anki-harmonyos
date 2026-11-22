@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { DialogBackdrop } from '../common/DialogBackdrop';
 import { GlassPanel } from '../common/GlassPanel';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { IconActionButton } from '../common/IconActionButton';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -73,6 +75,7 @@ type 侧边栏分区 = 'decks' | 'tags' | 'saved_searches';
 
 @Component
 export struct 浏览侧边栏 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   @Prop isDark: boolean = false;
@@ -126,7 +129,7 @@ export struct 浏览侧边栏 {
           Text($r('app.string.browser_sidebar_title'))
             .fontSize(应用尺寸.字号_面板标题)
             .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           Blank()
           IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_close'), label: $r('app.string.icon_sidebar_close'),
             onAction: (): void => { this.onClose(); } })
@@ -167,7 +170,7 @@ export struct 浏览侧边栏 {
               }
             }
             }.width('100%').backgroundColor(this.surfaceMaterial === 'glass' ? Color.Transparent : $r('app.color.surface_card'))
-              .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_指标卡).clip(true)
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_指标卡)).clip(true)
               .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
             // 标签分区
@@ -191,7 +194,7 @@ export struct 浏览侧边栏 {
               }
             }
             }.width('100%').backgroundColor(this.surfaceMaterial === 'glass' ? Color.Transparent : $r('app.color.surface_card'))
-              .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_指标卡).clip(true)
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_指标卡)).clip(true)
               .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
             // 已保存搜索分区
@@ -208,7 +211,7 @@ export struct 浏览侧边栏 {
               }
             }
             }.width('100%').backgroundColor(this.surfaceMaterial === 'glass' ? Color.Transparent : $r('app.color.surface_card'))
-              .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_指标卡).clip(true)
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_指标卡)).clip(true)
               .margin({ bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout) })
 
           }
@@ -227,12 +230,7 @@ export struct 浏览侧边栏 {
 
   build() {
     Stack({ alignContent: Alignment.Start }) {
-      // 遮罩层：点击关闭
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(this.isDark ? 'rgba(0,0,0,0.40)' : 'rgba(0,0,0,0.15)')
-        .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+      DialogBackdrop({ tracksHierarchy: false })
         .onClick((): void => {
           if (!this.busy) {
             this.onClose();
@@ -251,7 +249,7 @@ export struct 浏览侧边栏 {
   空提示() {
     Text($r('app.string.browser_sidebar_empty'))
       .fontSize(应用尺寸.字号_正文_小)
-      .fontColor($r('app.color.text_tertiary'))
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
       .width('100%')
       .padding({ left: 应用尺寸.间距_16, right: 应用尺寸.间距_16,
         top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
@@ -263,8 +261,8 @@ export struct 浏览侧边栏 {
     this.getUIContext().getPromptAction().showActionMenu({
       title: $r('app.string.browser_tag_actions'),
       buttons: [
-        { text: $r('app.string.browser_tag_append_search'), color: $r('app.color.text_primary') },
-        { text: $r('app.string.browser_tag_rename'), color: $r('app.color.text_primary') },
+        { text: $r('app.string.browser_tag_append_search'), color: appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')) },
+        { text: $r('app.string.browser_tag_rename'), color: appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')) },
         { text: $r('app.string.browser_tag_delete'), color: $r('app.color.error_text') }
       ]
     }, (err: BusinessError, data: promptAction.ActionMenuSuccessResponse): void => {
@@ -288,7 +286,7 @@ export struct 浏览侧边栏 {
     this.getUIContext().getPromptAction().showActionMenu({
       title: $r('app.string.browser_saved_search_actions'),
       buttons: [
-        { text: $r('app.string.browser_saved_search_rename'), color: $r('app.color.text_primary') },
+        { text: $r('app.string.browser_saved_search_rename'), color: appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')) },
         { text: $r('app.string.browser_saved_search_delete'), color: $r('app.color.error_text') }
       ]
     }, (err: BusinessError, data: promptAction.ActionMenuSuccessResponse): void => {
@@ -303,7 +301,7 @@ export struct 浏览侧边栏 {
     Row() {
       Text(项.name)
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .layoutWeight(1)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { ImportAnkiPackageOptions, ImportAnkiPackageUpdateCondition,
   DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS } from '../../proto/messages/ImportExportMessages';
 import { ImportSelect } from './ImportSelect';
@@ -8,6 +9,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct PackageImportOptions {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('loadOptions') options: ImportAnkiPackageOptions = DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS;
   @Prop isInteractive: boolean = true;
@@ -41,7 +43,7 @@ export struct PackageImportOptions {
         selectedIndex: this.notetypes, isInteractive: this.isInteractive,
         onSelect: (value: number): void => { this.notetypes = value; this.changed(); } })
       if (this.notes === ImportAnkiPackageUpdateCondition.ALWAYS || this.notetypes === ImportAnkiPackageUpdateCondition.ALWAYS) {
-        Text($r('app.string.transfer_update_warning')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        Text($r('app.string.transfer_update_warning')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }
       SettingsToggleRow({ title: $r('app.string.transfer_include_scheduling'), hint: $r('app.string.transfer_import_scheduling_hint'),
         isOn: this.scheduling, isInteractive: this.isInteractive, isDark: this.isDark,

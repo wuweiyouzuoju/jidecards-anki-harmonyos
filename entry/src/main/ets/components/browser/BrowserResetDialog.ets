@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import type { AppInterfaceControl } from '../../model/AppInterface';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
@@ -11,6 +12,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct BrowserResetDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('handleBack') backRequest: number = 0;
   @Prop @Watch('publish') busy: boolean = false;
   @Prop notes: boolean = false;
@@ -59,7 +61,7 @@ export struct BrowserResetDialog {
   @Builder
   private content() {
     Text(this.notes ? $r('app.string.browser_reset_notes_hint') : $r('app.string.browser_reset_hint'))
-      .fontColor($r('app.color.text_secondary')).fontSize(应用尺寸.字号_正文)
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).fontSize(应用尺寸.字号_正文)
     SettingsToggleRow({ title: $r('app.string.browser_reset_restore_position'), isOn: this.restorePosition,
       isInteractive: !this.busy && !this.loading && !this.failed,
       onChange: (value: boolean): void => { this.restorePosition = value; this.publish(); } })

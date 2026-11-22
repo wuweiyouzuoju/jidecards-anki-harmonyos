@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -8,6 +9,7 @@ import { newTagName } from '../../model/NoteTags';
 
 @Component
 export struct BrowserRenameTagDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
@@ -40,10 +42,10 @@ export struct BrowserRenameTagDialog {
     Column({ space: 应用尺寸.间距_4 }) {
       Text($r('app.string.browser_tag_rename_current'))
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       Text(this.original)
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .width('100%')
     }
     .width('100%')
@@ -52,9 +54,9 @@ export struct BrowserRenameTagDialog {
     Column({ space: 应用尺寸.间距_4 }) {
       Text($r('app.string.browser_tag_rename_new'))
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       TextInput({ text: this.name, placeholder: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.browser_tag_rename_placeholder')) })
-        .attributeModifier(new FormInputStyle())
+        .attributeModifier(new FormInputStyle( undefined, this.appearanceElements))
         .enabled(!this.busy)
         .onChange((值: string): void => {
           this.name = 值;

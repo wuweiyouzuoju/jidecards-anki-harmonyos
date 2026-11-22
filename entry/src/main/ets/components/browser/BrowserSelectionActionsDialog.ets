@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { SurfaceSelect } from '../common/SurfaceSelect';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
@@ -10,6 +11,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 export interface BrowserExportOptions { format: string; media: boolean; scheduling: boolean; }
 @Component
 export struct BrowserSelectionActionsDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @Prop @Watch('handleBack') backRequest: number = 0;
   @Prop action: string = 'grade';
@@ -58,9 +60,9 @@ export struct BrowserSelectionActionsDialog {
   @Builder
   private bodyContent() {
     Text(resourceText(this.getUIContext(), $r('app.string.browser_selection_scope'), this.count))
-      .fontColor($r('app.color.text_secondary')).width('100%')
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     if (this.action === 'grade') {
-      Text($r('app.string.browser_grade_hint')).fontColor($r('app.color.text_secondary')).width('100%')
+      Text($r('app.string.browser_grade_hint')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       SurfaceSelect({ options: this.options(),
         selectedIndex: this.rating,
         value: this.options()[this.rating].value,

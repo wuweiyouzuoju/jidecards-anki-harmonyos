@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { SeriesVisual } from '../../utils/SeriesVisual';
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { WALLPAPER_KEY } from '../../model/AppearanceCustomization';
 import { pageMaterialFill } from '../../utils/GlassMaterial';
 import { GlassSource } from '../common/GlassSource';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { EditorSectionCard } from '../common/EditorSectionCard';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { editorShortcutCommand } from '../../model/KeyboardShortcuts';
 import { StudyKeyboardSession } from '../../model/StudyKeyboard';
 import { studyEventChord } from '../../utils/StudyKeyAdapter';
@@ -57,9 +59,11 @@ import { noteLinkEditorFields, restoreNoteLinkEditorFields } from '../../model/N
 // 独立编辑页的表单：拥有字段/标签/附件草稿和放弃确认，读写由宿主页负责。
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { 颜色键 } from '../../model/颜色主题';
+import { AppLog } from '../../model/AppLog';
 
 @Component
 export struct 浏览编辑区 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @Prop ownGlassSource: boolean = true;
@@ -105,9 +109,11 @@ export struct 浏览编辑区 {
   @State @Watch('publishInterface') private linkDraftTargets: string[] | null = null;
   @State @Watch('publishInterface') private linkCount: number = -1;
   @State private linkedPreviewIds: number[] = [];
+  private linkGraphCenter: number = 0;
   private linkedPreviewBack: (() => boolean) | null = null;
   private linksBaseline: EditableNote | null = null;
   private linkCountGeneration: number = 0;
+  private linkCountTimer: number = -1;
   private readonly properties: NoteEditorProperties = new NoteEditorProperties();
   private readonly keyboardSession: StudyKeyboardSession = new StudyKeyboardSession();
   onReload: () => Promise<NoteEditorState | null> = async (): Promise<NoteEditorState | null> => null;
@@ -126,24 +132,30 @@ export struct 浏览编辑区 {
   @State private 本地错误: string = '';
   private disposed: boolean = false;
   private interfaceMounted: boolean = false;
+  private firstLayoutSeen: boolean = false;
 
   @StorageProp(颜色键.主色按钮背景) private 主色按钮背景: string = '#2F5FD0';
   @StorageProp(颜色键.主色按钮按下) private 主色按钮按下: string = '#1E4FB8';
 
   aboutToAppear(): void {
+    AppLog.info('BrowserEditor', '[BrowserPerf] form initializing');
     // 从父级传入的初始值拷贝到内部状态（仅初始化，后续编辑不影响 initialFieldValues）
     this.fieldValues = noteLinkEditorFields(this.initialFieldValues);
     this.linksBaseline = this.note;
     this.tags = this.initialTags;
     this.interfaceMounted = true;
     this.publishInterface();
-    this.loadLinkCount();
+    // 先挂载可编辑字段；快速切卡时不为已离开的笔记排队扫描关联。
+    this.linkCountTimer = setTimeout((): void => {
+      this.linkCountTimer = -1; this.loadLinkCount();
+    }, 1000);
   }
 
   aboutToDisappear(): void {
     this.tagsReveal.cancel(); this.properties.dispose(); this.keyboardSession.reset();
     this.disposed = true;
     this.linkCountGeneration++;
+    if (this.linkCountTimer >= 0) { clearTimeout(this.linkCountTimer); this.linkCountTimer = -1; }
     this.interfaceMounted = false;
     appInterface.leave('edit_note_form');
     appInterface.leave('note_audio_manage');
@@ -238,7 +250,10 @@ export struct 浏览编辑区 {
   }
 
   private async requestClose(): Promise<void> {
-    if (this.linkedPreviewIds.length > 0) { this.linkedPreviewBack?.(); return; }
+    if (this.linkedPreviewIds.length > 0) {
+      if (!this.linkedPreviewBack?.()) this.closeLinkedPreview();
+      return;
+    }
     if (this.propertyMode !== '') { if (this.propertyMode === 'templates' || this.propertyMode === 'links') this.propertyBack++; else if (!this.propertyBusy) this.propertyMode = ''; return; }
     if (this.preview !== null) return;
     if (this.busy || this.audioBusy || this.confirmingClose || this.propertyBusy || this.disposed) return;
@@ -312,8 +327,9 @@ export struct 浏览编辑区 {
     if (this.note === null || this.note.id <= 0 || this.disposed) return;
     const generation: number = ++this.linkCountGeneration;
     try {
-      const snapshot: NoteLinksSnapshot = await noteLinksService.load(this.note.id);
-      if (!this.disposed && generation === this.linkCountGeneration) this.updateLinkCount(snapshot);
+      const current = (): boolean => !this.disposed && generation === this.linkCountGeneration;
+      const count: number | null = await noteLinksService.count(this.note, current);
+      if (current() && count !== null) this.linkCount = count;
     } catch (_error) { if (!this.disposed && generation === this.linkCountGeneration) this.linkCount = -1; }
   }
   private updateLinkCount(snapshot: NoteLinksSnapshot): void {
@@ -322,7 +338,7 @@ export struct 浏览编辑区 {
   }
   private closeLinks(): void {
     if (this.disposed) return;
-    this.propertyMode = ''; this.onLinksVisibility(false);
+    this.linkGraphCenter = 0; this.propertyMode = ''; this.onLinksVisibility(false);
   }
   private updateLinkDraft(fields: string[]): void {
     if (this.disposed || this.note === null) return;
@@ -340,8 +356,9 @@ export struct 浏览编辑区 {
       return outgoing + Math.max(0, this.linkCount - old.targets.length);
     } catch (_error) { return Math.max(0, this.linkCount); }
   }
-  private openLinkedPreview(ids: number[]): void {
+  private openLinkedPreview(ids: number[], graphCenter: number = 0): void {
     if (this.disposed || this.propertyMode !== 'links' || ids.length === 0 || this.linkedPreviewIds.length > 0) return;
+    this.linkGraphCenter = graphCenter;
     this.linkedPreviewIds = ids.slice();
   }
   private closeLinkedPreview(): void {
@@ -467,7 +484,7 @@ Column() {
           }
           ForEach(this.fieldNames, (name: string, index: number) => {
             if (this.fieldVisible(index)) {
-            NoteFieldCard({ fieldName: name, fieldIndex: index, focusRequest: this.focusedField === index ? this.fieldFocusRequest : 0, originalStockKind: this.originalStockKind, value: this.fieldValues[index] ?? '',
+            NoteFieldCard({ deferInputUntilVisible: true, fieldName: name, fieldIndex: index, focusRequest: this.focusedField === index ? this.fieldFocusRequest : 0, originalStockKind: this.originalStockKind, value: this.fieldValues[index] ?? '',
               fieldConfig: this.fieldConfigs[index] ?? null, referenceSourceGuid: this.note?.guid ?? '',
               disabled: !this.interfaceEnabled('tags'),
               reverseToggle: index === this.optionalReverseFieldOrd, editing: true,
@@ -495,7 +512,7 @@ Column() {
           }, (name: string, index: number): string => `${index}-${name}`)
           EditorSectionCard() {
             Text(this.interfaceLabel('tags')).fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary')).width('100%')
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
             NoteTagsField({ text: this.tags, focusRequest: this.tagsFocusRequest, scroller: this.tagsReveal.scroller, isInteractive: this.interfaceEnabled('tags'),
               onChange: (value: string): void => { this.tags = value; } })
           }
@@ -508,7 +525,8 @@ Column() {
       }.width('100%').layoutWeight(1).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
         .align(Alignment.TopStart)
         .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
-          top: 应用尺寸.页面内容顶部间距(this.narrow) })
+          top: 应用尺寸.页面内容顶部间距(this.narrow), bottom: SeriesVisual.scrollShadowEndInset(this.pageMaterial, 0) })
+        .clipContent(this.pageMaterial === 'glass' ? ContentClipMode.BOUNDARY : ContentClipMode.CONTENT_ONLY)
       if (this.errorMessage !== '' || this.本地错误 !== '') {
         Text(this.errorMessage !== '' ? this.errorMessage : this.本地错误)
           .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text'))
@@ -520,7 +538,8 @@ Column() {
           isInteractive: this.interfaceEnabled('save'), onAction: (): void => { this.提交(); } })
       }.width('100%').flexShrink(0).padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
         top: 应用尺寸.操作区顶部间距(this.narrow),
-        bottom: 应用尺寸.操作区底部间距(this.narrow, this.navigationBarHeight) })
+        bottom: 应用尺寸.操作区底部间距(this.narrow, this.navigationBarHeight,
+          SeriesVisual.scrollShadowEndInset(this.pageMaterial, 0)) })
       }
     }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.pageSurface, this.pageMaterial, this.wallpaperPath))
       }
@@ -541,7 +560,8 @@ Column() {
       if (this.propertyMode === 'links' && this.note !== null && this.linkedPreviewIds.length === 0) {
         NoteLinksDraftPanel({ noteId: this.note.id, sourceGuid: this.note.guid, fields: this.fieldsWithLinks(), backRequest: this.propertyBack,
           onClose: (): void => { this.closeLinks(); }, onChange: (fields: string[]): void => { this.updateLinkDraft(fields); },
-          onPreview: (ids: number[]): void => { this.openLinkedPreview(ids); } })
+          initialGraphCenter: this.linkGraphCenter,
+          onPreview: (ids: number[], center?: number): void => { this.openLinkedPreview(ids, center ?? 0); } })
       }
       if (this.linkedPreviewIds.length > 0) {
         卡片预览页({ 卡片ID列表: this.linkedPreviewIds, 媒体目录: this.linkedMediaDirectory(), isDark: this.isDark, linksReadOnly: true,
@@ -549,6 +569,11 @@ Column() {
           onBackHandlerChange: (handler: (() => boolean) | null): void => { this.linkedPreviewBack = handler; } })
       }
     }.width('100%').height('100%')
+      .onAreaChange((_old: Area, area: Area): void => {
+        if (!this.firstLayoutSeen && Number(area.width) > 0 && Number(area.height) > 0) {
+          this.firstLayoutSeen = true; AppLog.info('BrowserEditor', '[BrowserPerf] form laid out');
+        }
+      })
       .onKeyPreIme((event: KeyEvent): boolean => this.handleEditorKey(event))
       .onKeyEvent((event: KeyEvent): void => { event.stopPropagation(); })
   }

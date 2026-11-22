@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 卡片状态分布：渲染 GraphsView.cardCounts（对齐 Anki CardCounts）。
 // Anki 为饼图 + 彩色表格；本项目按"不引 Canvas"决策用 100% 堆叠比例条替代饼图，
@@ -30,6 +31,7 @@ interface 卡片状态项 {
 
 @Component
 export struct 卡片状态分布 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('数据已变') 卡片计数: CardCounts | null = null;
   @Prop @Watch('数据已变') 分离暂停: boolean = false;
@@ -90,7 +92,7 @@ export struct 卡片状态分布 {
           })
         Text($r('app.string.stats_counts_separate_inactive'))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }
       .alignItems(VerticalAlign.Center)
       .width('100%')
@@ -102,7 +104,7 @@ export struct 卡片状态分布 {
       if (this.取数据() === null || this.取总数(this.取数据() as CardCountsBreakdown) === 0) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -120,7 +122,7 @@ export struct 卡片状态分布 {
           }
           .width('100%')
           .height(应用尺寸.进度条高度)
-          .borderRadius(应用尺寸.圆角_进度条)
+          .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_进度条))
           .clip(true)
 
           // 计数表：色块 + 标签 + 数量 + 百分比（Anki 表格列结构）
@@ -134,17 +136,17 @@ export struct 卡片状态分布 {
                   .backgroundColor(项.颜色)
                 Text(项.标签)
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_secondary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                   .layoutWeight(1)
                 Text(`${项.数值}`)
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_primary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                   .width(48)
                   .textAlign(TextAlign.End)
                 Text(`${this.取百分比(项.数值,
                   this.取总数(this.取数据() as CardCountsBreakdown))}%`)
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_tertiary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
                   .width(64)
                   .textAlign(TextAlign.End)
               }
@@ -157,16 +159,16 @@ export struct 卡片状态分布 {
               Text($r('app.string.stats_cards_total_label'))
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                 .layoutWeight(1)
               Text(`${this.取总数(this.取数据() as CardCountsBreakdown)}`)
                 .fontSize(应用尺寸.字号_正文_小)
                 .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             }
             .width('100%')
             .padding({ top: 应用尺寸.间距_4 })
-            .border(SurfaceBorder.options({ top: 0.5 }))
+            .border(SurfaceBorder.options({ top: 0.5 }, undefined, this.appearanceElements))
           }
           .width('100%')
         }

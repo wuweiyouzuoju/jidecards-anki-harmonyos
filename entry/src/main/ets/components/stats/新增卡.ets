@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 新增卡：渲染 GraphsResponse.added 为直方图（对齐 Anki AddedGraph）。
 // 蓝色渐变柱（最近深蓝 → 最旧浅蓝，Blues t∈[0.3,0.7]）；
@@ -14,6 +15,7 @@ import { 纵轴刻度, 横轴日期条, 纵轴宽 } from './图表轴';
 
 @Component
 export struct 新增卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('更新缓存') 新增数据: Added | null = null;
   @Prop 是否显示全部: boolean = false;
   @Prop @Watch('更新缓存') 范围索引: number = 0;
@@ -117,7 +119,7 @@ export struct 新增卡 {
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -163,21 +165,21 @@ export struct 新增卡 {
           Row() {
             Text($r('app.string.stats_total_label'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Blank()
             Text($r('app.string.stats_forecast_total', this.取总计()))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
           .width('100%')
           Row() {
             Text($r('app.string.stats_average_label'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Blank()
             Text($r('app.string.stats_forecast_average', `${Math.round(this.取总计() / this.取期间天数())}`))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
           .width('100%')
         }

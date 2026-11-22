@@ -11,6 +11,8 @@ import { SelectStyle } from '../../utils/SelectStyle';
 export struct 范围切换条 {
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @Prop label: ResourceStr = '';
+  @Prop isInteractive: boolean = true;
   @Prop 当前索引: number = 0;
   @Prop 标签集: Resource[] = [];
   @Prop surfaceColor: ResourceColor = $r('app.color.surface_sidebar');
@@ -24,7 +26,7 @@ export struct 范围切换条 {
   }
 
   build() {
-    SurfaceSelect({ options: this.options(),
+    SurfaceSelect({ options: this.options(), label: this.label, isInteractive: this.isInteractive,
       selectedIndex: this.当前索引,
       value: this.options()[this.当前索引]?.value ?? '',
       onSelect: (index: number): void => { this.onRangeChange(index); } })

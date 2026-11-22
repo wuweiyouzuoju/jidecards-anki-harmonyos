@@ -7,12 +7,14 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 搜索框 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private searchMaterial: string = 'flat';
   @StorageProp('themeMode') private searchTheme: string = 'system';
   @StorageProp('systemDarkMode') private searchSystemDark: boolean = false;
   @Prop @Watch('同步搜索文本') 搜索文本: string;
   onSearch: (text: string) => void = (text: string): void => {};
   onFocusChange: (focused: boolean) => void = (_focused: boolean): void => {};
+  onInteraction: () => void = (): void => {};
 
   // 本地输入态：TextInput 受控值。用户输入写入本地态，提交时随 onSearch 回传父组件。
   // 父组件外部更新 搜索文本 时通过 @Watch 同步到本地态（如清空搜索串）。
@@ -36,11 +38,13 @@ export struct 搜索框 {
         .id('browser-search-input')
         .onFocus((): void => { this.onFocusChange(true); })
         .onBlur((): void => { this.onFocusChange(false); })
+        .onClick((): void => { this.onInteraction(); })
         .layoutWeight(1)
         .height(应用尺寸.searchFieldHeight)
         .fontSize(应用尺寸.字号_正文)
-        .attributeModifier(new SearchFieldSurface(this.searchMaterial, SeriesVisual.isDark(this.searchTheme, this.searchSystemDark), 应用尺寸.searchFieldRadius))
+        .attributeModifier(new SearchFieldSurface(this.searchMaterial, SeriesVisual.isDark(this.searchTheme, this.searchSystemDark), 应用尺寸.searchFieldRadius, undefined, this.appearanceElements))
       .onChange((value: string): void => {
+          if (value !== this.当前输入) this.onInteraction();
           this.当前输入 = value;
         })
         .onSubmit((): void => {

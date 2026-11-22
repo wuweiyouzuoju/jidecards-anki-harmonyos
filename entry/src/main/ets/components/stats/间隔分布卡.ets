@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 间隔分布卡：渲染 GraphsView.intervals 为蓝色渐变直方图（对齐 Anki IntervalsGraph）。
 // 色带 Blues t∈[0.3,0.7]：短间隔浅蓝 → 长间隔深蓝；范围切换 1个月/50%/95%/全部（默认 95%）。
@@ -14,6 +15,7 @@ import { 纵轴刻度, 纵轴宽 } from './图表轴';
 
 @Component
 export struct 间隔分布卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('更新缓存') 间隔数据: Intervals | null = null;
   @Prop 是否显示全部: boolean = true;
   @Prop @Watch('更新缓存') 范围索引: number = 2;
@@ -100,7 +102,7 @@ export struct 间隔分布卡 {
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -135,12 +137,12 @@ export struct 间隔分布卡 {
         Row() {
           Text('0')
             .fontSize(应用尺寸.字号_说明_小)
-            .fontColor($r('app.color.text_tertiary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
             .layoutWeight(1)
             .textAlign(TextAlign.Start)
           Text(`${this.显示上限}`)
             .fontSize(应用尺寸.字号_说明_小)
-            .fontColor($r('app.color.text_tertiary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
             .layoutWeight(1)
             .textAlign(TextAlign.End)
         }
@@ -151,11 +153,11 @@ export struct 间隔分布卡 {
         Row() {
           Text($r('app.string.stats_interval_median'))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           Blank()
           Text($r('app.string.stats_interval_median_days', this.取中位间隔()))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         }
         .width('100%')
       }

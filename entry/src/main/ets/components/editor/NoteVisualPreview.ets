@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { common } from '@kit.AbilityKit';
 import { prepareNoteVideoPreview, releaseNoteVideoPreview, NoteVideoPreviewFile } from '../../backend/NoteVisualImport';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
@@ -9,6 +10,7 @@ import { NoteImagePreview } from '../common/NoteImagePreview';
 /** 选择器与主字段共用；视频只由用户播放，缓存与播放器随组件退出释放。 */
 @Component
 export struct NoteVisualPreview {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('load') source: string = '';
   @Prop @Watch('load') kind: string = 'image';
   @Prop @Watch('pauseIfBlocked') disabled: boolean = false;
@@ -55,7 +57,7 @@ export struct NoteVisualPreview {
             .fontColor($r('app.color.error_text')).padding(应用尺寸.卡片内边距)
         } else if (this.videoSource === '') {
           LoadingProgress().width(应用尺寸.按钮高度).height(应用尺寸.按钮高度)
-            .color($r('app.color.text_secondary'))
+            .color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         } else {
           Video({ src: this.videoSource, controller: this.video }).width('100%').height(应用尺寸.noteMediaPreviewHeight)
             .objectFit(ImageFit.Contain).controls(true).autoPlay(false).enabled(!this.disabled && this.foreground)
@@ -63,7 +65,7 @@ export struct NoteVisualPreview {
             .onStart((): void => { this.pauseIfBlocked(); })
             .onError((): void => { this.failed = true; this.pause(); })
         }
-      }.width('100%').attributeModifier(new ImageSurfaceStyle())
+      }.width('100%').attributeModifier(new ImageSurfaceStyle( this.appearanceElements))
     }
   }
 }

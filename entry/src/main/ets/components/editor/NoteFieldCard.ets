@@ -1,7 +1,8 @@
-import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
-import { themeSolidTextColor } from '../../model/色阶生成';
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceElementRadius, appearanceElementColor, appearanceModuleBorder, appearanceModuleRadius } from '../../utils/AppearanceElements';
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { IconActionButton } from '../common/IconActionButton';
@@ -10,6 +11,7 @@ import { noteFieldText } from '../../utils/NoteTypeText';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { NoteAudioField } from '../common/NoteAudioField';
 import { NoteFieldEditor, NoteFieldEditingOptions, NoteReferenceDialogRequest, noteFieldMediaTool } from '../common/NoteFieldEditor';
+import { NoteFieldModeButton } from '../common/NoteFieldModeButton';
 import { NoteReferencePicker } from '../links/NoteReferencePicker';
 import { noteReferenceUrl } from '../../model/NoteReferences';
 import { NoteVisualPreview } from './NoteVisualPreview';
@@ -19,7 +21,7 @@ import { NoteMediaPart, noteMediaParts, noteFieldDisplayParts, canShowNoteFieldV
 import { NoteFieldAudio, NoteAudioStatus } from '../../model/NoteAudioDraft';
 import { NoteAudioPreview } from '../../utils/NoteAudioPreview';
 import { SettingsToggleRow } from '../common/SettingsToggleRow';
-import { NOTE_FIELD_STICKY_CONTROL, noteFieldModeTool } from '../../model/NoteFieldEditing';
+import { NOTE_FIELD_STICKY_CONTROL, noteFieldModeTitleKey } from '../../model/NoteFieldEditing';
 import { NoteFieldImage } from '../../model/NoteImageDraft';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { DisclosureChevron } from '../common/DisclosureChevron';
@@ -30,8 +32,15 @@ import { 颜色键 } from '../../model/颜色主题';
 /** 字段标题、图像入口、输入区和附件的唯一布局；图片和视频共用原图标。 */
 @Component
 export struct NoteFieldCard {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
+  @Prop deferInputUntilVisible: boolean = false;
+  @State private inputActive: boolean = false;
+  private inputVisible(visible: boolean): void {
+    if (visible && this.deferInputUntilVisible && !this.inputActive && !this.disposed) this.inputActive = true;
+  }
+  private shouldRenderInput(): boolean { return !this.deferInputUntilVisible || this.inputActive; }
   @Prop fieldName: string = '';
   @Prop @Watch('loadFieldConfig') fieldConfig: NoteFieldEditingOptions | null = null;
   @State private collapsed: boolean = false;
@@ -62,7 +71,17 @@ export struct NoteFieldCard {
     } else this.requestedSourceMode = true;
     this.modeRequest++;
   }
-  private displayParts(): NoteMediaPart[] { return noteFieldDisplayParts(this.value, this.fullSource); }
+  private displayPartsValue: string | null = null;
+  private displayPartsSource: boolean = false;
+  private displayPartsCache: NoteMediaPart[] = [];
+  private displayParts(): NoteMediaPart[] {
+    // 同一轮布局多处读取媒体段，不能每个子控件都重新扫描完整字段HTML。
+    if (this.displayPartsValue !== this.value || this.displayPartsSource !== this.fullSource) {
+      this.displayPartsCache = noteFieldDisplayParts(this.value, this.fullSource);
+      this.displayPartsValue = this.value; this.displayPartsSource = this.fullSource;
+    }
+    return this.displayPartsCache;
+  }
   private partStartsInSource(index: number): boolean {
     return this.fullSource || this.requestedSourceMode || !canShowNoteFieldVisually(this.part(index)?.text ?? '');
   }
@@ -79,7 +98,7 @@ export struct NoteFieldCard {
   @Prop fieldIndex: number = 0;
   @Prop referenceSourceGuid: string = '';
   @Prop @Watch('focusRequested') focusRequest: number = 0;
-  private focusRequested(): void { if (this.focusRequest > 0 && !this.disabled) this.collapsed = false; }
+  private focusRequested(): void { if (this.focusRequest > 0 && !this.disabled) { this.collapsed = false; this.inputActive = true; } }
   private firstTextPart(): number { return this.displayParts().findIndex((part: NoteMediaPart): boolean => part.kind === 'text'); }
   @Prop audios: NoteFieldAudio[] = [];
   audioPreview: NoteAudioPreview = new NoteAudioPreview();
@@ -151,10 +170,10 @@ export struct NoteFieldCard {
     const presentation: NativeDialogPresentation = this.mediaDialog.presentation();
     const version: number = this.managerVersion;
     return new CustomDialogController({
-      builder: NoteMediaDialog({ kind: kind, fieldIndex: this.fieldIndex, initialValue: this.value,
+      builder: NoteMediaDialog({ kind: kind === 'drawing' ? 'image' : kind, startDrawing: kind === 'drawing', directPick: kind === 'image', fieldIndex: this.fieldIndex, initialValue: this.value,
         initialImages: this.images, initialAudios: this.audios, preview: this.audioPreview,
         onRequestClose: this.mediaDialog.guard((): void => { this.mediaDialog.close(); }),
-        onAudioStatus: (status: NoteAudioStatus): void => { if (this.isCurrentManager(version)) this.onAudioStatus(status); },
+        onAudioStatus: (status: NoteAudioStatus | null): void => { if (this.isCurrentManager(version)) this.onAudioStatus(status); },
         onReady: (dismiss: () => void): void => { if (this.isCurrentManager(version)) this.dismissManager = dismiss; },
         onApply: (value: string, images: NoteFieldImage[], audios: NoteFieldAudio[]): void => {
           if (this.isCurrentManager(version)) this.onMediaApply(value, images, audios);
@@ -224,8 +243,8 @@ export struct NoteFieldCard {
         kind: index >= 0 ? (this.part(index)?.kind ?? 'image') :
           (this.images.find((item: NoteFieldImage): boolean => item.id === id)?.kind ?? 'image'), disabled: this.disabled })
       Button($r('app.string.note_visual_remove')).height(应用尺寸.紧凑控件高度)
-        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-        .backgroundColor(insetMaterialFill($r('app.color.surface_card'))).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+        .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
+        .backgroundColor(insetMaterialFill($r('app.color.surface_card'))).border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         .margin(应用尺寸.间距_5).enabled(!this.disabled)
         .attributeModifier(new PressFeedback()).stateEffect(false)
         .onClick((): void => { this.removeImage(index, id); })
@@ -238,7 +257,7 @@ export struct NoteFieldCard {
       IconActionButton({ source: $r('app.media.' + (this.sticky ?
           NOTE_FIELD_STICKY_CONTROL.selectedIconKey : NOTE_FIELD_STICKY_CONTROL.iconKey)),
         label: $r('app.string.' + NOTE_FIELD_STICKY_CONTROL.titleKey),
-        glyphColor: this.accent, iconFill: this.sticky ? this.accent : Color.Transparent,
+        glyphColor: this.accent, iconFill: this.sticky ? this.accent : Color.Transparent, preserveIconFill: this.sticky,
         controlSize: 应用尺寸.按钮高度, controlGlyphSize: 20, isInteractive: !this.disabled && this.stickyInteractive,
         onAction: (): void => { this.toggleSticky(); } })
         .opacity(this.sticky ? 1 : 0.75)
@@ -248,8 +267,18 @@ export struct NoteFieldCard {
     }
   }
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
+      if (!this.shouldRenderInput() && !this.reverseToggle) {
+        Text(noteFieldText(this.getUIContext(), this.fieldName, this.originalStockKind)).fontSize(应用尺寸.字号_按钮).fontWeight(FontWeight.Medium)
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
+        if (!this.collapsed) { Column().width('100%').height(112) }
+      } else {
       if (this.reverseToggle) {
         Row({ space: 应用尺寸.间距_8 }) {
         SettingsToggleRow({ title: $r('app.string.note_reverse_toggle'),
@@ -261,7 +290,7 @@ export struct NoteFieldCard {
       } else {
         Row() {
           Text(noteFieldText(this.getUIContext(), this.fieldName, this.originalStockKind)).fontSize(应用尺寸.字号_按钮).fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary')).flexShrink(1)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).flexShrink(1)
           if (this.fieldConfig?.collapsed === true) {
             Button() {
               DisclosureChevron({ tint: this.accent }).rotate({ angle: this.collapsed ? 0 : 90 })
@@ -277,19 +306,19 @@ export struct NoteFieldCard {
               label: $r('app.string.' + noteFieldMediaTool('image').titleKey),
               glyphColor: this.accent, controlGlyphSize: 24, isInteractive: !this.disabled,
               onAction: (): void => { this.openManager('image'); } })
+            IconActionButton({ source: $r('app.media.' + noteFieldMediaTool('drawing').iconKey),
+              label: $r('app.string.' + noteFieldMediaTool('drawing').titleKey),
+              glyphColor: this.accent, controlGlyphSize: 24, isInteractive: !this.disabled,
+              onAction: (): void => { this.openManager('drawing'); } })
             IconActionButton({ source: $r('app.media.' + noteFieldMediaTool('audio').iconKey),
               label: $r('app.string.' + noteFieldMediaTool('audio').titleKey),
               glyphColor: this.accent, controlGlyphSize: 24, isInteractive: !this.disabled,
               onAction: (): void => { this.openManager('audio'); } })
           }
           if (!this.collapsed) {
-            Button($r('app.string.' + noteFieldModeTool(this.fullSource || this.modeSources.length > 0 ? 'source_edit' : 'visual').titleKey))
-              .id('note-field-mode-' + this.fieldIndex)
-              .fontSize(应用尺寸.字号_正文_小).fontColor(themeSolidTextColor(this.accent))
-              .height(32).padding({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8 })
-              .backgroundColor(this.accent).borderRadius(9).flexShrink(0)
-              .enabled(!this.disabled).attributeModifier(new PressFeedback()).stateEffect(false)
-              .onClick((): void => { this.toggleMode(); })
+            NoteFieldModeButton({ label: $r('app.string.' + noteFieldModeTitleKey(this.fullSource || this.modeSources.length > 0)), accent: this.accent,
+              controlId: 'note-field-mode-' + this.fieldIndex, isInteractive: !this.disabled,
+              onToggle: (): void => { this.toggleMode(); } })
           }
         }.width('100%')
         if (!this.collapsed) {
@@ -298,7 +327,7 @@ export struct NoteFieldCard {
               this.imagePreview(index)
             } else if (this.part(index)?.kind === 'text' &&
               (this.part(index)?.text !== '' || index === 0 || index === this.displayParts().length - 1)) {
-              NoteFieldEditor({ value: this.part(index)?.text ?? '',
+              NoteFieldEditor({ deferWheelUntilInputReady: this.deferInputUntilVisible, value: this.part(index)?.text ?? '',
                 modeControlInHeader: true, initialSourceMode: this.partStartsInSource(index), requestedSourceMode: this.requestedSourceMode, modeRequest: this.modeRequest,
                 modeRequestFocus: index === this.firstTextPart(),
                 onModeChanged: (source: boolean): void => { this.recordMode(index, source); },
@@ -321,8 +350,13 @@ export struct NoteFieldCard {
           }
         }
       }
+      }
     }.width('100%').padding(应用尺寸.卡片内边距)
-      .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
-      .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.isDark, this.accent, this.pageTint, undefined, this.moduleOpacity))
+      .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
+      .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.isDark, this.accent, this.pageTint, undefined, this.moduleOpacity, this.appearanceElements))
+      .background(this.renderGlassBackground(SeriesVisual.surfaceFor(this.surfaceMaterial, this.isDark, this.accent, this.pageTint, undefined, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
+      .onVisibleAreaChange([0], (visible: boolean, _ratio: number): void => { this.inputVisible(visible); })
   }
 }

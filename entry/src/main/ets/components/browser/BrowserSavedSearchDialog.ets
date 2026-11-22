@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DialogFrame } from '../common/DialogFrame';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DialogHeader } from '../common/DialogHeader';
@@ -7,6 +8,7 @@ import { localizedResourceText } from '../../utils/UiFeedback';
 
 @Component
 export struct BrowserSavedSearchDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop busy: boolean = false;
@@ -36,9 +38,9 @@ export struct BrowserSavedSearchDialog {
   @Builder
   private dialogContent() {
     Text(this.initialSearch).fontSize(应用尺寸.字号_正文_小)
-      .fontColor($r('app.color.text_secondary')).width('100%').maxLines(2);
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%').maxLines(2);
     TextInput({ text: this.name, placeholder: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.browser_saved_search_name_placeholder')) })
-      .border(SurfaceBorder.options())
+      .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
       .fontSize(应用尺寸.字号_正文).height(应用尺寸.按钮高度).width('100%')
       .enabled(!this.busy).onChange((value: string): void => { this.name = value; });
     if (this.error !== '') Text(this.error).fontSize(应用尺寸.字号_正文_小)

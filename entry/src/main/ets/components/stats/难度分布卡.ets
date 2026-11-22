@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // 难度分布卡：渲染 eases（SM-2 难度系数）或 difficulty（FSRS 难度）为直方图
 // （对齐 Anki EaseGraph / DifficultyGraph）。
@@ -24,6 +25,7 @@ interface 难度柱 {
 
 @Component
 export struct 难度分布卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('更新缓存') 难度数据: Eases | null = null;
   @Prop @Watch('更新缓存') FSRS难度: Eases | null = null;
@@ -151,7 +153,7 @@ export struct 难度分布卡 {
       if (this.数据为空()) {
         Text($r('app.string.stats_empty_section'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .textAlign(TextAlign.Center)
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
@@ -187,12 +189,12 @@ export struct 难度分布卡 {
           Row() {
             Text(`${this.域下限}%`)
               .fontSize(应用尺寸.字号_说明_小)
-              .fontColor($r('app.color.text_tertiary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               .layoutWeight(1)
               .textAlign(TextAlign.Start)
             Text(`${this.域上限}%`)
               .fontSize(应用尺寸.字号_说明_小)
-              .fontColor($r('app.color.text_tertiary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               .layoutWeight(1)
               .textAlign(TextAlign.End)
           }
@@ -205,12 +207,12 @@ export struct 难度分布卡 {
               Text(this.是否FSRS && this.FSRS难度 !== null
                 ? $r('app.string.stats_ease_average_label') : $r('app.string.stats_ease_average_sm2_label'))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               Blank()
               // % 放入参数而非资源模式，避免资源格式化歧义出现双 %%
               Text($r('app.string.stats_ease_average', localePercent((this.取数据() as Eases).average / 100, this.uiLanguage)))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_primary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             }
             .width('100%')
           }
