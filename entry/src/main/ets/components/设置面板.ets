@@ -1,11 +1,17 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { LeaderboardSettings } from './settings/LeaderboardSettings';
+import { ExternalMcpSettings } from './settings/ExternalMcpSettings';
+import { isExternalMcpDevice } from '../backend/external-agent/ExternalMcpService';
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { compactLandscapeScale } from '../model/AppLayoutState';
+import { appearanceElementColor, appearanceModuleRadius, appearanceModuleBorder } from '../utils/AppearanceElements';
 import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY, moduleOpacityPercent } from '../model/SurfaceMaterial';
 import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
 import { EditorSettings } from './settings/EditorSettings';
 import { GlassSource } from './common/GlassSource';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { LiveSearchField } from './common/LiveSearchField';
-import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
+import { WINDOW_SAFE_TOP_KEY, WINDOW_SIZE_KEY, WindowSizeVp } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { SeriesVisual } from '../utils/SeriesVisual';
 import { SettingsActionRow } from './common/SettingsActionRow';
@@ -13,13 +19,13 @@ import { settingsIcon } from '../utils/SettingsIcons';
 import { showToastSafely, resourceText, namedResourceText } from '../utils/UiFeedback';
 import { SettingsGroup, visibleSettingsGroups } from '../model/SettingsStructure';
 import { appInterface } from '../backend/AppInterfaceService';
-import { settingsHeaderControls, settingsHeaderItems } from '../model/AppInterface';
+import { AppInterfaceItem, settingsHeaderControls, settingsHeaderItems } from '../model/AppInterface';
 import { interfaceControlIcon, interfaceControlText } from '../utils/AppInterfaceText';
 import { IconActionButton } from './common/IconActionButton';
 import { SettingsEntry, filterSettingsEntries, SETTINGS_ENTRIES } from '../model/SettingsNavigation';
 import { syncActivity } from '../model/SyncSettings';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
-import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
+import { isWideLandscapeWindow, PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 
 import { common } from '@kit.AbilityKit';
 import { 主题模式 } from '../model/主题设置';
@@ -31,6 +37,7 @@ import { 设置面板色板_取 } from '../utils/设置面板配色';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
 import { RedemptionPanel } from './settings/RedemptionPanel';
 import { AboutSettings } from './settings/AboutSettings';
+import { HuaweiAccountSettings } from './settings/HuaweiAccountSettings';
 import { GeneralSettings } from './settings/GeneralSettings';
 import { ReviewControlsSettings } from './settings/ReviewControlsSettings';
 import { ReviewPreferencesSettings } from './settings/ReviewPreferencesSettings';
@@ -40,6 +47,7 @@ import { 布局分组 } from './settings/布局分组';
 import { 数据分组 } from './settings/数据分组';
 import { 模式切换菜单 } from './settings/模式切换菜单';
 import { 同步分组 } from './settings/同步分组';
+import { HuaweiCloudSettings } from './settings/HuaweiCloudSettings';
 import { DeviceLinkSettings } from './settings/DeviceLinkSettings';
 import { 术语分组 } from './settings/术语分组';
 import { 媒体管理面板 } from './settings/媒体管理面板';
@@ -48,15 +56,17 @@ import { 空卡列表面板 } from './settings/空卡列表面板';
 import { 查找重复对话框 } from './settings/查找重复对话框';
 import { 笔记类型管理面板 } from './settings/笔记类型管理面板';
 import { 笔记类型编辑器 } from './settings/笔记类型编辑器';
+import { 开发者调试分组 } from './settings/开发者调试分组';
 import { AIAgent设置分组 } from './settings/AIAgent设置分组';
 import { 设置分组卡片 } from './settings/设置分组卡片';
-import { 简洁模式AppStorage键, 加载简洁模式, 保存简洁模式 } from '../model/简洁模式存储';
+import { 简洁模式AppStorage键, 保存简洁模式 } from '../model/简洁模式存储';
 import { 字段帮助面板 } from './字段帮助面板';
 import { KeyboardShortcutHelp } from './KeyboardShortcutHelp';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 按下态按钮 } from './common/按下态按钮';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
+import { AppLog } from '../model/AppLog';
 
 // ========================================================
 // @块ID UI-SETTINGS-PANEL-001
@@ -82,6 +92,7 @@ import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 // ========================================================
 @Component
 export struct 设置面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') @Watch('publishInterface') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) @Watch('publishInterface') private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
@@ -94,7 +105,10 @@ export struct 设置面板 {
   @State private mediaBackRequest: number = 0;
   @State private backupBackRequest: number = 0;
 
+  @State private accountExternalUiActive: boolean = false;
+
   private handleBackRequest(): void {
+    if (this.accountExternalUiActive) return;
     if (this.keyboardHelpOpen) { this.keyboardHelpOpen = false; return; }
     if (this.显示笔记类型编辑器) { this.notetypeEditorBackRequest++; return; }
     if (this.显示笔记类型管理) { this.notetypeManagerBackRequest++; return; }
@@ -184,7 +198,7 @@ export struct 设置面板 {
   @State private 编辑笔记类型ID: number = 0;
   @State private 编辑笔记类型名: string = '';
   // 简洁模式：默认 true，隐藏调度分组/术语分组等高级功能
-  @StorageLink(简洁模式AppStorage键) @Watch('publishInterface') private 简洁模式: boolean = true;
+  @StorageLink(简洁模式AppStorage键) @Watch('interfaceModeChanged') private 简洁模式: boolean = true;
   // 输入开发者密钥后即时显示隐藏的 Agent 设置与各页面入口。
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) private Agent入口已启用: boolean = false;
   // 内容 List 滚动器：openAiSettings 跳转进来时无动画直接定位到 AI 智能体分组
@@ -195,23 +209,21 @@ export struct 设置面板 {
   private readonly 集合服务实例: 集合服务 = new 集合服务();
   private readonly 标签服务实例: 标签服务 = new 标签服务();
 
-  async aboutToAppear(): Promise<void> {
+  aboutToAppear(): void {
     this.publishInterface();
     this.disposed = false;
     const lifecycleVersion: number = ++this.lifecycleVersion;
     this.maintenanceSession.attach((state: CollectionMaintenanceState): void => { this.maintenance = state; });
     if (this.openAiSettings) { this.openSection('ai'); }
-    // 加载持久化的简洁模式值到 AppStorage，让 @StorageLink 跨重启保持一致
-    const 持久化值: boolean = await 加载简洁模式();
-    if (this.disposed || lifecycleVersion !== this.lifecycleVersion) return;
-    AppStorage.setOrCreate<boolean>(简洁模式AppStorage键, 持久化值);
+    // EntryAbility 已在创建页面前恢复模式；直接使用实时 StorageLink，
+    // 不重复读取磁盘，也不让迟到的持久化值覆盖用户刚切换的模式。
     // 学习控制偏好由 ReviewControlsSettings 自行恢复，并展示读取失败。
     // 未配置 AI 从制卡/改卡跳转进来：悬浮 Toast 提示 + 直接定位到 AI 智能体分组
     if (this.openAiSettings) {
       showToastSafely(this.getUIContext(), {
         message: this.取本地化文本($r('app.string.ai_agent_config_required'))
       });
-      // 等简洁模式恢复与内容 List 首帧布局完成后无动画定位；转场动画内完成，打开即在分组处
+      // 等内容 List 首帧布局完成后无动画定位。
       setTimeout((): void => {
         if (!this.disposed && lifecycleVersion === this.lifecycleVersion) {
           this.内容滚动器.scrollToIndex(0);
@@ -254,13 +266,65 @@ export struct 设置面板 {
     return namedResourceText(this.getUIContext(), key);
   }
 
+  @StorageProp(WINDOW_SIZE_KEY) @Watch('publishInterface') private windowSize: WindowSizeVp = { width: 0, height: 0 };
+
+  private toolbarTop(): number {
+    return 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop) -
+      应用尺寸.页面分组间距(this.narrowDeckLayout) * (1 - this.densityScale());
+  }
+  private toolbarHeight(): number {
+    return this.toolbarTop() + 应用尺寸.按钮高度 * this.densityScale();
+  }
+
+  private densityScale(): number {
+    return compactLandscapeScale(this.windowSize.width, this.windowSize.height);
+  }
+
+  private directoryScale(): number {
+    const rows: number = Math.ceil(this.directoryEntries().length / 2);
+    const available: number = this.windowSize.height -
+      this.toolbarHeight() -
+      应用尺寸.按钮高度 * this.densityScale() - 2 * this.settingsModuleGap() -
+      this.settingsEndInset();
+    if (!this.wideSettings() || rows === 0 || available <= 0) return 1;
+    // 短横屏允许更紧凑的目录行。达到下限后继续滚动。
+    const scale: number = this.densityScale();
+    return Math.max(0.82 * scale, Math.min(scale, available / (rows * 88 + (rows - 1) * 应用尺寸.页面内边距_水平)));
+  }
+  private settingsEndInset(): number {
+    return SeriesVisual.scrollShadowEndInset(this.surfaceMaterial,
+      应用尺寸.页面底部间距(this.narrowDeckLayout)) + this.导航条高度;
+  }
+
+  private directoryGap(): number {
+    return 应用尺寸.页面内边距_水平 * this.directoryScale();
+  }
+  private wideSettings(): boolean {
+    return isWideLandscapeWindow(this.windowSize.width, this.windowSize.height);
+  }
+  private settingsContentInset(): number {
+    return 应用尺寸.页面内边距_水平 * this.densityScale();
+  }
+  private settingsModuleGap(): number {
+    return (this.wideSettings() ? 应用尺寸.页面内边距_水平 : 应用尺寸.页面分组间距(this.narrowDeckLayout)) * this.densityScale();
+  }
+
+  private directoryQueryKey: string = '';
+  private directoryQueryEntries: SettingsEntry[] = [];
+
   private directoryEntries(): SettingsEntry[] {
-    return filterSettingsEntries(this.settingsQuery, this.简洁模式, this.Agent入口已启用,
-      (key: string): string => this.sectionText(key));
+    // 同一查询在行高、间距与目录渲染间复用；语言、模式或权限改变后重新匹配。
+    const key: string = JSON.stringify([this.settingsQuery, this.简洁模式, this.Agent入口已启用, this.uiLanguage]);
+    if (key !== this.directoryQueryKey) {
+      this.directoryQueryEntries = filterSettingsEntries(this.settingsQuery, this.简洁模式, this.Agent入口已启用,
+        (resourceKey: string): string => this.sectionText(resourceKey));
+      this.directoryQueryKey = key;
+    }
+    return this.directoryQueryEntries;
   }
 
   private sectionGroups(): SettingsGroup[] {
-    return visibleSettingsGroups(this.activeSection, this.简洁模式, this.Agent入口已启用);
+    return visibleSettingsGroups(this.activeSection, this.简洁模式, this.Agent入口已启用, isExternalMcpDevice());
   }
 
   private publishInterface(): void {
@@ -270,7 +334,7 @@ export struct 设置面板 {
       values: this.activeSection === 'appearance' ? [
         { id: 'surface_material', value: this.surfaceMaterial },
         { id: 'module_opacity', value: String(moduleOpacityPercent(this.moduleOpacity, this.surfaceMaterial, this.是否深色)) }
-      ] : [] });
+      ] : [{ id: 'directory_columns', value: this.wideSettings() ? '2' : '1' }] });
   }
 
   private sectionChanged(): void {
@@ -282,6 +346,25 @@ export struct 设置面板 {
     this.publishInterface();
   }
 
+  private changeInterfaceMode(simple: boolean): void {
+    if (simple === this.简洁模式) return;
+    保存简洁模式(simple).catch((): void => {
+      if (!this.disposed) showToastSafely(this.getUIContext(), { message: $r('app.string.settings_local_save_failed') });
+    });
+  }
+
+  private interfaceModeChanged(): void {
+    // UI 与 JIDE 的模式修改都由已保存的 StorageLink 驱动，模式刷新不播放分区导航动画。
+    this.animateSection = false;
+    this.previousSection = '';
+    this.activeSection = '';
+    this.publishInterface();
+  }
+
+  private sectionContentKey(): string {
+    // ForEach 不会重建相同 key 的闭包；模式/语言改变必须丢弃旧目录和分组快照。
+    return JSON.stringify([this.activeSection, this.简洁模式, this.uiLanguage]);
+  }
   private pageTitle(): string {
     const entry: SettingsEntry | undefined = SETTINGS_ENTRIES.find((item: SettingsEntry): boolean =>
       item.id === this.activeSection);
@@ -294,6 +377,7 @@ export struct 设置面板 {
   }
 
   private onSettingsSearchChange(value: string): void {
+    if (value === this.settingsQuery) return;
     this.settingsQuery = value;
     // 全局搜索框在详情页也保持可见；开始新的搜索时回到目录展示结果。
     if (value.trim() !== '' && this.activeSection !== '') {
@@ -309,8 +393,40 @@ export struct 设置面板 {
   }
 
   @Builder
+  private directoryCard(entry: SettingsEntry) {
+    SettingsActionRow({ title: this.sectionText(entry.titleKey), icon: settingsIcon(entry.id), spacious: true, densityScale: this.directoryScale(),
+      hint: this.sectionText(this.简洁模式 ? (entry.simpleDescriptionKey ?? entry.descriptionKey) : entry.descriptionKey),
+      onAction: (): void => { this.openSection(entry.id); } })
+      .padding({ left: 16 * this.directoryScale(), right: 16 * this.directoryScale() })
+      .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.动作主色链接, this.页面底色微染值, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements))
+      .background(this.renderGlassBackground(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.动作主色链接, this.页面底色微染值, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
+  }
+
+  @Builder
+  private wideDirectoryRows(entries: SettingsEntry[]) {
+    // 目录条目有限，普通行由外层 List 滚动，避免内层 Grid 截断外沿投影。
+    Column({ space: this.directoryGap() }) {
+      ForEach(entries, (entry: SettingsEntry, index: number) => {
+        if (index % 2 === 0) {
+          Row({ space: this.directoryGap() }) {
+            Column() { this.directoryCard(entry) }.layoutWeight(1)
+            Column() {
+              if (index + 1 < entries.length) this.directoryCard(entries[index + 1])
+            }.layoutWeight(1)
+          }.width('100%').height(88 * this.directoryScale())
+        }
+      }, (entry: SettingsEntry, index: number): string => entry.id + ':' + index)
+    }.width('100%')
+  }
+
+  @Builder
   private settingsDirectory() {
     Column() {
+      if (this.wideSettings() && this.directoryEntries().length > 0) {
+        this.wideDirectoryRows(this.directoryEntries())
+      } else {
       Column() {
         ForEach(this.directoryEntries(), (entry: SettingsEntry, index: number) => {
           Column() {
@@ -326,10 +442,14 @@ export struct 设置面板 {
         }, (entry: SettingsEntry): string => entry.id)
         if (this.directoryEntries().length === 0) {
           Text($r('app.string.settings_search_empty')).fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_secondary')).padding(20)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).padding(20)
         }
       }.width('100%')
-        .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.动作主色链接, this.页面底色微染值, 应用尺寸.圆角_卡片, this.moduleOpacity)).clip(true)
+        .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.动作主色链接, this.页面底色微染值, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements))
+        .background(this.renderGlassBackground(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.动作主色链接, this.页面底色微染值, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
+      }
     }.width('100%')
   }
 
@@ -414,7 +534,7 @@ export struct 设置面板 {
       }
     } catch (错误) {
       if (this.disposed || lifecycleVersion !== this.lifecycleVersion) return;
-      console.info(`SettingsPanel: 清除未用标签失败 错误=${错误}`);
+      AppLog.info('SettingsPanel', `SettingsPanel: 清除未用标签失败 错误=${错误}`);
       showToastSafely(this.getUIContext(), {
         message: this.取本地化文本($r('app.string.settings_clear_unused_tags_error'))
       });
@@ -449,6 +569,11 @@ export struct 设置面板 {
   // 无（构建器只负责渲染；副作用由用户交互触发对应回调）。
   // ========================================================
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     Stack() {
       GlassSource() {
@@ -456,8 +581,8 @@ Column() {
         // 返回先退回目录，模式切换入口保留在右侧。
         Stack({ alignContent: Alignment.Center }) {
           Text(this.pageTitle())
-            .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary')).width('44%')
+            .fontSize((this.wideSettings() ? 24 : 应用尺寸.字号_标题) * this.densityScale()).fontWeight(FontWeight.Medium)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('44%')
             .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(TextAlign.Center)
             .hitTestBehavior(HitTestMode.None)
           Row() {
@@ -478,13 +603,13 @@ Column() {
           }
           .width('100%')
           .height('100%')
-          .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平 })
+          .padding({ left: this.settingsContentInset(), right: this.settingsContentInset() })
           .hitTestBehavior(HitTestMode.Transparent)
         }
         .width('100%')
-        .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
+        .height(this.toolbarHeight())
         .padding({
-          top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
+          top: this.toolbarTop(),
           bottom: 0
         })
         .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial, this.wallpaperPath))
@@ -496,20 +621,25 @@ Column() {
         }
         .width('100%')
         .padding({
-          left: 应用尺寸.页面内边距_水平,
-          right: 应用尺寸.页面内边距_水平,
-          top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
-          bottom: 应用尺寸.页面分组间距(this.narrowDeckLayout)
+          left: this.settingsContentInset(),
+          right: this.settingsContentInset(),
+          top: this.settingsModuleGap(),
+          bottom: this.settingsModuleGap()
         })
 
-        // 只按导航身份切换内容；偏好/搜索结果更新不重放整页转场。
-        ForEach([this.activeSection], (_section: string) => {
-        List({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout), scroller: this.内容滚动器 }) {
+        // 导航、模式及语言决定内容身份；搜索与其它偏好沿用当前内容。
+        ForEach([this.sectionContentKey()], (_section: string) => {
+        List({ space: this.settingsModuleGap(), scroller: this.内容滚动器 }) {
           if (this.activeSection === '') {
             ListItem() { this.settingsDirectory() }
           }
           ForEach(this.sectionGroups(), (group: SettingsGroup) => {
-            if (group.id === 'general_display') {
+            if (group.id === 'huawei_account') {
+              ListItem() { HuaweiAccountSettings({ isDark: this.是否深色,
+                onExternalUiChange: (active: boolean): void => { this.accountExternalUiActive = active; },
+                onOpenSync: (): void => this.openSection('sync') }) }
+            }
+            else if (group.id === 'general_display') {
               ListItem() {
                 GeneralSettings({
                   是否深色: this.是否深色,
@@ -519,6 +649,16 @@ Column() {
                     this.显示说明浮层 = true;
                   }
                 })
+              }
+            }
+            else if (group.id === 'external_mcp') {
+              ListItem() {
+                ExternalMcpSettings({ isDark: this.是否深色,
+                  onHelp: (标题: Resource, 正文: Resource): void => {
+                    this.说明标题 = 标题;
+                    this.说明正文 = 正文;
+                    this.显示说明浮层 = true;
+                  } })
               }
             }
             else if (group.id === 'editor_wheel') {
@@ -580,6 +720,9 @@ Column() {
                   颜色主题切换回调: (主题: 颜色主题): void => { this.颜色主题切换回调(主题); }
                 })
               }
+            }
+            else if (group.id === 'huawei_cloud') {
+              ListItem() { HuaweiCloudSettings({ 是否深色: this.是否深色, startOnOpen: this.initialActionId === 'huawei_cloud_sync' }) }
             }
             else if (group.id === 'sync') {
               ListItem() {
@@ -663,6 +806,22 @@ Column() {
                 }
               }
             }
+            else if (group.id === 'leaderboard_settings') {
+              ListItem() { LeaderboardSettings({ isDark: this.是否深色 }) }
+            }
+            else if (group.id === 'advanced') {
+              ListItem() {
+                开发者调试分组({
+                  是否深色: this.是否深色,
+                  启用成功回调: (): void => {
+                    this.openSection('ai');
+                    setTimeout((): void => {
+                      this.内容滚动器.scrollToIndex(0);
+                    }, 50);
+                  }
+                })
+              }
+            }
             else if (group.id === 'redemption') {
               ListItem() {
                 RedemptionPanel({
@@ -675,16 +834,19 @@ Column() {
         .layoutWeight(1)
         .width('100%')
         .padding({
-          left: 应用尺寸.页面内边距_水平,
-          right: 应用尺寸.页面内边距_水平,
+          left: this.settingsContentInset(),
+          right: this.settingsContentInset(),
           top: 0,
-          bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout) + this.导航条高度
+          bottom: this.surfaceMaterial === 'glass' ? 0 : this.settingsEndInset()
         })
         .backgroundColor(pageMaterialFill(this.页面底色微染值, this.surfaceMaterial, this.wallpaperPath))
         .scrollBar(BarState.Off)
         .edgeEffect(EdgeEffect.Spring)
+        // 末尾留白参与滚动，最后一张卡片可连同投影一起滚进视口。
+        .contentEndOffset(this.surfaceMaterial === 'glass' ? this.settingsEndInset() : 0)
+        .clipContent(this.surfaceMaterial === 'glass' ? ContentClipMode.BOUNDARY : ContentClipMode.CONTENT_ONLY)
         .alignListItem(ListItemAlign.Center)
-        .transition(SurfaceTransition.pageContent(this.sectionForward, this.animateSection))
+        .transition(SurfaceTransition.pageContent(this.sectionForward, this.animateSection, this.surfaceMaterial === 'glass'))
         }, (section: string): string => section)
       }
       .width('100%')
@@ -716,11 +878,7 @@ Column() {
           顶部偏移: 应用尺寸.pageContentTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop),
           选择回调: (简洁: boolean): void => {
             this.显示模式菜单 = false;
-            if (简洁 !== this.简洁模式) {
-              保存简洁模式(简洁).then((): void => { this.activeSection = ''; }).catch((): void => {
-                showToastSafely(this.getUIContext(), { message: $r('app.string.settings_local_save_failed') });
-              });
-            }
+            this.changeInterfaceMode(简洁);
           },
           关闭回调: (): void => { this.显示模式菜单 = false; }
         })

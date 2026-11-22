@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { settingsItemText } from '../../utils/SettingsStructureText';
@@ -19,6 +20,7 @@ import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 /** 关于分组独占外链和反馈交互；主壳只负责目录与许可证导航。 */
 @Component
 export struct AboutSettings {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop centerCommunity: boolean = false;
   @Prop 是否深色: boolean = false;
@@ -27,8 +29,6 @@ export struct AboutSettings {
   private readonly 链接服务实例: 链接服务 = new 链接服务();
   // 官方 QQ 群号（关于分组入口点击复制到剪贴板，与 欢迎弹窗 中 QQ群号 保持一致）
   private readonly QQ群号: string = OFFICIAL_QQ_GROUP;
-  // 本应用 bundleName，用于拼接应用市场 DeepLink 跳转本应用详情页（好评回退路径）
-  private readonly 本应用包名: string = 'com.jide.kapian';
   private readonly feedbackDialog: NativeDialogHost = new NativeDialogHost();
 
   private readonly createFeedbackDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
@@ -65,17 +65,17 @@ export struct AboutSettings {
 
   private 打开好评弹窗(): void {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    打开应用内好评(context, this.本应用包名);
+    打开应用内好评(context, context.abilityInfo.bundleName);
   }
 
   @Builder
   private communityHint(): void {
     Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center }) {
-      Text($r('app.string.home_intro_copy_qq')).fontSize(12).fontColor($r('app.color.text_secondary'))
+      Text($r('app.string.home_intro_copy_qq')).fontSize(12).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       Text() { ForEach([themeTextKey(this.QQ群号, [], this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(this.QQ群号, [], this.getUIContext()) }, (_textKey: string): string => _textKey) }
         .fontSize(12).fontColor(this.解析主色()).fontWeight(FontWeight.Medium)
     }.width('100%')
-    Text($r('app.string.about_qq_group_summary')).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+    Text($r('app.string.about_qq_group_summary')).fontSize(12).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
   }
 
   build() {
@@ -85,7 +85,7 @@ export struct AboutSettings {
           Button({ type: ButtonType.Normal, stateEffect: false }) {
             Row({ space: 10 }) {
               Text($r('app.string.about_qq_group_title')).fontSize(18).fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.text_primary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
               Text(this.QQ群号).fontSize(18).fontWeight(FontWeight.Medium)
                 .fontColor($r('app.color.home_intro_link'))
             }.width('100%').justifyContent(FlexAlign.Center)
@@ -93,7 +93,7 @@ export struct AboutSettings {
             .attributeModifier(new PressFeedback())
             .onClick((): void => { copyOfficialQQGroup(this.getUIContext()); })
           Text($r('app.string.home_intro_qq_details')).fontSize(12).lineHeight(18)
-            .fontColor($r('app.color.text_secondary')).textAlign(TextAlign.Center).width('100%')
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).textAlign(TextAlign.Center).width('100%')
             .attributeModifier(new PressFeedback())
             .onClick((): void => { copyOfficialQQGroup(this.getUIContext()); })
         }.width('100%').alignItems(HorizontalAlign.Center).padding({ bottom: 16 })

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
 import { insetMaterialFill } from '../utils/GlassMaterial';
 import { DialogFrame } from './common/DialogFrame';
 import { GLASS_HOME_SOURCE } from '../utils/GlassBackdrop';
@@ -20,6 +21,7 @@ import { CLOUD_DECK_MAX_COUNT, CLOUD_DECK_MAX_MB, CLOUD_DECK_QQ_GROUP, 云端牌
  */
 @Component
 export struct 云端牌组弹窗 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
@@ -92,11 +94,11 @@ export struct 云端牌组弹窗 {
       } else {
         Text($r('app.string.cloud_deck_locked_badge'))
           .fontSize(应用尺寸.字号_说明)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .padding({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8,
             top: 应用尺寸.间距_4, bottom: 应用尺寸.间距_4 })
-          .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-          .borderRadius(应用尺寸.圆角_胶囊)
+          .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+          .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_胶囊))
       }
 
       Column({ space: 应用尺寸.间距_4 }) {
@@ -104,7 +106,7 @@ export struct 云端牌组弹窗 {
           Text(deck.name)
             .fontSize(应用尺寸.字号_正文)
             .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
@@ -123,7 +125,7 @@ export struct 云端牌组弹窗 {
         if (deck.description.length > 0) {
           Text(deck.description)
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .width('100%')
@@ -135,14 +137,14 @@ export struct 云端牌组弹窗 {
               格式化云端牌组大小(deck.size)) :
             $r('app.string.cloud_deck_meta_cards_unknown_size', deck.cardCount, deck.version))
             .fontSize(应用尺寸.字号_说明)
-            .fontColor($r('app.color.text_tertiary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
             .width('100%')
         } else {
           Text(格式化云端牌组大小(deck.size).length > 0 ?
             $r('app.string.cloud_deck_meta', deck.version, 格式化云端牌组大小(deck.size)) :
             $r('app.string.cloud_deck_meta_unknown', deck.version))
             .fontSize(应用尺寸.字号_说明)
-            .fontColor($r('app.color.text_tertiary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
             .width('100%')
         }
       }
@@ -150,10 +152,10 @@ export struct 云端牌组弹窗 {
     }
     .width('100%')
     .padding(应用尺寸.间距_8)
-    .backgroundColor(this.已选中(deck.id) ? this.选中背景色 : insetMaterialFill($r('app.color.surface_page')))
+    .backgroundColor(this.已选中(deck.id) ? this.选中背景色 : insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
     .border(SurfaceBorder.options(应用尺寸.卡片边框,
-      this.已选中(deck.id) ? this.动作主色 : SurfaceBorder.color()))
-    .borderRadius(应用尺寸.圆角_面板)
+      this.已选中(deck.id) ? this.动作主色 : SurfaceBorder.color(), this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
     .attributeModifier(new PressFeedback())
     .onClick((): void => {
       if (!this.busy && deck.accessType === 'public' && !this.已成功(deck.id)) {
@@ -192,14 +194,14 @@ export struct 云端牌组弹窗 {
             $r('app.string.cloud_deck_progress_importing', this.currentDeckName) :
             $r('app.string.cloud_deck_progress_downloading', this.currentDeckName))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .width('100%')
           Progress({ value: this.progressPercent, total: 100, type: ProgressType.Linear })
             .width('100%')
             .color(this.动作主色)
           Text($r('app.string.cloud_deck_progress_count', this.completedCount, this.taskCount))
             .fontSize(应用尺寸.字号_说明)
-            .fontColor($r('app.color.text_tertiary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
             .width('100%')
         }
         .width('100%')
@@ -208,12 +210,12 @@ export struct 云端牌组弹窗 {
         if (!this.从菜单打开) {
         Text($r('app.string.cloud_deck_onboarding_message', CLOUD_DECK_MAX_COUNT, CLOUD_DECK_MAX_MB))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
       } else {
         Text($r('app.string.cloud_deck_offline_notice'))
           .fontSize(应用尺寸.字号_说明)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
       }
 
@@ -232,7 +234,7 @@ export struct 云端牌组弹窗 {
             .color(this.动作主色)
           Text($r('app.string.cloud_deck_loading'))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         }
         .width('100%')
         .padding(应用尺寸.间距_16)
@@ -247,9 +249,9 @@ export struct 云端牌组弹窗 {
           }
             .type(ButtonType.Normal)
             .fontColor(this.动作主色)
-            .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-            .border(SurfaceBorder.options())
-            .borderRadius(应用尺寸.圆角_面板)
+            .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+            .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+            .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
             .attributeModifier(new PressFeedback())
             .stateEffect(false)
             .onClick((): void => { this.onRetry(); })
@@ -259,7 +261,7 @@ export struct 云端牌组弹窗 {
       } else if (this.decks.length === 0) {
         Text($r('app.string.cloud_deck_empty'))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .textAlign(TextAlign.Center)
           .width('100%')
           .padding(应用尺寸.间距_16)
@@ -278,7 +280,7 @@ export struct 云端牌组弹窗 {
     if (this.confirmingSkip) {
       Text($r('app.string.cloud_deck_skip_confirm_message'))
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .width('100%')
     } else {
       this.bodyContent()

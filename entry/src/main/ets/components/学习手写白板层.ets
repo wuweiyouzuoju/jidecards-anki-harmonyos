@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { SliderStyle } from '../utils/SliderStyle';
+import { appearanceElementColor, appearanceElementRadius } from '../utils/AppearanceElements';
 import { GlassBubblePanel } from './common/GlassBubblePanel';
 import { ActionMenuPointerSide } from './common/ActionMenuLayout';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { popupAppearance } from './common/PopupAppearance';
 import { LengthMetrics } from '@kit.ArkUI';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
@@ -8,6 +10,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 import { cardViewportWidth } from '../model/CardViewportLayout';
 import { WHITEBOARD_INTERFACE_ITEMS, AppInterfaceItem, AppInterfaceControl } from '../model/AppInterface';
 import { appInterface } from '../backend/AppInterfaceService';
+import { saveStudyWhiteboardSnapshot } from '../backend/StudyWhiteboardSnapshot';
 import { studyPenKitAvailability, StudyPenKitAvailability } from '../backend/StudyPenKitAvailability';
 import { interfaceControlText } from '../utils/AppInterfaceText';
 import { 按下态按钮 } from './common/按下态按钮';
@@ -22,10 +25,12 @@ import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
 import { loadStudyPaperTransparency, saveStudyPaperTransparency } from '../utils/StudyWhiteboardAppearanceStore';
 import { showToastSafely, resourceText } from '../utils/UiFeedback';
 import { 颜色键 } from '../model/颜色主题';
+import { AppLog } from '../model/AppLog';
 
 /** 官方套件不可用即回退原版；收起保留当前卡画布，换题清空。 */
 @Component
 export struct 学习手写白板层 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private popupMaterial: string = 'flat';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @Prop 是否深色: boolean = false;
@@ -43,6 +48,7 @@ export struct 学习手写白板层 {
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @State private canvasGeneration: number = 0;
   @State private isSupported: boolean = false;
+  @State @Watch('publishInterface') private screenshotBusy: boolean = false;
   @State private canvasReady: boolean = false;
   @State private canvasFailed: boolean = false;
   @State private fallbackReason: string = '';
@@ -85,7 +91,7 @@ export struct 学习手写白板层 {
     const availability: StudyPenKitAvailability = studyPenKitAvailability();
     this.isSupported = availability.available;
     this.fallbackReason = availability.reason;
-    console.info(`Study whiteboard selection: ${this.isSupported ? 'huawei_pen_kit' : 'local_canvas'}, reason=${this.fallbackReason}`);
+    AppLog.info('StudyWhiteboard', `Study whiteboard selection: ${this.isSupported ? 'huawei_pen_kit' : 'local_canvas'}, reason=${this.fallbackReason}`);
     if (this.isSupported) this.prepareCanvas();
     this.onEngineChanged(this.isSupported);
     this.publishInterface();
@@ -152,7 +158,7 @@ export struct 学习手写白板层 {
     this.canvasFailed = true;
     this.endNavigation();
     this.fallbackReason = reason;
-    console.warn(`Study whiteboard fallback: ${reason}`);
+    AppLog.warn('StudyWhiteboard', `Study whiteboard fallback: ${reason}`);
     this.canvasHost?.dispose();
     appInterface.leave('study_whiteboard');
     this.onEngineChanged(false);
@@ -162,7 +168,7 @@ export struct 学习手写白板层 {
   private canvasInitialized(generation: number): void {
     if (!this.mounted || generation !== this.canvasGeneration || this.canvasFailed) return;
     this.sdkInitialized = true;
-    console.info('Study whiteboard: Huawei Pen Kit initialized');
+    AppLog.info('StudyWhiteboard', 'Study whiteboard: Huawei Pen Kit initialized');
     this.updateCanvasReady();
   }
 
@@ -170,7 +176,7 @@ export struct 学习手写白板层 {
     if (!this.mounted || generation !== this.canvasGeneration || this.canvasFailed) return;
     this.canvasWidth = Number.isFinite(width) && width > 0 ? width : 0;
     this.canvasHeight = Number.isFinite(height) && height > 0 ? height : 0;
-    console.info(`Study whiteboard canvas layout: ${this.canvasWidth}x${this.canvasHeight}`);
+    AppLog.info('StudyWhiteboard', `Study whiteboard canvas layout: ${this.canvasWidth}x${this.canvasHeight}`);
     this.updateCanvasReady();
   }
 
@@ -242,7 +248,7 @@ export struct 学习手写白板层 {
       this.publishInterface();
     }).catch((error: Error): void => {
       if (this.transparencySaveRequest === request) this.requestedPaperTransparency = null;
-      console.warn(`Study paper transparency save failed: ${error}`);
+      AppLog.warn('StudyWhiteboard', `Study paper transparency save failed: ${error}`);
       if (this.mounted && this.isVisible) {
         showToastSafely(this.getUIContext(), {
           message: resourceText(this.getUIContext(), $r('app.string.study_whiteboard_opacity_save_failed'))
@@ -256,6 +262,26 @@ export struct 学习手写白板层 {
     this.savePaperTransparency();
     this.opacityOpen = false;
     this.onClose();
+  }
+
+  private async saveScreenshot(): Promise<void> {
+    const area = this.drawingArea;
+    if (area === null || this.screenshotBusy || !this.canReceiveInput()) return;
+    this.screenshotBusy = true;
+    const ui = this.getUIContext();
+    try {
+      const saved = await saveStudyWhiteboardSnapshot(ui, area);
+      if (saved && this.mounted) {
+        showToastSafely(ui, { message: resourceText(ui, $r('app.string.study_whiteboard_screenshot_saved')) });
+      }
+    } catch (error) {
+      AppLog.warn('StudyWhiteboard', 'Study whiteboard screenshot failed: ' + JSON.stringify(error));
+      if (this.mounted) {
+        showToastSafely(ui, { message: resourceText(ui, $r('app.string.study_whiteboard_screenshot_failed')) });
+      }
+    } finally {
+      if (this.mounted) this.screenshotBusy = false;
+    }
   }
 
   private canReceiveInput(): boolean {
@@ -421,7 +447,8 @@ export struct 学习手写白板层 {
         item.id === 'opacity' || item.id === 'official_tools' || item.condition === 'global_navigation' || item.condition === this.reviewPhase)
       .map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id, titleKey: item.titleKey, iconKey: item.iconKey,
         title: this.label(item.id), enabled: item.id === 'official_tools' ? this.canvasReady :
-          item.condition === 'global_navigation' ? this.canvasReady : true,
+          item.id === 'screenshot' ? this.canvasReady && !this.screenshotBusy :
+            item.condition === 'global_navigation' ? this.canvasReady : true,
         selected: item.id === 'opacity' && this.opacityOpen }));
     appInterface.observe({ surface: 'study_whiteboard', sectionId: this.reviewPhase, selectedId: '',
       optionIds: [], optionLabels: [], busy: this.isSupported && !this.canvasReady && !this.canvasFailed,
@@ -448,7 +475,7 @@ export struct 学习手写白板层 {
 
   @Builder
   private opacitySettings() {
-    GlassBubblePanel({ panelWidth: Math.max(0, Math.min(260, this.toolbarContentWidth - 2 * 应用尺寸.页面内边距_水平)), pointerCenter: (Math.max(0, Math.min(260, this.toolbarContentWidth - 2 * 应用尺寸.页面内边距_水平))) / 2,
+    GlassBubblePanel({ shadowVisible: false, panelWidth: Math.max(0, Math.min(260, this.toolbarContentWidth - 2 * 应用尺寸.页面内边距_水平)), pointerCenter: (Math.max(0, Math.min(260, this.toolbarContentWidth - 2 * 应用尺寸.页面内边距_水平))) / 2,
       pointerSide: ActionMenuPointerSide.Top, content: (): void => { this.opacitySettingsContent(); } })
   }
   @Builder
@@ -456,12 +483,12 @@ export struct 学习手写白板层 {
     Column({ space: 应用尺寸.间距_8 }) {
       Row() {
         Text(this.label('opacity')).fontSize(应用尺寸.字号_正文).layoutWeight(1)
-          .fontColor($r('app.color.text_primary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         Text($r('app.string.study_whiteboard_opacity_value', this.paperTransparency))
-          .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary'))
+          .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }.width('100%')
-      Slider({ value: this.paperTransparency, min: 0, max: 100, step: 1 })
-        .width('100%').selectedColor(this.actionColor).enabled(this.isInputEnabled)
+      Slider({ value: this.paperTransparency, min: 0, max: 100, step: 1 }).attributeModifier(new SliderStyle(this.actionColor))
+        .width('100%').enabled(this.isInputEnabled)
         .onChange((value: number, mode: SliderChangeMode): void => {
           this.setPaperTransparency(value, mode === SliderChangeMode.End || mode === SliderChangeMode.Click);
         })
@@ -482,6 +509,9 @@ export struct 学习手写白板层 {
         IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_close'), label: this.label('close'),
           isInteractive: this.isInputEnabled, onAction: (): void => { this.closeHandwriting(); } })
         Row({ space: 应用尺寸.间距_8 }) {
+        按下态按钮({ 文案: this.label('screenshot'), singleLine: true,
+          是否启用: this.isInputEnabled && this.canvasReady && !this.screenshotBusy,
+          点击回调: (): void => { this.saveScreenshot(); } })
         按下态按钮({ 文案: this.label('reset_view'), singleLine: true, 是否启用: this.isInputEnabled && this.canvasReady,
           点击回调: (): void => { this.resetGlobalView(); } })
         按下态按钮({ 文案: this.label('opacity'), singleLine: true, 是否启用: this.isInputEnabled,
@@ -491,7 +521,7 @@ export struct 学习手写白板层 {
             popupColor: Color.Transparent, enableArrow: false,
             shadow: MenuSurface.popupShadow(), backgroundBlurStyle: BlurStyle.NONE,
             arrowWidth: MenuSurface.pointerSpan, arrowHeight: MenuSurface.pointerDepth,
-            radius: 应用尺寸.圆角_指标卡, transition: TransitionEffect.IDENTITY,
+            radius: appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_指标卡), transition: TransitionEffect.IDENTITY,
             onStateChange: (event: PopupStateChangeParam): void => {
               if (!event.isVisible) { this.opacityOpen = false; this.publishInterface(); }
             }
@@ -510,7 +540,7 @@ export struct 学习手写白板层 {
       if (this.isSupported && this.canvasHost !== null && !this.canvasFailed) {
         ForEach([this.canvasGeneration], (generation: number) => {
           Stack({ alignContent: Alignment.TopStart }) {
-            Column().width('100%').height('100%').backgroundColor($r('app.color.surface_page'))
+            Column().width('100%').height('100%').backgroundColor(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page')))
               .opacity(1 - this.paperTransparency / 100).hitTestBehavior(HitTestMode.None)
             StudyContentViewport({ viewScale: this.viewScale, viewX: this.viewX, viewY: this.viewY,
               rootX: this.rootX, rootY: this.rootY,
@@ -558,6 +588,8 @@ export struct 学习手写白板层 {
           onDrawingAreaChanged: (area: Area): void => { this.drawingAreaChanged(area); },
           globalScale: this.viewScale, globalX: this.viewX, globalY: this.viewY, rootX: this.rootX, rootY: this.rootY,
           onResetGlobalView: (): void => { this.resetGlobalView(); },
+          isScreenshotBusy: this.screenshotBusy,
+          onScreenshot: (): void => { this.saveScreenshot(); },
           onGlobalTouch: (event: TouchEvent): void => { this.trackTouch(event); },
           onGlobalNavigationAllowed: (event: BaseEvent): boolean => this.canNavigate(event),
           onSinglePanAllowed: (event: BaseEvent): boolean => this.canSinglePan(event),

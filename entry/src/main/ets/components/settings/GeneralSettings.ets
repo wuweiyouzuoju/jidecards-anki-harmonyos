@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { HomeLayoutControl } from './HomeLayoutControl';
 import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { SettingsToggleRow } from '../common/SettingsToggleRow';
@@ -58,6 +59,7 @@ export struct GeneralSettings {
   build() {
     设置分组卡片({ groupId: 'general_display', 是否深色: this.是否深色 }) {
       Column({ space: FormRowLayout.rowGap }) {
+          HomeLayoutControl()
           FormSelectRow({ label: settingsItemText(this.getUIContext(), 'language', this.uiLanguage), options: this.语言选项(), selectedIndex: this.语言索引(),
             value: this.语言显示名(),
             onSelect: (索引: number): void => {

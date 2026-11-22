@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { PAGE_TOOLBAR_SCOPE, PageToolbarActionScope } from '../model/PageToolbarActions';
+import { PageActionShell } from '../components/common/PageActionShell';
 import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../utils/PressFeedback';
 import { 浏览编辑区 } from '../components/browser/浏览编辑区';
 import { NoteEditorHeader } from '../components/common/NoteEditorHeader';
@@ -17,16 +19,17 @@ import { 解析是否深色, 主题模式 } from '../model/主题设置';
 import { 加载主题模式 } from '../model/主题存储';
 import { localizedResourceText } from '../utils/UiFeedback';
 import { CustomTransition } from '../utils/自定义转场';
-import { navigationEnterOffset } from '../utils/AppMotion';
 import { appInterface } from '../backend/AppInterfaceService';
 import { visibleInterfaceItems, AppInterfaceControl } from '../model/AppInterface';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { NoteDraftPreviewInput } from '../model/NoteDraftPreview';
 import { NoteDraftPreviewPageParams } from '../model/navigation/PageParams';
+import { AppLog } from '../model/AppLog';
 
 /** 导航只传 ID；此页持有读取会话和写入保护，来源页面仅刷新返回结果。 */
 @Component
 export struct EditNotePage {
+  @Provide(PAGE_TOOLBAR_SCOPE) private pageToolbarScope: PageToolbarActionScope = new PageToolbarActionScope();
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
@@ -37,31 +40,35 @@ export struct EditNotePage {
   @State @Watch('publishInterface') private editor: NoteEditorState = initialNoteEditorState();
   @State private backRequest: number = 0;
   @State private previewReturnRequest: number = 0;
-  @State private opacityValue: number = 1;
+  @State private opacityValue: number = 0;
   @State private navigationOffset: number = 0;
   @StorageLink('themeMode') private theme: 主题模式 = 'system';
   @StorageLink('systemDarkMode') private systemDark: boolean = false;
   @StorageProp(PAGE_SURFACE_KEY) private surface: string = '#F5F7FA';
   private active: boolean = false;
   private linksVisible: boolean = false;
+  private previewOpen: boolean = false;
   private readonly writer: AnkiNoteUpdate = new AnkiNoteUpdate();
   private readonly operations: BrowserOperationController = new BrowserOperationController();
   private readonly session: NoteEditorSession = new NoteEditorSession(new AnkiNoteEditor(),
     (state: NoteEditorState): void => { this.editor = state; });
 
+  private initialPreparation: Promise<void> = Promise.resolve();
+
   aboutToAppear(): void {
     this.active = true;
+    this.wheelSession.setPresentation(0, 0);
     this.publishInterface();
-    CustomTransition.getInstance().注册NavParam('EditNotePage',
-      (push: boolean, exit: boolean): void => {
-        this.opacityValue = exit ? 1 : 0;
-        this.navigationOffset = exit ? 0 : navigationEnterOffset(push);
+    this.initialPreparation = this.load();
+    CustomTransition.getInstance().registerPage('EditNotePage',
+      (opacity: number, offset: number): void => {
+        this.opacityValue = opacity;
+        this.navigationOffset = offset;
+        this.wheelSession.setPresentation(opacity, offset);
+        this.wheelSession.setVisible(true);
       },
-      (_push: boolean, exit: boolean): void => {
-        this.opacityValue = exit ? 0 : 1;
-        this.navigationOffset = 0;
-      });
-    this.load();
+      (): Promise<void> => this.initialPreparation
+    );
     加载主题模式().then((mode: 主题模式): void => { if (this.active) this.theme = mode; })
       .catch((): void => {});
   }
@@ -78,14 +85,18 @@ export struct EditNotePage {
     if (!this.active || this.editor.busy) return false;
     const params: NoteDraftPreviewPageParams = { input: input };
     try {
+      this.previewOpen = true;
       this.pathStack.pushPath({ name: 'NoteDraftPreviewPage', param: params, onPop: onReturn });
       return true;
     } catch (error) {
-      console.warn((error as Error).message);
+      this.previewOpen = false;
+      AppLog.warn('EditNotePage', (error as Error).message);
       return false;
     }
   }
   private restoreEditorAfterPreview(): void {
+    if (!this.previewOpen) return;
+    this.previewOpen = false;
     this.previewReturnRequest++;
   }
   private publishInterface(): void {
@@ -125,6 +136,7 @@ export struct EditNotePage {
   }
   build() {
     NavDestination() {
+      PageActionShell({ surface: 'edit_note' }) {
       if (this.editor.note !== null) {
         浏览编辑区({ isDark: 解析是否深色(this.theme, this.systemDark), busy: this.editor.busy,
           errorMessage: this.editor.error === '' ? '' : localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.browser_detail_save_error')),
@@ -153,8 +165,11 @@ export struct EditNotePage {
           }
         }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial, this.wallpaperPath))
       }
-    }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
-      .translate({ x: this.navigationOffset })
+
+      }
+}.hideTitleBar(true).backgroundColor(Color.Transparent).visibility(this.pageMaterial === 'glass' && this.opacityValue <= 0 ? Visibility.Hidden : Visibility.Visible)
+    .opacity(this.opacityValue)
+    .translate({ x: this.navigationOffset })
       .onShown((): void => { this.restoreEditorAfterPreview(); this.wheelSession.setVisible(!this.linksVisible); appInterface.showPage('edit_note'); this.publishInterface(); })
       .onHidden((): void => { this.wheelSession.setVisible(false); appInterface.hidePage('edit_note'); })
       .onBackPressed((): boolean => { this.requestBack(); return true; })

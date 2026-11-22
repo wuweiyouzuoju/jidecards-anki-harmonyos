@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { reviewPreferences } from '../../backend/ReviewPreferencesService';
 import { ReviewPreferences, ReviewPreferenceField, ReviewPreferenceEdit } from '../../proto/messages/PreferencesMessages';
 import { preferenceSeconds } from '../../model/ReviewPreferencesStore';
@@ -17,6 +18,7 @@ import { namedResourceText } from '../../utils/UiFeedback';
 /** 两个分类复用集合偏好保存入口；草稿只记录用户实际编辑的字段。 */
 @Component
 export struct ReviewPreferencesSettings {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   @Prop displayOptions: boolean = false;
@@ -147,10 +149,10 @@ export struct ReviewPreferencesSettings {
   private numberField(field: ReviewPreferenceField) {
     Row({ space: 应用尺寸.间距_16 }) {
       Text(this.fieldTitle(field)).fontSize(应用尺寸.字号_按钮)
-        .fontColor($r('app.color.text_primary')).textAlign(TextAlign.Start).layoutWeight(1)
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).textAlign(TextAlign.Start).layoutWeight(1)
       TextInput({ text: field === ReviewPreferenceField.Rollover ? this.rollover :
         (field === ReviewPreferenceField.LearnAheadSecs ? this.learnAhead : this.timeLimit) })
-        .attributeModifier(new FormInputStyle()).width(96)
+        .attributeModifier(new FormInputStyle( undefined, this.appearanceElements)).width(96)
         .type(InputType.NUMBER_DECIMAL).enabled(this.loaded && !this.busy)
         .onChange((value: string): void => {
           if (field === ReviewPreferenceField.Rollover) { this.rollover = value; this.rolloverEdited = true; }
@@ -166,7 +168,7 @@ export struct ReviewPreferencesSettings {
       帮助正文: this.displayOptions ? null : $r('app.string.settings_core_review_help'), 打开说明回调: this.打开说明回调 }) {
       Column({ space: 应用尺寸.间距_8 }) {
         Text($r('app.string.settings_core_review_scope')).fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         if (this.displayOptions) {
           SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'show_remaining', this.uiLanguage), isOn: this.remaining, tint: this.actionColor, isDark: this.是否深色,
             isInteractive: this.loaded && !this.busy,

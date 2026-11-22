@@ -1,5 +1,6 @@
-import { GlassSource } from '../common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
+import { GlassSource } from '../common/GlassSource';
 import { webview } from '@kit.ArkWeb';
 import { common } from '@kit.AbilityKit';
 import { CardWebView, CardWebAttributes, cardScriptDiagnosticLabels } from '../../utils/CardWebView';
@@ -31,6 +32,7 @@ import { NoteLinksProxy } from '../../model/NoteLinksProxy';
 import { noteLinksService } from '../../backend/NoteLinksService';
 import { 卡片预览页 } from '../browser/卡片预览页';
 import { 颜色键 } from '../../model/颜色主题';
+import { AppLog } from '../../model/AppLog';
 
 class TemplateAudioProxy {
   dispatch: (action: string, version: number) => void = (_action: string, _version: number): void => {};
@@ -40,6 +42,7 @@ class TemplateAudioProxy {
 /** 草稿卡片只读预览；离线资源、翻面和 Web 生命周期复用学习渲染链。 */
 @Component
 export struct NotetypeTemplatePreview {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop rendered: RenderedCard;
   @Prop @Watch('contentChanged') contentRevision: number = 1;
   @Prop @Watch('loadingChanged') loading: boolean = false;
@@ -57,8 +60,12 @@ export struct NotetypeTemplatePreview {
   @StorageProp(颜色键.主色容器) @Watch('referenceThemeChanged') private referenceSurface: string = '#E8EEFC';
   @StorageProp(颜色键.主色文字) @Watch('referenceThemeChanged') private referenceText: string = '#183B8F';
   private referenceThemeChanged(): void {
-    if (this.alive && this.attached) this.controller.runJavaScript(noteLinkBridgeScript(this.previewVersion,
-      undefined, { surface: this.referenceSurface, text: this.referenceText })).catch((error: Object): void => { console.info(`Note reference theme: ${error}`); });
+    if (!this.alive || !this.attached) return;
+    try {
+      this.controller.runJavaScript(noteLinkBridgeScript(this.previewVersion,
+        undefined, { surface: this.referenceSurface, text: this.referenceText }))
+        .catch((error: Object): void => { AppLog.info('TemplatePreview', `Note reference theme: ${error}`); });
+    } catch (error) { AppLog.info('TemplatePreview', `Note reference theme: ${error}`); }
   }
   @State private answerSide: boolean = false;
   @State private failed: boolean = false;
@@ -108,13 +115,17 @@ export struct NotetypeTemplatePreview {
       if (!this.alive) return;
       this.hideAudioButtons = value.hideAudioPlayButtons;
       this.showSide();
-    }).catch((error: Error): void => { console.info(`Preview preferences: ${error.message}`); });
+    }).catch((error: Error): void => { AppLog.info('TemplatePreview', `Preview preferences: ${error.message}`); });
   }
-  aboutToDisappear(): void { this.onBackHandlerChange(null); this.releaseCard().catch((error: Error): void => { console.info(error.message); }); }
+  aboutToDisappear(): void { this.onBackHandlerChange(null); this.releaseCard().catch((error: Error): void => { AppLog.info('TemplatePreview', error.message); }); }
   private referenceBack(): boolean {
     if (this.linkedIds.length === 0) return false;
-    if (!this.linkedBack?.()) this.linkedIds = [];
+    if (!this.linkedBack?.()) this.closeLinkedPreview();
     return true;
+  }
+  private closeLinkedPreview(): void {
+    this.linkedIds = []; this.linkedBack = null;
+    this.cardWeb.setAudioEnabled(this.foreground && this.isVisible);
   }
   private requestClose(): void { if (!this.referenceBack()) this.onClose(); }
   private async openReference(guid: string, version: number): Promise<void> {
@@ -243,15 +254,15 @@ export struct NotetypeTemplatePreview {
           }
           Row({ space: 应用尺寸.间距_8 }) {
             Text(this.sample ? $r('app.string.notetype_preview_hint') : $r('app.string.note_preview_hint'))
-              .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary')).layoutWeight(1)
-            IconActionButton({ source: $r('app.media.ic_audio_replay'), label: $r('app.string.study_replay_sound'),
+              .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).layoutWeight(1)
+            IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_audio_replay'), label: $r('app.string.study_replay_sound'),
               onAction: (): void => { this.playAudio(); } })
           }.width('100%').alignItems(VerticalAlign.Center)
           if (this.failed || this.loadError !== '') {
             Text(this.loadError === '' ? $r('app.string.browser_preview_load_error') : this.loadError).fontColor($r('app.color.error_text'))
           }
           if (this.referenceError !== '') { Text(this.referenceError).fontColor($r('app.color.error_text')) }
-          if (this.rendered.isEmpty) { Text($r('app.string.note_preview_empty')).fontColor($r('app.color.text_secondary')) }
+          if (this.rendered.isEmpty) { Text($r('app.string.note_preview_empty')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))) }
           if (this.audioFailed) { Text($r('app.string.browser_preview_audio_error')).fontColor($r('app.color.error_text')) }
         }.width('100%')
       }.width('100%').constraintSize({ maxHeight: '40%' }).flexShrink(0).scrollBar(BarState.Auto)
@@ -312,7 +323,7 @@ export struct NotetypeTemplatePreview {
     }
     if (this.linkedIds.length > 0) {
       卡片预览页({ 卡片ID列表: this.linkedIds, 媒体目录: this.mediaDirectory(), isDark: this.isDark, linksReadOnly: true,
-        onClose: (): void => { this.linkedIds = []; this.linkedBack = null; this.cardWeb.setAudioEnabled(this.foreground && this.isVisible); },
+        onClose: (): void => { this.closeLinkedPreview(); },
         onBackHandlerChange: (handler: (() => boolean) | null): void => { this.linkedBack = handler; } })
     }
     }.width('100%').height('100%')

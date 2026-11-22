@@ -1,6 +1,13 @@
-import { initializeEditorWheelPreferences } from '../utils/EditorWheelPreferencesStore';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { WINDOW_KEYBOARD_TOP_KEY } from '../model/WindowSafeLayout';
+import { LEADERBOARD_PREVIEW_KEY } from '../model/StudyLeaderboard';
+import { initializeLeaderboardVisibility } from '../model/LeaderboardVisibility';
+import { externalMcpService } from '../backend/external-agent/ExternalMcpService';
+import { showToastSafely } from '../utils/UiFeedback';
+import { initializeHomeLayout } from '../utils/HomeLayoutStore';
+import { CONTINUATION_MIN_VERSION, CONTINUATION_PARAM, CONTINUATION_MAX_CHARS, continuationSession } from '../model/ContinuationSession';
+import { wantConstant } from '@kit.AbilityKit';
+import { initializeEditorWheelPreferences } from '../utils/EditorWheelPreferencesStore';
+import { HIDDEN_WINDOW_TITLE_BAR, WINDOW_KEYBOARD_TOP_KEY, WINDOW_TITLE_BAR_LAYOUT_KEY, WINDOW_PINNED_KEY, WindowTitleBarLayout } from '../model/WindowSafeLayout';
 
 import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
 import { setStudyPenKitContext, clearStudyPenKitContext } from '../backend/StudyPenKitContext';
@@ -13,36 +20,49 @@ import {
   Want
 } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { startInstallationUsage, stopInstallationUsage } from '../backend/InstallationRegistration';
 import { window } from '@kit.ArkUI';
 import { i18n } from '@kit.LocalizationKit';
-import { BusinessError } from '@kit.BasicServicesKit';
+import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
 import { 应用系统栏样式, readSystemDarkMode } from '../utils/主题控制器';
 import { 应用颜色主题 } from '../utils/颜色主题管理器';
 import { 颜色主题, 默认颜色主题, 规范化颜色主题 } from '../model/颜色主题';
 import { 刷新桌面卡片数据 } from '../model/FSRS控制器';
 import { 刷新学习提醒 } from '../model/学习提醒服务';
-import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
+import { AI_AGENT_CHANNELS_APP_STORAGE_KEY, initializeAiAgentChannels } from '../model/ReleaseFeatures';
 import { initializeCardTextSize } from '../utils/CardTextSizeStore';
 import { initializeDeckListAppearance } from '../utils/DeckListAppearanceStore';
+import { DESKTOP_HOME_LAYOUT_KEY } from '../model/DeckListAppearance';
 import { initializeSurfaceMaterial } from '../utils/SurfaceMaterialStore';
 import { initializeMotionStyle } from '../utils/MotionStyleStore';
 import { initializeStudyHaptics } from '../utils/StudyHaptics';
+import { initializeStudyAnswerButtons } from '../utils/StudyAnswerButtons';
 import { initializeSimpleMode } from '../model/简洁模式存储';
 import { syncActivity } from '../model/SyncSettings';
 import { externalDeckUri, externalDeckOpens, EXTERNAL_DECK_OPEN_REVISION_KEY } from '../model/ExternalDeckOpen';
 import { windowSafeInsets, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY, WINDOW_SAFE_LEFT_KEY,
-  WINDOW_SAFE_RIGHT_KEY, WINDOW_HEIGHT_KEY } from '../model/WindowSafeLayout';
+  WINDOW_SAFE_RIGHT_KEY, WINDOW_HEIGHT_KEY, WINDOW_SIZE_KEY, WindowSizeVp } from '../model/WindowSafeLayout';
+import { APP_LOG_DOMAIN, installHilogLogSink } from '../utils/HilogLogSink';
 
-const DOMAIN: number = 0x4342;
+const DOMAIN: number = APP_LOG_DOMAIN;
 
 export default class EntryAbility extends UIAbility {
   /** 主窗口引用：规避区高度同步用（onWindowStageCreate 时赋值） */
   private 主窗口?: window.Window;
+  private desktopTitleBarActive: boolean = false;
+  private readonly desktopWindow: boolean = deviceInfo.deviceType === 'pc' || deviceInfo.deviceType === '2in1';
+  private readonly titleButtonsChanged: (rect: window.TitleButtonRect) => void =
+    (rect: window.TitleButtonRect): void => {
+      if (this.desktopTitleBarActive && this.主窗口 !== undefined && rect.width > 0 && rect.height > 0) {
+        this.publishDesktopTitleBar(this.主窗口, rect);
+      }
+    };
   private windowLayoutTail: Promise<void> = Promise.resolve();
   private readonly windowStatusChanged: (status: window.WindowStatusType) => void = (status: window.WindowStatusType): void => {
     hilog.info(DOMAIN, 'jidecards', 'Window status changed: %{public}d', status);
     this.syncWindowLayout();
+    if (this.desktopWindow) this.syncDesktopTitleBar();
   };
 
   /** 只跟随系统窗口模式调整内容布局，不调用最大化、最小化或窗口模式切换。 */
@@ -59,6 +79,47 @@ export default class EntryAbility extends UIAbility {
     }).catch((error: Error): void => {
       hilog.warn(DOMAIN, 'jidecards', 'Window layout sync failed: %{public}s', error.message);
     });
+  }
+
+  private syncDesktopTitleBar(): void {
+    const target: window.Window | undefined = this.主窗口;
+    if (!this.desktopWindow || target === undefined) return;
+    try {
+      const status: window.WindowStatusType = target.getWindowStatus();
+      if (status === window.WindowStatusType.MINIMIZE) return;
+      const freeform: boolean = deviceInfo.sdkApiVersion < 22 || target.isInFreeWindowMode();
+      if (!freeform || (status !== window.WindowStatusType.FLOATING && status !== window.WindowStatusType.MAXIMIZE)) {
+        if (this.desktopTitleBarActive) {
+          target.setWindowDecorVisible(true);
+          this.desktopTitleBarActive = false;
+          AppStorage.setOrCreate<WindowTitleBarLayout>(WINDOW_TITLE_BAR_LAYOUT_KEY, HIDDEN_WINDOW_TITLE_BAR);
+        }
+        return;
+      }
+
+      const rect: window.TitleButtonRect = target.getTitleButtonRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      if (!this.desktopTitleBarActive) {
+        target.setWindowDecorVisible(false);
+        this.desktopTitleBarActive = true;
+      }
+      this.publishDesktopTitleBar(target, rect);
+    } catch (error) {
+      hilog.warn(DOMAIN, 'jidecards', 'Desktop window title bar sync failed');
+    }
+  }
+
+  private publishDesktopTitleBar(target: window.Window, rect: window.TitleButtonRect): void {
+    let height: number = rect.top + rect.height;
+    try { height = Math.max(height, target.getWindowDecorHeight()); }
+    catch { /* The system controls still define the required minimum height. */ }
+    const layout: WindowTitleBarLayout = { height: height, controlsWidth: rect.width,
+      controlsTop: rect.top, controlsHeight: rect.height };
+    const previous: WindowTitleBarLayout | undefined = AppStorage.get<WindowTitleBarLayout>(WINDOW_TITLE_BAR_LAYOUT_KEY);
+    if (previous?.height !== layout.height || previous?.controlsWidth !== layout.controlsWidth ||
+      previous?.controlsTop !== layout.controlsTop || previous?.controlsHeight !== layout.controlsHeight) {
+      AppStorage.setOrCreate<WindowTitleBarLayout>(WINDOW_TITLE_BAR_LAYOUT_KEY, layout);
+    }
   }
 
   private publishSystemDarkMode(isDark: boolean): void {
@@ -94,17 +155,31 @@ export default class EntryAbility extends UIAbility {
     应用颜色主题(theme, isDark);
   }
 
-  onCreate(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
+  onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    installHilogLogSink();
+    AppStorage.setOrCreate<boolean>(LEADERBOARD_PREVIEW_KEY, this.context.applicationInfo.debug &&
+      want.parameters?.['jideLeaderboardPreview'] === true);
+    AppStorage.setOrCreate<boolean>('analyticsTestSource', this.context.applicationInfo.debug &&
+      want.parameters?.['jideAnalyticsTest'] === true);
+    continuationSession.setListener((): void => { this.updateContinuationState(); });
     setStudyPenKitContext(this.context);
     AppStorage.setOrCreate<common.UIAbilityContext>('abilityContext', this.context);
+    externalMcpService.restore(this.context.abilityInfo.bundleName);
     initializeSimpleMode();
+    initializeLeaderboardVisibility(this.context);
     initializeCardTextSize();
+    AppStorage.setOrCreate<boolean>(DESKTOP_HOME_LAYOUT_KEY, this.desktopWindow);
     initializeDeckListAppearance();
+    initializeHomeLayout();
     initializeSurfaceMaterial();
     initializeMotionStyle();
     initializeEditorWheelPreferences();
     initializeStudyHaptics();
-    AppStorage.setOrCreate<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY, true);
+    initializeStudyAnswerButtons();
+    AppStorage.setOrCreate<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY, false);
+    initializeAiAgentChannels().catch((_error: Object): void => {
+      // 读取失败保持入口隐藏。
+    });
     this.refreshSystemDarkMode();
     // 存系统语言供纯函数层做本地化（如默认牌组名）
     try {
@@ -114,15 +189,92 @@ export default class EntryAbility extends UIAbility {
       AppStorage.setOrCreate<string>('系统语言', 'zh-Hans');
     }
     // DeepLink 跳转：桌面卡片点击 → jidecards://stats → 写 AppStorage 信号让首页 aboutToAppear 跳统计页
+    if (this.receiveContinuation(want, launchParam)) return;
     this.处理DeepLink(want);
     this.receiveExternalDeck(want);
     hilog.info(DOMAIN, 'jidecards', 'Application created');
   }
 
-  onNewWant(want: Want, _launchParam: AbilityConstant.LaunchParam): void {
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    if (this.receiveContinuation(want, launchParam)) return;
     // App 已在后台时，桌面卡片点击 → jidecards://stats → 写 AppStorage 信号让首页监听回调跳统计页
     this.处理DeepLink(want);
     this.receiveExternalDeck(want);
+  }
+
+  private continuationNotice: string = '';
+  private lastContinuationState: boolean | null = null;
+  private continuationStateTail: Promise<void> = Promise.resolve();
+  private updateContinuationState(): void {
+    this.continuationStateTail = this.continuationStateTail.then(async (): Promise<void> => {
+      const active: boolean = continuationSession.capture() !== null;
+      if (active === this.lastContinuationState) return;
+      await this.context.setMissionContinueState(active ? AbilityConstant.ContinueState.ACTIVE : AbilityConstant.ContinueState.INACTIVE);
+      this.lastContinuationState = active;
+    }).catch((error: Error): void => {
+      hilog.warn(DOMAIN, 'jidecards', 'Continuation state update failed: %{public}s', error.message);
+    });
+  }
+
+  private continuationToast(key: string): void {
+    try {
+      showToastSafely(this.context.windowStage.getMainWindowSync().getUIContext(), {
+        message: this.context.resourceManager.getStringByNameSync(key)
+      });
+    } catch (error) { hilog.warn(DOMAIN, 'jidecards', 'Unable to display continuation message'); }
+  }
+
+  onContinue(wantParam: Record<string, Object>): AbilityConstant.OnContinueResult {
+    try {
+      if (typeof wantParam.version !== 'number' || wantParam.version < CONTINUATION_MIN_VERSION) {
+        this.continuationToast('continuation_invalid');
+        return AbilityConstant.OnContinueResult.MISMATCH;
+      }
+      const payload = continuationSession.capture();
+      if (payload === null || syncActivity.isCollectionBusy()) {
+        this.continuationToast('continuation_busy');
+        return AbilityConstant.OnContinueResult.REJECT;
+      }
+      const text: string = JSON.stringify(payload);
+      if (text.length > CONTINUATION_MAX_CHARS) throw new Error('continuation_invalid');
+      wantParam[CONTINUATION_PARAM] = text;
+      wantParam[wantConstant.Params.SUPPORT_CONTINUE_PAGE_STACK_KEY] = false;
+      wantParam[wantConstant.Params.SUPPORT_CONTINUE_SOURCE_EXIT_KEY] = false;
+      return AbilityConstant.OnContinueResult.AGREE;
+    } catch (error) {
+      this.continuationToast('continuation_invalid');
+      return AbilityConstant.OnContinueResult.REJECT;
+    }
+  }
+
+  private receiveContinuation(want: Want, launchParam: AbilityConstant.LaunchParam): boolean {
+    if (launchParam.launchReason !== AbilityConstant.LaunchReason.CONTINUATION) return false;
+    let accepted: boolean = false;
+    try {
+      const text = want.parameters?.[CONTINUATION_PARAM];
+      if (typeof text !== 'string') throw new Error('continuation_invalid');
+      if (!continuationSession.receive(text)) return true;
+      accepted = true;
+      this.context.restoreWindowStage(new LocalStorage());
+      this.updateContinuationState();
+    } catch (error) {
+      if (accepted) continuationSession.discard();
+      const busy: boolean = error instanceof Error && error.message === 'continuation_busy';
+      this.continuationToast(busy ? 'continuation_busy' : 'continuation_invalid');
+      if (this.主窗口 === undefined) {
+        this.continuationNotice = busy ? 'continuation_busy' : 'continuation_invalid';
+        try { this.context.restoreWindowStage(new LocalStorage()); }
+        catch (restoreError) { hilog.error(DOMAIN, 'jidecards', 'Continuation fallback window restore failed'); }
+      }
+      hilog.warn(DOMAIN, 'jidecards', 'Continuation receive failed');
+    }
+    return true;
+  }
+
+  onWindowStageRestore(windowStage: window.WindowStage): void {
+    // Navigation 状态由根宿主恢复；窗口初始化与普通启动共用同一个入口。
+    this.onWindowStageDestroy();
+    this.onWindowStageCreate(windowStage);
   }
 
   /** 冷热启动共用入口，先保留文件，再通知首页安全导入。 */
@@ -192,6 +344,9 @@ export default class EntryAbility extends UIAbility {
         this.retryLoadContent(windowStage, 1);
         return;
       }
+      if (this.continuationNotice !== '') {
+        this.continuationToast(this.continuationNotice); this.continuationNotice = '';
+      }
       // 全屏时采用沉浸布局；半屏/悬浮窗跟随系统边界，不主动恢复全屏。
       // 全屏布局让应用内容延伸到状态栏/导航栏区域，
       // 配合各弹层的 expandSafeArea 实现磨砂遮罩覆盖状态栏（设置面板/字段帮助面板等）。
@@ -208,12 +363,20 @@ export default class EntryAbility extends UIAbility {
           this.同步规避区高度();
         });
         this.主窗口.on('keyboardHeightChange', (): void => { this.同步规避区高度(); });
-        this.主窗口.on('windowRectChange', (): void => { this.同步规避区高度(); });
+        this.主窗口.on('windowRectChange', (): void => {
+          this.同步规避区高度();
+          if (this.desktopWindow && !this.desktopTitleBarActive) this.syncDesktopTitleBar();
+        });
+        if (this.desktopWindow) {
+          this.主窗口.on('windowTitleButtonRectChange', this.titleButtonsChanged);
+          this.syncDesktopTitleBar();
+        }
         // 兜底：部分设备启动时规避区尚未计算完成（getWindowAvoidArea 返回 0）且
         // avoidAreaChange 不触发，会导致状态栏高度一直是 0、顶栏按钮与状态栏重合。
         // 延迟再同步一次（幂等，值无变化时 setOrCreate 不产生额外刷新）。
         setTimeout((): void => {
           this.同步规避区高度();
+          if (this.desktopWindow) this.syncDesktopTitleBar();
         }, 600);
       } catch (e) {
         hilog.error(DOMAIN, 'jidecards', `setWindowLayoutFullScreen failed: ${e}`);
@@ -248,12 +411,25 @@ export default class EntryAbility extends UIAbility {
       } catch (_error) { /* 窗口事件稍后会刷新。 */ }
       AppStorage.setOrCreate<number>('状态栏高度', this.主窗口.getUIContext().px2vp(系统栏区.topRect.height));
       AppStorage.setOrCreate<number>('导航条高度', this.主窗口.getUIContext().px2vp(导航条区.bottomRect.height));
+      const width: number = ui.px2vp(bounds.width);
+      const height: number = ui.px2vp(bounds.height);
+      const previousSize = AppStorage.get<WindowSizeVp>(WINDOW_SIZE_KEY);
+      if (previousSize?.width !== width || previousSize?.height !== height) {
+        AppStorage.setOrCreate<WindowSizeVp>(WINDOW_SIZE_KEY, { width: width, height: height });
+      }
     } catch (e) {
       hilog.error(DOMAIN, 'jidecards', `getWindowAvoidArea failed: ${e}`);
     }
   }
 
   onWindowStageDestroy(): void {
+    if (this.desktopWindow) {
+      try { this.主窗口?.off('windowTitleButtonRectChange', this.titleButtonsChanged); }
+      catch { hilog.warn(DOMAIN, 'jidecards', 'Title button listener release failed'); }
+      this.desktopTitleBarActive = false;
+      AppStorage.setOrCreate<WindowTitleBarLayout>(WINDOW_TITLE_BAR_LAYOUT_KEY, HIDDEN_WINDOW_TITLE_BAR);
+      AppStorage.setOrCreate<boolean>(WINDOW_PINNED_KEY, false);
+    }
     try { this.主窗口?.off('windowStatusChange', this.windowStatusChanged); }
     catch (error) { hilog.warn(DOMAIN, 'jidecards', 'Window status listener release failed'); }
     this.主窗口 = undefined;
@@ -261,11 +437,13 @@ export default class EntryAbility extends UIAbility {
   }
 
   onForeground(): void {
+    startInstallationUsage(this.context);
     AppStorage.setOrCreate<boolean>(APP_FOREGROUND_KEY, true);
     this.refreshSystemDarkMode();
     this.refreshThemeColors();
     // 回前台重读真实窗口模式，修复后台期间可能漏送的分屏/悬浮窗变化。
     this.syncWindowLayout();
+    if (this.desktopWindow) this.syncDesktopTitleBar();
     this.同步规避区高度();
   }
 
@@ -278,6 +456,7 @@ export default class EntryAbility extends UIAbility {
   // 短时任务不需要权限申请，任务完成后必须主动 cancelSuspendDelay 否则消耗配额。
   // 失败不阻塞退出，静默跳过保留上次的提醒快照与卡片数据。
   onBackground(): void {
+    stopInstallationUsage(this.context);
     syncActivity.continueInBackground();
     AppStorage.setOrCreate<boolean>(APP_FOREGROUND_KEY, false);
     hilog.info(DOMAIN, 'jidecards', 'Application moved to background');
@@ -338,6 +517,8 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
+    externalMcpService.dispose();
+    continuationSession.setListener(null);
     clearStudyPenKitContext(this.context);
     hilog.info(DOMAIN, 'jidecards', 'Application destroyed');
   }

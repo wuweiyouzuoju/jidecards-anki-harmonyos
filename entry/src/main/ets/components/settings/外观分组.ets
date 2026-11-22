@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { AppearanceCustomizationControl } from './AppearanceCustomizationControl';
 import { CUSTOM_ACCENT_KEY, DEFAULT_CUSTOM_ACCENT } from '../../model/AppearanceCustomization';
-import { SurfaceMaterialControl } from './SurfaceMaterialControl';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { isSettingsItemVisible } from '../../model/SettingsStructure';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { resourceText, namedResourceText } from '../../utils/UiFeedback';
@@ -161,7 +160,6 @@ export struct 外观分组 {
             ThemeMotionControl({ isDark: this.是否深色 })
           }
           AppearanceCustomizationControl()
-          SurfaceMaterialControl()
           MotionStyleControl()
           DeckWidthControl()
           CardTextSizeControl()

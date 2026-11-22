@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { OutlinedValue } from '../common/OutlinedValue';
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceElementColor, appearanceModuleRadius, appearanceModuleBorder } from '../../utils/AppearanceElements';
 import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { RedemptionDialog } from './RedemptionDialog';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { SeriesVisual } from '../../utils/SeriesVisual';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -21,6 +24,7 @@ import { 颜色主题, 颜色键 } from '../../model/颜色主题';
 /** 两种模式共用的独立兑换分类，直接展示识别码与主题兑换入口。 */
 @Component
 export struct RedemptionPanel {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('themeMode') private materialMode: string = 'system';
@@ -139,7 +143,7 @@ export struct RedemptionPanel {
       Row() {
 
         Text(settingsItemText(this.getUIContext(), 'installation_fingerprint', this.uiLanguage))
-          .fontSize(15).fontColor($r('app.color.text_primary')).textAlign(TextAlign.Start).layoutWeight(1)
+          .fontSize(15).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).textAlign(TextAlign.Start).layoutWeight(1)
         Button() {
           Text() { ForEach([themeTextKey(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'fingerprint_copy', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontColor(this.primary)
         }
@@ -148,15 +152,18 @@ export struct RedemptionPanel {
           .stateEffect(false)
           .onClick((): void => { this.copyFingerprint(); })
       }.width('100%')
-      Column({ space: 6 }) {
-        Text(this.fingerprintLine(1))
-          .fontSize(14).fontFamily('monospace').fontColor($r('app.color.text_secondary')).width('100%')
-        Text(this.fingerprintLine(5))
-          .fontSize(14).fontFamily('monospace').fontColor($r('app.color.text_secondary')).width('100%')
-      }.width('100%').padding(12).border(SurfaceBorder.options()).borderRadius(12)
-        .attributeModifier(SeriesVisual.insetSurface(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.primary, '', 12))
-      Text($r('app.string.redemption_fingerprint_hint'))
-        .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+      if (this.fingerprint !== '') {
+        OutlinedValue() {
+          Column({ space: 6 }) {
+            Text(this.fingerprintLine(1))
+              .fontSize(14).minFontSize(9).maxFontSize(14).maxLines(1).fontFamily('monospace')
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
+            Text(this.fingerprintLine(5))
+              .fontSize(14).minFontSize(9).maxFontSize(14).maxLines(1).fontFamily('monospace')
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
+          }.alignItems(HorizontalAlign.Start)
+        }
+      }
       if (this.loadFailed) {
         Button($r('app.string.redemption_retry'))
           .attributeModifier(new PressFeedback(1, 0.4, true))
@@ -168,7 +175,7 @@ export struct RedemptionPanel {
         Row() {
 
           Text() { ForEach([themeTextKey(settingsItemText(this.getUIContext(), 'redemption', this.uiLanguage), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(settingsItemText(this.getUIContext(), 'redemption', this.uiLanguage), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(15).fontColor(this.primary).textAlign(TextAlign.Start).layoutWeight(1)
-          DisclosureChevron({ tint: $r('app.color.text_tertiary') })
+          DisclosureChevron({ tint: appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')) })
         }.width('100%')
       }
         .width('100%').height(44).backgroundColor(Color.Transparent).borderRadius(12)
@@ -182,9 +189,17 @@ export struct RedemptionPanel {
         })
 
     }
-    .padding(16).width('100%').border(SurfaceBorder.options()).borderRadius(20)
-    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.primary, '', 20, this.moduleOpacity))
+    .alignItems(HorizontalAlign.Start).padding(16).width('100%').border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(20)
+    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.primary, '', 20, this.moduleOpacity, this.appearanceElements))
+    .background(this.renderGlassBackground(SeriesVisual.settingsSurface(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.primary, '', 20, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
   }
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     this.redemptionDetails()
   }

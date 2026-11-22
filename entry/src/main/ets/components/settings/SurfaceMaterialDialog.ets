@@ -1,4 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { APPEARANCE_CUSTOMIZATION_ITEMS } from '../../model/AppearanceCustomization';
+import { APPEARANCE_EDITOR_SECTIONS } from '../../model/AppearanceElements';
+import { AppearanceSectionPicker } from './AppearanceSectionPicker';
+import { SliderStyle } from '../../utils/SliderStyle';
+import { appearanceElementColor } from '../../utils/AppearanceElements';
+import { APPEARANCE_ELEMENTS_KEY, APPEARANCE_ELEMENTS_PREVIEW_KEY, APPEARANCE_ELEMENTS_ACTIVE_KEY,
+  elementStyleFor, replaceElementStyle } from '../../model/AppearanceElements';
+import { saveAppearanceElements } from '../../utils/AppearanceElementStore';
+import { 应用颜色主题 } from '../../utils/颜色主题管理器';
+import { ThemeId } from '../../model/ThemeCatalog';
 import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { SURFACE_MATERIAL_KEY, SURFACE_MATERIALS, surfaceMaterialTitleKey, MODULE_OPACITY_KEY,
@@ -24,7 +34,13 @@ interface OpacityPreview {
 
 @CustomDialog
 export struct SurfaceMaterialDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   controller?: CustomDialogController;
+  @Prop showSectionPicker: boolean = false;
+  @Prop sectionSwitching: boolean = false;
+  @Prop sectionMemoryFailed: boolean = false;
+  onSectionSelect: (id: string) => void = (_id: string): void => {};
+
   onClose: () => void = (): void => {};
   registerDismiss: (guard: () => boolean) => void = (_guard: () => boolean): void => {};
   private mounted: boolean = false;
@@ -36,7 +52,10 @@ export struct SurfaceMaterialDialog {
   @StorageProp(DIALOG_OPACITY_KEY) @Watch('syncOpacity') private dialogOpacity: MaterialOpacity = DEFAULT_DIALOG_OPACITY;
   @StorageProp('themeMode') @Watch('syncOpacity') private mode: string = 'system';
   @StorageProp('systemDarkMode') @Watch('syncOpacity') private systemDark: boolean = false;
-  @StorageProp(颜色键.主色按钮背景) private actionColor: string = '#2F5FD0';
+  @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
+  @State private blurDraft: number = 80;
+  private blurOriginal: string | undefined = undefined;
+  private blurDark: boolean = false;
   @State private opacityDraft: number = 100;
   @State private buttonDraft: number = 100;
   @State private dialogDraft: number = 0;
@@ -48,24 +67,61 @@ export struct SurfaceMaterialDialog {
     this.mounted = true;
     this.registerDismiss((): boolean => !this.saving);
     this.syncOpacity();
+    this.blurDraft = elementStyleFor(AppStorage.get<string>(APPEARANCE_ELEMENTS_KEY) ?? '', SeriesVisual.isDark(this.mode, this.systemDark)).blur;
   }
 
   aboutToDisappear(): void {
     this.mounted = false;
-    if (!this.saving) this.restoreOpacityPreview();
+    if (!this.saving) { this.restoreOpacityPreview(); this.restoreBlur(); }
     appInterface.leave('surface_material_settings');
   }
 
+  private refreshTheme(): void {
+    应用颜色主题(AppStorage.get<ThemeId>('colorTheme') ?? 'aurora', SeriesVisual.isDark(this.mode, this.systemDark));
+  }
+  private restoreBlur(): void {
+    if (this.blurOriginal === undefined) return;
+    this.blurOriginal = undefined;
+    AppStorage.delete(APPEARANCE_ELEMENTS_PREVIEW_KEY); this.refreshTheme();
+  }
+  private changeBlur(value: number, mode: SliderChangeMode): void {
+    if (!this.mounted || this.saving || !validModuleOpacity(value) || this.style !== 'glass' || (this.blurOriginal === undefined && value === this.blurDraft)) return;
+    if (this.blurOriginal === undefined) {
+      this.restoreOpacityPreview();
+      this.blurOriginal = AppStorage.get<string>(APPEARANCE_ELEMENTS_KEY) ?? '';
+      this.blurDark = SeriesVisual.isDark(this.mode, this.systemDark);
+    }
+    const style = elementStyleFor(this.blurOriginal, this.blurDark);
+    style.blur = value; this.blurDraft = value;
+    AppStorage.setOrCreate<string>(APPEARANCE_ELEMENTS_PREVIEW_KEY, replaceElementStyle(this.blurOriginal, this.blurDark, style));
+    this.refreshTheme(); this.publishInterface();
+    if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) this.persistBlur();
+  }
+  private async persistBlur(): Promise<void> {
+    if (this.blurOriginal === undefined) return;
+    this.saving = true; this.saveFailed = false;
+    try {
+      const style = elementStyleFor(this.blurOriginal, this.blurDark); style.blur = this.blurDraft;
+      await saveAppearanceElements(this.blurDark, style, this.blurOriginal);
+    } catch (error) { this.saveFailed = true; }
+    finally {
+      this.restoreBlur();
+      this.blurDraft = elementStyleFor(AppStorage.get<string>(APPEARANCE_ELEMENTS_KEY) ?? '', SeriesVisual.isDark(this.mode, this.systemDark)).blur;
+      this.saving = false; this.publishInterface();
+    }
+  }
   private close(): void { if (!this.saving) this.onClose(); }
 
   private publishInterface(): void {
     if (!this.mounted) return;
     appInterface.observe({ surface: 'surface_material_settings', sectionId: this.style, selectedId: this.style,
       optionIds: SURFACE_MATERIALS, optionLabels: [], busy: this.saving, controlsComplete: true,
-      items: SURFACE_MATERIAL_ITEMS.map((item): AppInterfaceControl => ({
+      items: [...SURFACE_MATERIAL_ITEMS, ...APPEARANCE_CUSTOMIZATION_ITEMS.filter((item): boolean => this.showSectionPicker && item.id === 'appearance_section')].filter((item): boolean => item.id !== 'glass_blur' || this.style === 'glass').map((item): AppInterfaceControl => ({
         id: item.id, titleKey: item.titleKey, title: '', enabled: !this.saving, selected: false
       })),
       values: [
+        { id: 'appearance_section', value: 'material' }, { id: 'appearance_section_options', value: JSON.stringify(APPEARANCE_EDITOR_SECTIONS) },
+        { id: 'glass_blur', value: String(this.blurDraft) },
         { id: 'module_opacity', value: String(moduleOpacityPercent(this.moduleOpacity, this.style, SeriesVisual.isDark(this.mode, this.systemDark))) },
         { id: 'button_opacity', value: String(buttonOpacityPercent(this.buttonOpacity, this.style)) },
         { id: 'dialog_opacity', value: String(dialogOpacityPercent(this.dialogOpacity, this.style)) }
@@ -73,6 +129,7 @@ export struct SurfaceMaterialDialog {
   }
 
   private syncOpacity(): void {
+    if (this.blurOriginal === undefined) this.blurDraft = elementStyleFor(AppStorage.get<string>(APPEARANCE_ELEMENTS_KEY) ?? '', SeriesVisual.isDark(this.mode, this.systemDark)).blur;
     if (!this.saving && this.preview !== undefined && this.preview.material !== this.style) {
       this.restoreOpacityPreview();
     }
@@ -90,6 +147,8 @@ export struct SurfaceMaterialDialog {
 
   private changeOpacity(value: number, mode: SliderChangeMode, target: OpacityTarget): void {
     if (!this.mounted || this.saving || !validModuleOpacity(value)) return;
+    const current: number = target === 'dialog' ? this.dialogDraft : target === 'button' ? this.buttonDraft : this.opacityDraft;
+    if (this.preview === undefined && value === current) return;
     const key: string = target === 'dialog' ? DIALOG_OPACITY_KEY : target === 'button' ? BUTTON_OPACITY_KEY : MODULE_OPACITY_KEY;
     if (this.preview === undefined || this.preview.key !== key) {
       this.restoreOpacityPreview();
@@ -130,6 +189,7 @@ export struct SurfaceMaterialDialog {
   private async selectStyle(index: number): Promise<void> {
     if (this.saving || index < 0 || index >= SURFACE_MATERIALS.length || SURFACE_MATERIALS[index] === this.style) return;
     this.restoreOpacityPreview();
+    this.restoreBlur();
     this.saving = true;
     this.saveFailed = false;
     try { await saveSurfaceMaterial(SURFACE_MATERIALS[index]); }
@@ -146,11 +206,11 @@ export struct SurfaceMaterialDialog {
     Column({ space: FormRowLayout.hintGap }) {
       Row() {
         Text(label)
-          .fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
-        Text(`${this.opacityValue(target)}%`).fontSize(15).fontColor($r('app.color.text_secondary'))
+          .fontSize(15).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).layoutWeight(1)
+        Text(`${this.opacityValue(target)}%`).fontSize(15).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }.width('100%')
-      Slider({ value: this.opacityValue(target), min: 0, max: 100, step: 1 }).width('100%')
-        .selectedColor(this.actionColor).enabled(!this.saving)
+      Slider({ value: this.opacityValue(target), min: 0, max: 100, step: 1 }).attributeModifier(new SliderStyle(this.actionColor)).width('100%')
+        .enabled(!this.saving)
         .onChange((value: number, mode: SliderChangeMode): void => { this.changeOpacity(value, mode, target); })
     }.width('100%')
   }
@@ -164,6 +224,17 @@ export struct SurfaceMaterialDialog {
           value: localizedNamedResourceText(this.getUIContext(), this.uiLanguage, surfaceMaterialTitleKey(this.style)),
           isInteractive: !this.saving, onSelect: (index: number): void => { this.selectStyle(index); } })
       }, (revision: number): string => revision.toString())
+      Text($r('app.string.appearance_material_hint')).fontSize(12).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
+      if (this.style === 'glass') {
+        Column({ space: FormRowLayout.hintGap }) {
+          Row() {
+            Text($r('app.string.appearance_glass_blur')).layoutWeight(1).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
+            Text(this.blurDraft.toString() + '%').fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
+          }.width('100%')
+          Slider({ value: this.blurDraft, min: 0, max: 100, step: 1 }).attributeModifier(new SliderStyle(this.actionColor)).width('100%').enabled(!this.saving)
+            .onChange((value: number, mode: SliderChangeMode): void => { this.changeBlur(value, mode); })
+        }.width('100%')
+      }
       Column({ space: FormRowLayout.rowGap }) {
         this.opacitySlider('module', $r('app.string.module_opacity'))
         this.opacitySlider('button', $r('app.string.button_opacity'))
@@ -177,8 +248,12 @@ export struct SurfaceMaterialDialog {
 
   @Builder
   private header() {
+    Column({ space: 8 }) {
     DialogHeader({ title: $r('app.string.surface_material'), showAction: false, closeEnabled: !this.saving,
       onClose: (): void => { this.close(); } })
+    if (this.showSectionPicker) AppearanceSectionPicker({ selectedId: 'material',
+      isInteractive: !this.saving && !this.sectionSwitching, memoryFailed: this.sectionMemoryFailed, onSelect: this.onSectionSelect })
+    }.width('100%')
   }
 
   build() {

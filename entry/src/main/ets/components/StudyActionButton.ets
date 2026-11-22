@@ -1,5 +1,7 @@
-import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceElementRadius, appearanceElementColor, appearanceTextColor } from '../utils/AppearanceElements';
+import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../model/SurfaceMaterial';
 import { GlassSurface } from '../utils/GlassSurface';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 
@@ -11,6 +13,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
  */
 @Component
 export struct StudyActionButton {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(GLASS_COLORS_KEY) private glassColors: string[] = GLASS_HIGHLIGHT_COLORS;
@@ -26,19 +29,24 @@ export struct StudyActionButton {
     return buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial);
   }
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     Button({ type: ButtonType.Normal }) {
       Column({ space: 2 }) {
         Text(this.label)
           .fontSize(this.labelFontSize)
           .fontWeight(FontWeight.Medium)
-          .fontColor(this.labelColor)
+          .fontColor(appearanceTextColor(this.appearanceElements, this.labelColor))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         if (this.subtitle.length > 0) {
           Text(this.subtitle)
             .fontSize(12)
-            .fontColor(this.labelColor)
+            .fontColor(appearanceTextColor(this.appearanceElements, this.labelColor))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
@@ -49,11 +57,12 @@ export struct StudyActionButton {
       .height(this.buttonHeight)
       .padding({ left: 4, right: 4 })
       .fontSize(this.labelFontSize)
-      .fontColor(this.labelColor)
+      .fontColor(appearanceTextColor(this.appearanceElements, this.labelColor))
       // 公共多态表面拥有按压反馈，不叠加 Button 默认效果。
-      .attributeModifier(new GlassSurface(this.surfaceMaterial, this.glassColors, this.fillColor, undefined, false, this.buttonOpacityPercent()))
+      .attributeModifier(new GlassSurface(this.surfaceMaterial, this.glassColors, this.fillColor, undefined, false, this.buttonOpacityPercent(), this.appearanceElements))
+      .background(this.renderGlassBackground((new GlassSurface(this.surfaceMaterial, this.glassColors, this.fillColor, undefined, false, this.buttonOpacityPercent(), this.appearanceElements)).backgroundSurface()))
       .stateEffect(false)
-      .borderRadius(应用尺寸.圆角_面板)
+      .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
       .onClick((): void => {
         this.onActivate();
       })

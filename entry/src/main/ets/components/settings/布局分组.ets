@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { resourceText } from '../../utils/UiFeedback';
@@ -33,6 +34,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 // ========================================================
 @Component
 export struct 布局分组 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   // ⓘ 上抛：点击布局行的 ⓘ 时，由父级（设置面板）弹出 字段帮助面板
@@ -127,7 +129,7 @@ export struct 布局分组 {
           if (this.当前布局模式 === 'smart') {
             Text(this.gripHint())
               .fontSize(应用尺寸.字号_正文_中)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               .width('100%')
           }
       }

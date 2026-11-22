@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
+import { insetMaterialFill } from '../utils/GlassMaterial';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { 按下态按钮 } from './common/按下态按钮';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -7,6 +8,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 /** 与卡片 Web 同宽同高的教学层；颜色配合文字，点击分区不提交评分。 */
 @Component
 export struct StudyTapZonesGuide {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   onConfirm: () => void = (): void => {};
 
   @Builder
@@ -16,7 +18,7 @@ export struct StudyTapZonesGuide {
       Rect().width('100%').height('100%').fill(color).opacity(0.5)
         .hitTestBehavior(HitTestMode.None)
       Text(label).fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary')).textAlign(TextAlign.Center)
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).textAlign(TextAlign.Center)
         .padding(8).backgroundColor(insetMaterialFill($r('app.color.surface_card'))).borderRadius(8)
     }.layoutWeight(1).height('100%')
   }
@@ -35,10 +37,10 @@ export struct StudyTapZonesGuide {
       }.width('100%').height('100%')
       Column({ space: 8 }) {
         Text($r('app.string.tap_zones_guide_message')).fontSize(13)
-          .fontColor($r('app.color.text_primary')).textAlign(TextAlign.Center)
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).textAlign(TextAlign.Center)
         按下态按钮({ 文案: $r('app.string.study_guide_start'), 点击回调: this.onConfirm })
       }.width('88%').constraintSize({ maxWidth: 360 })
-        .padding(12).backgroundColor(insetMaterialFill($r('app.color.surface_card'))).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
+        .padding(12).backgroundColor(insetMaterialFill($r('app.color.surface_card'))).border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
     }.width('100%').height('100%').onClick((): void => {})
   }
 }

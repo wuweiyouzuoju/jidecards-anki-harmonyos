@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { TEMPLATE_SHORTCUTS, shortcutCommand } from '../../model/KeyboardShortcuts';
 import { StudyKeyboardSession } from '../../model/StudyKeyboard';
 import { studyEventChord } from '../../utils/StudyKeyAdapter';
@@ -60,6 +61,7 @@ interface TemplateSelection { start: number; end: number; }
 
 @Component
 export struct 笔记类型编辑器 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -465,8 +467,8 @@ export struct 笔记类型编辑器 {
         .fontSize(应用尺寸.字号_正文_小)
         .height(应用尺寸.按钮高度)
         .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-        .border(SurfaceBorder.options())
-        .borderRadius(应用尺寸.圆角_面板)
+        .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+        .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         .layoutWeight(1)
         .onChange((值: string) => { this.updateFieldName(字段.draftId, 值); })
       IconActionButton({ source: $r('app.media.ic_common_arrow_up'), label: $r('app.string.icon_field_up'),
@@ -511,10 +513,10 @@ export struct 笔记类型编辑器 {
           LoadingProgress()
             .width(20)
             .height(20)
-            .color($r('app.color.text_secondary'))
+            .color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           Text($r('app.string.notetype_editor_loading'))
             .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         }
         .width('100%')
         .justifyContent(FlexAlign.Center)
@@ -534,14 +536,14 @@ export struct 笔记类型编辑器 {
         Column({ space: 应用尺寸.间距_5 }) {
           Text($r('app.string.notetype_editor_name'))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .width('100%')
           TextInput({ text: this.类型名 })
             .height(应用尺寸.按钮高度)
             .fontSize(应用尺寸.字号_正文)
             .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-            .border(SurfaceBorder.options())
-            .borderRadius(应用尺寸.圆角_面板)
+            .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+            .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
             .onChange((值: string) => { this.类型名 = 值; })
         }
         .width('100%')
@@ -598,7 +600,7 @@ export struct 笔记类型编辑器 {
                 点击回调: (): void => { this.previewTemplate(); } })
             }.width('100%')
             Text(this.isCloze ? $r('app.string.notetype_cloze_template_hint') : $r('app.string.notetype_template_change_hint'))
-              .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+              .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
             if (this.previewBusy) { LoadingProgress().width(24).height(24) }
             // 模板选择器
             if (this.模板列表.length > 1) {
@@ -612,21 +614,21 @@ export struct 笔记类型编辑器 {
             // 模板名
             Text($r('app.string.notetype_editor_template_name'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               .width('100%')
             TextInput({ text: this.当前模板().name })
               .height(应用尺寸.按钮高度)
               .fontSize(应用尺寸.字号_正文_小)
               .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-              .border(SurfaceBorder.options())
-              .borderRadius(应用尺寸.圆角_面板)
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+              .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
               .onChange((值: string) => { this.更新模板名(值); })
 
             // 字段令牌（点击插入）
             if (this.字段列表.length > 0) {
               Text($r('app.string.notetype_editor_tokens'))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .width('100%')
               Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
                 ForEach(this.字段列表, (字段: EditableNotetypeField) => {
@@ -639,13 +641,13 @@ export struct 笔记类型编辑器 {
             // 正面模板
             Text($r('app.string.notetype_editor_front_template'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               .width('100%')
             TextArea({ text: this.当前模板().qfmt, controller: this.frontController })
               .fontSize(应用尺寸.字号_正文_小)
               .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-              .border(SurfaceBorder.options())
-              .borderRadius(应用尺寸.圆角_面板)
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+              .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
               .constraintSize({ minHeight: 80 })
               .width('100%')
               .onFocus((): void => { this.templateFace = 'front'; })
@@ -655,13 +657,13 @@ export struct 笔记类型编辑器 {
             // 背面模板
             Text($r('app.string.notetype_editor_back_template'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               .width('100%')
             TextArea({ text: this.当前模板().afmt, controller: this.backController })
               .fontSize(应用尺寸.字号_正文_小)
               .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-              .border(SurfaceBorder.options())
-              .borderRadius(应用尺寸.圆角_面板)
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+              .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
               .constraintSize({ minHeight: 80 })
               .width('100%')
               .onFocus((): void => { this.templateFace = 'back'; })
@@ -685,8 +687,8 @@ export struct 笔记类型编辑器 {
             TextArea({ text: this.CSS文本 })
               .fontSize(应用尺寸.字号_正文_小)
               .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-              .border(SurfaceBorder.options())
-              .borderRadius(应用尺寸.圆角_面板)
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+              .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
               .constraintSize({ minHeight: 100 })
               .width('100%')
               .onChange((值: string) => { this.CSS文本 = 值; })
@@ -699,10 +701,10 @@ export struct 笔记类型编辑器 {
             LoadingProgress()
               .width(20)
               .height(20)
-              .color($r('app.color.text_secondary'))
+              .color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Text($r('app.string.notetype_editor_saving'))
               .fontSize(应用尺寸.字号_正文_中)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           }
           .width('100%')
           .justifyContent(FlexAlign.Center)

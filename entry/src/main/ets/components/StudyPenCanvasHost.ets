@@ -6,6 +6,7 @@ import { StudyPenCanvasParameters } from './StudyPenCanvasParameters';
 import { StudyPenCanvasFactory, StudyPenCanvasMount } from './StudyPenCanvasMount';
 import { isStudyPenKitAvailable } from '../backend/StudyPenKitAvailability';
 import { setStudyPenKitContext } from '../backend/StudyPenKitContext';
+import { AppLog } from '../model/AppLog';
 
 export type StudyPenCanvasLoader = () => Promise<StudyPenCanvasFactory>;
 
@@ -70,7 +71,7 @@ export class StudyPenCanvasHost {
         const position = node.convertPositionFromWindow({ x: x, y: y });
         return position.x >= 0 && position.y >= 0 && position.x < width && position.y < height;
       } catch (error) {
-        console.warn(`Study Pen Kit tool position is unavailable: ${error}`);
+        AppLog.warn('StudyPenCanvas', `Study Pen Kit tool position is unavailable: ${error}`);
         return false;
       }
     }
@@ -118,7 +119,7 @@ export class StudyPenCanvasHost {
         try {
           this.mount?.resize(this.viewportWidth, this.viewportHeight);
         } catch (error) {
-          console.error(`Study Pen Kit canvas resize failed: ${error}`);
+          AppLog.error('StudyPenCanvas', `Study Pen Kit canvas resize failed: ${error}`);
           this.dispose();
           this.onFailure(this.parameters.generation, 'initialization_failed');
         }
@@ -173,7 +174,7 @@ export class StudyPenCanvasHost {
       }
     } catch (error) {
       if (this.isDisposed) return;
-      console.error(`Study Pen Kit loading/build failed: ${error}`);
+      AppLog.error('StudyPenCanvas', `Study Pen Kit loading/build failed: ${error}`);
       this.dispose();
       this.onFailure(this.parameters.generation, failureReason);
     }
@@ -186,7 +187,7 @@ export class StudyPenCanvasHost {
       try {
         this.content.removeFrameNode(this.frame);
       } catch (error) {
-        console.error(`Study Pen Kit canvas detach failed: ${error}`);
+        AppLog.error('StudyPenCanvas', `Study Pen Kit canvas detach failed: ${error}`);
       }
       this.frame = null;
     }

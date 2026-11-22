@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
 import { keyboardHelpSections, KeyboardHelpSection } from '../model/KeyboardShortcuts';
 import { defaultStudyControls, STUDY_CONTROLS_KEY } from '../model/StudyControls';
 import { readStudyControls } from '../backend/StudyControlsService';
@@ -14,6 +15,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 
 @Component
 export struct KeyboardShortcutHelp {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @StorageProp(STUDY_CONTROLS_KEY) @Watch('publishInterface') private controlsJson: string = JSON.stringify(defaultStudyControls());
   @State private expandedIds: string[] = [];
@@ -76,7 +78,7 @@ export struct KeyboardShortcutHelp {
           expanded: this.expandedIds.includes(section.id), onAction: (): void => { this.toggleSection(section.id); } })
         if (this.expandedIds.includes(section.id)) {
           if (section.id === 'study' && this.studyLoading) {
-            Text($r('app.string.common_loading')).fontColor($r('app.color.text_secondary')).width('100%')
+            Text($r('app.string.common_loading')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           } else if (section.id === 'study' && this.studyFailed) {
             Text($r('app.string.study_keyboard_load_failed')).fontColor($r('app.color.error_text')).width('100%')
             SettingsActionRow({ title: $r('app.string.common_retry'), onAction: (): void => { this.reloadStudyControls(); } })

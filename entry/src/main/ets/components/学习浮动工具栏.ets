@@ -1,7 +1,10 @@
-import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceElementRadius } from '../utils/AppearanceElements';
+import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../model/SurfaceMaterial';
 import { currentMotionProfile, motionAnimation } from '../utils/AppMotion';
 import { StudyRatingSurface } from '../utils/StudyRatingSurface';
+import { STUDY_TWO_BUTTONS_KEY } from '../utils/StudyAnswerButtons';
 import { GesturePointer, gesturePointer } from '../model/GesturePointer';
 import { GLASS_COLORS_KEY, GLASS_HIGHLIGHT_COLORS } from '../model/ThemeCatalog';
 //
@@ -74,6 +77,8 @@ import { PRIMARY_GLASS_KEY, PrimaryGlassStyle, themePrimaryGlass } from '../mode
 
 @Component
 export struct 学习浮动工具栏 {
+  @StorageProp(STUDY_TWO_BUTTONS_KEY) private twoButtons: boolean = false;
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -455,9 +460,10 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .height('100%')
     .padding({ left: 4, right: 4 })
-    .attributeModifier(new PrimaryGlassSurface(this.surfaceMaterial, this.primaryGlass, this.动作主色, this.是否深色, buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial)))
+    .attributeModifier(new PrimaryGlassSurface(this.surfaceMaterial, this.primaryGlass, this.动作主色, this.是否深色, buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial), this.appearanceElements))
+    .background(this.renderGlassBackground((new PrimaryGlassSurface(this.surfaceMaterial, this.primaryGlass, this.动作主色, this.是否深色, buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial), this.appearanceElements)).backgroundSurface()))
     .stateEffect(false)
-    .borderRadius(应用尺寸.圆角_面板)
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
     .onClick(() => {
       this.显示答案回调();
     })
@@ -486,9 +492,10 @@ export struct 学习浮动工具栏 {
     .width('100%')
     .padding({ left: 4, right: 4 })
     .layoutWeight(1)
-    .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, this.glassColors, 底色, true, this.动作主色, this.是否深色, buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial)))
+    .attributeModifier(new StudyRatingSurface(this.surfaceMaterial, this.glassColors, 底色, true, this.动作主色, this.是否深色, buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial), this.appearanceElements))
+    .background(this.renderGlassBackground((new StudyRatingSurface(this.surfaceMaterial, this.glassColors, 底色, true, this.动作主色, this.是否深色, buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial), this.appearanceElements)).backgroundSurface()))
     .stateEffect(false)
-    .borderRadius(应用尺寸.圆角_面板)
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
     .onClick(() => {
       this.评分回调(评分);
     })
@@ -499,12 +506,16 @@ export struct 学习浮动工具栏 {
     Column({ space: 应用尺寸.间距_8 }) {
       this.竖版评分按钮(RATING_AGAIN, $r('app.string.rating_again'),
         $r('app.color.study_again_text'), $r('app.color.study_again_background'))
-      this.竖版评分按钮(RATING_HARD, $r('app.string.rating_hard'),
-        $r('app.color.study_hard_text'), $r('app.color.study_hard_background'))
+      if (!this.twoButtons) {
+        this.竖版评分按钮(RATING_HARD, $r('app.string.rating_hard'),
+          $r('app.color.study_hard_text'), $r('app.color.study_hard_background'))
+      }
       this.竖版评分按钮(RATING_GOOD, $r('app.string.rating_good'),
         $r('app.color.study_good_text'), $r('app.color.study_good_background'))
-      this.竖版评分按钮(RATING_EASY, $r('app.string.rating_easy'),
-        $r('app.color.study_easy_text'), $r('app.color.study_easy_background'))
+      if (!this.twoButtons) {
+        this.竖版评分按钮(RATING_EASY, $r('app.string.rating_easy'),
+          $r('app.color.study_easy_text'), $r('app.color.study_easy_background'))
+      }
     }
     .width('100%')
     .height('100%')
@@ -533,6 +544,11 @@ export struct 学习浮动工具栏 {
   // ========================================================
 
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     if (!this.位置已加载 || (this.当前阶段 !== 'question' && this.当前阶段 !== 'answer')) {
       // 非学习阶段连外框与拖动热区一起隐藏，保留组件的位置状态供继续学习复用。
@@ -554,7 +570,7 @@ export struct 学习浮动工具栏 {
         .height('100%')
         .padding(应用尺寸.间距_8)
         .backgroundColor(this.浮卡底色())
-        .border({ width: 应用尺寸.卡片边框, color: this.主色边框 }).borderRadius(应用尺寸.圆角_面板)
+        .border({ width: 应用尺寸.卡片边框, color: this.主色边框 }).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
       }
       // position 是绝对定位（相对父容器左上角），Stack 作占位容器不影响布局
       .width(工具栏宽度(this.工具栏类型))

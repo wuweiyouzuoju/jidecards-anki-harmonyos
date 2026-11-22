@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { GlassPanel } from '../common/GlassPanel';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import type { AppInterfaceControl } from '../../model/AppInterface';
@@ -48,6 +49,7 @@ import { MediaMaintenanceSession, MediaMaintenanceState } from '../../model/sett
 
 @Component
 export struct 媒体管理面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @State private surfaceWidth: string = '88%';
   @State private surfaceMaximumWidth: number = 480;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -266,7 +268,7 @@ Column({ space: 应用尺寸.间距_16 }) {
             bottom: 应用尺寸.间距_8
           })
           .backgroundColor(this.isDark ? 'rgba(230, 81, 0, 0.15)' : 'rgba(230, 81, 0, 0.08)')
-          .borderRadius(应用尺寸.圆角_卡片)
+          .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
         }
 
         // 检查按钮
@@ -277,10 +279,10 @@ Column({ space: 应用尺寸.间距_16 }) {
             LoadingProgress()
               .width(20)
               .height(20)
-              .color($r('app.color.text_secondary'))
+              .color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             Text($r('app.string.media_checking'))
               .fontSize(应用尺寸.字号_正文_中)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           }
           .width('100%')
           .justifyContent(FlexAlign.Center)
@@ -296,7 +298,7 @@ Column({ space: 应用尺寸.间距_16 }) {
 
         if (this.taggedCount >= 0) {
           Text(this.取本地化带参文本($r('app.string.media_tagged_notes_count'), [this.taggedCount]))
-            .fontColor($r('app.color.text_secondary')).fontSize(应用尺寸.字号_正文_小)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).fontSize(应用尺寸.字号_正文_小)
             .width('100%')
         }
 
@@ -309,7 +311,7 @@ Column({ space: 应用尺寸.间距_16 }) {
                 Row() {
                   Text(this.取本地化带参文本($r('app.string.media_unused_count'), [this.未使用总数]))
                     .fontSize(应用尺寸.字号_正文)
-                    .fontColor($r('app.color.text_primary'))
+                    .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                     .fontWeight(FontWeight.Medium)
                     .layoutWeight(1)
                 }
@@ -317,7 +319,7 @@ Column({ space: 应用尺寸.间距_16 }) {
                 if (this.未使用总数 === 0) {
                   Text($r('app.string.media_no_unused'))
                     .fontSize(应用尺寸.字号_正文_小)
-                    .fontColor($r('app.color.text_secondary'))
+                    .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                     .width('100%')
                 }
 
@@ -327,9 +329,9 @@ Column({ space: 应用尺寸.间距_16 }) {
                   .height(40)
                   .fontSize(14)
                   .fontColor(this.未使用总数 > 0 && !this.处理中 ?
-                    $r('app.color.error_text') : $r('app.color.text_secondary'))
+                    $r('app.color.error_text') : appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                   .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-                  .border(SurfaceBorder.options(0.5))
+                  .border(SurfaceBorder.options(0.5, undefined, this.appearanceElements))
                   .borderRadius(10)
                   .enabled(this.未使用总数 > 0 && !this.检查中 && !this.处理中)
                   .stateStyles({ disabled: { .opacity(1) } })
@@ -341,14 +343,14 @@ Column({ space: 应用尺寸.间距_16 }) {
               .width('100%')
               .alignItems(HorizontalAlign.Start)
               .padding(12)
-              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-              .border(SurfaceBorder.options()).borderRadius(12)
+              .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(12)
 
               // 缺失媒体区
               Column({ space: 应用尺寸.间距_4 }) {
                 Text(this.取本地化带参文本($r('app.string.media_missing_count'), [this.缺失总数]))
                   .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                   .fontWeight(FontWeight.Medium)
                   .width('100%')
                 DataActionRow({ title: $r('app.string.media_view_missing'),
@@ -361,21 +363,21 @@ Column({ space: 应用尺寸.间距_16 }) {
                 if (this.缺失总数 === 0) {
                   Text($r('app.string.media_no_missing'))
                     .fontSize(应用尺寸.字号_正文_小)
-                    .fontColor($r('app.color.text_secondary'))
+                    .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                     .width('100%')
                 }
               }
               .width('100%')
               .alignItems(HorizontalAlign.Start)
               .padding(12)
-              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-              .border(SurfaceBorder.options()).borderRadius(12)
+              .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(12)
 
               // 连续滚动按需追加报告块；分页仅存在于传输边界。
               Column({ space: 应用尺寸.间距_4 }) {
                 Text($r('app.string.media_check_report'))
                   .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                   .fontWeight(FontWeight.Medium)
                   .width('100%')
                 ForEach(this.reportChunks, (chunk: string, index: number) => {
@@ -388,34 +390,34 @@ Column({ space: 应用尺寸.间距_16 }) {
               }
               .width('100%')
               .padding(12)
-              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-              .border(SurfaceBorder.options()).borderRadius(12)
+              .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(12)
 
               // 回收站状态
               Column({ space: 12 }) {
                 Row() {
                   Text($r('app.string.media_trash_status'))
                     .fontSize(应用尺寸.字号_正文)
-                    .fontColor($r('app.color.text_primary'))
+                    .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                     .layoutWeight(1)
                   Text(this.回收站有内容 ? $r('app.string.media_trash_has_items') : $r('app.string.media_trash_empty'))
                     .fontSize(应用尺寸.字号_正文_小)
-                    .fontColor(this.回收站有内容 ? $r('app.color.error_text') : $r('app.color.text_secondary'))
+                    .fontColor(this.回收站有内容 ? $r('app.color.error_text') : appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 }
                 .width('100%')
                 Row({ space: 8 }) {
                   Button() {
                     Text() { ForEach([themeTextKey($r('app.string.media_restore_trash'), (this.回收站有内容 && !this.处理中) ? this.themeAccentColors : [], this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans($r('app.string.media_restore_trash'), (this.回收站有内容 && !this.处理中) ? this.themeAccentColors : [], this.getUIContext()) }, (_textKey: string): string => _textKey) }.fontSize(14).fontColor(this.回收站有内容 && !this.处理中 ?
-                      this.dialogActionColor : $r('app.color.text_secondary'))
+                      this.dialogActionColor : appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                   }
                     .type(ButtonType.Normal)
                     .layoutWeight(1)
                     .height(40)
                     .fontSize(14)
                     .fontColor(this.回收站有内容 && !this.处理中 ?
-                      this.dialogActionColor : $r('app.color.text_secondary'))
+                      this.dialogActionColor : appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                     .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-                    .border(SurfaceBorder.options(0.5))
+                    .border(SurfaceBorder.options(0.5, undefined, this.appearanceElements))
                     .borderRadius(10)
                     .enabled(this.回收站有内容 && !this.检查中 && !this.处理中)
                     .stateStyles({ disabled: { .opacity(1) } })
@@ -429,9 +431,9 @@ Column({ space: 应用尺寸.间距_16 }) {
                     .height(40)
                     .fontSize(14)
                     .fontColor(this.回收站有内容 && !this.处理中 ?
-                      $r('app.color.error_text') : $r('app.color.text_secondary'))
+                      $r('app.color.error_text') : appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                     .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-                    .border(SurfaceBorder.options(0.5))
+                    .border(SurfaceBorder.options(0.5, undefined, this.appearanceElements))
                     .borderRadius(10)
                     .enabled(this.回收站有内容 && !this.检查中 && !this.处理中)
                     .stateStyles({ disabled: { .opacity(1) } })
@@ -443,8 +445,8 @@ Column({ space: 应用尺寸.间距_16 }) {
               }
               .width('100%')
               .padding(12)
-              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-              .border(SurfaceBorder.options()).borderRadius(12)
+              .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(12)
             }
             .width('100%')
           }
@@ -462,10 +464,10 @@ Column({ space: 应用尺寸.间距_16 }) {
               LoadingProgress()
                 .width(20)
                 .height(20)
-                .color($r('app.color.text_secondary'))
+                .color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               Text($r('app.string.media_processing'))
                 .fontSize(应用尺寸.字号_正文_中)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             }
             .width('100%')
             .justifyContent(FlexAlign.Center)

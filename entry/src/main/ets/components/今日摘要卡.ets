@@ -1,5 +1,7 @@
-import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceElementRadius, appearanceElementColor, appearanceModuleBorder, appearanceModuleRadius } from '../utils/AppearanceElements';
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 import { SeriesVisual } from '../utils/SeriesVisual';
 import { LengthMetrics } from '@kit.ArkUI';
 import { ThemeDefinition, themeDefinition, THEME_VISUALS_KEY } from '../model/ThemeCatalog';
@@ -35,6 +37,7 @@ import { 颜色键 } from '../model/颜色主题';
 // ========================================================
 @Component
 export struct 今日摘要卡 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('themeMode') private themeMode: string = 'system';
@@ -45,6 +48,8 @@ export struct 今日摘要卡 {
   @Prop indicatorSpace: number = 0;
   @Prop cardHeight: number = 150;
   @Prop compactCard: boolean = false;
+  @Prop compactLandscape: boolean = false;
+  @Prop nestedSurface: boolean = false;
   @StorageProp(THEME_VISUALS_KEY) private visual: ThemeDefinition = themeDefinition('aurora');
   @Prop 已完成数: number = 0;
   @Prop 待学数: number = 0;
@@ -115,7 +120,7 @@ export struct 今日摘要卡 {
   // ========================================================
   private pageGeometry(): HomeSummaryGeometry {
     const context: UIContext = this.getUIContext();
-    return homeSummaryGeometry(this.cardHeight, this.compactCard, this.indicatorSpace, context.px2vp(context.fp2px(1)));
+    return homeSummaryGeometry(this.cardHeight, this.compactCard, this.indicatorSpace, context.px2vp(context.fp2px(1)), this.compactLandscape);
   }
 
   private stackedMetrics(): boolean {
@@ -123,15 +128,20 @@ export struct 今日摘要卡 {
     return homeSummaryStacksMetrics(this.contentWidth, context.px2vp(context.fp2px(1)));
   }
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
-    Column({ space: 应用尺寸.间距_8 }) {
+    Column({ space: this.pageGeometry().sectionGap }) {
       Flex({ direction: this.stackedMetrics() ? FlexDirection.Column : FlexDirection.Row,
         alignItems: this.stackedMetrics() ? ItemAlign.Start : ItemAlign.Center }) {
         Text($r('app.string.today_progress'))
           .fontSize(this.compactCard ? 应用尺寸.字号_强调 : 应用尺寸.字号_摘要标题)
           .wordBreak(WordBreak.BREAK_WORD)
           .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           .layoutWeight(this.stackedMetrics() ? 0 : 1)
           .width(this.stackedMetrics() ? '100%' : undefined)
         Text($r('app.string.deck_count_summary', this.牌组数))
@@ -139,15 +149,15 @@ export struct 今日摘要卡 {
           .width(this.stackedMetrics() ? '100%' : undefined)
           .textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.End)
           .flexShrink(0).margin({ left: this.stackedMetrics() ? 0 : 应用尺寸.间距_4 })
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }
       .width('100%').constraintSize({ minHeight: this.pageGeometry().titleHeight })
 
-      Column({ space: 应用尺寸.间距_8 }) {
+      Column({ space: this.pageGeometry().sectionGap }) {
         if (this.是否空态()) {
           Text(this.空态提示())
             .fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .textAlign(TextAlign.Center)
             .width('100%')
         } else {
@@ -155,7 +165,7 @@ export struct 今日摘要卡 {
             .height(应用尺寸.进度条高度)
             .color(this.visual.progressColors.length > 0 ? themeProgressGradient(this.visual.progressColors) : this.动作主色)
             .backgroundColor(this.主色容器色)
-            .borderRadius(应用尺寸.圆角_进度条)
+            .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_进度条))
 
           Scroll() {
           Flex({ direction: this.stackedMetrics() ? FlexDirection.Column : FlexDirection.Row,
@@ -171,7 +181,7 @@ export struct 今日摘要卡 {
                 .width(this.stackedMetrics() ? '28%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
             Text($r('app.string.completed_today'))
               .fontSize(应用尺寸.字号_正文_小).wordBreak(WordBreak.NORMAL)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .width(this.stackedMetrics() ? '72%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
             }
             .width(this.stackedMetrics() ? '100%' : undefined)
@@ -188,7 +198,7 @@ export struct 今日摘要卡 {
                 .width(this.stackedMetrics() ? '28%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
             Text($r('app.string.pending_today'))
               .fontSize(应用尺寸.字号_正文_小).wordBreak(WordBreak.NORMAL)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .width(this.stackedMetrics() ? '72%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
             }
             .width(this.stackedMetrics() ? '100%' : undefined)
@@ -205,7 +215,7 @@ export struct 今日摘要卡 {
                 .width(this.stackedMetrics() ? '28%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
             Text($r('app.string.today_pass_rate_short'))
               .fontSize(应用尺寸.字号_正文_小).wordBreak(WordBreak.NORMAL)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .width(this.stackedMetrics() ? '72%' : '100%').textAlign(this.stackedMetrics() ? TextAlign.Start : TextAlign.Center)
                 .accessibilityText($r('app.string.today_recall_rate'))
             }
@@ -219,10 +229,13 @@ export struct 今日摘要卡 {
     }
     .width('100%')
     .height(this.cardHeight)
-    .onAreaChange((_old: Area, area: Area): void => { this.contentWidth = Number(area.width); })
-    .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().padding,
+    .padding({ top: this.pageGeometry().topPadding, bottom: this.pageGeometry().bottomPadding,
       left: this.pageGeometry().padding, right: this.pageGeometry().padding })
-    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
-      this.动作主色, this.pageTint, undefined, this.moduleOpacity))
+    .attributeModifier(this.nestedSurface ? SeriesVisual.insetSurface(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark), this.动作主色, this.pageTint, undefined, this.appearanceElements) : SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
+      this.动作主色, this.pageTint, undefined, this.moduleOpacity, this.appearanceElements))
+    .background(this.renderGlassBackground(this.nestedSurface ? SeriesVisual.insetSurface(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark), this.动作主色, this.pageTint, undefined, this.appearanceElements) : SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
+      this.动作主色, this.pageTint, undefined, this.moduleOpacity, this.appearanceElements)))
+    .border(this.nestedSurface ? { width: 0 } : appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
   }
 }

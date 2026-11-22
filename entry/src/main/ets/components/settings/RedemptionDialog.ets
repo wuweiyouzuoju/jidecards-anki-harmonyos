@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { IridescentUnlockCelebration } from './IridescentUnlockCelebration';
@@ -12,6 +13,7 @@ import { ThemeId } from '../../model/ThemeCatalog';
 /** 原生窗口直接链接草稿与结果，不能把成功状态锁在打开时的 Builder 闭包中。 */
 @CustomDialog
 export struct RedemptionDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   controller?: CustomDialogController;
   @Link busy: boolean;
   @Link code: string;
@@ -46,21 +48,21 @@ export struct RedemptionDialog {
         IridescentUnlockCelebration({ onUse: (): void => { this.onUse(); } })
       } else if (!this.unlocked) {
       Text($r('app.string.redemption_form_hint'))
-        .fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
+        .fontSize(13).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       TextArea({ text: this.code, placeholder: $r('app.string.redemption_placeholder') })
-        .border(SurfaceBorder.options())
+        .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
         .height(108).maxLength(1024).enabled(!this.busy).fontSize(14)
-        .fontColor($r('app.color.text_primary')).placeholderColor($r('app.color.text_tertiary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).placeholderColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
         .borderRadius(14).padding(14)
-        .attributeModifier(SeriesVisual.insetSurface(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.primary, '', 14))
+        .attributeModifier(SeriesVisual.insetSurface(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.primary, '', 14, this.appearanceElements))
         .onChange((value: string): void => { this.code = value; this.message = ''; this.unlocked = false; })
       }
       if (this.message !== '' && !this.unlocked) {
-        Text(this.message).fontSize(13).fontColor($r('app.color.text_secondary')).width('100%')
+        Text(this.message).fontSize(13).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
       if (this.unlocked && !this.showCelebration) {
         LabeledActionRow({ label: this.message, actionLabel: $r('app.string.redemption_use_theme'), tint: this.primary,
-          textColor: $r('app.color.text_secondary'), isInteractive: !this.busy,
+          textColor: appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')), isInteractive: !this.busy,
           onAction: (): void => { this.onUse(); } })
       }
     }.width('100%')

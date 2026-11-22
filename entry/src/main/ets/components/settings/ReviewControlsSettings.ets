@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { SettingsToggleRow } from '../common/SettingsToggleRow';
@@ -12,12 +13,14 @@ import { StudyQuickAnswerMode } from '../../model/StudyGestures';
 import { 颜色键 } from '../../model/颜色主题';
 import { 设置分组卡片 } from './设置分组卡片';
 import { STUDY_HAPTICS_KEY, saveStudyHaptics } from '../../utils/StudyHaptics';
+import { STUDY_TWO_BUTTONS_KEY, saveStudyTwoButtons } from '../../utils/StudyAnswerButtons';
 import { STUDY_QUICK_ANSWER_KEY, loadStudyQuickAnswerMode,
   saveStudyQuickAnswerMode } from '../../model/实验性功能存储';
 
 /** 快捷答题模式互斥；评分触感使用独立本机偏好。 */
 @Component
 export struct ReviewControlsSettings {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   @Prop 简洁模式: boolean = true;
@@ -32,6 +35,10 @@ export struct ReviewControlsSettings {
   @State private hapticsToggle: boolean = true;
   @State private hapticsSaving: boolean = false;
   @State private hapticsSaveFailed: boolean = false;
+  @StorageProp(STUDY_TWO_BUTTONS_KEY) @Watch('syncTwoButtons') private twoButtons: boolean = false;
+  @State private twoButtonsToggle: boolean = false;
+  @State private twoButtonsSaving: boolean = false;
+  @State private twoButtonsFailed: boolean = false;
   private keyboardDialog: NativeDialogHost = new NativeDialogHost();
   private keyboardBusy: boolean = false;
   private gestureDialog: NativeDialogHost = new NativeDialogHost();
@@ -64,6 +71,7 @@ export struct ReviewControlsSettings {
     this.keyboardDialog.activate();
     this.gestureDialog.activate();
     this.hapticsToggle = this.hapticsEnabled;
+    this.syncTwoButtons();
     this.loadControls();
   }
   aboutToDisappear(): void { this.keyboardDialog.dispose(); this.gestureDialog.dispose(); }
@@ -129,6 +137,17 @@ export struct ReviewControlsSettings {
     this.hapticsToggle = this.hapticsEnabled;
   }
 
+  private syncTwoButtons(): void { this.twoButtonsToggle = this.twoButtons; }
+  private async changeTwoButtons(enabled: boolean): Promise<void> {
+    if (this.twoButtonsSaving || enabled === this.twoButtons) return;
+    this.twoButtonsSaving = true;
+    this.twoButtonsFailed = false;
+    this.twoButtonsToggle = enabled;
+    try { await saveStudyTwoButtons(enabled, this.twoButtons); }
+    catch (error) { this.twoButtonsFailed = true; }
+    finally { this.syncTwoButtons(); this.twoButtonsSaving = false; }
+  }
+
   /** 保存期间防止重复写入，失败恢复开关并显示可重试的提示。 */
   private async changeStudyHaptics(enabled: boolean): Promise<void> {
     if (this.hapticsSaving || enabled === this.hapticsEnabled) { return; }
@@ -149,6 +168,14 @@ export struct ReviewControlsSettings {
   build() {
     设置分组卡片({ groupId: 'review_controls', 是否深色: this.是否深色 }) {
       Column({ space: FormRowLayout.rowGap }) {
+          SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'study_two_buttons', this.uiLanguage),
+            isOn: this.twoButtonsToggle, isInteractive: !this.twoButtonsSaving, showHelp: true,
+            onHelp: (): void => {
+              this.打开说明回调($r('app.string.settings_study_two_buttons'), $r('app.string.settings_study_two_buttons_help'));
+            }, onChange: (enabled: boolean): void => { this.changeTwoButtons(enabled); } })
+          if (this.twoButtonsFailed) {
+            Text($r('app.string.settings_study_controls_failed')).fontSize(12).fontColor($r('app.color.error_text'))
+          }
           SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'study_haptics', this.uiLanguage), isOn: this.hapticsToggle, tint: this.actionColor, isDark: this.是否深色,
             isInteractive: !this.hapticsSaving,
             onChange: (enabled: boolean): void => { this.changeStudyHaptics(enabled); } })
@@ -169,7 +196,7 @@ export struct ReviewControlsSettings {
         Text(this.selectedMode === StudyQuickAnswerMode.TapZones ? $r('app.string.settings_controls_tap_hint') :
           (this.selectedMode === StudyQuickAnswerMode.Gestures ? $r('app.string.settings_study_gestures_hint') :
             $r('app.string.settings_quick_answer_off_hint')))
-          .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+          .fontSize(12).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         if (this.controlsFailed) {
           Text($r('app.string.settings_study_controls_failed')).fontSize(12)
             .fontColor($r('app.color.error_text'))

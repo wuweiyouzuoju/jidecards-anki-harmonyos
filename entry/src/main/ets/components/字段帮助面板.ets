@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
 import { DialogFrame } from './common/DialogFrame';
 import { DialogHeader } from './common/DialogHeader';
 import { 应用尺寸 } from '../utils/应用尺寸';
@@ -6,6 +7,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 /** 页面根层承载只读说明；关闭不提交或丢弃下层表单草稿。 */
 @Component
 export struct 字段帮助面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop nativeHost: boolean = false;
   @Prop 标题: ResourceStr = $r('app.string.deck_options_title');
   @Prop 正文: ResourceStr = '';
@@ -24,7 +26,7 @@ export struct 字段帮助面板 {
   @Builder
   private helpContent() {
     if (this.正文 !== '') {
-      Text(this.正文).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary')).width('100%')
+      Text(this.正文).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     }
     this.内容()
   }
@@ -41,6 +43,7 @@ export struct 字段帮助面板 {
 /** 原生弹窗宿主的薄适配；系统返回只关闭这一层，展示仍复用字段帮助面板。 */
 @CustomDialog
 export struct 字段帮助对话框 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   controller?: CustomDialogController;
   标题: ResourceStr = '';
   正文: ResourceStr = '';

@@ -1,5 +1,7 @@
-import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceElementRadius, appearanceElementColor, appearanceModuleBorder, appearanceModuleRadius } from '../utils/AppearanceElements';
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 import { SeriesVisual } from '../utils/SeriesVisual';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { PressFeedback } from '../utils/PressFeedback';
@@ -17,6 +19,7 @@ import { localeNumber } from '../utils/LocaleFormatting';
 /** 同牌组同一天刷新保留已展示图表；切换范围隐藏旧值，迟到结果丢弃。 */
 @Component
 export struct DeckStudyHistoryCard {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('themeMode') private themeMode: string = 'system';
@@ -115,22 +118,27 @@ export struct DeckStudyHistoryCard {
     }
   }
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
       Text($r('app.string.deck_history_title'))
         .fontSize(应用尺寸.字号_按钮)
         .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .width('100%')
       if (this.loading) {
         Text($r('app.string.deck_history_loading'))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .height(168)
       } else if (this.failed) {
         Text($r('app.string.deck_history_error'))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         Button($r('app.string.deck_history_retry'))
           .fontColor(this.accent)
           .backgroundColor(Color.Transparent)
@@ -145,7 +153,7 @@ export struct DeckStudyHistoryCard {
             Column({ space: 6 }) {
               Text(localeNumber(day.count, this.uiLanguage))
                 .fontSize(12)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .maxLines(1)
                 .minFontSize(9)
                 .maxFontSize(12)
@@ -161,7 +169,7 @@ export struct DeckStudyHistoryCard {
               .width('100%')
               Text(this.dayLabel(day))
                 .fontSize(10)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .maxLines(1).wordBreak(WordBreak.NORMAL)
             }
             .layoutWeight(1).constraintSize({ minWidth: this.dayColumnWidth() })
@@ -174,10 +182,10 @@ export struct DeckStudyHistoryCard {
             Text($r('app.string.deck_history_active_days', this.history.activeDays))
               .fontSize(应用尺寸.字号_卡片标题)
               .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             Text($r('app.string.deck_history_days_label'))
               .fontSize(12)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           }.layoutWeight(1)
           Column({ space: 4 }) {
             Text(this.history.totalMillis > 0 && this.history.totalMillis < 1000 ?
@@ -186,27 +194,31 @@ export struct DeckStudyHistoryCard {
                 Math.floor(this.history.totalMillis / 1000) % 60))
               .fontSize(应用尺寸.字号_卡片标题)
               .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             Text($r('app.string.deck_history_time_label'))
               .fontSize(12)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           }.layoutWeight(1)
         }
         .width('100%')
         if (this.history.totalCount > 0) {
           Text($r('app.string.deck_history_scope'))
             .fontSize(12)
-            .fontColor($r('app.color.text_tertiary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
             .width('100%')
         }
       }
     }
     .width('100%')
     .padding(应用尺寸.卡片内边距)
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
     .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
-      this.accent, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity))
+      this.accent, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements))
+    .background(this.renderGlassBackground(SeriesVisual.clearSurface(this.surfaceMaterial, SeriesVisual.isDark(this.themeMode, this.systemDark),
+      this.accent, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
     .onVisibleAreaChange([0], (visible: boolean): void => { this.setVisible(visible); })
   }
 }

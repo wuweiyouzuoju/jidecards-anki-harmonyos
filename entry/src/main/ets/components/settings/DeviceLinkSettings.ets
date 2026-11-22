@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { common } from '@kit.AbilityKit';
 import { scanBarcode, scanCore } from '@kit.ScanKit';
 import { DeviceLinkService, DeviceLinkSnapshot, DevicePeerView, DeviceProgressView, DeviceCollectionView } from '../../backend/device-link/DeviceLinkService';
@@ -22,6 +23,7 @@ import { DevicePairingDialog } from './DevicePairingDialog';
 
 @Component
 export struct DeviceLinkSettings {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 是否深色: boolean = false;
   @Prop initiallyExpanded: boolean = false;
@@ -304,18 +306,18 @@ export struct DeviceLinkSettings {
       SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'device_link_scan', this.uiLanguage),
         showDisclosure: false, isInteractive: this.canAct(), onAction: (): void => { this.scanCode(); } })
       Text(settingsItemText(this.getUIContext(), 'device_link_devices', this.uiLanguage))
-        .fontSize(应用尺寸.字号_按钮).fontColor($r('app.color.text_primary')).width('100%')
+        .fontSize(应用尺寸.字号_按钮).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       if (this.snapshot.peers.length === 0) {
         Text($r('app.string.device_link_empty')).fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
       ForEach(this.snapshot.peers, (peer: DevicePeerView) => {
         Column({ space: 应用尺寸.间距_8 }) {
           Divider().color(SurfaceBorder.color())
           Column({ space: 应用尺寸.间距_4 }) {
-            Text(peer.name).fontSize(应用尺寸.字号_按钮).fontColor($r('app.color.text_primary')).width('100%')
+            Text(peer.name).fontSize(应用尺寸.字号_按钮).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
             Text(peer.online ? $r('app.string.device_link_online') : $r('app.string.device_link_offline'))
-              .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+              .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           }.width('100%').padding({ top: 应用尺寸.间距_12, bottom: 应用尺寸.间距_8 })
           SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'device_collection_allow', this.uiLanguage),
             showHelp: true, isHelpEnabled: this.canAct(), onHelp: (): void => {
@@ -335,7 +337,7 @@ export struct DeviceLinkSettings {
             }
           }
           if (this.collectionText(peer.id) !== '') {
-            Text(this.collectionText(peer.id)).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+            Text(this.collectionText(peer.id)).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           }
           Divider().color(SurfaceBorder.color())
           SettingsToggleRow({ title: settingsItemText(this.getUIContext(), 'device_progress_allow', this.uiLanguage),
@@ -352,7 +354,7 @@ export struct DeviceLinkSettings {
           }
           if (this.progressText(peer.id) !== '') {
             Text(this.progressText(peer.id)).fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary')).width('100%')
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           }
           Divider().color(SurfaceBorder.color())
           SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'device_link_forget', this.uiLanguage),
@@ -378,15 +380,15 @@ export struct DeviceLinkSettings {
       if (this.snapshot.progressBusy) {
         Text((this.snapshot.collection ?? []).some((item: DeviceCollectionView): boolean => item.phase === 'running') ?
           $r('app.string.device_collection_working') : $r('app.string.device_progress_working')).fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'device_progress_cancel', this.uiLanguage),
           showDisclosure: false, onAction: (): void => { this.cancelProgress(); } })
       }
       if (this.busy && !this.snapshot.progressBusy) {
         Text($r('app.string.device_link_working')).fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
-      if (this.error !== '') { Text(this.error).fontColor($r('app.color.text_secondary')).width('100%') }
+      if (this.error !== '') { Text(this.error).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%') }
     }.width('100%').alignItems(HorizontalAlign.Start)
       .onAreaChange((_oldArea: Area, newArea: Area): void => {
         this.reveal?.revealAfterLayout(this.expanded, Number(newArea.height));

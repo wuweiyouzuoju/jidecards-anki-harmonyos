@@ -2,6 +2,7 @@
 import { EditNotePage } from '../EditNotePage';
 import { NoteDraftPreviewPage } from '../NoteDraftPreviewPage';
 import { DeckOptionsPage } from '../DeckOptionsPage';
+import { StudyLeaderboardPage } from '../StudyLeaderboardPage';
 import { 学习页, 学习页参数 } from '../学习页';
 import { 浏览页 } from '../浏览页';
 import { 统计页, 统计页参数 } from '../统计页';
@@ -25,6 +26,7 @@ export interface HomeDestinationContext {
 export function HomeDestinations(name: string, param: ESObject, context: HomeDestinationContext) {
   if (name === appPageName('study')) {
     学习页({
+      pageContinuation: (param as 学习页参数).continuation ?? null,
       pageDeckId: (param as 学习页参数).deckId ?? '',
       pageDeckName: (param as 学习页参数).deckName ?? '',
       pathStack: context.pathStack
@@ -52,6 +54,8 @@ export function HomeDestinations(name: string, param: ESObject, context: HomeDes
       pathStack: context.pathStack,
       initialSnapshot: param as 统计页参数
     })
+  } else if (name === appPageName('study_leaderboard')) {
+    StudyLeaderboardPage({ pathStack: context.pathStack })
   } else if (name === appPageName('add_note')) {
     添加笔记页({
       pageDeckId: (param as 添加笔记页参数).deckId ?? '',
@@ -71,6 +75,7 @@ export function HomeDestinations(name: string, param: ESObject, context: HomeDes
       onNavigateApp: context.onNavigateApp,
       pathStack: context.pathStack
     })
+
   } else if (name === appPageName('reminders')) {
     学习提醒页({
       pathStack: context.pathStack

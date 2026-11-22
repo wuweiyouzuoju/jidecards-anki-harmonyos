@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
+import { insetMaterialFill } from '../utils/GlassMaterial';
 import { DialogFrame } from './common/DialogFrame';
 import { PressFeedback } from '../utils/PressFeedback';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -12,6 +13,7 @@ import { showToastSafely, resourceText } from '../utils/UiFeedback';
 
 @CustomDialog
 export struct StudyAutoAdvanceDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   controller?: CustomDialogController;
   draft: StudyAutoAdvanceDraft = new StudyAutoAdvanceDraft(new StudyOptions(), false, 0);
@@ -99,11 +101,11 @@ export struct StudyAutoAdvanceDialog {
   setting(field: StudyAdvanceField) {
     Row({ space: 应用尺寸.间距_12 }) {
       Column({ space: 4 }) {
-        Text(this.title(field)).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+        Text(this.title(field)).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         Text(this.label(field, this.draft.value(field)))
-          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+          .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-      DisclosureChevron({ tint: $r('app.color.text_secondary') })
+      DisclosureChevron({ tint: appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')) })
     }
     .width('100%').constraintSize({ minHeight: 64 }).padding({ left: 8, right: 8, top: 8, bottom: 8 })
     .attributeModifier(new PressFeedback())
@@ -121,9 +123,9 @@ export struct StudyAutoAdvanceDialog {
   @Builder
   private dialogContent() {
     Text(this.title(this.field)).fontSize(18).fontWeight(FontWeight.Bold)
-      .fontColor($r('app.color.text_primary')).width('100%').textAlign(TextAlign.Center)
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%').textAlign(TextAlign.Center)
     Text($r('app.string.study_auto_advance_session_only'))
-      .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+      .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
     Column() {
       if (this.field === StudyAdvanceField.Main) {
         if (this.choice) {
@@ -131,7 +133,7 @@ export struct StudyAutoAdvanceDialog {
         } else {
           Row({ space: 应用尺寸.间距_12 }) {
             Text($r('app.string.study_auto_advance_start')).fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary')).layoutWeight(1)
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).layoutWeight(1)
             ForEach([this.toggleVersion], (_version: number) => {
               Toggle({ type: ToggleType.Switch, isOn: this.isAdvanceEnabled })
                 .onChange((value: boolean): void => { this.changeAdvance(value); })
@@ -146,11 +148,11 @@ export struct StudyAutoAdvanceDialog {
         ForEach(this.draft.choices(), (value: number) => {
           Row({ space: 应用尺寸.间距_12 }) {
             Text(this.label(this.field, value)).fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary')).layoutWeight(1)
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).layoutWeight(1)
           }
           .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8 })
-          .borderRadius(应用尺寸.圆角_面板)
-          .backgroundColor(this.selected === value ? insetMaterialFill($r('app.color.surface_page')) : Color.Transparent)
+          .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
+          .backgroundColor(this.selected === value ? insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))) : Color.Transparent)
           .accessibilitySelected(this.selected === value)
           .attributeModifier(new PressFeedback())
           .onClick((): void => { this.selected = value; })

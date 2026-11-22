@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GLASS_HOME_SOURCE } from '../utils/GlassBackdrop';
 import { DirectoryTree } from './common/DirectoryTree';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../model/DirectoryTree';
 import { interfaceItemText } from '../utils/AppInterfaceText';
@@ -44,6 +45,7 @@ import { 颜色键 } from '../model/颜色主题';
 
 @Component
 export struct 创建牌组面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop @Watch('publishInterface') busy: boolean = false;
@@ -249,7 +251,7 @@ export struct 创建牌组面板 {
 
     // 牌组名称输入框上移到标题下方（先填名称 → 再选父牌组 → 看预览 → 提交）
     TextInput({ placeholder: interfaceItemText(this.getUIContext(), 'create_deck', 'name', this.uiLanguage), text: this.deckName })
-      .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
+      .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距, this.appearanceElements))
       .enabled(!this.busy)
       .onChange((value: string) => {
         this.deckName = value;
@@ -299,7 +301,7 @@ export struct 创建牌组面板 {
   }
 
   build() {
-    DialogFrame({ canDismiss: !this.busy, onDismiss: this.onCancel,
+    DialogFrame({ refractionSource: GLASS_HOME_SOURCE, canDismiss: !this.busy, onDismiss: this.onCancel,
       header: () => { this.headerContent(); }, content: () => { this.formContent(); } })
   }
 }

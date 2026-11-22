@@ -1,5 +1,7 @@
-import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceModuleRadius, appearanceModuleBorder } from '../../utils/AppearanceElements';
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 import { HelpLabel } from '../common/HelpLabel';
 
 // 二级设置页的静态分区：选项直接呈现，帮助按钮仍打开页面级说明。
@@ -12,6 +14,7 @@ import { settingsGroupText } from '../../utils/SettingsStructureText';
 
 @Component
 export struct 设置分组卡片 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -26,9 +29,17 @@ export struct 设置分组卡片 {
   打开说明回调: (标题: Resource, 正文: Resource) => void =
     (_标题: Resource, _正文: Resource): void => {};
   @BuilderParam 内容: () => void = this.默认内容;
+  @Prop trailingTitle: Resource | null = null;
+  @Prop trailingHelpTitle: Resource | null = null;
+  @Prop trailingHelpBody: Resource | null = null;
 
   @Builder
   private 默认内容(): void {}
+
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
 
   build() {
     Column() {
@@ -39,6 +50,13 @@ export struct 设置分组卡片 {
           showHelp: this.帮助标题 !== null && this.帮助正文 !== null,
           onHelp: (): void => { this.打开说明回调(this.帮助标题 as Resource, this.帮助正文 as Resource); }
           }).layoutWeight(1)
+          if (this.trailingTitle !== null) {
+            HelpLabel({ title: this.trailingTitle as Resource, textSize: 14, textWeight: FontWeight.Medium, minRowHeight: 44,
+              textColor: 设置面板色板_取(this.是否深色).次文字,
+              showHelp: this.trailingHelpTitle !== null && this.trailingHelpBody !== null,
+              onHelp: (): void => { this.打开说明回调(this.trailingHelpTitle as Resource, this.trailingHelpBody as Resource); }
+            }).layoutWeight(1)
+          }
         }.width('100%').alignItems(VerticalAlign.Center)
       }
 
@@ -46,6 +64,9 @@ export struct 设置分组卡片 {
     }
     .width('100%')
     .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距, top: 8, bottom: 8 })
-    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.actionColor, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity))
+    .attributeModifier(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.actionColor, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements))
+    .background(this.renderGlassBackground(SeriesVisual.settingsSurface(this.surfaceMaterial, this.是否深色, this.actionColor, this.pageTint, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
   }
 }

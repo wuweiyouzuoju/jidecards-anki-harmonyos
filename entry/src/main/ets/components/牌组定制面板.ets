@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { GLASS_HOME_SOURCE } from '../utils/GlassBackdrop';
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
 import { GlassPanel } from './common/GlassPanel';
 import { insetMaterialFill } from '../utils/GlassMaterial';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { DialogFrame } from './common/DialogFrame';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { IconActionButton } from './common/IconActionButton';
@@ -61,6 +63,7 @@ export type { 牌组背景动作, 牌组定制结果 } from '../model/DeckCustom
 
 @Component
 export struct 牌组定制面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -329,19 +332,19 @@ export struct 牌组定制面板 {
       Column({ space: 应用尺寸.间距_5 }) {
         Text(interfaceItemText(this.getUIContext(), 'deck_customize', 'name', this.uiLanguage))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
         TextInput({ text: this.编辑中名称 })
           .width('100%')
           .height(应用尺寸.按钮高度)
           .fontSize(应用尺寸.字号_正文)
           .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-          .border(SurfaceBorder.options())
-          .borderRadius(应用尺寸.圆角_面板)
+          .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+          .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
           .enabled(!this.busy)
           .onChange((值: string) => { if (!this.busy) { this.编辑中名称 = 值; this.publishInterface(); } })
         Text($r('app.string.deck_customize_alias_hint')).fontSize(应用尺寸.字号_说明)
-          .fontColor($r('app.color.text_tertiary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary'))).width('100%')
       }.width('100%')
 
       // 背景图预览与操作区
@@ -352,7 +355,7 @@ export struct 牌组定制面板 {
           onAction: (): void => { this.选取并裁剪(); } })
         Text($r('app.string.deck_customize_background_hint'))
           .fontSize(应用尺寸.字号_说明)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
 
         // 预览框：与牌组行实际渲染口径一致（objectFit=Cover + 同宽度 + 同高度）
@@ -365,7 +368,7 @@ export struct 牌组定制面板 {
             Column({ space: 应用尺寸.间距_5 }) {
               Text($r('app.string.deck_customize_background_remove'))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_tertiary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
             }
             .width('100%')
             .height('100%')
@@ -379,7 +382,7 @@ export struct 牌组定制面板 {
               .width('100%')
               .height('100%')
               .objectFit(ImageFit.Cover)
-              .borderRadius(应用尺寸.圆角_面板)
+              .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
             // 右上角 × 删除：markAnchor 锚定元素右上角，position 锚定 Stack 右上角，
             // translate 推 4px 内边距；避免 position('88%') 在不同预览宽度下距右边漂移
             IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.icon_background_remove'),
@@ -391,7 +394,7 @@ export struct 牌组定制面板 {
               .width('100%')
               .height('100%')
               .objectFit(ImageFit.Cover)
-              .borderRadius(应用尺寸.圆角_面板)
+              .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
             IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.icon_background_remove'),
               glyphColor: '#FFFFFF', surface: '#CC000000', onAction: (): void => { this.标记移除(); } })
               .markAnchor({ x: '100%', y: '0%' }).position({ x: '100%', y: 0 }).translate({ x: -4, y: 4 })
@@ -406,8 +409,8 @@ export struct 牌组定制面板 {
         }
         .width('100%')
         .height(应用尺寸.deckRowHeight(this.narrow))
-        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-        .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+        .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+        .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         .onAreaChange((_旧: Area, 新区域: Area) => {
           // Area.width/height 在 ArkTS 里是 Length 类型（string|number），需转 number
           const 宽: number = typeof 新区域.width === 'number'
@@ -455,7 +458,7 @@ export struct 牌组定制面板 {
           })
           Text($r('app.string.deck_customize_background_crop_hint'))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .width('100%')
 
           // 裁剪器：仅在 预览宽度/高度 测量完成后渲染（避免 0 尺寸导致组件初始化异常）
@@ -476,7 +479,7 @@ export struct 牌组定制面板 {
 
   build() {
     Stack() {
-      DialogFrame({ header: () => { this.panelHeader(); }, content: () => { this.panelContent(); },
+      DialogFrame({ refractionSource: GLASS_HOME_SOURCE, header: () => { this.panelHeader(); }, content: () => { this.panelContent(); },
         canDismiss: !this.busy && !this.裁剪模式, onDismiss: (): void => { this.onClose(); } })
 
       // ---- 顶层：裁剪模式覆盖层（仅 裁剪模式=true 时显示）----

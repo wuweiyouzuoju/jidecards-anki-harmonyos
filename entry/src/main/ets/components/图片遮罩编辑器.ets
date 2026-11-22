@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
 import { ImageSurfaceStyle } from '../utils/ImageSurfaceStyle';
 import { LengthMetrics } from '@kit.ArkUI';
 import { GesturePointer, gesturePointer } from '../model/GesturePointer';
@@ -53,6 +54,7 @@ interface ImageContentRect {
 
 @Component
 export struct 图片遮罩编辑器 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop 源图Uri: string = '';
   @Prop initialMasks: 遮罩描述[] = [];
 
@@ -873,7 +875,7 @@ export struct 图片遮罩编辑器 {
           )
       }
       .width(this.stageSize().width).height(this.stageSize().height)
-      .attributeModifier(new ImageSurfaceStyle())
+      .attributeModifier(new ImageSurfaceStyle( this.appearanceElements))
     }.width('100%').justifyContent(FlexAlign.Center)
   }
 
@@ -882,7 +884,7 @@ export struct 图片遮罩编辑器 {
     Column({ space: 应用尺寸.间距_8 }) {
       if (this.shapeKind === 'polygon') {
         Text(this.polygonPoints.length > 0 ? $r('app.string.io_polygon_points', this.polygonPoints.length) :
-          $r('app.string.io_polygon_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+          $r('app.string.io_polygon_hint')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(应用尺寸.间距_8), cross: LengthMetrics.vp(应用尺寸.间距_8) } }) {
           按下态按钮({ 文案: $r('app.string.io_finish_polygon'),
             是否启用: !this.confirmingClose && this.polygonPoints.length >= 3 && occlusionPolygonArea(this.polygonPoints) >= 0.00001,
@@ -893,9 +895,9 @@ export struct 图片遮罩编辑器 {
         }.width('100%')
       }
       if (this.shapeKind === 'text') {
-        Text($r('app.string.io_text_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        Text($r('app.string.io_text_hint')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         TextArea({ text: this.annotationText, placeholder: $r('app.string.io_text') })
-          .attributeModifier(new FormTextAreaStyle()).height(应用尺寸.按钮高度 * 2).enabled(!this.confirmingClose)
+          .attributeModifier(new FormTextAreaStyle( this.appearanceElements)).height(应用尺寸.按钮高度 * 2).enabled(!this.confirmingClose)
           .onChange((text: string): void => { this.annotationText = text; })
         按下态按钮({ 文案: this.selectedMask >= 0 && this.遮罩列表[this.selectedMask].形状 === 'text' ?
           $r('app.string.io_update_text') : $r('app.string.io_add_text'),
@@ -926,8 +928,8 @@ export struct 图片遮罩编辑器 {
           是否启用: !this.confirmingClose && (this.遮罩列表.length > 0 || this.polygonPoints.length > 0 || this.annotationText !== ''),
           点击回调: (): void => { this.清空全部(); } })
       }.width('100%')
-      Text($r('app.string.io_group_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-      Text($r('app.string.image_occlusion_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+      Text($r('app.string.io_group_hint')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
+      Text($r('app.string.image_occlusion_hint')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       if (this.imageFailed) Text($r('app.string.note_image_preview_failed')).fontColor($r('app.color.error_text'))
     }.width('100%').alignItems(HorizontalAlign.Start)
   }
@@ -955,7 +957,7 @@ export struct 图片遮罩编辑器 {
             this.choice('hide_one', $r('app.string.io_hide_one'), (): void => { this.setInactiveMode(false); })
             this.choice('hide_all', $r('app.string.io_hide_all'), (): void => { this.setInactiveMode(true); })
           }.width('100%')
-          Text(this.modeHint()).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+          Text(this.modeHint()).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           this.imageStage()
           this.editorActions()
         }.width('100%').alignItems(HorizontalAlign.Start)

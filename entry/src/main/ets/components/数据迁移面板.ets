@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
+import { insetMaterialFill } from '../utils/GlassMaterial';
 import { DirectorySelect } from './common/DirectorySelect';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows } from '../model/DirectoryTree';
 import { appInterface } from '../backend/AppInterfaceService';
@@ -39,6 +40,7 @@ export type { 数据迁移模式, 导出牌组选项, 导出牌组意图, 导出
 /** Presentation-only data management panel. File and backend work stay with its owner. */
 @Component
 export struct 数据迁移面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop deckId: number = 0;
@@ -263,7 +265,7 @@ export struct 数据迁移面板 {
     Row() {
       Text(标签)
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: 是否开启 })
         .selectedColor(this.主色按钮背景)
@@ -306,10 +308,10 @@ export struct 数据迁移面板 {
           LoadingProgress()
             .width(20)
             .height(20)
-            .color($r('app.color.text_secondary'))
+            .color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           Text(this.阶段文案())
             .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         }
         .width('100%')
         .justifyContent(FlexAlign.Center)
@@ -317,7 +319,7 @@ export struct 数据迁移面板 {
       if (this.busy && this.progress.total > 0) {
         Progress({ value: this.progress.processed, total: this.progress.total, type: ProgressType.Linear }).width('100%')
         Text(Math.min(100, Math.floor(this.progress.processed * 100 / this.progress.total)).toString() + '%')
-          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+          .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }
   }
 
@@ -330,12 +332,12 @@ export struct 数据迁移面板 {
     } else {
           Text(this.副标题())
             .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .margin({ top: 应用尺寸.间距_4 })
 
       if (this.fileName !== '') {
         Text(this.fileName).fontSize(应用尺寸.字号_正文_中)
-          .fontColor($r('app.color.text_primary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       }
 
       // === 牌组选择（仅 exportDeck 且允许选牌）===
@@ -365,7 +367,7 @@ export struct 数据迁移面板 {
           isInteractive: !this.busy, onSelect: (index: number): void => { this.exportFormat = index; } })
         if (this.exportFormat > 0) {
           Text($r('app.string.transfer_text_export_hint')).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary')).width('100%')
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           SettingsToggleRow({ title: $r('app.string.transfer_text_html'), isOn: this.textWithHtml, isDark: this.isDark, isInteractive: !this.busy,
             onChange: (value: boolean): void => { this.textWithHtml = value; } })
           if (this.exportFormat === 1) {
@@ -387,7 +389,7 @@ export struct 数据迁移面板 {
             this.选项行(this.解析文本($r('app.string.transfer_include_scheduling')),
               this.包含调度信息, (值: boolean) => { this.包含调度信息 = 值; })
             Text($r('app.string.card_mark_export_hint')).fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             this.选项行(this.解析文本($r('app.string.transfer_include_deck_configs')),
               this.包含牌组配置, (值: boolean) => { this.包含牌组配置 = 值; })
           }
@@ -423,7 +425,7 @@ export struct 数据迁移面板 {
           Row() {
             Text(this.解析文本($r('app.string.transfer_acknowledge_personal')))
               .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
               .layoutWeight(1)
             Toggle({ type: ToggleType.Checkbox, isOn: this.已确认替换个人数据 })
               .selectedColor(this.主色按钮背景)
@@ -433,8 +435,8 @@ export struct 数据迁移面板 {
         }
         .width('100%')
         .padding(应用尺寸.间距_12)
-        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-        .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+        .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+        .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
       }
 
       // === 错误信息（红字）===
@@ -446,7 +448,7 @@ export struct 数据迁移面板 {
       }
 
       if (this.cancelled) {
-        Text($r('app.string.transfer_cancelled')).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary'))
+        Text($r('app.string.transfer_cancelled')).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }
 
     }

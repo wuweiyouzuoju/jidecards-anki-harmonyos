@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
 import { DialogFrame } from './common/DialogFrame';
 import { DialogHeader } from './common/DialogHeader';
 import { ThemeTextSpans } from './common/ThemeText';
@@ -40,6 +41,7 @@ import { 取全屏转场时长, 取全屏转场曲线 } from '../utils/转场时
 
 @Component
 export struct 许可证面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @Prop isDark: boolean = false;
   onClose: () => void = (): void => {
@@ -52,11 +54,11 @@ export struct 许可证面板 {
       Text(标题)
         .fontSize(应用尺寸.字号_按钮)
         .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .width('100%')
       Text(正文)
         .fontSize(应用尺寸.字号_正文_中)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .width('100%')
     }
     .width('100%')
@@ -67,7 +69,7 @@ export struct 许可证面板 {
   private 许可证正文(正文: Resource) {
     Text(正文)
       .fontSize(应用尺寸.字号_正文_中)
-      .fontColor($r('app.color.text_secondary'))
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       .width('100%')
   }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { AppInterfaceItem, visibleInterfaceItems } from '../model/AppInterface';
+import { AppInterfaceItem, AppInterfaceControl, visibleInterfaceItems } from '../model/AppInterface';
 import { appInterface } from '../backend/AppInterfaceService';
 import { namedResourceText } from '../utils/UiFeedback';
 import { ActionMenuList, ActionMenuListItem } from './common/ActionMenuList';
@@ -11,6 +11,7 @@ import { 简洁模式AppStorage键 } from '../model/简洁模式存储';
 
 @Component
 export struct 主页操作面板 {
+  @Prop @Watch('publishInterface') centeredDialog: boolean = false;
   slideScope: MenuSlideScope = new MenuSlideScope();
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   创建牌组回调: () => void = (): void => {};
@@ -54,7 +55,11 @@ export struct 主页操作面板 {
     const items: AppInterfaceItem[] = this.menuItems();
     appInterface.observe({ surface: 'home_create', sectionId: '', selectedId: '',
       optionIds: items.map((item: AppInterfaceItem): string => item.id),
-      optionLabels: items.map((item: AppInterfaceItem): string => namedResourceText(this.getUIContext(), item.titleKey)), busy: false });
+      optionLabels: items.map((item: AppInterfaceItem): string => namedResourceText(this.getUIContext(), item.titleKey)), busy: false,
+      values: [{ id: 'presentation', value: this.centeredDialog ? 'centered_dialog' : 'button_anchored_popup' }],
+      controlsComplete: true,
+      items: items.map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id, title: '', titleKey: item.titleKey,
+        enabled: true, selected: false })).concat(this.centeredDialog ? [{ id: 'close', title: '', titleKey: 'close', enabled: true, selected: false }] : []) });
   }
   aboutToAppear(): void { this.publishInterface(); }
   aboutToDisappear(): void { appInterface.leave('home_create'); }

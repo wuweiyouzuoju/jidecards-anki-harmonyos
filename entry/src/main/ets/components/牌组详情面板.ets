@@ -1,6 +1,10 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { compactLandscapeScale, isWideLandscapeWindow } from '../model/AppLayoutState';
+import { WINDOW_SIZE_KEY, WindowSizeVp } from '../model/WindowSafeLayout';
+import { appearanceElementRadius, appearanceElementColor, appearanceModuleBorder, appearanceModuleRadius } from '../utils/AppearanceElements';
 import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 import { rememberPopupTrigger } from '../utils/PopupTrigger';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { AppInterfaceControl } from '../model/AppInterface';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { HomeActionAnchor } from '../model/HomeHeaderLayout';
@@ -56,6 +60,12 @@ import { SeriesVisual } from '../utils/SeriesVisual';
 // ========================================================
 @Component
 export struct 牌组详情面板 {
+  @StorageProp(WINDOW_SIZE_KEY) private densityWindow: WindowSizeVp = { width: 0, height: 0 };
+  private densityScale(): number {
+    return compactLandscapeScale(this.densityWindow.width, this.densityWindow.height);
+  }
+
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -63,6 +73,7 @@ export struct 牌组详情面板 {
   @StorageLink(AI_AGENT_CHANNELS_APP_STORAGE_KEY) @Watch('publishInterface') private Agent入口已启用: boolean = false;
   @Prop historyRefreshToken: number = 0;
   @Prop @Watch('publishInterface') showHeaderActions: boolean = true;
+  @Prop @Watch('publishInterface') actionWheel: boolean = false;
   @Prop @Watch('publishInterface') headerActionHeight: number = 应用尺寸.按钮高度;
   @Prop previewBusy: boolean = false;
   onPreviewHold: () => void = (): void => {};
@@ -116,15 +127,24 @@ export struct 牌组详情面板 {
         titleKey: item.titleKey, title: namedResourceText(this.getUIContext(), item.titleKey) + ' · ' + namedResourceText(this.getUIContext(), item.instructionsKey),
         enabled: true, selected: false, opens: item.opens })),
       values: [{ id: 'name', value: 牌组显示名(deck) }, { id: 'core_name', value: deck.fullName }, { id: 'filtered', value: String(deck.filtered === true) },
-        { id: 'header_actions_position', value: this.showHeaderActions ?
+        { id: 'header_actions_position', value: this.actionWheel ? 'right_grid' : this.showHeaderActions ?
           (this.headerActionHeight > 0 ? 'above_card' : 'hidden') : 'toolbar_right' },
         { id: 'header_actions_style', value: 'icons' },
-        { id: 'header_actions_layout', value: this.showHeaderActions ? (this.headerActionHeight > 0 ?
+        { id: 'header_actions_layout', value: this.actionWheel ? 'compact_grid' : this.showHeaderActions ? (this.headerActionHeight > 0 ?
           (this.Agent入口已启用 ? 'add_note:left,agent:after_add_note,preview:right_group,more:right' : 'add_note:left,preview:right_group,more:right') : 'hidden') :
           (this.Agent入口已启用 ? 'add_note:right_group,agent:right_group,preview:right_group,more:right_group' : 'add_note:right_group,preview:right_group,more:right_group') },
         { id: 'local_display_name', value: deck.displayName }, { id: 'description', value: deck.description },
         { id: 'total', value: String(deck.totalCards) }, { id: 'new', value: String(deck.newCount) },
         { id: 'learning', value: String(deck.learningCount) }, { id: 'review', value: String(deck.reviewCount) }] });
+  }
+
+  private countShortcutInset(): number {
+    return isWideLandscapeWindow(this.densityWindow.width, this.densityWindow.height) ? 0 : 应用尺寸.间距_4;
+  }
+
+  private countShortcutGap(): number {
+    if (this.densityScale() < 1) return 应用尺寸.间距_4;
+    return isWideLandscapeWindow(this.densityWindow.width, this.densityWindow.height) ? 应用尺寸.间距_8 : 应用尺寸.间距_15;
   }
 
   @Builder
@@ -133,13 +153,14 @@ export struct 牌组详情面板 {
       Row({ space: 8 }) {
         Column({ space: 4 }) {
           Text(interfaceItemText(this.getUIContext(), 'deck_details', id, this.uiLanguage))
-            .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary')).width('100%')
+            .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         Text(count.toString()).fontSize(应用尺寸.字号_卡片标题).fontWeight(FontWeight.Bold)
           .fontColor(tint).flexShrink(0)
-        DisclosureChevron({ tint: $r('app.color.text_tertiary') }).flexShrink(0)
-      }.width('100%').constraintSize({ minHeight: 44 })
-    }.width('100%').padding({ top: 4, bottom: 4 }).backgroundColor(Color.Transparent)
+        DisclosureChevron({ tint: appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')) }).flexShrink(0)
+      }.width('100%').constraintSize({ minHeight: 应用尺寸.按钮高度 })
+    }.width('100%').padding({ top: this.countShortcutInset(), bottom: this.countShortcutInset() })
+      .backgroundColor(Color.Transparent)
       .attributeModifier(new PressFeedback(1, 0.4, true)).stateEffect(false)
       .onAreaChange((_old: Area, area: Area): void => { this.shortcutAreas.set(id, area); })
       .onClick((): void => { this.activateShortcut(id); })
@@ -161,7 +182,7 @@ export struct 牌组详情面板 {
     Row() {
       ForEach(this.主页快照数据.decks, (deck: 牌组汇总) => {
         if (deck.id === this.选中牌组Id) {
-          Row({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
+          Row({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) * this.densityScale() }) {
             this.creationAction($r('app.media.ic_study_edit'),
               interfaceItemText(this.getUIContext(), 'deck_details', 'add_note', this.uiLanguage), (): void => { this.添加卡片(); })
             if (this.Agent入口已启用) {
@@ -170,7 +191,7 @@ export struct 牌组详情面板 {
             }
           }
           Blank()
-          Row({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
+          Row({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) * this.densityScale() }) {
           this.creationAction($r('app.media.ic_common_preview'),
             interfaceItemText(this.getUIContext(), 'deck_details', 'preview', this.uiLanguage),
             (): void => { this.预览(); }, !this.previewBusy, true)
@@ -184,10 +205,10 @@ export struct 牌组详情面板 {
     .height(this.headerActionHeight)
     .alignItems(VerticalAlign.Center)
     .flexShrink(0)
-    .margin({ bottom: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) })
+    .margin({ bottom: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) * this.densityScale() })
     .onAreaChange((_old: Area, area: Area): void => {
       this.onActionAnchorChange({ left: Number(area.globalPosition.x),
-        top: Number(area.globalPosition.y) + Number(area.height) + 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
+        top: Number(area.globalPosition.y) + Number(area.height) + 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) * this.densityScale(),
         width: Number(area.width) });
     })
   }
@@ -216,13 +237,26 @@ export struct 牌组详情面板 {
   // 无。仅上抛回调。
   // ========================================================
 
+  private detailShadowSideInset(): number {
+    return this.surfaceMaterial === 'glass' ? 应用尺寸.页面内边距_水平 * this.densityScale() : 0;
+  }
+
+  private detailShadowTopInset(): number {
+    return this.surfaceMaterial === 'glass' ? 应用尺寸.页面分组间距(this.narrowDeckLayout) * this.densityScale() / 2 : 0;
+  }
+
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     Stack() {
       Column() {
       if (this.showHeaderActions && this.headerActionHeight > 0) { this.headerActions() }
       // 详情内容独立滚动，开始学习按钮固定在底部。
       Scroll() {
-      Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
+      Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) * this.densityScale() }) {
         // 第 6 次修复：完全绕过 @State/@Watch/@Builder 间接响应链，
         // 直接在 build() 中用 ForEach + if 从 @Consume 主页快照数据 渲染。
         // ForEach 建立 @Consume 主页快照数据 响应式依赖，
@@ -235,33 +269,39 @@ export struct 牌组详情面板 {
                 Column({ space: 4 }) {
                   Text(牌组显示名(deck, this.uiLanguage))
                     .fontSize(应用尺寸.字号_牌组标题).fontWeight(FontWeight.Bold)
-                    .fontColor($r('app.color.text_primary')).width('100%').wordBreak(WordBreak.BREAK_ALL)
+                    .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%').wordBreak(WordBreak.BREAK_ALL)
                 }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-                DisclosureChevron({ tint: $r('app.color.text_tertiary') }).flexShrink(0)
+                DisclosureChevron({ tint: appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')) }).flexShrink(0)
               }.width('100%')
-            }.width('100%').padding(应用尺寸.卡片内边距)
+            }.width('100%').padding(应用尺寸.卡片内边距 * this.densityScale())
               .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色,
-                this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片, this.moduleOpacity))
+                this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements))
+              .background(this.renderGlassBackground(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色,
+                this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements)))
+              .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
               .attributeModifier(new PressFeedback(1, 0.4, true)).stateEffect(false)
-              .onAreaChange((_old: Area, area: Area): void => { this.shortcutAreas.set('name', area); })
               .onClick((): void => { this.activateShortcut('name'); })
             if (deck.description !== '') {
               Text(deck.description)
                 .fontSize(应用尺寸.字号_正文)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .width('100%')
             }
-            Column({ space: 应用尺寸.间距_15 }) {
-              this.countShortcut('total', deck.totalCards, $r('app.color.text_primary'), deck.filtered === true)
+            Column({ space: this.countShortcutGap() }) {
+              this.countShortcut('total', deck.totalCards, appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')), deck.filtered === true)
               this.countShortcut('new', deck.newCount, this.新卡计数色, deck.filtered === true)
               this.countShortcut('learning', deck.learningCount, this.学习中计数色, deck.filtered === true)
               this.countShortcut('review', deck.reviewCount, this.复习中计数色, deck.filtered === true)
             }
             .width('100%')
-            .padding(应用尺寸.卡片内边距)
-            .border(SurfaceBorder.options())
-            .borderRadius(应用尺寸.圆角_指标卡)
-            .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色, this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片, this.moduleOpacity))
+            .padding(应用尺寸.卡片内边距 * this.densityScale())
+            .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+            .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_指标卡))
+            .attributeModifier(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色, this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements))
+            .background(this.renderGlassBackground(SeriesVisual.clearSurface(this.surfaceMaterial, this.是否深色, this.动作主色, this.页面底色微染, 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
 
             DeckStudyHistoryCard({
               search: deckHistorySearch(deck.id, this.主页快照数据.decks),
@@ -283,13 +323,16 @@ export struct 牌组详情面板 {
       .alignItems(HorizontalAlign.Start)
         .width('100%')
       .padding({
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout)
+        left: this.detailShadowSideInset(),
+        right: this.detailShadowSideInset(),
+        top: this.detailShadowTopInset(),
+        bottom: SeriesVisual.scrollShadowEndInset(this.surfaceMaterial, 应用尺寸.页面底部间距(this.narrowDeckLayout) * this.densityScale())
       })
       }
-      .width('100%')
+      // 视口借用外层留白容纳投影，正文等量内缩以保持原来的对齐线。
+      .width('calc(100% + ' + (2 * this.detailShadowSideInset()) + 'vp)')
+      .margin({ left: -this.detailShadowSideInset(), right: -this.detailShadowSideInset(),
+        top: -this.detailShadowTopInset(), bottom: 0 })
       .layoutWeight(1)
       .align(Alignment.Top)
       .scrollBar(BarState.Off)
@@ -297,8 +340,6 @@ export struct 牌组详情面板 {
       // 滚动视口不绘制整栏底色，独立内容卡与左侧模块共用同一材质。
       .backgroundColor(Color.Transparent)
       .clip(true)
-      // 操作区自己贡献唯一的区块间距，避免卡片 margin 与按钮 padding 叠加。
-      .margin({ bottom: 0 })
       ForEach(this.主页快照数据.decks, (deck: 牌组汇总) => {
         if (deck.id === this.选中牌组Id) {
           Row() {
@@ -310,8 +351,9 @@ export struct 牌组详情面板 {
           .width('100%')
           .flexShrink(0)
           .padding({
-            top: 应用尺寸.操作区顶部间距(this.narrowDeckLayout),
-            bottom: 应用尺寸.操作区底部间距(this.narrowDeckLayout, this.navigationBottomInset)
+            top: 应用尺寸.操作区顶部间距(this.narrowDeckLayout) * this.densityScale(),
+            bottom: SeriesVisual.scrollShadowEndInset(this.surfaceMaterial,
+              应用尺寸.页面底部间距(this.narrowDeckLayout) * this.densityScale()) + this.navigationBottomInset
           })
         }
       }, (deck: 牌组汇总): string => deck.id)
@@ -322,9 +364,9 @@ export struct 牌组详情面板 {
     .width('100%')
     .height('100%')
     .padding({
-      left: 应用尺寸.页面内边距_水平,
-      right: 应用尺寸.页面内边距_水平,
-      top: this.showHeaderActions && this.headerActionHeight > 0 ? 0 : 应用尺寸.页面内容顶部间距(this.narrowDeckLayout)
+      left: 应用尺寸.页面内边距_水平 * this.densityScale(),
+      right: 应用尺寸.页面内边距_水平 * this.densityScale(),
+      top: this.actionWheel || (this.showHeaderActions && this.headerActionHeight > 0) ? 0 : 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) * this.densityScale()
     })
   }
 }

@@ -1,5 +1,9 @@
-import { GlassSource } from '../components/common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SeriesVisual } from '../utils/SeriesVisual';
+import { PAGE_TOOLBAR_SCOPE, PageToolbarActionScope } from '../model/PageToolbarActions';
+import { PageActionShell } from '../components/common/PageActionShell';
+import { appearanceElementColor } from '../utils/AppearanceElements';
+import { GlassSource } from '../components/common/GlassSource';
 import { DirectorySelect } from '../components/common/DirectorySelect';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../model/DirectoryTree';
 import { navigationEnterOffset } from '../utils/AppMotion';
@@ -67,6 +71,9 @@ function 默认偏好(): GraphPreferences {
 
 @Component
 export struct 统计页 {
+  @Provide(PAGE_TOOLBAR_SCOPE) private pageToolbarScope: PageToolbarActionScope = new PageToolbarActionScope();
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('refreshDeckLocale') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   /** 页面栈：返回主页时 pop */
@@ -278,7 +285,7 @@ export struct 统计页 {
 
   /** 牌组下拉切换：重选牌组后重新加载统计 */
   private on牌组切换(索引: number): void {
-    hilog.info(0xFFFE, '统计页', `牌组切换请求 索引=${索引} 旧=${this.选中牌组索引}`);
+    hilog.info(0x4342, '统计页', `牌组切换请求 索引=${索引} 旧=${this.选中牌组索引}`);
     if (索引 === this.选中牌组索引) {
       return;
     }
@@ -491,29 +498,23 @@ export struct 统计页 {
 
   @Builder
   private 顶部条() {
-    // 与浏览页顶部条同款：左侧公共返回图标。
-    // FSRS 状态位于右上角，牌组和历史范围位于内容首行。
     Stack({ alignContent: Alignment.Center }) {
       Text($r('app.string.stats_page_title'))
         .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary')).width('38%').textAlign(TextAlign.Center)
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('38%').textAlign(TextAlign.Center)
         .maxLines(1).hitTestBehavior(HitTestMode.None)
-      Row() {
+      Row({ space: 应用尺寸.间距_8 }) {
         IconActionButton({ toolbarStyle: true,
           source: $r('app.media.ic_common_arrow_left'),
           label: interfaceItemText(this.getUIContext(), 'stats', 'back', this.uiLanguage),
           onAction: (): void => this.返回()
         })
-
         Blank()
-
         if (this.图表数据 !== null) {
           Row() {
-            Text(this.图表数据.fsrs
-              ? $r('app.string.stats_fsrs_enabled')
-              : $r('app.string.stats_fsrs_disabled'))
+            Text(this.图表数据.fsrs ? $r('app.string.stats_fsrs_enabled') : $r('app.string.stats_fsrs_disabled'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           }
           .height(应用尺寸.紧凑控件高度)
           .alignItems(VerticalAlign.Center)
@@ -522,7 +523,6 @@ export struct 统计页 {
       .width('100%')
       .height('100%')
       .alignItems(VerticalAlign.Center)
-
     }
     .width('100%')
     .height(应用尺寸.pageToolbarHeight(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop))
@@ -537,21 +537,276 @@ export struct 统计页 {
   }
 
   @Builder
+  private sectionCard(section: AppInterfaceItem) {
+    if (section.id === 'today') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+
+        有数据: this.图表数据 !== null && this.图表数据.today !== null,
+        帮助标题: $r('app.string.stats_section_today'),
+        帮助正文: $r('app.string.stats_help_today'),
+        actionTitleKey: this.图表数据 !== null && this.图表数据.today !== null && this.图表数据.today.answerCount > 0
+          ? 'stats_today_details' : '', actionSelected: this.todayDetailsOpen,
+        onAction: (): void => { if (this.阶段 === 'content') this.todayDetailsOpen = !this.todayDetailsOpen; },
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        今日计数卡({
+          showDetails: this.todayDetailsOpen,
+          今日数据: this.图表数据 !== null ? this.图表数据.today : null,
+          预测数据: this.图表数据 !== null ? this.图表数据.futureDue : null
+        })
+      }
+    }
+    else if (section.id === 'forecast') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+        rangeLabels: this.统计天数 === 0 ? this.forecastLabels : this.forecastLabels.slice(0, 3),
+        rangeIndex: this.forecastRange,
+        onRangeChange: (index: number): void => { this.forecastRange = index; },
+
+        有数据: this.图表数据 !== null && this.图表数据.futureDue !== null,
+        帮助标题: $r('app.string.stats_section_forecast'),
+        帮助正文: $r('app.string.stats_help_forecast'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        预测卡({
+          范围索引: this.forecastRange,
+          预测数据: this.图表数据 !== null ? this.图表数据.futureDue : null,
+          显示积压: this.图表偏好.futureDueShowBacklog,
+          是否显示全部: this.统计天数 === 0,
+          on积压变更: (值: boolean): void => {
+            this.on积压变更(值);
+          }
+        })
+      }
+    }
+    else if (section.id === 'calendar') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+
+        有数据: this.图表数据 !== null && this.图表数据.reviewCountsByDaysAgo !== null,
+        帮助标题: $r('app.string.stats_section_calendar'),
+        帮助正文: $r('app.string.stats_help_calendar'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        日历卡({
+          复习计数: this.图表数据 !== null ? this.图表数据.reviewCountsByDaysAgo : null,
+          周首日: this.图表偏好.calendarFirstDayOfWeek,
+          统计天数: this.统计天数,
+          是否深色: this.是否深色(),
+          on首日变更: (首日: Weekday): void => {
+            this.on首日变更(首日);
+          }
+        })
+      }
+    }
+    else if (section.id === 'reviews') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+        rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
+        rangeIndex: this.reviewsRange,
+        onRangeChange: (index: number): void => { this.reviewsRange = index; },
+
+        有数据: this.图表数据 !== null && this.图表数据.reviewCountsByDaysAgo !== null,
+        帮助标题: $r('app.string.stats_section_reviews'),
+        帮助正文: $r('app.string.stats_help_reviews'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        复习卡({
+          范围索引: this.reviewsRange,
+          复习计数: this.图表数据 !== null ? this.图表数据.reviewCountsByDaysAgo : null,
+          复习时间: this.图表数据 !== null ? this.图表数据.reviewTimesByDaysAgo : null,
+          是否显示全部: this.统计天数 === 0
+        })
+      }
+    }
+    else if (section.id === 'card_counts') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+
+        有数据: this.图表数据 !== null && this.图表数据.cardCounts !== null,
+        帮助标题: $r('app.string.stats_section_card_counts'),
+        帮助正文: $r('app.string.stats_help_card_counts'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        卡片状态分布({
+          卡片计数: this.图表数据 !== null ? this.图表数据.cardCounts : null,
+          分离暂停: this.图表偏好.cardCountsSeparateInactive,
+          on分离变更: (值: boolean): void => {
+            this.on分离变更(值);
+          }
+        })
+      }
+    }
+    else if (section.id === 'interval') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+        rangeLabels: this.intervalLabels,
+        rangeIndex: this.intervalRange,
+        onRangeChange: (index: number): void => { this.intervalRange = index; },
+
+        有数据: this.图表数据 !== null && this.图表数据.intervals !== null,
+        帮助标题: $r('app.string.stats_section_interval'),
+        帮助正文: $r('app.string.stats_help_interval'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        间隔分布卡({
+          范围索引: this.intervalRange,
+          间隔数据: this.图表数据 !== null ? this.图表数据.intervals : null
+        })
+      }
+    }
+    else if (section.id === 'stability') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+        rangeLabels: this.intervalLabels,
+        rangeIndex: this.stabilityRange,
+        onRangeChange: (index: number): void => { this.stabilityRange = index; },
+
+        有数据: (this.图表数据?.stability ?? null) !== null,
+        帮助标题: $r('app.string.stats_section_stability'),
+        帮助正文: $r('app.string.stats_help_stability'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        稳定度分布卡({
+          范围索引: this.stabilityRange,
+          稳定度数据: this.图表数据?.stability ?? null
+        })
+      }
+    }
+    else if (section.id === 'ease') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+        rangeLabels: this.图表数据 !== null && this.图表数据.fsrs ? this.percentageLabels : [],
+        rangeIndex: this.difficultyRange,
+        onRangeChange: (index: number): void => { this.difficultyRange = index; },
+
+        有数据: this.图表数据 !== null
+          && (this.图表数据.eases !== null || this.图表数据.difficulty !== null),
+        帮助标题: $r('app.string.stats_section_ease'),
+        帮助正文: $r('app.string.stats_help_ease'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        难度分布卡({
+          范围索引: this.difficultyRange,
+          难度数据: this.图表数据 !== null ? this.图表数据.eases : null,
+          FSRS难度: this.图表数据 !== null ? this.图表数据.difficulty : null,
+          是否FSRS: this.图表数据 !== null ? this.图表数据.fsrs : false
+        })
+      }
+    }
+    else if (section.id === 'retrievability') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+        rangeLabels: this.percentageLabels,
+        rangeIndex: this.retrievabilityRange,
+        onRangeChange: (index: number): void => { this.retrievabilityRange = index; },
+
+        有数据: (this.图表数据?.retrievability ?? null) !== null,
+        帮助标题: $r('app.string.stats_section_retrievability'),
+        帮助正文: $r('app.string.stats_help_retrievability'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        记忆率卡({
+          范围索引: this.retrievabilityRange,
+          记忆率数据: this.图表数据?.retrievability ?? null
+        })
+      }
+    }
+    else if (section.id === 'retention') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+        rangeLabels: this.retentionLabels,
+        rangeIndex: this.retentionView,
+        onRangeChange: (index: number): void => { this.retentionView = index; },
+
+        有数据: this.图表数据 !== null && this.图表数据.trueRetention !== null,
+        帮助标题: $r('app.string.stats_section_retention'),
+        帮助正文: $r('app.string.stats_help_retention'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        真实保留率卡({
+          视图索引: this.retentionView,
+          保留率数据: this.图表数据 !== null ? this.图表数据.trueRetention : null,
+          是否显示全部: this.统计天数 === 0
+        })
+      }
+    }
+    else if (section.id === 'hours') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+        rangeLabels: this.historyLabels,
+        rangeIndex: this.小时分布窗口,
+        onRangeChange: (索引: number): void => {
+            this.on小时切换(索引);
+          },
+
+        有数据: this.图表数据 !== null && this.图表数据.hours !== null,
+        帮助标题: $r('app.string.stats_section_hours'),
+        帮助正文: $r('app.string.stats_help_hours'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        小时分布卡({
+          小时数据: this.图表数据 !== null ? this.图表数据.hours : null,
+          时间段索引: this.小时分布窗口,
+          是否深色: this.是否深色()
+        })
+      }
+    }
+    else if (section.id === 'buttons') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+        rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
+        rangeIndex: this.buttonsRange,
+        onRangeChange: (index: number): void => { this.buttonsRange = index; },
+
+        有数据: this.图表数据 !== null && this.图表数据.buttons !== null,
+        帮助标题: $r('app.string.stats_section_buttons'),
+        帮助正文: $r('app.string.stats_help_buttons'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        回答按钮卡({
+          范围索引: this.buttonsRange,
+          按钮数据: this.图表数据 !== null ? this.图表数据.buttons : null,
+          是否显示全部: this.统计天数 === 0
+        })
+      }
+    }
+    else if (section.id === 'added') {
+      统计图表分区({
+        interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
+        rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
+        rangeIndex: this.addedRange,
+        onRangeChange: (index: number): void => { this.addedRange = index; },
+
+        有数据: this.图表数据 !== null && this.图表数据.added !== null,
+        帮助标题: $r('app.string.stats_section_added'),
+        帮助正文: $r('app.string.stats_help_added'),
+        onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
+      }) {
+        新增卡({
+          范围索引: this.addedRange,
+          新增数据: this.图表数据 !== null ? this.图表数据.added : null,
+          是否显示全部: this.统计天数 === 0
+        })
+      }
+    }
+  }
+
+  @Builder
   private 统计内容() {
     Scroll() {
       Column({ space: 应用尺寸.页面分组间距(this.narrowDeckLayout) }) {
         // 统计口径行：牌组选择在左，历史范围选择在右。
         Row({ space: 应用尺寸.间距_8 }) {
           if (this.牌组选项.length > 1) {
-            DirectorySelect({ rows: this.deckRows(), showLabel: false, title: $r('app.string.transfer_label_deck'),
+            DirectorySelect({ rows: this.deckRows(), showLabel: false, fillWidth: false, title: $r('app.string.transfer_label_deck'),
               value: this.牌组选项[this.选中牌组索引]?.value as string ?? '', surfaceColor: $r('app.color.surface_card'),
               isInteractive: this.阶段 === 'content' && !this.preferenceSaving,
               onSelect: (id: string): void => { this.selectDirectoryDeck(id); },
-              onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('stats_deck', view); } }).layoutWeight(1)
-          } else {
-            Blank()
+              onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('stats_deck', view); } })
           }
-
+          Blank()
           范围切换条({
             surfaceColor: $r('app.color.surface_card'),
             当前索引: this.统计天数 === 0 ? 1 : 0,
@@ -562,261 +817,16 @@ export struct 统计页 {
         .width('100%')
         .alignItems(VerticalAlign.Center)
 
-        ForEach(this.interfaceSections(), (section: AppInterfaceItem) => {
-          if (section.id === 'today') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-
-              有数据: this.图表数据 !== null && this.图表数据.today !== null,
-              帮助标题: $r('app.string.stats_section_today'),
-              帮助正文: $r('app.string.stats_help_today'),
-              actionTitleKey: this.图表数据 !== null && this.图表数据.today !== null && this.图表数据.today.answerCount > 0
-                ? 'stats_today_details' : '', actionSelected: this.todayDetailsOpen,
-              onAction: (): void => { if (this.阶段 === 'content') this.todayDetailsOpen = !this.todayDetailsOpen; },
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              今日计数卡({
-                showDetails: this.todayDetailsOpen,
-                今日数据: this.图表数据 !== null ? this.图表数据.today : null,
-                预测数据: this.图表数据 !== null ? this.图表数据.futureDue : null
-              })
+        GridRow({ columns: 2,
+          gutter: 应用尺寸.页面分组间距(this.narrowDeckLayout),
+          breakpoints: { value: [应用尺寸.twoCardGridBreakpoint(this.narrowDeckLayout)],
+            reference: BreakpointsReference.ComponentSize } }) {
+          ForEach(this.interfaceSections(), (section: AppInterfaceItem) => {
+            GridCol({ span: { xs: 2, sm: 1, md: 1, lg: 1, xl: 1, xxl: 1 } }) {
+              this.sectionCard(section)
             }
-          }
-          else if (section.id === 'forecast') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-              rangeLabels: this.统计天数 === 0 ? this.forecastLabels : this.forecastLabels.slice(0, 3),
-              rangeIndex: this.forecastRange,
-              onRangeChange: (index: number): void => { this.forecastRange = index; },
-
-              有数据: this.图表数据 !== null && this.图表数据.futureDue !== null,
-              帮助标题: $r('app.string.stats_section_forecast'),
-              帮助正文: $r('app.string.stats_help_forecast'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              预测卡({
-                范围索引: this.forecastRange,
-                预测数据: this.图表数据 !== null ? this.图表数据.futureDue : null,
-                显示积压: this.图表偏好.futureDueShowBacklog,
-                是否显示全部: this.统计天数 === 0,
-                on积压变更: (值: boolean): void => {
-                  this.on积压变更(值);
-                }
-              })
-            }
-          }
-          else if (section.id === 'calendar') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-
-              有数据: this.图表数据 !== null && this.图表数据.reviewCountsByDaysAgo !== null,
-              帮助标题: $r('app.string.stats_section_calendar'),
-              帮助正文: $r('app.string.stats_help_calendar'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              日历卡({
-                复习计数: this.图表数据 !== null ? this.图表数据.reviewCountsByDaysAgo : null,
-                周首日: this.图表偏好.calendarFirstDayOfWeek,
-                统计天数: this.统计天数,
-                是否深色: this.是否深色(),
-                on首日变更: (首日: Weekday): void => {
-                  this.on首日变更(首日);
-                }
-              })
-            }
-          }
-          else if (section.id === 'reviews') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-              rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
-              rangeIndex: this.reviewsRange,
-              onRangeChange: (index: number): void => { this.reviewsRange = index; },
-
-              有数据: this.图表数据 !== null && this.图表数据.reviewCountsByDaysAgo !== null,
-              帮助标题: $r('app.string.stats_section_reviews'),
-              帮助正文: $r('app.string.stats_help_reviews'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              复习卡({
-                范围索引: this.reviewsRange,
-                复习计数: this.图表数据 !== null ? this.图表数据.reviewCountsByDaysAgo : null,
-                复习时间: this.图表数据 !== null ? this.图表数据.reviewTimesByDaysAgo : null,
-                是否显示全部: this.统计天数 === 0
-              })
-            }
-          }
-          else if (section.id === 'card_counts') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-
-              有数据: this.图表数据 !== null && this.图表数据.cardCounts !== null,
-              帮助标题: $r('app.string.stats_section_card_counts'),
-              帮助正文: $r('app.string.stats_help_card_counts'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              卡片状态分布({
-                卡片计数: this.图表数据 !== null ? this.图表数据.cardCounts : null,
-                分离暂停: this.图表偏好.cardCountsSeparateInactive,
-                on分离变更: (值: boolean): void => {
-                  this.on分离变更(值);
-                }
-              })
-            }
-          }
-          else if (section.id === 'interval') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-              rangeLabels: this.intervalLabels,
-              rangeIndex: this.intervalRange,
-              onRangeChange: (index: number): void => { this.intervalRange = index; },
-
-              有数据: this.图表数据 !== null && this.图表数据.intervals !== null,
-              帮助标题: $r('app.string.stats_section_interval'),
-              帮助正文: $r('app.string.stats_help_interval'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              间隔分布卡({
-                范围索引: this.intervalRange,
-                间隔数据: this.图表数据 !== null ? this.图表数据.intervals : null
-              })
-            }
-          }
-          else if (section.id === 'stability') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-              rangeLabels: this.intervalLabels,
-              rangeIndex: this.stabilityRange,
-              onRangeChange: (index: number): void => { this.stabilityRange = index; },
-
-              有数据: (this.图表数据?.stability ?? null) !== null,
-              帮助标题: $r('app.string.stats_section_stability'),
-              帮助正文: $r('app.string.stats_help_stability'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              稳定度分布卡({
-                范围索引: this.stabilityRange,
-                稳定度数据: this.图表数据?.stability ?? null
-              })
-            }
-          }
-          else if (section.id === 'ease') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-              rangeLabels: this.图表数据 !== null && this.图表数据.fsrs ? this.percentageLabels : [],
-              rangeIndex: this.difficultyRange,
-              onRangeChange: (index: number): void => { this.difficultyRange = index; },
-
-              有数据: this.图表数据 !== null
-                && (this.图表数据.eases !== null || this.图表数据.difficulty !== null),
-              帮助标题: $r('app.string.stats_section_ease'),
-              帮助正文: $r('app.string.stats_help_ease'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              难度分布卡({
-                范围索引: this.difficultyRange,
-                难度数据: this.图表数据 !== null ? this.图表数据.eases : null,
-                FSRS难度: this.图表数据 !== null ? this.图表数据.difficulty : null,
-                是否FSRS: this.图表数据 !== null ? this.图表数据.fsrs : false
-              })
-            }
-          }
-          else if (section.id === 'retrievability') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-              rangeLabels: this.percentageLabels,
-              rangeIndex: this.retrievabilityRange,
-              onRangeChange: (index: number): void => { this.retrievabilityRange = index; },
-
-              有数据: (this.图表数据?.retrievability ?? null) !== null,
-              帮助标题: $r('app.string.stats_section_retrievability'),
-              帮助正文: $r('app.string.stats_help_retrievability'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              记忆率卡({
-                范围索引: this.retrievabilityRange,
-                记忆率数据: this.图表数据?.retrievability ?? null
-              })
-            }
-          }
-          else if (section.id === 'retention') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-              rangeLabels: this.retentionLabels,
-              rangeIndex: this.retentionView,
-              onRangeChange: (index: number): void => { this.retentionView = index; },
-
-              有数据: this.图表数据 !== null && this.图表数据.trueRetention !== null,
-              帮助标题: $r('app.string.stats_section_retention'),
-              帮助正文: $r('app.string.stats_help_retention'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              真实保留率卡({
-                视图索引: this.retentionView,
-                保留率数据: this.图表数据 !== null ? this.图表数据.trueRetention : null,
-                是否显示全部: this.统计天数 === 0
-              })
-            }
-          }
-          else if (section.id === 'hours') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-              rangeLabels: this.historyLabels,
-              rangeIndex: this.小时分布窗口,
-              onRangeChange: (索引: number): void => {
-                  this.on小时切换(索引);
-                },
-
-              有数据: this.图表数据 !== null && this.图表数据.hours !== null,
-              帮助标题: $r('app.string.stats_section_hours'),
-              帮助正文: $r('app.string.stats_help_hours'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              小时分布卡({
-                小时数据: this.图表数据 !== null ? this.图表数据.hours : null,
-                时间段索引: this.小时分布窗口,
-                是否深色: this.是否深色()
-              })
-            }
-          }
-          else if (section.id === 'buttons') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-              rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
-              rangeIndex: this.buttonsRange,
-              onRangeChange: (index: number): void => { this.buttonsRange = index; },
-
-              有数据: this.图表数据 !== null && this.图表数据.buttons !== null,
-              帮助标题: $r('app.string.stats_section_buttons'),
-              帮助正文: $r('app.string.stats_help_buttons'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              回答按钮卡({
-                范围索引: this.buttonsRange,
-                按钮数据: this.图表数据 !== null ? this.图表数据.buttons : null,
-                是否显示全部: this.统计天数 === 0
-              })
-            }
-          }
-          else if (section.id === 'added') {
-            统计图表分区({
-              interfaceId: section.id, interfaceTitleKey: section.titleKey, isInteractive: this.阶段 === 'content',
-              rangeLabels: this.统计天数 === 0 ? this.historyLabels : this.historyLabels.slice(0, 3),
-              rangeIndex: this.addedRange,
-              onRangeChange: (index: number): void => { this.addedRange = index; },
-
-              有数据: this.图表数据 !== null && this.图表数据.added !== null,
-              帮助标题: $r('app.string.stats_section_added'),
-              帮助正文: $r('app.string.stats_help_added'),
-              onHelp: (title: Resource, body: Resource): void => { this.on分区帮助(title, body); }
-            }) {
-              新增卡({
-                范围索引: this.addedRange,
-                新增数据: this.图表数据 !== null ? this.图表数据.added : null,
-                是否显示全部: this.统计天数 === 0
-              })
-            }
-          }
-        }, (section: AppInterfaceItem): string => section.id)
+          }, (section: AppInterfaceItem): string => section.id)
+        }.width('100%')
       }
       .width('100%')
       .enabled(this.阶段 === 'content' && !this.preferenceSaving)
@@ -825,7 +835,7 @@ export struct 统计页 {
         right: 应用尺寸.页面内边距_水平,
         top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
         // 抬高避让手势导航条（AppGallery 导航栏适配要求）
-        bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout) + this.导航条高度
+        bottom: SeriesVisual.scrollShadowEndInset(this.surfaceMaterial, 应用尺寸.页面底部间距(this.narrowDeckLayout)) + this.导航条高度
       })
     }
     .width('100%')
@@ -837,6 +847,7 @@ export struct 统计页 {
 
   build() {
     NavDestination() {
+      PageActionShell({ surface: 'stats' }) {
       Stack() {
         GlassSource() {
 Column() {
@@ -845,7 +856,7 @@ Column() {
           if (this.阶段 === 'loading' && this.图表数据 === null) {
             Text($r('app.string.stats_loading'))
               .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               .width('100%')
               .textAlign(TextAlign.Center)
               .padding(40)
@@ -891,7 +902,9 @@ Column() {
       }
       .width('100%')
       .height('100%')
-    }
+
+      }
+}
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => {

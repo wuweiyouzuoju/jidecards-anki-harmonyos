@@ -1,12 +1,12 @@
 # 设置分类与后续接入位置
 
-2026-10-11：完成牌组选项、集合偏好及 AnkiDroid 设置分类的源码/主机/Core 审查，并修复三处 P1（全局 FSRS 改绑、预设基线覆盖、非当前草稿越过范围）和一处 P2（JIDE 图表只读能力写入）。真实 Core 复查通过普通字段、120 种枚举与排序组合、父子/今日限额、过滤牌组高级配置及四处反例。修复与验证边界见[当日设置审查](../../../../../../docs/development/settings-integration-audit-2026-10-11.md)；设备行为和在线同步仍须单独验收。
+2026-10-11：完成牌组选项、集合偏好及 AnkiDroid 设置分类的源码/主机/Core 审查，并修复三处 P1（全局 FSRS 改绑、预设基线覆盖、非当前草稿越过范围）和一处 P2（JIDE 图表只读能力写入）。真实 Core 复查通过普通字段、120 种枚举与排序组合、父子/今日限额、过滤牌组高级配置及四处反例。修复与验证边界见[当日设置审查](../../../../../../docs/archive/development/settings-integration-audit-2026-10-11.md)；设备行为和在线同步仍须单独验收。
 
-2026-10-07：外观的卡面显示已补隐藏音频按钮及显示答案时中断音频，两个模式都使用公共设置行和真实 Core 偏好；JIDE 读取/提案同步接通。导入结果可按 Core 返回的笔记 ID 分类、分批跳转浏览页，失败条目不能定位时禁用。模拟器与主机验收记录见[高优先级改进](../../../../../../docs/development/ankidroid-high-priority-2026-10-07.md)。
+2026-10-07：外观的卡面显示已补隐藏音频按钮及显示答案时中断音频，两个模式都使用公共设置行和真实 Core 偏好；JIDE 读取/提案同步接通。导入结果可按 Core 返回的笔记 ID 分类、分批跳转浏览页，失败条目不能定位时禁用。模拟器与主机验收记录见[高优先级改进](../../../../../../docs/archive/development/ankidroid-high-priority-2026-10-07.md)。
 
 2026-09-19 核对。以 AnkiDroid 当前源码的分类为参考，沿用 JideCards 的鸿蒙组件与已实现能力；不承诺像素一致或功能全部对齐。本文件与设置组件放在一起，供后续开发定位，未完成项不进入用户设置菜单。
 
-2026-10-04 后续核对：缺失媒体定位/打标，以及 JIDE 专用备份策略、学习常亮、输入映射等已接通，下表已更新。[Core 全量接入盘点](../../../../../../docs/development/ankicore-integration-audit-2026-10-04.md)保留当日快照，不作为当前剩余清单；当前能力沿领域拥有者核对，区分 Core 保存、JIDE 操作与本机实际生效。
+2026-10-04 后续核对：缺失媒体定位/打标，以及 JIDE 专用备份策略、学习常亮、输入映射等已接通，下表已更新。[Core 全量接入盘点](../../../../../../docs/archive/development/ankicore-integration-audit-2026-10-04.md)保留当日快照，不作为当前剩余清单；当前能力沿领域拥有者核对，区分 Core 保存、JIDE 操作与本机实际生效。
 
 参考：[目录定义](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/res/xml/preference_headers.xml)、[复习偏好](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/res/xml/preferences_reviewing.xml)、[外观偏好](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/res/xml/preferences_appearance.xml)、[控制偏好](https://github.com/ankidroid/Anki-Android/blob/main/AnkiDroid/src/main/res/xml/preferences_controls.xml)。菜单维护操作参考[官方手册](https://github.com/ankidroid/ankidroiddocs/blob/main/manual.asc)。
 
@@ -15,7 +15,7 @@
 | 分类 | 简洁版 | 实验版 | 开发位置 |
 | --- | --- | --- | --- |
 | 常规 | 语言、首页今日进度 | 相同 | `GeneralSettings.ets`；既有语言存储、主页偏好 |
-| 复习 | 评分振动、学习手势、四象限点击答题、底部/悬浮答题工具栏 | 相同，另有默认关闭的完整手势配置（按卡面绑定、四向滑动、分区/多指点击与摇动）、全部牌组的复习设置（新学习日开始时间、允许提前学习、学习休息提醒）及 FSRS 开关与作用范围说明 | `ReviewControlsSettings.ets`、`StudyGestureSettings.ets`、`布局分组.ets`、`ReviewPreferencesSettings.ets`、`调度器分组.ets`、`model/FSRS控制器.ets`；每日上限、学习步骤、目标记忆率等仍在牌组选项，不能复制成全局设置 |
+| 复习 | 双按钮评分（忘记/良好，底部与悬浮共用）、评分振动、学习手势、四象限点击答题、底部/悬浮答题工具栏 | 相同，另有默认关闭的完整手势配置（按卡面绑定、四向滑动、分区/多指点击与摇动）、全部牌组的复习设置（新学习日开始时间、允许提前学习、学习休息提醒）及 FSRS 开关与作用范围说明 | `ReviewControlsSettings.ets`、`StudyGestureSettings.ets`、`布局分组.ets`、`ReviewPreferencesSettings.ets`、`调度器分组.ets`、`model/FSRS控制器.ets`；每日上限、学习步骤、目标记忆率等仍在牌组选项，不能复制成全局设置 |
 | 同步 | 账号、自动/立即同步、自定义服务器 | 相同 | `同步分组.ets` |
 | 外观 | 深浅与颜色主题、支持主题的背景动效、卡片字号、剩余卡数/下次复习间隔显示、隐藏音频按钮与显示答案时中断音频 | 相同 | `外观分组.ets`、`CardTextSizeControl.ets`、`ThemeMotionControl.ets`、`ReviewPreferencesSettings.ets` |
 | 数据管理 | 导入文件、导出牌组、备份与恢复、媒体管理、隐藏牌组恢复 | 另含数据库检查、笔记类型、空卡、重复笔记、未用标签 | `数据分组.ets`；数据库检查状态和服务调用保留在 `../设置面板.ets`，并入普通列表行 |

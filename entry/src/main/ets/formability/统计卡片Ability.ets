@@ -31,8 +31,11 @@ import { FormExtensionAbility, formBindingData, formProvider } from '@kit.FormKi
 import { Want, common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 加载卡片数据, 保存formId带上下文, 桌面卡片数据, localizedWidgetLabels } from '../model/桌面卡片数据存储';
+import { APP_LOG_DOMAIN, installHilogLogSink } from '../utils/HilogLogSink';
 
 const 日志域: string = 'StatsFormAbility';
+// 卡片扩展运行在独立进程，模块加载时安装统一日志输出。
+installHilogLogSink();
 const 卡片绑定键: string = 'statsCardData';
 
 // 卡片绑定数据载体：单键 'statsCardData' 承载整对象 JSON 字符串
@@ -61,7 +64,7 @@ export default class 统计卡片Ability extends FormExtensionAbility {
   // ========================================================
   /** @throws {Error} 首帧资源读取或绑定失败交给平台报告。 */
   onAddForm(want: Want): formBindingData.FormBindingData {
-    hilog.info(0x0000, 日志域, 'onAddForm: 添加统计卡片');
+    hilog.info(APP_LOG_DOMAIN, 日志域, 'onAddForm: 添加统计卡片');
     // 提取 formId 并保存（供主进程主动推送）
     const formId: string = want.parameters?.['oh.form.extra.formId'] as string ?? '';
     if (formId !== '') {
@@ -79,7 +82,7 @@ export default class 统计卡片Ability extends FormExtensionAbility {
   // @作用 系统定时刷新（每 30 分钟）调此方法；读 filesDir 推送最新数据
   // ========================================================
   async onUpdateForm(formId: string): Promise<void> {
-    hilog.info(0x0000, 日志域, `onUpdateForm: 刷新卡片 ${formId}`);
+    hilog.info(APP_LOG_DOMAIN, 日志域, `onUpdateForm: 刷新卡片 ${formId}`);
     await this.推送卡片数据(formId);
   }
 
@@ -88,7 +91,7 @@ export default class 统计卡片Ability extends FormExtensionAbility {
   // @作用 临时卡片转正式卡片时刷新
   // ========================================================
   async onCastToNormalForm(formId: string): Promise<void> {
-    hilog.info(0x0000, 日志域, `onCastToNormalForm: 临时转正式 ${formId}`);
+    hilog.info(APP_LOG_DOMAIN, 日志域, `onCastToNormalForm: 临时转正式 ${formId}`);
     await this.推送卡片数据(formId);
   }
 
@@ -105,7 +108,7 @@ export default class 统计卡片Ability extends FormExtensionAbility {
   // @作用 用户移除卡片，清理资源（当前无 formId 持久化，空实现）
   // ========================================================
   onRemoveForm(_formId: string): void {
-    hilog.info(0x0000, 日志域, `onRemoveForm: 移除卡片 ${_formId}`);
+    hilog.info(APP_LOG_DOMAIN, 日志域, `onRemoveForm: 移除卡片 ${_formId}`);
   }
 
   // ========================================================
@@ -127,7 +130,7 @@ export default class 统计卡片Ability extends FormExtensionAbility {
       const 绑定数据: 卡片绑定载体 = { 'statsCardData': JSON.stringify(数据) };
       await formProvider.updateForm(formId, formBindingData.createFormBindingData(绑定数据));
     } catch (错误) {
-      hilog.error(0x0000, 日志域, `推送卡片数据失败: ${错误}`);
+      hilog.error(APP_LOG_DOMAIN, 日志域, `推送卡片数据失败: ${错误}`);
     }
   }
 }

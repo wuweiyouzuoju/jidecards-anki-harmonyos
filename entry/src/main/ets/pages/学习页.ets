@@ -1,7 +1,19 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { ensureHuaweiAIAccount } from '../backend/agent/HuaweiAIAccount';
+import { compactLandscapeScale } from '../model/AppLayoutState';
+import { WINDOW_SIZE_KEY, WindowSizeVp } from '../model/WindowSafeLayout';
+import { BrowserDueDialog } from '../components/browser/BrowserDueDialog';
+import { TagPicker } from '../components/common/TagPicker';
+import type { TagSelectionChange } from '../model/NoteTags';
+import { 卡片服务 } from '../backend/卡片服务';
+import { PAGE_TOOLBAR_SCOPE, PageToolbarActionScope } from '../model/PageToolbarActions';
+import { PageActionShell } from '../components/common/PageActionShell';
+import { continuationSession, StudyContinuation, hasContinuationTemplateInput, studyContinuationFingerprint } from '../model/ContinuationSession';
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
 import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
+import { SeriesVisual } from '../utils/SeriesVisual';
 import { GlassSource } from '../components/common/GlassSource';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteLinksPanel } from '../components/links/NoteLinksPanel';
 import { 卡片预览页 } from '../components/browser/卡片预览页';
 import { noteLinksService } from '../backend/NoteLinksService';
@@ -144,6 +156,7 @@ import {
 } from '../backend/agent/AgentSettingsStore';
 import { loadAgentSecret } from '../backend/agent/AgentSecretStore';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
+import { AppLog } from '../model/AppLog';
 
 /** 与上游 buildNextLearnMsg 一致：下一张学习卡 >=1 天后到期时，完成页不再提示学习卡 */
 const SECONDS_PER_DAY: number = 86400;
@@ -152,6 +165,7 @@ interface AgentPendingStudy { command: string; expected: string; resolve: (resul
 interface AgentStudyAudioResult { completed: boolean; error: string; }
 
 export interface 学习页参数 {
+  continuation?: StudyContinuation;
   deckId?: string;
   deckName?: string;
 }
@@ -167,6 +181,13 @@ class StudyGestureProxy {
 
 @Component
 export struct 学习页 {
+  @StorageProp(WINDOW_SIZE_KEY) private densityWindow: WindowSizeVp = { width: 0, height: 0 };
+  private densityScale(): number {
+    return compactLandscapeScale(this.densityWindow.width, this.densityWindow.height);
+  }
+
+  @Provide(PAGE_TOOLBAR_SCOPE) private pageToolbarScope: PageToolbarActionScope = new PageToolbarActionScope();
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -177,6 +198,14 @@ export struct 学习页 {
   private markingUndoDepth: number = 0;
   private previousCardId: number = 0;
   @State private infoCardId: number = 0;
+  @State @Watch('updateShakeSensor') private gestureNoteAction: string = '';
+  @State private gestureNoteBusy: boolean = false;
+  @State private gestureNoteTags: string[] = [];
+  private gestureNoteVersion: number = 0;
+  private gestureNoteBaseline: string = '';
+  private gestureNoteId: number = 0;
+  private gestureNoteCardId: number = 0;
+
   @State private voiceOpen: boolean = false;
   @State private voiceTriggerCode: number = -1;
   @State private voiceAction: string = '';
@@ -187,6 +216,8 @@ export struct 学习页 {
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
   @StorageProp('cardTextSizePercent') private cardTextSizePercent: number = 100;
   /** Navigation 入栈参数（替代原路由取参方式） */
+  pageContinuation: StudyContinuation | null = null;
+  private pendingContinuation: StudyContinuation | null = null;
   pageDeckId: string = '';
   pageDeckName: string = '';
   /** 页面栈：返回主页时 pop */
@@ -304,11 +335,16 @@ export struct 学习页 {
   @State @Watch('publishInterface') private noteLinksOpen: boolean = false;
   @State private noteLinksBack: number = 0;
   @State private linkedPreviewIds: number[] = [];
+  @State private linkedPreviewRefresh: number = 0;
+  private linkedPreviewNeedsRefresh: boolean = false;
+  private noteLinksQuery: string = '';
+  private linkGraphCenter: number = 0;
   private linkedPreviewBack: (() => boolean) | null = null;
   private linksOpenedAt: number = 0;
   private linkPanelAfterPreview: boolean = false;
   private openNoteLinks(): void {
     if (this.当前卡片 === null || this.studyGestureBlocked()) return;
+    this.noteLinksQuery = ''; this.linkGraphCenter = 0;
     this.linksOpenedAt = Date.now(); this.noteLinksOpen = true;
     this.stopStudyTimers(); this.clearChoiceAutoAdvance(); this.audioSession.stop();
   }
@@ -322,7 +358,25 @@ export struct 学习页 {
   private closeLinkedPreview(): void {
     if (this.linkedPreviewBack?.()) return;
     this.linkedPreviewIds = [];
+    this.linkedPreviewNeedsRefresh = false;
     if (!this.linkPanelAfterPreview) this.closeNoteLinks();
+  }
+  private editLinkedCard(cardId: number): void {
+    if (!this.页面已显示 || this.linkedPreviewIds.length === 0 || cardId <= 0) return;
+    const params: EditNotePageParams = { targetId: cardId, isNote: false };
+    this.pathStack.pushPath({ name: 'EditNotePage', param: params });
+  }
+  private async editLinkedCardWithAgent(cardId: number): Promise<void> {
+    const preview: number[] = this.linkedPreviewIds;
+    if (preview.length === 0 || cardId <= 0 || !await ensureHuaweiAIAccount(this.getUIContext())) return;
+    const configured: boolean = await this.isAIConfigured();
+    if (!this.mounted || !this.页面已显示 || this.linkedPreviewIds !== preview) return;
+    if (!configured) {
+      this.openAISettings();
+      return;
+    }
+    const params: AI制卡页参数 = { mode: 'edit', cardIds: [cardId], noteIds: [], templateIdx: -1 };
+    this.pathStack.pushPath({ name: 'AiCardPage', param: params });
   }
   private async followNoteLink(guid: string, version: number): Promise<void> {
     if (!this.isCurrentRequest(version) || this.studyGestureBlocked() || !this.foreground || !this.页面已显示) return;
@@ -340,7 +394,7 @@ export struct 学习页 {
   }
 
   private studyGestureBlocked(): boolean {
-    return this.noteLinksOpen || this.recoveryMessage !== '' || this.voiceOpen || this.infoCardId > 0 || this.studyGuideVisible || this.tapZonesGuideVisible || this.studyMenuOpen ||
+    return this.gestureNoteAction !== '' || this.noteLinksOpen || this.recoveryMessage !== '' || this.voiceOpen || this.infoCardId > 0 || this.studyGuideVisible || this.tapZonesGuideVisible || this.studyMenuOpen ||
       this.flagNamesOpen || this.timeboxNotice !== null || this.autoAdvanceSettingsOpen || this.editingPageOpen ||
       this.手写模式 || this.评分中 || this.customSchedulingWarning || this.cardRenderPending || this.flipPending ||
       this.contentRefreshInFlight || !this.controllerReady || this.pendingHtml !== '';
@@ -352,11 +406,11 @@ export struct 学习页 {
     try {
       this.网页控制器.runJavaScript(buildStudyGestureScript(this.requestVersion, this.interactionVersion,
         this.isStudyGesturesEnabled(), config === undefined ? undefined : activeStudyGestureInputs(config, this.阶段)))
-        .catch((error: Object): void => { console.info(`Study interaction: ${error}`); });
+        .catch((error: Object): void => { AppLog.info('StudyPage', `Study interaction: ${error}`); });
       this.网页控制器.runJavaScript(noteLinkBridgeScript(this.requestVersion, undefined,
         { surface: this.主色容器色, text: this.referenceText })).then((): void => { this.refreshNoteLinkMirror(); })
-        .catch((error: Object): void => { console.info(`NoteLinks bridge: ${error}`); });
-    } catch (error) { console.info(`Study interaction: ${error}`); }
+        .catch((error: Object): void => { AppLog.info('StudyPage', `NoteLinks bridge: ${error}`); });
+    } catch (error) { AppLog.info('StudyPage', `Study interaction: ${error}`); }
   }
   private async refreshNoteLinkMirror(): Promise<void> {
     if (this.当前卡片 === null || this.阶段 !== 'answer') return;
@@ -365,11 +419,11 @@ export struct 学习页 {
       const html: string = await noteLinksService.mirror(noteId);
       if (this.mounted && version === this.requestVersion && this.当前卡片?.noteId === noteId && this.阶段 === 'answer')
         await this.网页控制器.runJavaScript(noteLinkMirrorScript(version, html));
-    } catch (error) { console.info(`NoteLinks mirror: ${error}`); }
+    } catch (error) { AppLog.info('StudyPage', `NoteLinks mirror: ${error}`); }
   }
   private updateScreenAwake(): void {
     if (this.screenAwake !== null) this.screenAwake.update(this.mounted && this.页面已显示 && this.foreground &&
-      this.controls().keepScreenOn).catch((error: Error): void => { console.error(`Study screen awake: ${error.message}`); });
+      this.controls().keepScreenOn).catch((error: Error): void => { AppLog.error('StudyPage', `Study screen awake: ${error.message}`); });
   }
   @State @Watch('publishInterface') private editingPageOpen: boolean = false;
   private editStartedAt: number = 0;
@@ -402,7 +456,7 @@ export struct 学习页 {
 
   private studyWebUnavailable(slot: number, reason: string = 'load_error'): void {
     if (!this.cardWeb.isRelevant(slot)) return;
-    console.warn(`Study Web ${reason}: slot=${slot}, request=${this.requestVersion}, pending=${this.cardRenderPending}`);
+    AppLog.warn('StudyPage', `Study Web ${reason}: slot=${slot}, request=${this.requestVersion}, pending=${this.cardRenderPending}`);
     this.studyWebFailed(this.取文案($r('app.string.study_load_error')));
   }
 
@@ -418,7 +472,7 @@ export struct 学习页 {
       $r('app.string.feedback_buried') : $r('app.string.feedback_suspended'));
     this.resultUndo = null;
     try { this.resultUndo = resultUndoStatus(before, await this.studySession.historyStatus()); }
-    catch (error) { console.info(`Study result history: ${error}`); }
+    catch (error) { AppLog.info('StudyPage', `Study result history: ${error}`); }
     this.publishInterface();
   }
 
@@ -489,7 +543,7 @@ export struct 学习页 {
   @StorageProp(颜色键.主色文字) @Watch('referenceThemeChanged') private referenceText: string = '#183B8F';
   private referenceThemeChanged(): void {
     if (this.mounted && this.controllerReady) this.网页控制器.runJavaScript(noteLinkBridgeScript(this.requestVersion,
-      undefined, { surface: this.主色容器色, text: this.referenceText })).catch((error: Object): void => { console.info(`Note reference theme: ${error}`); });
+      undefined, { surface: this.主色容器色, text: this.referenceText })).catch((error: Object): void => { AppLog.info('StudyPage', `Note reference theme: ${error}`); });
   }
   @StorageProp(PAGE_SURFACE_KEY) private 页面底色微染值: string = '#F5F7FA';
   // 状态栏高度（沉浸式全屏下，顶部条需让出状态栏区域，避免按钮叠在状态栏上）
@@ -512,7 +566,10 @@ export struct 学习页 {
   @State private 转场透明度: number = 1;
   @State private navigationOffset: number = 0;
 
+  private releaseContinuation: () => void = (): void => {};
   async aboutToAppear(): Promise<void> {
+    this.pendingContinuation = this.pageContinuation;
+    this.releaseContinuation = continuationSession.bindStudy((): StudyContinuation | null => this.captureStudyContinuation());
     agentOperationHosts.register('study',this.agentStudyHost);
     this.studyGuideDialog.activate(); this.autoAdvanceDialog.activate();
     // 与浏览、统计共用转场协议；背景由首页根层持续持有。
@@ -569,6 +626,7 @@ export struct 学习页 {
   }
 
   aboutToDisappear(): void {
+    this.releaseContinuation();
     agentOperationHosts.unregister('study',this.agentStudyHost);
     this.pendingAgentStudy?.reject(new Error('study_session_disposed')); this.pendingAgentStudy = null;
     this.mounted = false;
@@ -627,7 +685,13 @@ export struct 学习页 {
       });
   };
 
+  private continuationAnswerPending: boolean = false;
   private maybeShowStudyGuide(): void {
+    if (this.continuationAnswerPending && !this.cardRenderPending && this.controllerReady && this.pendingHtml === '' && this.页面已显示) {
+      this.continuationAnswerPending = false;
+      this.显示答案();
+      return;
+    }
     if (this.cardRenderPending || this.studyGuideChecked || !this.页面已显示 || !this.controllerReady || this.pendingHtml !== '' ||
       this.评分中 || this.阶段 !== 'question') {
       return;
@@ -783,6 +847,17 @@ export struct 学习页 {
       const snapshot: StudySnapshot | null = await this.studySession.loadNext(this.牌组ID,
         (): boolean => this.isCurrentRequest(version));
       if (snapshot === null || !this.isCurrentRequest(version)) { return; }
+      const continuation = this.pendingContinuation ?? null;
+      if (continuation !== null && (snapshot.card === null || snapshot.rendered === null ||
+        snapshot.card.cardId !== continuation.cardId || snapshot.card.noteId !== continuation.noteId ||
+        studyContinuationFingerprint(snapshot.card, snapshot.rendered) !== continuation.fingerprint)) {
+        this.pendingContinuation = null;
+        this.阶段 = 'error';
+        this.recoveryMessage = this.取文案($r('app.string.continuation_sync_required'));
+        this.recoveryAction = null;
+        this.publishInterface();
+        return;
+      }
       this.可撤销 = snapshot.canUndo;
       this.reviewPreferences = snapshot.preferences;
       this.新卡剩余 = snapshot.queue.newCount;
@@ -851,6 +926,11 @@ export struct 学习页 {
       }
       this.阶段 = 'question';
       this.publishInterface();
+      if (continuation !== null) {
+        this.已输入答案 = continuation.typedAnswer;
+        this.pendingContinuation = null;
+        this.continuationAnswerPending = continuation.answerShown;
+      }
       this.applyStudyHtml(this.正面HTML);
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -883,6 +963,7 @@ export struct 学习页 {
 
   /** 隐藏和系统后台共用取消规则；回来后重新读取队列，不能继续评旧卡。 */
   private studyActivityChanged(): void {
+    continuationSession.changed();
     if (!this.mounted) { return; }
     this.cardWeb.setActive(this.页面已显示 && this.foreground);
     this.cardWeb.setAudioEnabled(this.页面已显示 && this.foreground);
@@ -905,7 +986,7 @@ export struct 学习页 {
       if (!this.editingPageOpen) this.待重渲染当前卡 = true;
       if (this.controllerReady) {
         this.网页控制器.runJavaScript('document.querySelectorAll("audio,video").forEach(function(m){m.pause();});')
-          .catch((error: Object): void => { console.info(`Study media pause: ${error}`); });
+          .catch((error: Object): void => { AppLog.info('StudyPage', `Study media pause: ${error}`); });
       }
       return;
     }
@@ -942,8 +1023,9 @@ export struct 学习页 {
       this.maybeShowStudyGuide();
       this.playStudyAudio();
       this.startStudyTimers();
-      this.studySession.prepareNextCard().catch((error: Error): void => { console.info(`Study prepare: ${error}`); });
+      this.studySession.prepareNextCard().catch((error: Error): void => { AppLog.info('StudyPage', `Study prepare: ${error}`); });
     }
+    continuationSession.changed();
     this.maybeShowTapZonesGuide();
     this.refreshStudyGestureScript();
   }
@@ -997,7 +1079,7 @@ export struct 学习页 {
       if (outcome !== null) { outcome.error = error instanceof Error ? error.message : 'study_audio_failed'; return; }
       if (!this.isCurrentRequest(version)) { return; }
       this.有音频 = true;
-      console.info(`Study audio: ${error}`);
+      AppLog.info('StudyPage', `Study audio: ${error}`);
       showToastSafely(this.getUIContext(), {
         message: this.取文案($r('app.string.browser_preview_audio_error'))
       });
@@ -1124,7 +1206,7 @@ export struct 学习页 {
             this.studyTimer.restartAdvance();
           }, finish, dismiss), (): boolean => { this.autoAdvanceDialogBack(); return false; });
     } catch (error) {
-      console.error(`Auto advance dialog failed: ${error}`);
+      AppLog.error('StudyPage', `Auto advance dialog failed: ${error}`);
       finish();
     }
   }
@@ -1335,7 +1417,18 @@ export struct 学习页 {
     }
   }
 
+  private captureStudyContinuation(): StudyContinuation | null {
+    const card = this.当前卡片;
+    const rendered = this.已渲染;
+    if (!this.mounted || !this.页面已显示 || !this.foreground || card === null || rendered === null ||
+      !['question', 'answer'].includes(this.阶段) || this.studyGestureBlocked() || this.studySession.hasPendingAnswer() ||
+      this.choiceQuestion !== null || this.whiteboardMounted || this.voiceAudios.length > 0 || hasContinuationTemplateInput(rendered) || this.已输入答案.length > 4000 || this.webInputFocused) return null;
+    return { cardId: card.cardId, noteId: card.noteId, fingerprint: studyContinuationFingerprint(card, rendered),
+      answerShown: this.阶段 === 'answer', typedAnswer: this.已输入答案 };
+  }
+
   private publishInterface(_locale: string = this.uiLanguage): void {
+    continuationSession.changed();
     if (!this.mounted) return;
     this.updateShakeSensor();
     const controls: AppInterfaceControl[] = visibleInterfaceItems('study', { simple: this.简洁模式,
@@ -1473,6 +1566,7 @@ export struct 学习页 {
    *  未配置 AI 时与首页同款跳转：直接进入设置并展开 AI 智能体分组；
    *  学习进度不动，配置完成返回后可原样再从菜单进入。 */
   private async 打开AI改卡(): Promise<void> {
+    if (!await ensureHuaweiAIAccount(this.getUIContext())) return;
     if (this.当前卡片 === null) { return; }
     if (!await this.isAIConfigured()) {
       this.openAISettings();
@@ -1573,6 +1667,10 @@ export struct 学习页 {
     if (this.卡片内容变更信号 <= 0) { return; }
     this.studySession.clearPreparedCard();
     this.待重渲染当前卡 = true;
+    if (this.noteLinksOpen && this.linkedPreviewIds.length > 0) {
+      if (this.页面已显示) this.linkedPreviewRefresh++;
+      else this.linkedPreviewNeedsRefresh = true;
+    }
     if (this.页面已显示) {
       this.消费待重渲染();
     }
@@ -1582,7 +1680,7 @@ export struct 学习页 {
   private 消费待重渲染(): void {
     if (!this.mounted || !this.sessionReady || !this.foreground || !this.待重渲染当前卡 ||
       this.recoveryMessage !== '' ||
-      !this.页面已显示 || this.contentRefreshInFlight || this.评分中 || this.editingPageOpen ||
+      !this.页面已显示 || this.noteLinksOpen || this.contentRefreshInFlight || this.评分中 || this.editingPageOpen ||
       (this.阶段 === 'loading' && this.loadingVersion === this.requestVersion)) { return; }
     this.待重渲染当前卡 = false;
     this.刷新编辑后当前卡();
@@ -1691,7 +1789,7 @@ export struct 学习页 {
   // @副作用
   // 无（仅弹框）
   // ========================================================
-  private 请求删除当前卡(): void {
+  private 请求删除当前卡(wholeNote: boolean = false): void {
     if (this.recoveryMessage !== '' || this.评分中 || this.当前卡片 === null) {
       return;
     }
@@ -1703,8 +1801,8 @@ export struct 学习页 {
     const version: number = this.requestVersion;
     let settled: boolean = false;
     this.getUIContext().showAlertDialog({
-        title: $r('app.string.study_delete_card_confirm_title'),
-        message: $r('app.string.study_delete_card_confirm_message'),
+        title: wholeNote ? $r('app.string.study_delete_note_title') : $r('app.string.study_delete_card_confirm_title'),
+        message: wholeNote ? $r('app.string.study_delete_note_message') : $r('app.string.study_delete_card_confirm_message'),
         autoCancel: false,
         alignment: DialogAlignment.Center,
         cancel: (): void => { settled = true; },
@@ -1722,7 +1820,7 @@ export struct 学习页 {
                     settled = true;
                     if (!this.isCurrentRequest(version) || this.当前卡片?.cardId !== cardId)
                         return;
-                    this.确认删除当前卡();
+                    this.确认删除当前卡(this.uiLanguage, wholeNote);
                 }
             }
         ],
@@ -1730,7 +1828,7 @@ export struct 学习页 {
     });
   }
 
-  private async 确认删除当前卡(_locale: string = this.uiLanguage): Promise<void> {
+  private async 确认删除当前卡(_locale: string = this.uiLanguage, wholeNote: boolean = false): Promise<void> {
     if (this.recoveryMessage !== '' || this.评分中 || this.当前卡片 === null) {
       return;
     }
@@ -1740,7 +1838,10 @@ export struct 学习页 {
     const version: number = this.requestVersion;
     try {
       const cardId: number = this.当前卡片.cardId;
-      await this.studySession.removeCard(cardId);
+      if (wholeNote) {
+        const ids: number[] = await this.笔记服务实例.获取笔记的卡片(this.当前卡片.noteId);
+        await new 卡片服务().删除卡片(ids);
+      } else await this.studySession.removeCard(cardId);
       await this.加载下一张卡();
     } catch (error) {
       if (!this.isCurrentRequest(version)) { return; }
@@ -1897,9 +1998,9 @@ export struct 学习页 {
         .scrollBar(BarState.Auto)
         if (this.阶段 === 'question') {
           Button($r('app.string.jide_choice_submit'))
-            .width('100%').height(应用尺寸.行动按钮高度)
+            .width('100%').height(应用尺寸.行动按钮高度 * this.densityScale())
             .backgroundColor(this.动作主色).fontColor($r('app.color.action_on_primary'))
-            .borderRadius(应用尺寸.圆角_行动按钮)
+            .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_行动按钮))
             .enabled(this.choiceSelectedIds.length > 0 && !this.评分中)
             .attributeModifier(new PressFeedback())
             .stateEffect(false)
@@ -1910,9 +2011,9 @@ export struct 学习页 {
             .fontSize(应用尺寸.字号_正文_中)
             .fontColor(this.choiceGrade.correct ? $r('app.color.status_ready') : $r('app.color.error_text'))
           Button($r('app.string.jide_choice_continue'))
-            .width('100%').height(应用尺寸.行动按钮高度)
+            .width('100%').height(应用尺寸.行动按钮高度 * this.densityScale())
             .backgroundColor(this.动作主色).fontColor($r('app.color.action_on_primary'))
-            .borderRadius(应用尺寸.圆角_行动按钮)
+            .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_行动按钮))
             .attributeModifier(new PressFeedback())
             .stateEffect(false)
             .onClick((): void => { this.继续选择题反馈(); });
@@ -1922,7 +2023,7 @@ export struct 学习页 {
       .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
         top: 应用尺寸.间距_8, bottom: 应用尺寸.间距_8 })
       .align(Alignment.Bottom)
-      .backgroundColor($r('app.color.surface_page'))
+      .backgroundColor(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page')))
       .parallelGesture(SwipeGesture({ direction: SwipeDirection.Horizontal })
         .onAction((event: GestureEvent): void => {
           if (Math.abs(event.angle) < 90) this.继续选择题反馈();
@@ -1947,7 +2048,7 @@ export struct 学习页 {
     Button() {
       Row({ space: 应用尺寸.间距_8 }) {
         Text(`${String.fromCharCode(65 + this.选择题选项序号(option))}.`)
-          .fontSize(应用尺寸.字号_按钮).fontColor($r('app.color.text_secondary'))
+          .fontSize(应用尺寸.字号_按钮).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         Text(this.choiceGrade === null ? (this.选择题选项已选(option) ? '✓' : '○') :
           (this.选择题选项正确(option) ? '✓' : (this.选择题选项已选(option) ? '×' : '○')))
           .fontSize(应用尺寸.字号_按钮)
@@ -1955,14 +2056,14 @@ export struct 学习页 {
             (this.选择题选项正确(option) ? $r('app.color.status_ready') :
               (this.选择题选项已选(option) ? $r('app.color.error_text') : this.动作主色)))
         Text(option.text).fontSize(应用尺寸.字号_正文_中)
-          .fontColor($r('app.color.text_primary')).textAlign(TextAlign.Start).layoutWeight(1)
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).textAlign(TextAlign.Start).layoutWeight(1)
       }
       .width('100%')
     }
-    .width('100%').constraintSize({ minHeight: 应用尺寸.行动按钮高度 })
+    .width('100%').constraintSize({ minHeight: 应用尺寸.行动按钮高度 * this.densityScale() })
     .backgroundColor(this.选择题选项已选(option) ? $r('app.color.surface_selected') : $r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_面板)
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
     .enabled(this.choiceGrade === null && !this.评分中)
     .attributeModifier(new PressFeedback())
     .stateEffect(false)
@@ -2027,6 +2128,19 @@ export struct 学习页 {
       case 'add': this.openAddNote(); break;
       case 'hint': case 'all_hints': this.revealHints(command === 'all_hints'); break;
       case 'previous_info': this.openPreviousInfo(); break;
+      case 'page_up': case 'page_down': this.runGestureScript(command); break;
+      case 'card_info': this.openCurrentInfo(); break;
+      case 'tag': case 'reschedule_note': this.openGestureNoteAction(command); break;
+      case 'user_action_1': this.runGestureScript(command); break;
+      case 'user_action_2': this.runGestureScript(command); break;
+      case 'user_action_3': this.runGestureScript(command); break;
+      case 'user_action_4': this.runGestureScript(command); break;
+      case 'user_action_5': this.runGestureScript(command); break;
+      case 'user_action_6': this.runGestureScript(command); break;
+      case 'user_action_7': this.runGestureScript(command); break;
+      case 'user_action_8': this.runGestureScript(command); break;
+      case 'user_action_9': this.runGestureScript(command); break;
+
       case 'voice_record': case 'voice_replay': case 'voice_save': this.openVoice(command); break;
       case 'bury_note': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_BURY_USER, true); break;
       case 'suspend_note': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND, true); break;
@@ -2035,6 +2149,7 @@ export struct 学习页 {
       case 'suspend': this.埋藏或暂停当前卡(BURY_SUSPEND_MODE_SUSPEND); break;
       case 'back': this.返回(); break;
       case 'delete': this.请求删除当前卡(); break;
+      case 'delete_note': this.请求删除当前卡(true); break;
       case 'edit': this.openNoteEditor(); break;
       case 'mark': this.changeMarking(null); break;
       case 'flag0': this.changeMarking(0); break;
@@ -2150,10 +2265,22 @@ export struct 学习页 {
   /** 自由绑定采用完整修饰键与卡面匹配；输入框、弹层和手写保留自身操作。 */
   private 处理按键(event: KeyEvent): boolean {
     const fresh: boolean = this.keyboardSession.update(event.keyCode, event.type === KeyType.Down);
+    if (this.gestureNoteAction) {
+      if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') this.closeGestureNoteAction();
+      return false;
+    }
     if (this.editingPageOpen || this.answerInputFocused || this.webInputFocused) { this.Ctrl按下 = false; return false; }
     if (this.customSchedulingWarning && studyKeyName(event.keyCode) !== 'back') return true;
     // 系统返回由 NavDestination 关闭当前弹层，不能被快捷键屏蔽吞掉。
     if (studyKeyName(event.keyCode) === 'back') return false;
+    if (this.noteLinksOpen) {
+      this.Ctrl按下 = false;
+      if (fresh && event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') {
+        this.返回();
+        return true;
+      }
+      return false;
+    }
     if (this.flagNamesOpen) {
       this.Ctrl按下 = false;
       if (event.type === KeyType.Down && studyKeyName(event.keyCode) === 'escape') { this.markingBackRequest++; return true; }
@@ -2238,6 +2365,65 @@ export struct 学习页 {
     const params: 添加笔记页参数 = { deckId: this.pageDeckId, deckName: this.pageDeckName };
     this.pathStack.pushPath({ name: 'AddNotePage', param: params });
   }
+  private runGestureScript(command: string): void {
+    if (!this.controllerReady || this.pendingHtml !== '' || this.cardRenderPending) return;
+    const number: number = Number(command.replace('user_action_', ''));
+    const script: string = command === 'page_up' ? 'window.scrollBy(0,-window.innerHeight*0.9)' :
+      command === 'page_down' ? 'window.scrollBy(0,window.innerHeight*0.9)' :
+      Number.isInteger(number) && number >= 1 && number <= 9 ?
+        'if(typeof userAction==="function")userAction(' + number + ')' : '';
+    if (script !== '') this.网页控制器.runJavaScript(script).catch((error: Object): void => { AppLog.info('StudyPage', `Study template action: ${error}`); });
+  }
+  private openCurrentInfo(): void {
+    if (this.当前卡片 === null) return;
+    this.stopStudyTimers(); this.clearChoiceAutoAdvance(); this.infoCardId = this.当前卡片.cardId;
+  }
+  private async openGestureNoteAction(command: string): Promise<void> {
+    if (this.当前卡片 === null || this.studyGestureBlocked()) return;
+    this.stopStudyTimers(); this.clearChoiceAutoAdvance(); this.audioSession.stop();
+    const version: number = ++this.gestureNoteVersion;
+    this.gestureNoteId = this.当前卡片.noteId; this.gestureNoteCardId = this.当前卡片.cardId;
+    this.gestureNoteAction = command; this.gestureNoteBusy = true;
+    try {
+      if (command === 'tag') {
+        const note: EditableNote = await this.笔记服务实例.获取笔记(this.gestureNoteId);
+        if (!this.mounted || version !== this.gestureNoteVersion || this.gestureNoteAction !== command) return;
+        this.gestureNoteBaseline = JSON.stringify(note.tags); this.gestureNoteTags = note.tags.slice();
+      }
+    } catch (error) { showToastSafely(this.getUIContext(), { message: String(error) }); this.gestureNoteAction = ''; }
+    finally { this.gestureNoteBusy = false; }
+  }
+  private closeGestureNoteAction(): void {
+    if (this.gestureNoteBusy) return;
+    this.gestureNoteVersion++; this.gestureNoteAction = ''; this.startStudyTimers(); this.scheduleChoiceAutoAdvance();
+  }
+  private async saveGestureNoteAction(days: string = ''): Promise<void> {
+    if (this.gestureNoteBusy || this.当前卡片?.cardId !== this.gestureNoteCardId) return;
+    this.gestureNoteBusy = true;
+    try {
+      if (this.gestureNoteAction === 'tag') {
+        const note: EditableNote = await this.笔记服务实例.获取笔记(this.gestureNoteId);
+        if (JSON.stringify(note.tags) !== this.gestureNoteBaseline) throw new Error('Tags changed; reopen and retry');
+        note.tags = this.gestureNoteTags.slice(); await this.笔记服务实例.更新笔记([note], false);
+      } else {
+        const ids: number[] = await this.笔记服务实例.获取笔记的卡片(this.gestureNoteId);
+        await this.调度器服务实例.设置到期日(ids, days);
+      }
+      this.gestureNoteAction = ''; this.待重渲染当前卡 = true; this.消费待重渲染();
+    } catch (error) { showToastSafely(this.getUIContext(), { message: String(error) }); }
+    finally { this.gestureNoteBusy = false; this.startStudyTimers(); }
+  }
+  @Builder
+  private gestureTagsHeader() {
+    DialogHeader({ title: $r('app.string.add_note_tags'), closeEnabled: !this.gestureNoteBusy,
+      onClose: (): void => { this.closeGestureNoteAction(); }, actionLabel: $r('app.string.browser_detail_save'),
+      actionEnabled: !this.gestureNoteBusy, onAction: (): void => { this.saveGestureNoteAction(); } })
+  }
+  @Builder
+  private gestureTagsContent() {
+    TagPicker({ noteTags: [this.gestureNoteTags], isInteractive: !this.gestureNoteBusy,
+      onChanged: (_changes: TagSelectionChange[], tags: string[]): void => { this.gestureNoteTags = tags; } })
+  }
   private revealHints(all: boolean): void {
     if (!this.controllerReady || this.pendingHtml !== '' || this.cardRenderPending) return;
     this.网页控制器.runJavaScript(studyHintScript(all)).catch((): void => {});
@@ -2271,7 +2457,7 @@ export struct 学习页 {
         Text(this.牌组名)
           .fontSize(应用尺寸.字号_标题)
           .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           // 2026-07-28：左侧只剩「返回」按钮（约 62px），右侧只剩「更多」按钮（约 62px），
@@ -2400,10 +2586,10 @@ export struct 学习页 {
       if (this.studyOptions.showTimer && (this.阶段 === 'question' || this.阶段 === 'answer')) {
         Text(this.studyTimerText)
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .padding(应用尺寸.间距_8)
           .backgroundColor($r('app.color.surface_card'))
-          .borderRadius(应用尺寸.圆角_胶囊)
+          .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_胶囊))
           .align(Alignment.TopEnd)
           .margin(应用尺寸.间距_12)
           .hitTestBehavior(HitTestMode.None)
@@ -2436,10 +2622,10 @@ export struct 学习页 {
           Text($r('app.string.study_load_error'))
             .fontSize(应用尺寸.字号_标题)
             .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           Text(this.错误详情)
             .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .textAlign(TextAlign.Center)
           ResultNotice({ message: this.错误详情, actionLabel: $r('app.string.common_retry'),
             onAction: (): void => { this.retryStudy(); } })
@@ -2458,24 +2644,24 @@ export struct 学习页 {
           Text(this.完成页数据已加载 ? $r('app.string.study_congrats_title') : $r('app.string.study_finish_title'))
             .fontSize(应用尺寸.字号_面板标题)
             .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           if (this.完成页数据已加载) {
             if (this.完成页学习剩余 > 0) {
               Text($r('app.string.study_congrats_learn_remaining', this.完成页学习剩余, this.完成页下张学习分钟))
                 .fontSize(应用尺寸.字号_正文_中)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .textAlign(TextAlign.Center)
             }
             if (this.完成页复习受限) {
               Text($r('app.string.study_congrats_review_limit'))
                 .fontSize(应用尺寸.字号_正文_中)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .textAlign(TextAlign.Center)
             }
             if (this.完成页新卡受限) {
               Text($r('app.string.study_congrats_new_limit'))
                 .fontSize(应用尺寸.字号_正文_中)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                 .textAlign(TextAlign.Center)
             }
             if (this.完成页有埋藏) {
@@ -2487,8 +2673,8 @@ export struct 学习页 {
                 .fontSize(应用尺寸.字号_按钮)
                 .fontColor(this.动作主色)
                 .backgroundColor($r('app.color.surface_card'))
-                .border(SurfaceBorder.options())
-                .borderRadius(应用尺寸.圆角_胶囊)
+                .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+                .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_胶囊))
                 .margin({ top: 应用尺寸.间距_8 })
                 .attributeModifier(new PressFeedback())
                 .stateEffect(false)
@@ -2499,7 +2685,7 @@ export struct 学习页 {
           } else {
             Text($r('app.string.study_finish_hint'))
               .fontSize(应用尺寸.字号_正文_中)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               .textAlign(TextAlign.Center)
           }
         }
@@ -2519,7 +2705,7 @@ export struct 学习页 {
       .alignContent(Alignment.BottomEnd)
       .backgroundColor($r('app.color.surface_card'))
       .clip(true)
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
+      .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
 
       // Type-in-the-Answer：正面阶段在 Web 下方渲染输入框，翻面后比对用户输入与笔记字段值。
       // Enter 提交翻面（对齐 Anki 桌面端输入框回车显示答案）。
@@ -2541,12 +2727,12 @@ export struct 学习页 {
           }) {
             TextInput({ placeholder: $r('app.string.study_type_answer_placeholder'), text: this.已输入答案 })
               .width('100%')
-              .height(应用尺寸.行动按钮高度)
+              .height(应用尺寸.行动按钮高度 * this.densityScale())
               .fontSize(应用尺寸.字号_按钮)
-              .fontColor($r('app.color.text_primary'))
-              .placeholderColor($r('app.color.text_tertiary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
+              .placeholderColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
               .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-              .border({ width: 0 }).borderRadius(应用尺寸.圆角_行动按钮)
+              .border({ width: 0 }).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_行动按钮))
               .backgroundColor($r('app.color.surface_card'))
               // 聚焦视觉完全去主题色，三层处理：局部主题色、组件状态样式、系统焦点框。
               .stateStyles({
@@ -2617,10 +2803,12 @@ export struct 学习页 {
       right: 应用尺寸.页面内边距_水平,
       top: 应用尺寸.操作区顶部间距(this.narrowDeckLayout),
       // 抬高避让手势导航条（AppGallery 导航栏适配要求）
-      bottom: 应用尺寸.操作区底部间距(this.narrowDeckLayout, this.导航条高度)
+      bottom: 应用尺寸.操作区底部间距(this.narrowDeckLayout, this.导航条高度,
+        SeriesVisual.scrollShadowEndInset(this.pageMaterial, 0))
     })
     .backgroundColor(pageMaterialFill(this.页面底色微染值, this.pageMaterial, this.wallpaperPath))
   }
+
 
   @Builder
   private cardViewportContent() {
@@ -2650,6 +2838,7 @@ export struct 学习页 {
 
   build() {
     NavDestination() {
+      PageActionShell({ surface: 'study' }) {
       // 外层 Stack：浮层工具栏用 position 绝对定位，需要全屏父容器；底层是限宽居中的内容列。
       // bottom 模式下 答案条 在内容列内，与原体验一致；float 模式下 答案条 不渲染，答案与评分浮动工具栏叠加在 Stack 上层。
       Stack() {
@@ -2688,6 +2877,15 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
           })
         }
 
+        if (this.gestureNoteAction === 'reschedule_note') {
+          BrowserDueDialog({ isDark: this.是否深色(), busy: this.gestureNoteBusy,
+            onClose: (): void => { this.closeGestureNoteAction(); },
+            onSubmit: (days: string): void => { this.saveGestureNoteAction(days); } })
+        }
+        if (this.gestureNoteAction === 'tag') {
+          DialogFrame({ canDismiss: !this.gestureNoteBusy, onDismiss: (): void => { this.closeGestureNoteAction(); },
+            header: () => { this.gestureTagsHeader(); }, content: () => { this.gestureTagsContent(); } })
+        }
         if (this.whiteboardMounted) {
           学习手写白板层({ 是否深色: this.是否深色(), isVisible: this.手写模式,
             isInputEnabled: this.页面已显示 && this.foreground && !this.editingPageOpen && !this.评分中 &&
@@ -2706,14 +2904,20 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
         }
 
         if (this.noteLinksOpen && this.当前卡片 !== null && this.linkedPreviewIds.length === 0) {
-          NoteLinksPanel({ noteId: this.当前卡片.noteId, backRequest: this.noteLinksBack,
+          NoteLinksPanel({ noteId: this.当前卡片.noteId, backRequest: this.noteLinksBack, initialQuery: this.noteLinksQuery,
+            initialGraphCenter: this.linkGraphCenter,
             onClose: (): void => { this.closeNoteLinks(); },
             onChanged: (): void => { this.待重渲染当前卡 = true; },
-            onPreview: (ids: number[]): void => { this.linkPanelAfterPreview = true; this.linkedPreviewIds = ids; } })
+            onPreview: (ids: number[], query: string, center?: number): void => {
+              this.linkGraphCenter = center ?? 0; this.noteLinksQuery = query; this.linkPanelAfterPreview = true; this.linkedPreviewIds = ids;
+            } })
         }
         if (this.linkedPreviewIds.length > 0) {
           卡片预览页({ 卡片ID列表: this.linkedPreviewIds, 媒体目录: this.媒体目录,
             isDark: this.是否深色(), onClose: (): void => { this.closeLinkedPreview(); },
+            刷新版本: this.linkedPreviewRefresh, interactionEnabled: this.页面已显示,
+            onEditField: (cardId: number): void => { this.editLinkedCard(cardId); },
+            onEditWithAgent: (cardId: number): void => { this.editLinkedCardWithAgent(cardId); },
             onBackHandlerChange: (handler: (() => boolean) | null): void => { this.linkedPreviewBack = handler; } })
         }
         if (this.infoCardId > 0) {
@@ -2769,12 +2973,16 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
       .onKeyPreIme((event: KeyEvent): boolean => {
         return this.处理按键(event);
       })
-    }
+
+      }
+}
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .opacity(this.转场透明度)
     .translate({ x: this.navigationOffset })
     .onBackPressed((): boolean => {
+      if (this.gestureNoteAction !== '') { this.closeGestureNoteAction(); return true; }
+      if (this.noteLinksOpen) { this.返回(); return true; }
       if (this.flagNamesOpen) { this.markingBackRequest++; return true; }
       if (this.手写模式) { this.whiteboardBackTick++; return true; }
       if (this.timeboxNotice !== null) { this.closeTimebox(); return true; }
@@ -2787,6 +2995,10 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
     .onShown((): void => {
       appInterface.showPage('study');
       this.页面已显示 = true;
+      if (this.linkedPreviewNeedsRefresh) {
+        this.linkedPreviewNeedsRefresh = false;
+        this.linkedPreviewRefresh++;
+      }
       if (this.pendingAgentStudy !== null) { this.resumeAgentStudy(this.pendingAgentStudy); return; }
       this.returnFromEditor();
       this.studyActivityChanged();
@@ -2814,6 +3026,6 @@ CardViewport({ content: () => { this.cardViewportContent(); } })
   private timeboxContent() {
     Text($r('app.string.study_timebox_message', Math.floor((this.timeboxNotice?.seconds ?? 0) / 60),
       this.timeboxNotice?.answers ?? 0))
-      .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+      .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
   }
 }

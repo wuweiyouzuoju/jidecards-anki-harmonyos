@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
 import { GlassPanel } from './common/GlassPanel';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { PressFeedback } from '../utils/PressFeedback';
@@ -9,12 +10,14 @@ import { THEME_TEXT_COLORS_KEY } from '../model/ThemeCatalog';
 
 import { DialogHeader } from './common/DialogHeader';
 import type { 官方公告展示项 } from '../model/官方公告模型';
+import { 格式化公告发布时间 } from '../model/官方公告模型';
 import { 颜色键 } from '../model/颜色主题';
 import { 应用尺寸 } from '../utils/应用尺寸';
 
 /** 官方启动公告弹窗：纯展示层；确认与详情动作经回调上抛，返回键与遮罩点击不关闭。 */
 @Component
 export struct 官方公告弹窗 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @State private surfaceWidth: string = '88%';
   @State private surfaceMaximumWidth: number = 480;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -26,13 +29,9 @@ export struct 官方公告弹窗 {
   onAcknowledge: () => void = (): void => {};
   onOpenDetails: () => void = (): void => {};
 
-  private 发布日期(): string {
-    return this.announcement.publishedAt.substring(0, 10);
-  }
-
   private 本地化发布时间(_locale: string = this.uiLanguage): string {
     return resourceText(this.getUIContext(),
-      $r('app.string.official_announcement_published_at'), this.发布日期());
+      $r('app.string.official_announcement_published_at'), 格式化公告发布时间(this.announcement.publishedAt));
   }
 
   build() {
@@ -56,13 +55,13 @@ Column({ space: 应用尺寸.间距_12 }) {
 
         Text(this.本地化发布时间())
           .fontSize(应用尺寸.字号_说明)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
 
         Scroll() {
           Text(this.announcement.content)
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .lineHeight(22)
             .width('100%')
         }
@@ -80,7 +79,7 @@ Column({ space: 应用尺寸.间距_12 }) {
               .height(应用尺寸.按钮高度)
               .fontColor($r('app.color.action_primary'))
               .backgroundColor(Color.Transparent)
-              .borderRadius(应用尺寸.圆角_面板)
+              .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
               .attributeModifier(new PressFeedback())
               .stateEffect(false)
               .onClick((): void => { this.onOpenDetails(); })

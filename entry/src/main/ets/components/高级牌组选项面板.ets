@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
 import { DeckOptionField, DeckOptionChoice } from './home/DeckOptionField';
 import { FsrsTools } from './home/FsrsTools';
 import { DeckOptionsFsrsState } from '../model/home/DeckOptionsSession';
@@ -25,6 +26,7 @@ import { SurfaceBorder } from '../utils/SurfaceBorder';
 /** 完整模式内嵌所有官方分组；与简洁模式共用同一草稿和唯一保存入口。 */
 @Component
 export struct 高级牌组选项面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @ObjectLink @Watch('publishInterface') form: 牌组配置表单;
   @ObjectLink @Watch('publishInterface') options: 牌组选项编辑;
@@ -35,6 +37,7 @@ export struct 高级牌组选项面板 {
   @Prop customScheduling: string = '';
   @Prop fsrsState: DeckOptionsFsrsState = new DeckOptionsFsrsState();
   @Prop presetAssignmentsChanged: boolean = false;
+  @BuilderParam presetCard: () => void = this.emptyPresetCard;
   onOptimize: (all: boolean, retry: boolean) => void = (): void => {};
   onSimulate: (days: number) => void = (): void => {};
   onEvaluate: () => void = (): void => {};
@@ -192,7 +195,7 @@ export struct 高级牌组选项面板 {
         DeckOptionField({ title: this.text('deck_weekday_' + String(day)), help: this.text(field.helpKey), value: this.dayValue(day),
           choices: this.dayChoices(), busy: this.busy, defaultValue: '1', onChange: (value: string): void => { this.changeDay(day, value); } })
       }, (day: number): string => String(day))
-      Text(this.text('deck_easy_days_future_hint')).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+      Text(this.text('deck_easy_days_future_hint')).fontSize(14).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       if (!easyDayValues(this.form.取配置().easyDaysPercentages).includes(1)) {
         Text(this.text('deck_easy_days_no_normal_hint')).fontSize(14).fontColor($r('app.color.error_text')).width('100%')
       }
@@ -202,20 +205,23 @@ export struct 高级牌组选项面板 {
         choices: this.choices(field), busy: this.busy || field.kind === 'unsupported', defaultValue: this.defaultValue(field),
         validate: (value: string): string => this.validate(field, value), onChange: (value: string): void => this.change(field, value) })
       if (field.kind === 'unsupported') {
-        Text(this.text(field.helpKey)).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+        Text(this.text(field.helpKey)).fontSize(14).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
     }
   }
   @Builder
+  private emptyPresetCard() {}
+
+  @Builder
   private groupContent(group: DeckOptionGroup) {
     Column() {
       Text(this.text(group.titleKey)).fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
         .padding({ top: 应用尺寸.间距_12, bottom: 应用尺寸.间距_12 })
       ForEach(this.fields(group), (field: DeckOptionDefinition) => { this.option(field) }, (field: DeckOptionDefinition): string => field.key)
       if (group.id === 'fsrs' && this.options.是否启用FSRS) {
         if (this.presetAssignmentsChanged) {
-          Text(this.text('deck_preset_save_before_optimize')).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+          Text(this.text('deck_preset_save_before_optimize')).fontSize(14).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         }
         FsrsTools({ state: this.fsrsState, busy: this.busy || this.presetAssignmentsChanged, onOptimize: this.onOptimize, onSimulate: this.onSimulate,
           onEvaluate: this.onEvaluate, onRetention: (value: string): void => { if (!this.busy) this.form.目标保留率文本 = value; } })
@@ -224,10 +230,18 @@ export struct 高级牌组选项面板 {
   }
 
   build() {
-    Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
+    GridRow({ columns: 2,
+      gutter: 应用尺寸.页面分组间距(this.narrow),
+      breakpoints: { value: [应用尺寸.twoCardGridBreakpoint(this.narrow)],
+        reference: BreakpointsReference.ComponentSize } }) {
+      GridCol({ span: { xs: 2, sm: 1, md: 1, lg: 1, xl: 1, xxl: 1 } }) {
+        this.presetCard()
+      }
       ForEach(DECK_OPTION_GROUPS, (group: DeckOptionGroup) => {
-        设置分组卡片({ showHeader: false, 是否深色: this.isDark,
-          内容: () => { this.groupContent(group); } })
+        GridCol({ span: { xs: 2, sm: 1, md: 1, lg: 1, xl: 1, xxl: 1 } }) {
+          设置分组卡片({ showHeader: false, 是否深色: this.isDark,
+            内容: () => { this.groupContent(group); } })
+        }
       }, (group: DeckOptionGroup): string => group.id)
     }.width('100%')
   }

@@ -31,6 +31,13 @@ export struct 同步面板 {
   @Prop 是否深色: boolean = false;
   @Prop 账号名: string = '';
   @Prop automatic: boolean = false;
+  @Prop showOnStart: boolean = false;
+  @Prop cloudDisplay: boolean = false;
+  @Prop cloudBusy: boolean = false;
+  @Prop cloudProgress: number = -1;
+  @Prop cloudStatus: string = '';
+  @Prop cloudDetail: string = '';
+  @Prop cloudFailed: boolean = false;
   @Prop @Watch('dismissPresentation') backRequest: number = 0;
   @Prop @Watch('showDetails') detailsRequest: number = 0;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('syncForegroundChanged') private syncForeground: boolean = true;
@@ -56,6 +63,7 @@ export struct 同步面板 {
   };
 
   aboutToAppear(): void {
+    if (this.cloudDisplay) return;
     this.session = createSyncSession(this.初始鉴权, this.automatic, {
       text: (key: string): string => namedResourceText(this.getUIContext(), key),
       toast: (message: string): void => { showToastSafely(this.getUIContext(), { message: message, duration: 3000 }); },
@@ -67,10 +75,14 @@ export struct 同步面板 {
       yielded: (automatic: boolean): void => { this.onYield(automatic); }
     });
     this.session.aboutToAppear();
+    if (this.showOnStart) this.session.showDetails();
   }
   aboutToDisappear(): void { this.session?.aboutToDisappear(); }
   private showDetails(): void { this.session?.showDetails(); }
-  private dismissPresentation(): void { this.session?.dismissPresentation(); }
+  private dismissPresentation(): void {
+    if (this.cloudDisplay) this.关闭回调();
+    else this.session?.dismissPresentation();
+  }
   private syncForegroundChanged(): void { if (this.syncForeground) this.session?.syncForegroundChanged(); }
   private 冲突确认(upload: boolean): void { this.session?.冲突确认(upload); }
   private 取本地化文案(resource: Resource, _locale: string = this.uiLanguage): string { return resourceText(this.getUIContext(), resource); }
@@ -79,7 +91,7 @@ export struct 同步面板 {
   @Builder
   private 头部行() {
     DialogHeader({
-      title: this.取本地化文案($r('app.string.settings_sync_group')),
+      title: this.取本地化文案(this.cloudDisplay ? $r('app.string.huawei_cloud_title') : $r('app.string.settings_sync_group')),
       closeLabel: $r('app.string.close'),
       showAction: false,
       onClose: (): void => {
@@ -205,6 +217,25 @@ export struct 同步面板 {
   }
 
   @Builder
+  private cloudContent() {
+    Row({ space: 应用尺寸.间距_8 }) {
+      if (this.cloudBusy && this.cloudProgress < 0) {
+        LoadingProgress().width(20).height(20).color(this.dialogActionColor)
+      }
+      Text(this.cloudStatus).layoutWeight(1).fontSize(应用尺寸.字号_正文)
+        .fontColor(this.cloudFailed ? this.取色板().错误色 : this.取色板().主文字)
+      if (this.cloudBusy && this.cloudProgress >= 0) {
+        Text(this.cloudDetail !== '' ? this.cloudDetail : `${this.cloudProgress}%`).fontSize(应用尺寸.字号_正文_小)
+          .fontColor(this.取色板().次文字)
+      }
+    }.width('100%')
+    if (this.cloudBusy && this.cloudProgress >= 0) {
+      Progress({ value: this.cloudProgress, total: 100, type: ProgressType.Linear })
+        .width('100%').color(this.dialogActionColor)
+    }
+  }
+
+  @Builder
   private syncDialog() {
     Stack() {
       // 磨砂玻璃遮罩：canClose=false 时不响应点击
@@ -230,7 +261,9 @@ Column({ space: 应用尺寸.间距_12 }) {
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
 
-        if (this.state.当前阶段 === 'syncing') {
+        if (this.cloudDisplay) {
+          this.cloudContent()
+        } else if (this.state.当前阶段 === 'syncing') {
           this.同步中内容()
         } else if (this.state.当前阶段 === 'conflict') {
           this.冲突内容()
@@ -252,13 +285,13 @@ Column({ space: 应用尺寸.间距_12 }) {
 
   build() {
     Stack({ alignContent: Alignment.Top }) {
-      if (this.state.detailsVisible) {
+      if (this.cloudDisplay || this.state.detailsVisible) {
         this.syncDialog()
       }
     }
     .width('100%')
     .height('100%')
-    .hitTestBehavior(!this.state.detailsVisible ?
+    .hitTestBehavior(!this.cloudDisplay && !this.state.detailsVisible ?
       HitTestMode.Transparent : HitTestMode.Default)
   }
 }

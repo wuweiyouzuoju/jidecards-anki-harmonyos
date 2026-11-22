@@ -1,10 +1,14 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { SeriesVisual } from '../utils/SeriesVisual';
+import { PAGE_TOOLBAR_SCOPE, PageToolbarActionScope } from '../model/PageToolbarActions';
+import { PageActionShell } from '../components/common/PageActionShell';
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
 import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
 import { insetMaterialFill } from '../utils/GlassMaterial';
 import { GlassSource } from '../components/common/GlassSource';
 import { EditorSectionCard } from '../components/common/EditorSectionCard';
 import { NOTE_FIELD_STICKY_CONTROL } from '../model/NoteFieldEditing';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteLinksDraftPanel } from '../components/links/NoteLinksDraftPanel';
 import { 卡片预览页 } from '../components/browser/卡片预览页';
 import { SettingsActionRow } from '../components/common/SettingsActionRow';
@@ -14,12 +18,12 @@ import { StudyKeyboardSession } from '../model/StudyKeyboard';
 import { studyEventChord } from '../utils/StudyKeyAdapter';
 import { DirectorySelect } from '../components/common/DirectorySelect';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directoryRow } from '../model/DirectoryTree';
+import { 后端会话 } from '../backend/后端会话';
 import { 牌组服务 } from '../backend/牌组服务';
 import { DeckTreeNode } from '../proto/messages/DeckMessages';
 import { 笔记类型编辑器 } from '../components/settings/笔记类型编辑器';
 import { 添加笔记牌组选项, 添加笔记笔记类型选项 } from '../model/navigation/PageParams';
 import { PressFeedback } from '../utils/PressFeedback';
-import { navigationEnterOffset } from '../utils/AppMotion';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
 import { ExpansionReveal } from '../utils/ExpansionReveal';
 import { NoteFieldCard } from '../components/editor/NoteFieldCard';
@@ -80,6 +84,8 @@ interface 添加笔记下拉选项 { value: string; }
 
 @Component
 export struct 添加笔记页 {
+  @Provide(PAGE_TOOLBAR_SCOPE) private pageToolbarScope: PageToolbarActionScope = new PageToolbarActionScope();
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
@@ -171,40 +177,34 @@ export struct 添加笔记页 {
   @StorageProp('导航条高度') private 导航条高度: number = 0;
   // 状态栏高度（沉浸式全屏下，顶部条需让出状态栏区域，避免返回按钮叠在状态栏上）
   @StorageProp('状态栏高度') private 状态栏高度: number = 0;
-  /** NavDestination 透明度（由 customNavContentTransition 回调控制，实现淡入淡出转场）。 */
-  @State private 转场透明度: number = 1;
+  @State private 转场透明度: number = 0;
   @State private navigationOffset: number = 0;
 
-  async aboutToAppear(): Promise<void> {
+  private initialPreparation: Promise<void> = Promise.resolve();
+
+  aboutToAppear(): void {
     this.pageActive = true;
+    this.wheelSession.setPresentation(0, 0);
     this.publishInterface();
 
     this.牌组ID = this.pageDeckId === '' ? 0 : parseInt(this.pageDeckId);
     this.牌组名 = this.pageDeckName;
     this.牌组选项 = this.pageDeckOptions;
-    // 注册自定义转场回调：首页 Navigation.customNavContentTransition 通过此 name 查找回调，
-    // 在 animateTo 内调用起点/终点回调修改 转场透明度，实现淡入淡出（替代系统默认左右平移）。
-    // key 用 'AddNotePage'（NavPathStack pushPath 时传的 name，与 from.name / to.name 一致）。
-    CustomTransition.getInstance().注册NavParam('AddNotePage',
-      (isPush: boolean, isExit: boolean): void => {
-        this.转场透明度 = isExit ? 1 : 0;
-        this.navigationOffset = isExit ? 0 : navigationEnterOffset(isPush);
+    this.initialPreparation = this.加载初始数据();
+    // 完整字段就绪后，由导航协调器切换正文可见性。
+    CustomTransition.getInstance().registerPage('AddNotePage',
+      (opacity: number, offset: number): void => {
+        this.转场透明度 = opacity;
+        this.navigationOffset = offset;
+        this.wheelSession.setPresentation(opacity, offset);
+        this.wheelSession.setVisible(true);
       },
-      (isPush: boolean, isExit: boolean): void => {
-        this.转场透明度 = isExit ? 0 : 1;
-        this.navigationOffset = 0;
-      }
+      (): Promise<void> => this.initialPreparation
     );
     // 加载主题模式用于图片遮罩编辑器的深色判断；失败回退默认 'system'，不阻塞建卡流程。
-    try {
-      const mode: 主题模式 = await 加载主题模式();
-      if (!this.pageActive) return;
-      this.主题模式值 = mode;
-    } catch (错误) {
-      if (!this.pageActive) return;
-      this.主题模式值 = 'system';
-    }
-    await this.加载初始数据();
+    加载主题模式().then((mode: 主题模式): void => {
+      if (this.pageActive) this.主题模式值 = mode;
+    }).catch((): void => {});
   }
 
   aboutToDisappear(): void {
@@ -226,7 +226,10 @@ export struct 添加笔记页 {
    * Invariants: 图片遮盖编辑器优先于帮助浮层（编辑器更靠上层）。
    */
   onBackPress(): boolean {
-    if (this.linkedIds.length > 0) { this.linkedBack?.(); return true; }
+    if (this.linkedIds.length > 0) {
+      if (!this.linkedBack?.()) { this.linkedIds = []; this.linkedBack = null; }
+      return true;
+    }
     if (this.linksOpen) { this.linksBack++; return true; }
     if (this.templatesOpen) { this.templateBackRequest++; return true; }
     if (this.draftPreview !== null) return true;
@@ -334,8 +337,13 @@ export struct 添加笔记页 {
   private async 加载初始数据(): Promise<void> {
     const context = this.取能力上下文();
     if (context === null) { this.错误信息 = this.取本地化文案($r('app.string.add_note_notetype_load_failed')); return; }
-    await this.creationSession.initialize(context.filesDir);
+    await Promise.all([this.creationSession.initialize(context.filesDir), this.loadEditorDecks(context.filesDir)]);
+  }
+
+  private async loadEditorDecks(filesDir: string): Promise<void> {
     try {
+      await 后端会话.获取实例().确保已打开(filesDir);
+      if (!this.pageActive) return;
       const tree: DeckTreeNode = await new 牌组服务().获取牌组树();
       if (!this.pageActive) return;
       const options: 添加笔记牌组选项[] = []; this.collectDeckOptions(tree, '', options);
@@ -676,7 +684,7 @@ export struct 添加笔记页 {
   private 带帮助的标签(标签文案: Resource, 取帮助: () => Resource) {
     // 点击时读取帮助，避免切换笔记类型后仍显示旧说明。
     HelpLabel({ title: 标签文案, textSize: 应用尺寸.字号_正文_小,
-      textColor: $r('app.color.text_secondary'), isHelpEnabled: !this.处理中,
+      textColor: appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')), isHelpEnabled: !this.处理中,
       onHelp: (): void => { this.打开帮助(标签文案, 取帮助()); }
     }).width('100%')
   }
@@ -721,7 +729,7 @@ export struct 添加笔记页 {
         onChange: (value: string): void => { this.updateTags(value); } })
       Text($r('app.string.add_note_duplicate_policy'))
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_tertiary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
         .width('100%')
     }
     }.width('100%')
@@ -742,6 +750,7 @@ export struct 添加笔记页 {
 
   build() {
     NavDestination() {
+      PageActionShell({ surface: 'add_note' }) {
       Stack() {
       GlassSource() {
 Column() {
@@ -754,7 +763,7 @@ Column() {
               DirectorySelect({ label: $r('app.string.add_note_deck'), value: this.牌组名,
                 surfaceColor: $r('app.color.surface_card'),
                 rows: this.deckRows(), openRequest: this.deckOpenRequest, isInteractive: this.interfaceEnabled('deck'),
-                showHelp: true, onHelp: (): void => { this.打开帮助($r('app.string.add_note_deck'), $r('app.string.add_note_deck_help')); },
+                onHelp: (): void => { this.打开帮助($r('app.string.add_note_deck'), $r('app.string.add_note_deck_help')); },
                 onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('add_note_decks', view); },
                 onSelect: (id: string): void => {
                   this.牌组ID = Number(id); this.牌组名 = this.牌组选项.find((item): boolean => item.id === Number(id))?.name ?? '';
@@ -767,7 +776,7 @@ Column() {
                 labelActionLabel: this.interfaceLabel('templates'),
                 isLabelActionEnabled: this.interfaceEnabled('templates') && this.已选笔记类型ID > 0,
                 onLabelAction: (): void => { this.openTemplates(); },
-                showHelp: true, onHelp: (): void => { this.打开帮助($r('app.string.add_note_notetype'), this.笔记类型帮助); },
+                onHelp: (): void => { this.打开帮助($r('app.string.add_note_notetype'), this.笔记类型帮助); },
                 onSelect: (id: string): void => { this.加载笔记类型(Number(id)); } })
             }
 
@@ -779,7 +788,7 @@ Column() {
                   .fontSize(应用尺寸.字号_正文)
                   .fontColor(this.动作主色)
                   .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-                  .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+                  .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
                   .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
                   .attributeModifier(new PressFeedback())
                   .stateEffect(false)
@@ -790,7 +799,7 @@ Column() {
                     .fontSize(应用尺寸.字号_正文)
                     .fontColor(this.动作主色)
                     .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-                    .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+                    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
                     .enabled(!this.处理中 && !this.pickingFieldImage && !this.audioBusy && !this.confirmingDiscard)
                     .attributeModifier(new PressFeedback())
                     .stateEffect(false)
@@ -880,8 +889,10 @@ Column() {
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
-          top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout)
+          top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
+          bottom: SeriesVisual.scrollShadowEndInset(this.pageMaterial, 0)
         })
+        .clipContent(this.pageMaterial === 'glass' ? ContentClipMode.BOUNDARY : ContentClipMode.CONTENT_ONLY)
 
         // 错误固定显示，避免字段较多时被滚出屏幕。
         if (this.错误信息 !== '') {
@@ -904,7 +915,8 @@ Column() {
             isInteractive: this.interfaceEnabled('save'), onAction: (): void => { this.提交(false); } }).layoutWeight(1)
         }.width('100%').flexShrink(0).padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
           top: 应用尺寸.操作区顶部间距(this.narrowDeckLayout),
-          bottom: 应用尺寸.操作区底部间距(this.narrowDeckLayout, this.导航条高度) })
+          bottom: 应用尺寸.操作区底部间距(this.narrowDeckLayout, this.导航条高度,
+            SeriesVisual.scrollShadowEndInset(this.pageMaterial, 0)) })
       }
       .width('100%')
       .height('100%')
@@ -964,7 +976,7 @@ Column() {
         }
         .width('100%')
         .height('100%')
-        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
+        .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
         .padding({
           left: 应用尺寸.页面内边距_水平,
           right: 应用尺寸.页面内边距_水平,
@@ -975,9 +987,12 @@ Column() {
     }
     .width('100%')
     .height('100%')
-    }
+
+      }
+}
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
+    .visibility(this.pageMaterial === 'glass' && this.转场透明度 <= 0 ? Visibility.Hidden : Visibility.Visible)
     .opacity(this.转场透明度)
     .translate({ x: this.navigationOffset })
     .onKeyPreIme((event: KeyEvent): boolean => this.handleEditorKey(event))

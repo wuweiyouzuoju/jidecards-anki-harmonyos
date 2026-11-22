@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
 import { GlassPanel } from './common/GlassPanel';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { PressFeedback } from '../utils/PressFeedback';
@@ -51,6 +52,7 @@ import { 颜色键 } from '../model/颜色主题';
 
 @Component
 export struct AnkiWeb引导对话框 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @State private surfaceWidth: string = '88%';
   @State private surfaceMaximumWidth: number = 480;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -109,13 +111,13 @@ Column({ space: 应用尺寸.间距_12 }) {
 
         Text($r('app.string.ankiweb_guide_message'))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
           .lineHeight(20)
 
         Text($r('app.string.ankiweb_guide_url_label'))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
           .margin({ top: 应用尺寸.间距_4 })
 
@@ -128,7 +130,7 @@ Column({ space: 应用尺寸.间距_12 }) {
 
         Text($r('app.string.ankiweb_guide_notice'))
           .fontSize(应用尺寸.字号_说明)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .margin({ top: 应用尺寸.间距_4 })
 
@@ -142,7 +144,7 @@ Column({ space: 应用尺寸.间距_12 }) {
             .fontSize(应用尺寸.字号_正文)
             .fontColor($r('app.color.action_primary'))
             .backgroundColor(Color.Transparent)
-            .borderRadius(应用尺寸.圆角_面板)
+            .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
             .attributeModifier(new PressFeedback())
             .stateEffect(false)
             .onClick(() => { this.前往AnkiWeb(); })

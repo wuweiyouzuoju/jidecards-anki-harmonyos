@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -6,6 +7,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 /** 只展示本次配对码；窗口、有效期和配对完成后的关闭由设备直连宿主持有。 */
 @CustomDialog
 export struct DevicePairingDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   controller?: CustomDialogController;
   @Prop invitation: string = '';
   onClose: () => void = (): void => {};
@@ -23,7 +25,7 @@ export struct DevicePairingDialog {
         .color($r('app.color.device_link_qr_foreground')).backgroundColor($r('app.color.device_link_qr_background'))
         .accessibilityText($r('app.string.device_link_code_title'))
       Text($r('app.string.device_link_code_hint')).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%').textAlign(TextAlign.Start)
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%').textAlign(TextAlign.Start)
     }.width('100%').alignItems(HorizontalAlign.Center)
   }
 

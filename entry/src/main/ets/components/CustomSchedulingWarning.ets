@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
 import { DialogFrame } from './common/DialogFrame';
 import { DialogHeader } from './common/DialogHeader';
 import { PrimaryActionButton } from './common/PrimaryActionButton';
@@ -8,6 +9,7 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 /** Script failure is explicit; continuing opts into standard Core scheduling for this session. */
 @Component
 export struct CustomSchedulingWarning {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop script: string = '';
   @Prop error: string = '';
   onExit: () => void = (): void => {};
@@ -28,11 +30,11 @@ export struct CustomSchedulingWarning {
   }
   @Builder
   private content() {
-    Text($r('app.string.custom_scheduling_hint')).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+    Text($r('app.string.custom_scheduling_hint')).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
     Text(this.error).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
-    Text($r('app.string.custom_scheduling_script')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+    Text($r('app.string.custom_scheduling_script')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
     Scroll() {
-      Text(this.script).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+      Text(this.script).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     }.height(160).width('100%')
     PrimaryActionButton({ label: $r('app.string.custom_scheduling_continue'), onAction: this.onContinue })
   }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
 import type { AppInterfaceControl } from '../model/AppInterface';
 import { DialogFrame } from './common/DialogFrame';
 import { DialogHeader } from './common/DialogHeader';
@@ -11,6 +12,8 @@ import { 应用尺寸 } from '../utils/应用尺寸';
 
 @Component
 export struct CollectionHistoryDialog {
+  @Prop refractionSource: string = '';
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('handleBack') backRequest: number = 0;
   @State private state: CollectionHistoryState = new CollectionHistoryState();
   onClose: () => void = (): void => {};
@@ -44,7 +47,7 @@ export struct CollectionHistoryDialog {
   @Builder
   private content() {
     if (this.state.busy) {
-      Text($r('app.string.common_loading')).fontColor($r('app.color.text_secondary'))
+      Text($r('app.string.common_loading')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
     }
     DataActionRow({ title: $r('app.string.collection_history_undo'),
       hint: this.state.status?.undo || $r('app.string.collection_history_empty'),
@@ -53,16 +56,16 @@ export struct CollectionHistoryDialog {
       hint: this.state.status?.redo || $r('app.string.collection_history_empty'),
       isInteractive: !this.state.busy && !!this.state.status?.redo, onAction: (): void => { this.session.apply(true); } })
     if (this.state.error !== '') {
-      Text(namedResourceText(this.getUIContext(), this.state.error)).fontColor($r('app.color.text_secondary'))
+      Text(namedResourceText(this.getUIContext(), this.state.error)).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       if (this.state.errorDetail !== '') {
-        Text(this.state.errorDetail).fontColor($r('app.color.text_secondary')).fontSize(应用尺寸.字号_说明)
+        Text(this.state.errorDetail).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).fontSize(应用尺寸.字号_说明)
       }
     }
     DataActionRow({ title: $r('app.string.collection_history_reload'), isInteractive: !this.state.busy,
       onAction: (): void => { this.session.load(); } })
   }
   build() {
-    DialogFrame({ maximumWidth: 应用尺寸.dialogCompactMaxWidth, canDismiss: !this.state.applying,
+    DialogFrame({ refractionSource: this.refractionSource, maximumWidth: 应用尺寸.dialogCompactMaxWidth, canDismiss: !this.state.applying,
       header: () => { this.header(); }, content: () => { this.content(); }, onDismiss: (): void => { this.handleBack(); } })
   }
 }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { localeNumber } from '../../utils/LocaleFormatting';
 import { agentHistoryRepository } from '../../backend/agent/AgentHistoryFiles';
 import { AgentHistoryInfo, AGENT_HISTORY_DEFAULT_LIMIT, AGENT_HISTORY_LIMITS } from '../../model/agent/AgentHistoryRepository';
@@ -16,6 +17,7 @@ interface HistoryLimitOption { value: string; }
 
 @Component
 export struct AgentHistorySettingsSection {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
   @Prop isLocked: boolean = false;
@@ -36,6 +38,13 @@ export struct AgentHistorySettingsSection {
   aboutToDisappear(): void { this.alive = false; this.generation++; }
   private text(resource: Resource, ...args: string[]): string {
     return localizedResourceText(this.getUIContext(), this.uiLanguage, resource, ...args);
+  }
+  private async showRetentionHelp(): Promise<void> {
+    try {
+      await this.getUIContext().getPromptAction().showDialog({ title: this.text($r('app.string.agent_history_manage')),
+        message: this.text($r('app.string.agent_history_retention_hint')),
+        buttons: [{ text: this.text($r('app.string.settings_confirm')), color: '#2F5FD0' }] });
+    } catch (error) { /* Closing read-only help does not change history. */ }
   }
   private canEdit(): boolean { return this.alive && this.ready && !this.busy && !this.isLocked; }
   private publish(): void { if (this.alive) this.onStateChange(this.info, this.busy); }
@@ -99,26 +108,24 @@ export struct AgentHistorySettingsSection {
     this.reload();
   }
   build() {
-    设置分组卡片({ 是否深色: this.isDark, showHeader: false }) {
+    设置分组卡片({ 是否深色: this.isDark, 标题: $r('app.string.agent_history_manage'),
+      帮助标题: $r('app.string.agent_history_manage'), 帮助正文: $r('app.string.agent_history_retention_hint'),
+      打开说明回调: (): void => { this.showRetentionHelp(); } }) {
       Column({ space: FormRowLayout.rowGap }) {
-        Text($r('app.string.agent_history_manage')).fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary')).width('100%')
         FormSelectRow({ label: settingsItemText(this.getUIContext(), 'history_limit', this.uiLanguage),
           options: AGENT_HISTORY_LIMITS.map((value: number): HistoryLimitOption => ({ value: String(value) })),
           selectedIndex: AGENT_HISTORY_LIMITS.indexOf(this.limit), value: String(this.limit), isInteractive: this.canEdit(),
           onSelect: (index: number): void => { if (index >= 0 && index < AGENT_HISTORY_LIMITS.length) this.change('limit', AGENT_HISTORY_LIMITS[index]); } })
-        Text($r('app.string.agent_history_retention_hint')).fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary')).width('100%')
         if (this.ready) {
           Text(this.text($r('app.string.agent_history_usage'), localeNumber(this.count, this.uiLanguage), localeNumber(this.storedBytes / 1024 / 1024, this.uiLanguage, 2)))
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+            .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%').textAlign(TextAlign.Start)
         }
-        SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'history_manage', this.uiLanguage), icon: $r('app.media.ic_common_history'),
+        SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'history_manage', this.uiLanguage),
           isInteractive: this.canEdit(), onAction: (): void => { this.manage(); } })
-        SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'history_clear', this.uiLanguage), icon: $r('app.media.ic_study_delete'),
+        SettingsActionRow({ title: settingsItemText(this.getUIContext(), 'history_clear', this.uiLanguage),
           isInteractive: this.canEdit() && this.count > 0, onAction: (): void => { this.change('clear'); } })
         if (this.message !== '') {
-          Text(this.message).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
+          Text(this.message).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%').textAlign(TextAlign.Start)
           SettingsActionRow({ title: $r('app.string.common_retry'), isInteractive: !this.busy && !this.isLocked,
             onAction: (): void => { this.reload(); } })
         }
@@ -126,7 +133,7 @@ export struct AgentHistorySettingsSection {
           AgentHistoryList({ conversations: this.conversations, canRestore: false, management: true,
             isInteractive: this.canEdit(), onDelete: (item: AgentConversationSummary): void => { this.change('delete', 0, item.id); } })
         }
-      }.width('100%')
+      }.width('100%').alignItems(HorizontalAlign.Start)
     }
   }
 }

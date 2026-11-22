@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
+import { insetMaterialFill } from '../utils/GlassMaterial';
 import { GlassPanel } from './common/GlassPanel';
 import { SurfaceSelect } from './common/SurfaceSelect';
 import { DirectorySelect } from './common/DirectorySelect';
@@ -72,6 +73,7 @@ interface 添加笔记下拉选项 {
 
 @Component
 export struct 添加笔记面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @State private surfaceWidth: string = '88%';
   @State private surfaceMaximumWidth: number = 520;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -329,7 +331,7 @@ export struct 添加笔记面板 {
   private 带帮助的标签(label: Resource, help: Resource) {
     // 点击时读取帮助，避免切换笔记类型后仍显示旧说明。
     HelpLabel({ title: label, textSize: 应用尺寸.字号_正文_小,
-      textColor: $r('app.color.text_secondary'), isHelpEnabled: !this.busy,
+      textColor: appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')), isHelpEnabled: !this.busy,
       onHelp: (): void => { this.打开帮助(label, help); }
     }).width('100%')
   }
@@ -394,18 +396,18 @@ Column({ space: 应用尺寸.间距_14 }) {
               Column({ space: 应用尺寸.间距_5 }) {
                 Text(noteFieldText(this.getUIContext(), 字段名, this.originalStockKind))
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_secondary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                   .width('100%')
                 TextArea({ placeholder: noteFieldText(this.getUIContext(), 字段名, this.originalStockKind), text: this.fieldValues[index] })
                   .width('100%')
                   // B12-Y2 2026-07-22：height 88 → 56，配合 Scroll 让字段多时可滚动不越界
                   .height(56)
                   .fontSize(应用尺寸.字号_正文)
-                  .fontColor($r('app.color.text_primary'))
-                  .placeholderColor($r('app.color.text_tertiary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
+                  .placeholderColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
                   .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-                  .border(SurfaceBorder.options())
-                  .borderRadius(应用尺寸.圆角_面板)
+                  .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+                  .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
                   .padding(应用尺寸.间距_10)
                   .enabled(!this.busy)
                   .onChange((value: string): void => {
@@ -423,8 +425,8 @@ Column({ space: 应用尺寸.间距_14 }) {
               .flexShrink(0)
               .fontSize(应用尺寸.字号_按钮)
               .fontColor(this.动作主色)
-              .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-              .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+              .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
               .enabled(!this.busy)
               .attributeModifier(new PressFeedback())
               .stateEffect(false)
@@ -439,7 +441,7 @@ Column({ space: 应用尺寸.间距_14 }) {
                   onChange: (value: string): void => { this.tags = value; } })
                 Text($r('app.string.add_note_duplicate_rejected'))
                   .fontSize(应用尺寸.字号_正文_小)
-                  .fontColor($r('app.color.text_tertiary'))
+                  .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
                   .width('100%')
               }
               .width('100%')

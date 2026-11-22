@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
 import { common } from '@kit.AbilityKit';
 import { picker } from '@kit.CoreFileKit';
 import { NoteAudioField } from './common/NoteAudioField';
@@ -16,6 +17,7 @@ import { resourceText } from '../utils/UiFeedback';
 /** 复用录音组件和播放器；录音归学习会话持有，保存由系统文件选择器完成。 */
 @Component
 export struct StudyVoiceDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop audios: NoteFieldAudio[] = [];
   @Prop initialAction: string = '';
   @Prop initialKeyCode: number = -1;
@@ -81,7 +83,7 @@ export struct StudyVoiceDialog {
   @Builder
   private body() {
     Column() {
-      Text($r('app.string.keyboard_voice_hint')).fontColor($r('app.color.text_secondary')).width('100%')
+      Text($r('app.string.keyboard_voice_hint')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       NoteAudioField({ audios: this.audios, mediaOnly: true, captureOnly: true, recordRequest: this.recordRequest,
         disabled: this.saving, preview: this.preview,
         onBusy: (value: boolean): void => { this.busy = value; this.publish(); },
@@ -90,7 +92,7 @@ export struct StudyVoiceDialog {
         onRemove: (_id: number): void => { this.onRemove(); } })
       SettingsActionRow({ title: $r('app.string.keyboard_voice_save'), isInteractive: !this.busy && !this.saving && this.audios.length > 0,
         onAction: (): void => { this.save(); } })
-      if (this.message !== '') { Text(this.message).fontColor($r('app.color.text_secondary')).width('100%') }
+      if (this.message !== '') { Text(this.message).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%') }
     }.width('100%').onAreaChange((): void => { this.start(); })
   }
   build() {

@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { PAGE_TOOLBAR_SCOPE, PageToolbarActionScope } from '../model/PageToolbarActions';
+import { PageActionShell } from '../components/common/PageActionShell';
 import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { DeckOptionsFeature } from '../components/home/DeckOptionsFeature';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
@@ -11,6 +13,7 @@ import { appInterface } from '../backend/AppInterfaceService';
 /** 目的地只拥有导航；草稿、退出保护和 Core 会话由功能组件持有。 */
 @Component
 export struct DeckOptionsPage {
+  @Provide(PAGE_TOOLBAR_SCOPE) private pageToolbarScope: PageToolbarActionScope = new PageToolbarActionScope();
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   deckId: number = 0;
@@ -43,13 +46,16 @@ export struct DeckOptionsPage {
 
   build() {
     NavDestination() {
+      PageActionShell({ surface: 'deck_options' }) {
       Column() {
         // pop 必须带 result 才触发首页 onPop，释放入口占用并刷新。
         DeckOptionsFeature({ deckId: this.deckId, deckName: this.deckName,
           isDark: 解析是否深色(this.theme, this.systemDark), backRequest: this.backRequest,
           onBusy: this.onBusy, onClose: (): void => { this.pathStack.pop({}); } })
       }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial, this.wallpaperPath))
-    }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
+
+      }
+}.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
       .translate({ x: this.navigationOffset })
       .onShown((): void => { appInterface.showPage('deck_options'); })
       .onHidden((): void => { appInterface.hidePage('deck_options'); })

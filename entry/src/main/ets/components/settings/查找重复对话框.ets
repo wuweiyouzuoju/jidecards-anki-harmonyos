@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { noteTypeText, noteFieldText } from '../../utils/NoteTypeText';
 import { localizedResourceText, resourceText, namedResourceText } from '../../utils/UiFeedback';
@@ -17,6 +18,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 查找重复对话框 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
   @Prop isDark: boolean = false;
@@ -116,16 +118,16 @@ export struct 查找重复对话框 {
         onSelect: (index: number): void => { this.fieldOrd = index; this.session.reset(); } })
     }
     TextInput({ text: this.searchScope, placeholder: $r('app.string.find_dupes_scope') })
-      .attributeModifier(new FormInputStyle()).width('100%')
+      .attributeModifier(new FormInputStyle( undefined, this.appearanceElements)).width('100%')
       .onChange((value: string): void => { this.searchScope = value; this.session.reset(); })
     Text($r('app.string.find_dupes_matching_help')).fontSize(应用尺寸.字号_正文_小)
-      .fontColor($r('app.color.text_secondary')).width('100%')
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     if (this.加载中 || this.scan.busy) {
       Row({ space: 应用尺寸.间距_8 }) {
-        LoadingProgress().width(20).height(20).color($r('app.color.text_secondary'))
+        LoadingProgress().width(20).height(20).color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         Text(this.scan.total > 0 ? localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.find_dupes_progress'),
           this.scan.scanned, this.scan.total) : localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.find_dupes_searching')))
-          .fontSize(应用尺寸.字号_正文_中).fontColor($r('app.color.text_secondary'))
+          .fontSize(应用尺寸.字号_正文_中).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }.width('100%')
     }
     if (this.错误信息 !== '' || this.scan.error !== '') {
@@ -137,22 +139,22 @@ export struct 查找重复对话框 {
     }
     if (this.scan.cancelled) {
       Text($r('app.string.find_dupes_cancelled')).fontSize(应用尺寸.字号_正文_中)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
     }
     if (this.scan.complete) {
       Text(localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.find_dupes_count'), this.scan.groups.length))
-        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       if (this.scan.groups.length === 0) {
         Text($r('app.string.find_dupes_no_duplicates')).fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }
       ForEach(this.scan.groups.slice(0, this.resultLimit), (group: DuplicateGroup) => {
         Column({ space: 应用尺寸.间距_4 }) {
           Text(group.value.length > 80 ? group.value.substring(0, 80) + '…' : group.value)
-            .fontSize(应用尺寸.字号_正文_中).fontColor($r('app.color.text_primary')).maxLines(2)
+            .fontSize(应用尺寸.字号_正文_中).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).maxLines(2)
           Text(localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.find_dupes_notes_in_group'), group.noteIds.length))
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-        }.width('100%').padding(应用尺寸.间距_8).border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+            .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
+        }.width('100%').padding(应用尺寸.间距_8).border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         .backgroundColor(insetMaterialFill($r('app.color.surface_sidebar'))).attributeModifier(new PressFeedback())
         .onClick((): void => { this.jump(group); })
       }, (group: DuplicateGroup): string => `${group.noteIds[0]}`)

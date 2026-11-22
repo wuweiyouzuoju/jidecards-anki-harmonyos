@@ -1,5 +1,7 @@
-import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceElementColor, appearanceModuleRadius, appearanceModuleBorder } from '../../utils/AppearanceElements';
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 import { noteTypeText } from '../../utils/NoteTypeText';
 import { showToastSafely, resourceText } from '../../utils/UiFeedback';
 import { IconActionButton } from '../common/IconActionButton';
@@ -51,6 +53,7 @@ import type { NotetypeNameId } from '../../proto/messages/NotetypeMessages';
 
 @Component
 export struct 笔记类型管理面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp(颜色键.动作主色) private materialAccent: string = '#2F5FD0';
@@ -207,7 +210,10 @@ export struct 笔记类型管理面板 {
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .padding(应用尺寸.间距_12)
-    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.isDark, this.materialAccent, '', 应用尺寸.圆角_卡片, this.moduleOpacity))
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.isDark, this.materialAccent, '', 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements))
+    .background(this.renderGlassBackground(SeriesVisual.surfaceFor(this.surfaceMaterial, this.isDark, this.materialAccent, '', 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
   }
 
   private openCreate(sourceId: number = 0, sourceName: string = ''): void {
@@ -236,8 +242,8 @@ export struct 笔记类型管理面板 {
   @Builder
   private createContent() {
     Column({ space: 应用尺寸.间距_12 }) {
-      Text($r('app.string.notetype_editor_name')).fontColor($r('app.color.text_secondary')).width('100%')
-      TextInput({ text: this.createName }).attributeModifier(new FormInputStyle()).enabled(!this.处理中)
+      Text($r('app.string.notetype_editor_name')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
+      TextInput({ text: this.createName }).attributeModifier(new FormInputStyle( undefined, this.appearanceElements)).enabled(!this.处理中)
         .onChange((value: string): void => { this.createName = value; })
       if (this.cloneSourceId === 0) {
         FormSelectRow({ label: $r('app.string.notetype_stock_source'),
@@ -246,7 +252,7 @@ export struct 笔记类型管理面板 {
           onSelect: (index: number): void => { this.stockKind = index; } })
       } else {
         Text($r('app.string.notetype_clone_hint')).fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
       if (this.处理中) { LoadingProgress().width(24).height(24) }
       if (this.createError !== '') { Text(this.createError).fontColor($r('app.color.error_text')).width('100%') }
@@ -272,7 +278,7 @@ export struct 笔记类型管理面板 {
     // 说明文案
     Text($r('app.string.notetype_mgmt_description'))
       .fontSize(应用尺寸.字号_正文_小)
-      .fontColor($r('app.color.text_secondary'))
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       .width('100%')
 
     // busy 指示
@@ -281,10 +287,10 @@ export struct 笔记类型管理面板 {
         LoadingProgress()
           .width(20)
           .height(20)
-          .color($r('app.color.text_secondary'))
+          .color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         Text(this.处理中 ? $r('app.string.notetype_mgmt_processing') : $r('app.string.notetype_mgmt_loading'))
           .fontSize(应用尺寸.字号_正文_中)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }
       .width('100%')
       .justifyContent(FlexAlign.Center)
@@ -301,13 +307,18 @@ export struct 笔记类型管理面板 {
     Column({ space: 应用尺寸.间距_8 }) {
       if (this.类型列表.length === 0 && !this.加载中) {
         Text($r('app.string.notetype_mgmt_empty')).fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
       ForEach(this.类型列表, (类型: NotetypeNameId) => {
         this.类型行(类型)
       }, (类型: NotetypeNameId): string => `${类型.id}`)
     }.width('100%').alignItems(HorizontalAlign.Start)
 
+  }
+
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
   }
 
   build() {

@@ -1,5 +1,6 @@
-import { GlassSource } from './common/GlassSource';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
+import { GlassSource } from './common/GlassSource';
 import { DeckOptionRow } from './home/DeckOptionRow';
 import { 设置分组卡片 } from './settings/设置分组卡片';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../model/AppLayoutState';
@@ -59,6 +60,7 @@ interface 牌组枚举选项 { value: Resource; numericValue: number; }
 
 @Component
 export struct 牌组选项面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -469,15 +471,14 @@ export struct 牌组选项面板 {
   }
   @Builder
   private experimentalOptions() {
-    Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
+    高级牌组选项面板({ form: this.form, options: this.options, busy: this.busy, defaultValues: this.defaultValues,
+      isDark: this.isDark,
+      customScheduling: this.customScheduling, fsrsState: this.fsrsState, presetAssignmentsChanged: this.presetAssignmentsChanged,
+      onHelp: (title: string, body: string): void => { this.openHelp(title, body); },
+      onOptimize: this.onOptimize, onSimulate: this.onSimulate, onEvaluate: this.onEvaluate }) {
       设置分组卡片({ 标题: $r('app.string.deck_preset_label'), 是否深色: this.isDark,
         内容: () => { this.presetOptions(); } })
-      高级牌组选项面板({ form: this.form, options: this.options, busy: this.busy, defaultValues: this.defaultValues,
-        isDark: this.isDark,
-        customScheduling: this.customScheduling, fsrsState: this.fsrsState, presetAssignmentsChanged: this.presetAssignmentsChanged,
-        onHelp: (title: string, body: string): void => { this.openHelp(title, body); },
-        onOptimize: this.onOptimize, onSimulate: this.onSimulate, onEvaluate: this.onEvaluate })
-    }.width('100%')
+    }
   }
 
   build() {
@@ -506,11 +507,11 @@ Column() {
           Column({ space: 应用尺寸.页面分组间距(this.narrow) }) {
             Column({ space: 应用尺寸.间距_8 }) {
               Text(this.deckName).fontSize(应用尺寸.字号_卡片标题).fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary')).width('100%')
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
               if (this.简洁模式) {
                 Text($r('app.string.deck_save_scope_summary', this.resolveText(this.options.applyToSharedDecks ?
                   $r('app.string.deck_save_scope_preset') : $r('app.string.deck_scope_deck'))))
-                  .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary')).width('100%')
+                  .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
               }
             }.width('100%').padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
             if (this.form !== null) {

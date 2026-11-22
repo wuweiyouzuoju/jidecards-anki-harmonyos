@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
 import { GlassPanel } from './common/GlassPanel';
 import { SurfaceTransition } from '../utils/SurfaceTransition';
 import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
@@ -40,6 +41,7 @@ interface 更新条目 {
 
 @Component
 export struct 欢迎弹窗 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @State private surfaceWidth: string = '88%';
   @State private surfaceMaximumWidth: number = 480;
   @StorageProp(颜色键.动作主色) private 动作主色: string = '#2F5FD0';
@@ -100,18 +102,18 @@ Column() {
           Text($r('app.string.welcome_section1_title'))
             .fontSize(应用尺寸.字号_按钮)
             .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             .width('100%')
           Text() {
             ForEach(this.解析更新条目(), (条目: 更新条目) => {
               Span(条目.前缀)
                 .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.text_primary'))
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
               Span(条目.正文 + '\n')
             })
           }
           .fontSize(应用尺寸.字号_正文_中)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
         }
         .width('100%')
@@ -125,7 +127,7 @@ Column() {
           Text($r('app.string.welcome_section2_title'))
             .fontSize(应用尺寸.字号_按钮)
             .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             .width('100%')
           // 方式 1：ankiweb.net 链接可点击跳转浏览器
           Text() {
@@ -138,7 +140,7 @@ Column() {
             Span($r('app.string.welcome_section2_way1_tail'))
           }
           .fontSize(应用尺寸.字号_正文_中)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
           // 方式 2：QQ 群号可长按选中复制（copyOption On 启用整段文本选择）
           Text() {
@@ -150,13 +152,13 @@ Column() {
             Span($r('app.string.welcome_section2_qq_suffix'))
           }
           .fontSize(应用尺寸.字号_正文_中)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .copyOption(CopyOptions.LocalDevice)
           .width('100%')
           // 提示：获取牌组方式可在设置-关于中再次查看
           Text($r('app.string.welcome_section2_hint'))
             .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .width('100%')
         }
         .width('100%')
@@ -170,7 +172,7 @@ Column() {
           Text($r('app.string.welcome_section3_title'))
             .fontSize(应用尺寸.字号_按钮)
             .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             .width('100%')
           Text() {
             Span('本应用后端复用开源项目Anki，因此具备极其成熟的闪卡算法。有任何建议可以在应用市场直接')
@@ -181,7 +183,7 @@ Column() {
             Span('或在QQ群反馈')
           }
           .fontSize(应用尺寸.字号_正文_中)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
         }
         .width('100%')

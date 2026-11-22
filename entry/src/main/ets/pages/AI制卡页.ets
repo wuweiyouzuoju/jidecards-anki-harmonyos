@@ -1,8 +1,23 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { externalMcpService, isExternalMcpDevice } from '../backend/external-agent/ExternalMcpService';
+import { ensureHuaweiAIAccount } from '../backend/agent/HuaweiAIAccount';
+import { externalRequestId, externalRequestStatus } from '../model/external-agent/ExternalRequestStatus';
+import { ExternalAgentBridge, ExternalAgentHost } from '../backend/external-agent/ExternalAgentBridge';
+import type { AgentToolCall } from '../model/agent/AgentTypes';
+import type { AgentToolResult } from '../backend/agent/AgentToolRegistry';
+import { createStartedAgentToolTrace, completeAgentToolTrace } from '../model/agent/AgentToolDiagnostics';
+import { AgentVoiceCapture } from '../backend/agent/AgentVoiceCapture';
+import { DeepSeekMediaService, removeAgentSpeech, writeAgentSpeech } from '../backend/agent/DeepSeekMediaService';
+import { AGENT_VOICE_SECONDS, agentVoiceFailure, deepSeekOcrRequested } from '../model/agent/DeepSeekMedia';
+import { 声音播放器 } from '../utils/声音播放器';
+import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { PAGE_TOOLBAR_SCOPE, PageToolbarActionScope } from '../model/PageToolbarActions';
+import { PageActionShell } from '../components/common/PageActionShell';
+import { appearanceElementRadius, appearanceElementColor, appearanceModuleBorder, appearanceModuleRadius } from '../utils/AppearanceElements';
 import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 import { insetMaterialFill } from '../utils/GlassMaterial';
 import { GlassSource } from '../components/common/GlassSource';
-// SPDX-License-Identifier: AGPL-3.0-or-later
-import { ActionStatus } from '../components/common/ActionStatus';
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -10,9 +25,8 @@ import { AgentDocumentStore } from '../backend/agent/AgentDocumentStore';
 import { AgentNoteMediaTools } from '../backend/agent/AgentNoteMediaTools';
 import { isAgentNoteMediaTool } from '../model/agent/AgentNoteMedia';
 import { appInterface } from '../backend/AppInterfaceService';
-import { agentInterfaceControls, agentInterfaceTitle, agentImportLabelKey, agentComposerLabelKeys, visibleInterfaceItems,
+import { agentInterfaceControls, agentInterfaceTitle, visibleInterfaceItems,
   AppInterfaceMenuItem, AppInterfaceControl, AppInterfaceItem } from '../model/AppInterface';
-import { hasActionStatus } from '../model/InteractionFeedback';
 import { interfaceControlText } from '../utils/AppInterfaceText';
 import { interfaceItemText } from '../utils/AppInterfaceText';
 import { localizedNamedResourceText, namedResourceText } from '../utils/UiFeedback';
@@ -38,8 +52,9 @@ import type { RestoreNotetypeAction } from '../model/agent/AgentMaintenanceActio
 import { AgentAppNavigationSession } from '../model/agent/AgentAppNavigation';
 import { AgentAppNavigationTools, readNavigationTarget } from '../backend/agent/AgentAppNavigationTools';
 import type { AppNavigationArguments, AppNavigationRequest } from '../model/navigation/AppNavigation';
-import { APP_FOREGROUND_KEY } from '../model/AppLifecycleState';
+
 import { syncActivity } from '../model/SyncSettings';
+import { recordAiActivity } from '../backend/InstallationRegistration';
 import { AI_AGENT_CHANNELS_APP_STORAGE_KEY } from '../model/ReleaseFeatures';
 import type { ThemeModeChange } from '../model/settings/ThemeModeSession';
 import { PrimaryActionButton } from '../components/common/PrimaryActionButton';
@@ -60,7 +75,7 @@ import { AgentTaskPlanState } from '../model/agent/AgentTaskPlan';
 import { AgentEmptySuggestions } from '../components/agent/AgentEmptySuggestions';
 import { buildAgentAppRecommendations } from '../model/agent/AgentAppRecommendations';
 import type { AgentAppRecommendation } from '../model/agent/AgentAppRecommendations';
-import { createAgentMessage, cloneAgentCard, cloneAgentTrace, cloneAgentMessage } from '../model/agent/AgentConversationView';
+import { createAgentMessage, cloneAgentCard, cloneAgentTrace, cloneAgentMessage, agentReplySpeechText } from '../model/agent/AgentConversationView';
 import type { 卡片草稿, 聊天消息 } from '../model/agent/AgentConversationView';
 import { AgentEditableCard } from '../components/agent/AgentEditableCard';
 import { AgentCardBatch } from '../model/agent/AgentCardBatch';
@@ -154,6 +169,7 @@ import {
   isAgentProviderConfigured,
   loadAgentSettings
 } from '../backend/agent/AgentSettingsStore';
+import { OFFICIAL_AI_BASE } from '../backend/agent/OfficialAIService';
 import { loadAgentSecret } from '../backend/agent/AgentSecretStore';
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { SeriesVisual } from '../utils/SeriesVisual';
@@ -182,6 +198,8 @@ import {
   successfulAgentImportedFiles
 } from '../model/agent/AgentFileImport';
 import { selectAndParseAgentFiles } from '../backend/agent/AgentFileImportService';
+import { AppLog } from '../model/AppLog';
+
 
 interface AgentMessageViewContext {
   message: 聊天消息;
@@ -226,6 +244,8 @@ class 页面Agent观察者 implements AgentRunObserver {
 
 @Component
 export struct AI制卡页 {
+  @Provide(PAGE_TOOLBAR_SCOPE) private pageToolbarScope: PageToolbarActionScope = new PageToolbarActionScope();
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @Provide(NOTE_EDITOR_WHEEL_SESSION_KEY) private wheelSession: NoteEditorWheelSession = new NoteEditorWheelSession();
@@ -255,6 +275,13 @@ export struct AI制卡页 {
     (): void => { this.聊天滚动器.scrollEdge(Edge.Bottom); },
     (): boolean => !this.pageDisposed, 50);
   private readonly agentScope: AgentScope = new AgentScope();
+  private externalRegistry: AgentToolRegistry | null = null;
+  private externalBridge: ExternalAgentBridge | null = null;
+  private externalGeneration: number = 0;
+  private readonly externalRequests: Map<string, number> = new Map<string, number>();
+  private readonly externalOutputs: Map<number, string> = new Map<number, string>();
+  private readonly externalNavigations: Map<string, number> = new Map<string, number>();
+
   private readonly agentExecutor: AgentDraftExecutor = new AgentDraftExecutor();
   private agentRunner: AgentRunner | null = null;
   private agentTurnVersion: number = 0;
@@ -267,6 +294,15 @@ export struct AI制卡页 {
   @State @Watch('publishInterface') private themeUndoBusy: boolean = false;
   private sessionController: AgentSessionController | null = null;
   private checkpointStore: AgentCheckpointStore | null = null;
+  @State @Watch('publishInterface') private voiceState: string = '';
+  @State @Watch('publishInterface') private speechMessageId: number = -1;
+  @State @Watch('publishInterface') private deepSeekMediaReady: boolean = false;
+  private voiceCapture = new AgentVoiceCapture();
+  private deepSeekVoice = new DeepSeekMediaService();
+  private speechPlayer = new 声音播放器();
+  private mediaGeneration: number = 0;
+  private voiceTimer: number = -1;
+
   private documentStore: AgentDocumentStore | null = null;
   private documentAccess: AgentDocumentAccess | null = null;
   private ankiHelpTools: AgentAnkiHelpTools | null = null;
@@ -299,6 +335,9 @@ export struct AI制卡页 {
   });
   private notetypeLoadVersion: number = 0;
   private readonly cardBatch: AgentCardBatch = new AgentCardBatch();
+  @StorageProp(APP_FOREGROUND_KEY) @Watch('onAgentForegroundChanged') private agentAppForeground: boolean = true;
+  private backgroundConversation: string = '';
+  private activeAgentIntent: string = '';
   private conversationId: string = `agent-${Date.now()}-${Math.random()}`;
   private 历史执行结果: AgentHistoryResult[] = [];
   private omittedMediaInContext: boolean = false;
@@ -448,6 +487,7 @@ export struct AI制卡页 {
     });
     this.appSettingsTools.register(registry);
     this.appSettingsTools.setNavigationReadiness(() => this.navigationSession?.readiness() ?? []);
+    this.externalRegistry = registry;
     this.agentRunner = new AgentRunner(registry);
     if (this.workspaceStore !== null) {
       const auxiliary: AgentAuxiliaryTools = new AgentAuxiliaryTools(this.agentScope, this.workspaceStore);
@@ -460,12 +500,14 @@ export struct AI制卡页 {
       });
     }
     await this.加载本地入口上下文();
+    this.attachExternalAgent();
   }
 
   aboutToDisappear(): void {
     this.interfaceMounted = false;
     appInterface.hidePage('agent');
     appInterface.leave('agent');
+    this.stopExternalAgent();
     this.navigationSession?.cancel();
     this.pageDisposed = true;
     this.agentTurnVersion++;
@@ -473,6 +515,7 @@ export struct AI制卡页 {
     this.historyReadGeneration++;
     this.history.dispose();
     this.agentTailFollower.dispose();
+    this.stopDeepSeekMedia(true);
     if (this.agentRunner !== null) { this.agentRunner.cancel(); }
     this.getUIContext().setKeyboardAvoidMode(this.上一键盘避让模式);
     CustomTransition.getInstance().注销NavParam('AiCardPage');
@@ -480,18 +523,26 @@ export struct AI制卡页 {
 
   /** 从设置页的唯一配置源加载当前 Provider 坐标与密钥。 */
   private async loadProviderConfiguration(): Promise<void> {
+    this.deepSeekMediaReady = false;
+    let settings: AgentSettings = defaultAgentSettings();
+    let apiKey: string = '';
     try {
-      this.agentSettings = await loadAgentSettings();
-    } catch (error) {
-      this.agentSettings = defaultAgentSettings();
-    }
-    const provider: ProviderId = this.agentSettings.selectedProvider;
+      settings = await loadAgentSettings(true);
+      apiKey = (await loadAgentSecret(settings.selectedProvider)).trim();
+    } catch (error) { /* 配置未能读出时，默认模型只用于占位。 */ }
+    if (this.pageDisposed) return;
+    const provider: ProviderId = settings.selectedProvider;
+    const baseUrl: string = provider === 'official' ? OFFICIAL_AI_BASE : provider === 'deepseek' ? DEEPSEEK_PROVIDER.baseUrl :
+      (provider === 'openai' ? OPENAI_PROVIDER.baseUrl : settings.customBaseUrl);
+    const model: string = provider === 'official' ? DEEPSEEK_PROVIDER.defaultModel : provider === 'deepseek' ? settings.deepseekModel :
+      (provider === 'openai' ? settings.openaiModel : settings.customModel);
+    const mediaReady: boolean = provider === 'deepseek' && isAgentProviderConfigured(settings, apiKey);
+    if (!mediaReady && (this.voiceState !== '' || this.speechMessageId >= 0)) await this.stopDeepSeekMedia();
+    if (this.pageDisposed) return;
+    this.agentSettings = settings;
     this.页面Provider = provider;
-    const baseUrl: string = provider === 'deepseek' ? DEEPSEEK_PROVIDER.baseUrl :
-      (provider === 'openai' ? OPENAI_PROVIDER.baseUrl : this.agentSettings.customBaseUrl);
-    const model: string = provider === 'deepseek' ? this.agentSettings.deepseekModel :
-      (provider === 'openai' ? this.agentSettings.openaiModel : this.agentSettings.customModel);
-    this.AI配置 = { apiKey: await loadAgentSecret(provider), baseUrl: baseUrl, model: model };
+    this.AI配置 = { apiKey: apiKey, baseUrl: baseUrl, model: model };
+    this.deepSeekMediaReady = mediaReady;
   }
 
   private hasPendingAction(): boolean {
@@ -570,7 +621,8 @@ export struct AI制卡页 {
 
   private async resolveAction(messageIndex: number, accepted: boolean): Promise<void> {
     if (this.处理中 || this.sessionController === null) { return; }
-    const action: AgentAction | null = this.sessionController.getAction();
+    const external: boolean = this.externalOutputs.has(this.消息列表[messageIndex].id);
+    const action: AgentAction | null = external ? this.消息列表[messageIndex].action : this.sessionController.getAction();
     if (action === null || action.status !== 'pending' || this.消息列表[messageIndex].action?.id !== action.id) { return; }
     this.处理中 = true;
     let resultJson: string = '{"status":"cancelled_by_user","instruction":"Do not repeat the same proposal."}';
@@ -595,12 +647,36 @@ export struct AI制卡页 {
       this.处理中 = false;
       await this.保存当前会话历史();
     }
+    if (external) return;
     const visible: string = this.取本地化文案(accepted ? $r('app.string.ai_agent_action_confirmed_continue') :
       $r('app.string.ai_agent_action_cancelled_continue'));
     const result: AgentRunResult | null = await this.runAgentTurn(visible, visible, 0, '', resultJson);
     if (result?.clarification !== null && result?.clarification !== undefined) {
       this.appendClarificationMessage(result.clarification);
       await this.保存当前会话历史();
+    }
+  }
+
+  private onAgentForegroundChanged(): void {
+    if (!this.agentAppForeground && (this.voiceState === 'recording' || this.voiceState === 'transcribing' || this.speechMessageId >= 0)) this.stopDeepSeekMedia();
+    if (!this.agentAppForeground && this.处理中) this.backgroundConversation = this.conversationId;
+    if (!this.agentAppForeground) return;
+    if (this.backgroundConversation === this.conversationId) this.agentRunner?.interruptProviderStream();
+    this.resumeBackgroundTask();
+  }
+
+  private async resumeBackgroundTask(): Promise<void> {
+    if (this.pageDisposed || !this.agentAppForeground || !this.isAgentPageVisible || this.处理中 ||
+      this.backgroundConversation !== this.conversationId || !this.sessionController?.isPaused()) return;
+    this.backgroundConversation = '';
+    if (this.hasPendingAction() || this.hasPendingClarification()) return;
+    try {
+      const visible = this.取本地化文案($r('app.string.ai_agent_task_resume'));
+      const result = await this.runAgentTurn(visible, visible, 0, this.activeAgentIntent, '{"status":"continue_after_background"}');
+      if (result?.clarification) this.appendClarificationMessage(result.clarification);
+      await this.保存当前会话历史();
+    } catch (error) {
+      this.错误信息 = this.取Agent错误文案(error instanceof Error ? error : new Error('agent_session_failed'));
     }
   }
 
@@ -624,7 +700,6 @@ export struct AI制卡页 {
   /** 刷新当前操作目标；保留会话已发现的只读对象和检索游标。 */
   private 重建本轮AgentScope(): void {
     this.agentScope.beginTurn();
-    this.agentScope.configureBatchLimit(this.agentSettings.batchLimit);
     this.agentScope.configureCreateTarget(
       this.pageMode !== 'edit' ? this.牌组ID : 0,
       this.pageMode !== 'edit' ? this.已选笔记类型ID : 0);
@@ -761,14 +836,15 @@ export struct AI制卡页 {
     const effectiveInput: string = this.输入草稿.trim().length > 0 ? this.输入草稿 :
       (successfulAgentImportedFiles(this.导入文件列表).length > 0 ? 'imported-file' : '');
     return evaluateAgentReadiness(this.taskSetup(), effectiveInput,
-      this.providerReady(), this.cardBatch.isRunning() || this.处理中 || this.targetSelectionBusy || this.themeUndoBusy || this.文件解析中 || this.hasPendingClarification() || this.hasPendingAction());
+      this.providerReady(), this.cardBatch.isRunning() || this.处理中 || this.targetSelectionBusy || this.themeUndoBusy || this.文件解析中 || Boolean(this.voiceState) || this.hasPendingClarification() || this.hasPendingAction());
   }
 
   private interfaceControls(): AppInterfaceMenuItem[] {
     return agentInterfaceControls({ history: this.显示历史区, settings: this.settingsVisible, settingsBusy: this.settingsBusy,
       memory: this.memoryVisible, memoryCanCreate: this.memoryCanCreate, processing: this.处理中,
       parsing: this.文件解析中, batchRunning: this.cardBatch.isRunning(),
-      pendingClarification: this.hasPendingClarification(), canSubmit: this.canSubmit() });
+      pendingClarification: this.hasPendingClarification(), canSubmit: this.canSubmit(),
+      voiceAvailable: this.deepSeekMediaReady, voiceState: this.voiceState, speechActive: this.speechMessageId >= 0 });
   }
 
   private interfaceLabel(id: string): string {
@@ -782,7 +858,7 @@ export struct AI制卡页 {
   private publishInterface(_locale: string = this.uiLanguage): void {
     if (!this.interfaceMounted || this.pageDisposed) return;
     const controls: AppInterfaceControl[] = this.interfaceControls().map((item): AppInterfaceControl =>
-      ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey,
+      ({ id: item.id, title: namedResourceText(this.getUIContext(), item.titleKey), titleKey: item.titleKey, iconKey: item.iconKey,
         enabled: item.enabled, selected: item.selected }));
     const files: AgentImportedFile[] = this.显示历史区 || this.settingsVisible || this.memoryVisible ? [] : this.导入文件列表.slice(0, 100);
     for (const file of files) {
@@ -790,11 +866,20 @@ export struct AI制卡页 {
       controls.push({ id: 'remove-' + file.id, title: namedResourceText(this.getUIContext(), 'ai_agent_file_remove'),
         titleKey: 'ai_agent_file_remove', enabled: true, selected: false });
     }
+    if (this.deepSeekMediaReady && !this.显示历史区 && !this.settingsVisible && !this.memoryVisible) {
+      for (const message of this.消息列表.slice(-20)) {
+        if (!this.canReadAloud(message)) continue;
+        const speaking = this.speechMessageId === message.id;
+        const titleKey = speaking ? 'ai_agent_deepseek_tts_stop' : 'ai_agent_deepseek_tts';
+        controls.push({ id: 'read-aloud-' + message.id, title: namedResourceText(this.getUIContext(), titleKey),
+          titleKey: titleKey, enabled: this.voiceState === '', selected: speaking });
+      }
+    }
     appInterface.observe({ surface: 'agent', titleKey: agentInterfaceTitle(this.pageMode, this.显示历史区, this.memoryVisible, this.settingsVisible),
       sectionId: this.memoryVisible ? 'memory' : this.settingsVisible ? 'settings' : this.显示历史区 ? 'history' : 'conversation', selectedId: this.conversationId,
       optionIds: files.map((file): string => 'file-' + file.id), optionLabels: files.map((file): string => file.name.slice(0, 160)),
       optionsTotal: this.显示历史区 || this.settingsVisible || this.memoryVisible ? 0 : this.导入文件列表.length,
-      busy: this.处理中 || this.文件解析中 || this.cardBatch.isRunning() || this.settingsBusy, items: controls, controlsComplete: true,
+      busy: this.处理中 || this.文件解析中 || this.cardBatch.isRunning() || this.settingsBusy || Boolean(this.voiceState), items: controls, controlsComplete: true,
       values: [{ id: 'request_feedback', value: this.requestFeedback }, { id: 'mode', value: this.pageMode }, { id: 'message_count', value: String(this.消息列表.length) },
         { id: 'draft_length', value: String(this.输入草稿.length) },
         { id: 'pending_clarification', value: String(this.hasPendingClarification()) },
@@ -803,7 +888,7 @@ export struct AI制卡页 {
   }
 
   private canSubmit(): boolean {
-    return this.readinessReason() === 'ready';
+    return !this.externalBridge?.isBusy() && this.readinessReason() === 'ready';
   }
 
   private taskSnapshot(input: string): AgentTaskSnapshot {
@@ -815,8 +900,7 @@ export struct AI制卡页 {
       clozeFieldOrds: setup.clozeFieldOrds.slice(), userText: input,
       templateCount: setup.templateCount, templatePreviews: setup.templatePreviews?.slice(),
       localContext: this.本地入口上下文.length > 0 ? this.本地入口上下文 : '无预选卡片，可使用搜索工具。',
-      omittedMedia: this.omittedMediaInContext,
-      batchLimit: this.agentSettings.batchLimit
+      omittedMedia: this.omittedMediaInContext
     };
   }
 
@@ -845,7 +929,7 @@ export struct AI制卡页 {
 
   /** 每轮过滤实际能力目录；Runner 按需加载定义，读取不会自动取得写入权限。 */
   private providerFunctionToolsForTurn(allowWeb: boolean = true): ProviderFunctionTool[] {
-    return filterAgentWebTools(agentFunctionTools(this.agentSettings.batchLimit, this.pageMode), allowWeb).filter(
+    return filterAgentWebTools(agentFunctionTools(this.pageMode), allowWeb).filter(
       (tool: ProviderFunctionTool): boolean => (this.documentAccess !== null || !isAgentDocumentTool(tool.name)) &&
         (this.documentAccess !== null || !isAgentNoteMediaTool(tool.name)) &&
         (this.ankiHelpTools !== null || !isAgentAnkiHelpTool(tool.name)) &&
@@ -1049,6 +1133,11 @@ export struct AI制卡页 {
     if (错误.message === 'transfer_ai_content_export_blocked') return this.取本地化文案($r('app.string.transfer_ai_content_export_blocked'));
     if (错误 instanceof AgentTransportError) {
       if (错误.kind === 'http') {
+        if (this.agentSettings.selectedProvider === 'official') {
+          if (错误.statusCode === 402) return this.取本地化文案($r('app.string.official_ai_insufficient'));
+          if (错误.statusCode === 401) return this.取本地化文案($r('app.string.official_ai_login_required'));
+          return this.取本地化文案($r('app.string.official_ai_unavailable'));
+        }
         if (错误.detailMessage.length > 0) {
           return this.取本地化格式($r('app.string.ai_agent_http_error_detail'),
             [错误.statusCode, 错误.detailMessage]);
@@ -1061,6 +1150,9 @@ export struct AI制卡页 {
       if (错误.kind === 'cancelled') {
         return this.取本地化文案($r('app.string.ai_agent_turn_cancelled'));
       }
+    }
+    if (错误.message === 'provider_response_incomplete_content_filter') {
+      return this.取本地化文案($r('app.string.ai_agent_content_filtered'));
     }
     if (错误.message === 'cancelled') {
       return this.取本地化文案($r('app.string.ai_agent_turn_cancelled'));
@@ -1097,6 +1189,7 @@ export struct AI制卡页 {
   }
 
   private 取消当前请求(): void {
+    this.backgroundConversation = '';
     this.requestFeedback = 'idle';
     this.navigationSession?.cancel();
     this.agentTurnVersion++;
@@ -1135,6 +1228,7 @@ export struct AI制卡页 {
   @State @Watch('publishInterface') private requestFeedback: string = 'idle';
 
   private async 发送(): Promise<void> {
+    if (!await ensureHuaweiAIAccount(this.getUIContext())) return;
     const 输入: string = this.输入草稿.trim();
     const reason: AgentReadinessReason = this.readinessReason();
     if (reason !== 'ready') { return; }
@@ -1171,12 +1265,17 @@ export struct AI制卡页 {
 
   private async runAgentTurn(providerText: string, visibleUserText: string,
     existingUserMessageId: number = 0, intentText: string = visibleUserText, resumeOutput: string = ''): Promise<AgentRunResult | null> {
-    if (this.pageDisposed || this.cardBatch.isRunning() || this.处理中 || this.themeUndoBusy || this.agentRunner === null || this.sessionController === null) { return null; }
+    if (this.externalBridge?.isBusy() || this.pageDisposed || this.cardBatch.isRunning() || this.处理中 || this.themeUndoBusy || this.agentRunner === null || this.sessionController === null) { return null; }
     this.appSettingsTools?.beginTurn(existingUserMessageId === 0 && resumeOutput.length === 0 ? intentText : '');
     const navigationGeneration: number = this.navigationSession?.beginTurn(
       existingUserMessageId === 0 && resumeOutput.length === 0 ? intentText : '') ?? 0;
     this.重建本轮AgentScope();
     this.documentAccess?.bind(this.conversationId, this.currentModelSupportsImages());
+    if (this.documentAccess !== null && this.documentStore !== null && this.documentStore !== undefined) {
+      const cloudOcr = this.deepSeekMediaReady && !explicitWebSearchForbidden(intentText) && deepSeekOcrRequested(intentText);
+      this.documentStore.setDeepSeekOcrKey(cloudOcr ? this.AI配置.apiKey : '');
+      this.documentAccess?.setDeepSeekOcr(cloudOcr);
+    }
     this.agentScope.configureCreateConstraints(this.pageMode !== 'edit' &&
       explicitYearClozeRequested(providerText));
     this.错误信息 = '';
@@ -1202,6 +1301,7 @@ export struct AI制卡页 {
     }
     this.storeClarificationAnswerMessageId(userMessageId);
     this.处理中 = true; this.requestFeedback = 'busy';
+    this.activeAgentIntent = intentText;
     const aiMessage: 聊天消息 = this.空消息('ai', '', false);
     aiMessage.streaming = true;
     this.追加消息(aiMessage);
@@ -1210,11 +1310,14 @@ export struct AI制卡页 {
     const turnVersion: number = ++this.agentTurnVersion;
     let navigationSuccess: boolean = false;
     try {
-      const allowWeb: boolean = !explicitWebSearchForbidden(intentText) && await loadAgentWebEnabled();
+      const allowWeb: boolean = this.agentSettings.selectedProvider !== 'official' && !explicitWebSearchForbidden(intentText) && await loadAgentWebEnabled();
       if (this.pageDisposed || turnVersion !== this.agentTurnVersion ||
         this.currentMessageIndex(conversationId, aiMessage.id) < 0 || !this.处理中) { return null; }
       const functionTools: ProviderFunctionTool[] = this.providerFunctionToolsForTurn(allowWeb);
-      this.appSettingsTools?.setInterfaceTools(functionTools, allowWeb ? await loadAgentSearchProvider() : '');
+      const searchProvider = allowWeb ? await loadAgentSearchProvider() : '';
+      const nativeWeb = allowWeb && searchProvider === 'deepseek' &&
+        this.agentSettings.selectedProvider === 'deepseek' && this.AI配置.model === 'deepseek-flash';
+      this.appSettingsTools?.setInterfaceTools(functionTools, searchProvider, nativeWeb);
       const request: ProviderTurnRequest = {
         apiKey: this.AI配置.apiKey,
         baseUrl: this.AI配置.baseUrl,
@@ -1224,15 +1327,17 @@ export struct AI制卡页 {
         input: this.构建Provider输入(),
         functionTools: functionTools,
         deferTools: true,
-        // 由本机工具联网；关闭提供商的重复搜索路径。
-        searchMode: 'off',
+        // Flash 使用原生深度搜索；其余配置继续由已选本机搜索工具执行。
+        searchMode: nativeWeb ? 'auto' : 'off',
+        nativeWebTools: nativeWeb,
+        nativeReadUrlOnly: nativeWeb && /https?:\/\//i.test(intentText) && !explicitWebSearchRequested(intentText),
         // 只分析用户可见要求，不扫描任务配置或本地卡片内容，避免上下文里的“联网”等词误触发。
         requiresWebSearch: explicitWebSearchRequested(intentText),
         requiresSearchEvidence: explicitSourceEvidenceRequested(intentText),
         requiresDraft: false,
         expectedDraftCount: this.pageMode !== 'edit' ?
-          inferRequestedCardCount(intentText, this.agentSettings.batchLimit) : 0,
-        reasoningEffort: 'low',
+          inferRequestedCardCount(intentText) : 0,
+        reasoningEffort: nativeWeb ? 'high' : 'low',
         maxOutputTokens: agentExecutionBudget(this.agentSettings.selectedProvider, this.AI配置.model).maxOutputTokens,
         contextBudgetChars: agentExecutionBudget(this.agentSettings.selectedProvider, this.AI配置.model).contextBudgetChars
       };
@@ -1246,6 +1351,9 @@ export struct AI制卡页 {
         });
       const result: AgentRunResult = await this.sessionController.run(this.agentSettings.selectedProvider, request, observer, resumeOutput);
       if (this.currentMessageIndex(conversationId, aiMessage.id) < 0) return null;
+      if (result.providerCalls > 0 && result.status !== 'paused') {
+        recordAiActivity(this.getUIContext().getHostContext() as common.UIAbilityContext, true);
+      }
       await this.syncSessionTarget();
       if (this.currentMessageIndex(conversationId, aiMessage.id) < 0) return null;
       if (result.status === 'awaiting_clarification') {
@@ -1265,10 +1373,12 @@ export struct AI制卡页 {
         this.requestFeedback = result.status === 'completed' ? 'success' : 'idle';
       }
       navigationSuccess = result.status === 'completed';
+      if (result.status !== 'paused') this.backgroundConversation = '';
       return result;
     } catch (错误) {
       if (this.currentMessageIndex(conversationId, aiMessage.id) < 0) return null;
       if (turnVersion === this.agentTurnVersion) this.requestFeedback = 'failure';
+      if (!(错误 instanceof AgentTransportError) || 错误.kind !== 'network') this.backgroundConversation = '';
       const 异常: Error = 错误 instanceof Error ? 错误 : new Error(`${错误}`);
       const 错误文案: string = this.取Agent错误文案(异常);
       this.更新消息(aiIndex, (message: 聊天消息): void => {
@@ -1295,7 +1405,7 @@ export struct AI制卡页 {
         } catch (error) {
           if (this.currentMessageIndex(conversationId, aiMessage.id) >= 0) {
             const reason: string = error instanceof Error ? error.message : 'navigation_unavailable';
-            console.info('JIDE navigation did not execute: ' + reason);
+            AppLog.info('AgentPage', 'JIDE navigation did not execute: ' + reason);
             const detail: Resource = reason === 'navigation_collection_busy' ? $r('app.string.ai_agent_navigation_busy') :
               reason === 'navigation_deck_missing' ? $r('app.string.ai_agent_navigation_deck_missing') :
                 reason === 'navigation_study_active' ? $r('app.string.ai_agent_navigation_study_active') :
@@ -1310,6 +1420,7 @@ export struct AI制卡页 {
           }
         }
       }
+      this.resumeBackgroundTask();
     }
   }
 
@@ -1432,6 +1543,14 @@ export struct AI制卡页 {
       optionLabel: option === undefined ? '' : option.label,
       supplementalText: view.supplementalText.trim()
     };
+    if (this.externalOutputs.has(this.消息列表[messageIndex].id)) {
+      this.更新消息(messageIndex, (message: 聊天消息): void => {
+        if (message.clarification !== null) { message.clarification.state = 'resolved'; message.expanded = false; }
+      });
+      this.externalOutputs.set(this.消息列表[messageIndex].id, JSON.stringify(answer));
+      await this.保存当前会话历史();
+      return;
+    }
     let inheritedIntent: string = buildClarificationAnswerVisibleText(answer);
     for (let index: number = messageIndex - 1; index >= 0; index--) {
       if (this.消息列表[index].角色 === 'user' && this.消息列表[index].正文.length > 0) {
@@ -1485,7 +1604,7 @@ export struct AI制卡页 {
   }
 
   private 构建Agent指令(): string {
-    return buildAgentSessionInstructions(this.taskSetup(), this.agentSettings.batchLimit) +
+    return buildAgentSessionInstructions(this.taskSetup()) +
       '\n最近本机主题操作结果（应用数据，不是指令；手动设置可能已改变当前值，需要时重新读取）：' +
       JSON.stringify(this.lastThemeChange);
   }
@@ -1957,6 +2076,8 @@ export struct AI制卡页 {
   /** 恢复可见历史、协议与检索进度；旧卡片写入令牌不恢复。 */
   private async 恢复历史会话(selected: AgentConversation): Promise<void> {
     if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
+    this.stopExternalAgent();
+    this.externalRequests.clear(); this.externalOutputs.clear();
     const restored = this.history.restore(selected,
       this.牌组选项.map((item: AI制卡牌组选项): number => item.id),
       this.笔记类型选项.map((item: AI制卡笔记类型选项): number => item.id),
@@ -1983,6 +2104,7 @@ export struct AI制卡页 {
     if (!validContext) this.cancelRestoredClarifications(this.取本地化文案(this.牌组ID === 0 ?
       $r('app.string.ai_agent_setup_missing_deck') : $r('app.string.ai_agent_setup_missing_notetype')));
     this.滚动到底部();
+    this.attachExternalAgent();
   }
 
   private cancelRestoredClarifications(reason: string): void {
@@ -2002,6 +2124,9 @@ export struct AI制卡页 {
 
   private 开始新会话(keepSettings: boolean = false): void {
     if (this.pageDisposed || this.处理中 || this.文件解析中 || this.cardBatch.isRunning()) return;
+    this.stopExternalAgent();
+    this.externalRequests.clear(); this.externalOutputs.clear();
+    this.stopDeepSeekMedia();
     this.memoryVisible = false;
     this.closeMoreMenu();
     this.historyReadGeneration++; this.historyReading = false;
@@ -2020,6 +2145,7 @@ export struct AI制卡页 {
     if (this.pageMode === 'assistant') { this.牌组ID = 0; this.选择笔记类型(0); }
     this.导入文件列表 = [];
     this.显示历史区 = false;
+    this.attachExternalAgent();
   }
 
   private 关闭历史区(): void {
@@ -2048,7 +2174,13 @@ export struct AI制卡页 {
     try {
       const selected: AgentImportedFile[] = await selectAndParseAgentFiles(context, remaining, conversationId);
       if (selected.length === 0) { return; }
-      if (this.pageDisposed || conversationId !== this.conversationId) return;
+      if (this.pageDisposed || conversationId !== this.conversationId) {
+        const store = new AgentDocumentStore(context);
+        for (const file of selected) {
+          if (file.documentId !== undefined && file.documentId.length > 0) store.discardStaged(conversationId, file.documentId);
+        }
+        return;
+      }
       this.导入文件列表 = mergeAgentImportedFiles(this.导入文件列表, selected);
       this.错误信息 = '';
     } catch (error) {
@@ -2089,6 +2221,9 @@ export struct AI制卡页 {
       const extension: string = file.extension.length > 0 ? file.extension :
         this.取本地化文案($r('app.string.ai_agent_file_unknown_type'));
       return this.取本地化格式($r('app.string.ai_agent_file_unsupported'), [extension]);
+    }
+    if (file.errorCode === 'document_space_insufficient') {
+      return this.取本地化文案($r('app.string.transfer_space_insufficient'));
     }
     if (file.errorCode === 'file_too_large') {
       return this.取本地化文案($r('app.string.ai_agent_file_too_large'));
@@ -2193,7 +2328,7 @@ export struct AI制卡页 {
         agentInterfaceTitle(this.pageMode, this.显示历史区, this.memoryVisible, this.settingsVisible)))
         .fontSize(应用尺寸.字号_标题)
         .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .width('30%')
         .textAlign(TextAlign.Center)
         .maxLines(1)
@@ -2237,6 +2372,140 @@ export struct AI制卡页 {
     .backgroundColor(Color.Transparent)
   }
 
+  private stopExternalAgent(): void {
+    this.externalGeneration++;
+    if (this.externalBridge !== null) this.externalRegistry?.cancelActive();
+    if (this.externalBridge !== null) {
+      externalMcpService.detach(this.externalBridge);
+      this.externalBridge.close(); this.externalBridge = null;
+    }
+    this.externalNavigations.clear();
+  }
+
+  /** @throws {Error} 配置读取失败，MCP 不猜测联网状态。 */
+  private async externalTools(): Promise<ProviderFunctionTool[]> {
+    const allowWeb: boolean = await loadAgentWebEnabled();
+    const tools: ProviderFunctionTool[] = this.providerFunctionToolsForTurn(allowWeb);
+    this.appSettingsTools?.setInterfaceTools(tools, allowWeb ? await loadAgentSearchProvider() : '');
+    return tools;
+  }
+
+  private externalReady(): boolean {
+    return externalMcpService.isRunning() && this.isAgentPageVisible && !this.pageDisposed && !this.处理中 && !this.文件解析中 &&
+      !this.cardBatch.isRunning() && !this.hasPendingAction() && !this.hasPendingClarification() &&
+      !this.targetSelectionBusy && !this.draftConfirmationPending && !syncActivity.isCollectionBusy() &&
+      this.externalRequests.size < 256;
+  }
+
+  private attachExternalAgent(): void {
+    if (!isExternalMcpDevice() || this.pageMode !== 'assistant' || this.pageDisposed || !this.isAgentPageVisible ||
+      this.externalRegistry === null) return;
+    if (this.externalBridge !== null) { externalMcpService.attach(this.externalBridge); return; }
+    const registry: AgentToolRegistry = this.externalRegistry;
+    const conversation: string = this.conversationId;
+    const generation: number = ++this.externalGeneration;
+    const host: ExternalAgentHost = {
+      tools: (): Promise<ProviderFunctionTool[]> => this.externalTools(),
+      ready: (): boolean => generation === this.externalGeneration && this.externalReady(),
+      receive: (call: AgentToolCall, result: AgentToolResult): Promise<string> => {
+        if (conversation !== this.conversationId || generation !== this.externalGeneration) return Promise.reject(new Error('external_session_changed'));
+        return this.receiveExternalResult(call, result, conversation);
+      },
+      status: (json: string): string => this.externalRequestStatus(json),
+      immediate: (call: AgentToolCall): Promise<AgentToolResult> => this.confirmExternalImmediate(call, registry, generation),
+      afterSend: async (call: AgentToolCall): Promise<void> => {
+        const generation: number | undefined = this.externalNavigations.get(call.id);
+        if (generation === undefined) return;
+        this.externalNavigations.delete(call.id);
+        try {
+          const dispatched: boolean = await this.navigationSession?.finish(true, generation) ?? false;
+          const id: number | undefined = this.externalRequests.get(call.id);
+          if (id !== undefined) {
+            const output: Record<string, Object> = JSON.parse(this.externalOutputs.get(id) ?? '{}') as Record<string, Object>;
+            output['status'] = dispatched ? 'completed' : 'cancelled'; output['completed'] = dispatched;
+            this.externalOutputs.set(id, JSON.stringify(output));
+          }
+        }
+        catch (_error) {
+          const id: number | undefined = this.externalRequests.get(call.id);
+          if (id !== undefined) this.externalOutputs.set(id, '{"status":"failed","error":"navigation_failed"}');
+        }
+      }
+    };
+    this.externalBridge = new ExternalAgentBridge(registry, host);
+    externalMcpService.attach(this.externalBridge);
+  }
+
+  /** @throws {Error} 提案准备、目标读取或历史保存失败，交给 MCP 错误边界。 */
+  private async receiveExternalResult(call: AgentToolCall, result: AgentToolResult, conversation: string): Promise<string> {
+    if (this.pageDisposed) throw new Error('external_session_closed');
+    if (result.action !== undefined) {
+      if (this.auxiliaryTools === null || this.sessionController === null) throw new Error('action_executor_unavailable');
+      await this.auxiliaryTools.prepareAction(result.action);
+      this.sessionController.actionExecutor.registerPending(result.action);
+    }
+    await this.syncSessionTarget();
+    if (this.pageDisposed || conversation !== this.conversationId) throw new Error('external_session_changed');
+    const message: 聊天消息 = this.空消息('ai', this.取本地化格式($r('app.string.ai_agent_external_received'), [call.name]), false);
+    message.providerText = '';
+    const trace: AgentToolTrace = completeAgentToolTrace(createStartedAgentToolTrace(call, 0, 1), result.outputJson);
+    message.工具过程.push(trace);
+    const block: AgentTimelineBlock = appendAgentTimelineReference(message.timeline, 'tool', call.id);
+    block.toolName = call.name; block.index = 0;
+    message.action = result.action ?? null;
+    this.追加消息(message);
+    const index: number = this.消息列表.length - 1;
+    if (result.draft !== null) this.接收Agent草稿(index, [result.draft]);
+    let messageId: number = message.id;
+    if (result.clarification !== null) {
+      this.appendClarificationMessage(result.clarification);
+      messageId = this.消息列表[this.消息列表.length - 1].id;
+    }
+    this.externalRequests.set(call.id, messageId);
+    this.externalOutputs.set(messageId, result.outputJson);
+    await this.保存当前会话历史();
+    return call.id;
+  }
+
+  private externalRequestStatus(json: string): string {
+    const requestId: string = externalRequestId(json);
+    const id: number | undefined = this.externalRequests.get(requestId);
+    const message: 聊天消息 | undefined = this.消息列表.find((item: 聊天消息): boolean => item.id === id);
+    if (message === undefined) throw new Error('external_request_not_found');
+    return externalRequestStatus(requestId, message, this.externalOutputs.get(message.id) ?? '{}');
+  }
+
+  private async confirmExternalImmediate(call: AgentToolCall, registry: AgentToolRegistry, sessionGeneration: number): Promise<AgentToolResult> {
+    if (call.argumentsJson.length > 16384) throw new Error('invalid_tool_arguments');
+    const accessGeneration: number = externalMcpService.generation();
+    const accepted: boolean = await new Promise<boolean>((resolve): void => {
+      this.getUIContext().showAlertDialog({ title: this.取本地化文案($r('app.string.ai_agent_external_mcp')),
+        message: this.取本地化文案($r('app.string.ai_agent_external_confirm')) + '\n' + call.name + '\n' + call.argumentsJson,
+        buttonDirection: DialogButtonDirection.AUTO,
+        cancel: (): void => { resolve(false); }, buttons: [
+          { value: $r('app.string.cancel'), action: (): void => { resolve(false); } },
+          { value: $r('app.string.settings_confirm'), action: (): void => { resolve(true); } }
+        ] });
+    });
+    if (!accepted || accessGeneration !== externalMcpService.generation() || sessionGeneration !== this.externalGeneration ||
+      !externalMcpService.isRunning() || !this.isAgentPageVisible || this.pageDisposed) throw new Error('external_call_cancelled');
+    if (call.name === 'set_theme_mode') {
+      const args: Record<string, Object> = JSON.parse(call.argumentsJson) as Record<string, Object>;
+      const mode: string = args['mode'] as string;
+      this.appSettingsTools?.beginTurn(mode === 'dark' ? '切换到深色' : mode === 'light' ? '切换到浅色' : '跟随系统');
+      try { return await registry.execute(call); } finally { this.appSettingsTools?.endTurn(); }
+    }
+    const generation: number | undefined = this.navigationSession?.beginTurn('打开用户已确认的页面');
+    try {
+      const result: AgentToolResult = await registry.execute(call);
+      if (generation !== undefined) this.externalNavigations.set(call.id, generation);
+      return result;
+    } catch (error) {
+      this.navigationSession?.cancel();
+      throw error instanceof Error ? error : new Error('navigation_failed');
+    }
+  }
+
   private closeMoreMenu(): void {
     this.moreVisible = false;
     appInterface.leave('agent_more');
@@ -2266,10 +2535,10 @@ export struct AI制卡页 {
       onClose: (): void => { this.closeMoreMenu(); } }) {
       ActionMenuList({ items: this.moreEntries(), onSelect: (id: string): void => { this.selectMore(id); } })
         .onAppear((): void => { appInterface.observe({ surface: 'agent_more', sectionId: '', selectedId: '',
-          optionIds: ['settings', 'history'], optionLabels: [], busy: false, controlsComplete: true,
+          optionIds: this.moreEntries().map((item: ActionMenuListItem): string => item.id), optionLabels: [], busy: false, controlsComplete: true,
           items: this.moreEntries().map((item: ActionMenuListItem): AppInterfaceControl => ({ id: item.id, title: '',
             titleKey: item.id === 'settings' ? 'ai_agent_settings_page_title' : 'ai_agent_history',
-            iconKey: item.id === 'settings' ? 'ic_home_settings' : 'ic_common_history', enabled: true, selected: false })) }); })
+            iconKey: item.id === 'settings' ? 'ic_home_settings' : 'ic_common_history', enabled: item.available !== false, selected: false })) }); })
     }
   }
 
@@ -2318,7 +2587,7 @@ export struct AI制卡页 {
         .copyOption(CopyOptions.LocalDevice)
         .fontColor($r('app.color.action_on_primary'))
         .backgroundColor(this.主色按钮背景色)
-        .borderRadius(应用尺寸.圆角_面板)
+        .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         .padding({
           left: 应用尺寸.卡片内边距,
           right: 应用尺寸.卡片内边距,
@@ -2362,7 +2631,7 @@ export struct AI制卡页 {
         agentOperationTitle(ctx.message.变更草稿列表[ctx.itemIndex].operations[0],(key: string): string => namedResourceText(this.getUIContext(),key)) : ctx.message.变更草稿列表[ctx.itemIndex].summary)
         .fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium).width('100%')
       Text(this.影响范围(ctx.message.变更草稿列表[ctx.itemIndex]))
-        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+        .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       ForEach(ctx.message.变更草稿列表[ctx.itemIndex].operations,
         (operation: DraftOperation, operationIndex: number) => {
           Column({ space: 应用尺寸.间距_4 }) {
@@ -2371,7 +2640,7 @@ export struct AI制卡页 {
             }
             if (operation.kind === 'app_operation') {
               ForEach(agentOperationPreview(operation,(key: string): string => namedResourceText(this.getUIContext(),key)),(row: OperationPreviewRow) => {
-                Text(row.title).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+                Text(row.title).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
                 Text(row.after).fontSize(应用尺寸.字号_正文).width('100%').copyOption(CopyOptions.LocalDevice)
               },(row: OperationPreviewRow,index: number): string => row.title + index)
               Text($r('app.string.agent_operation_confirm_hint')).fontSize(应用尺寸.字号_正文_小).width('100%')
@@ -2387,7 +2656,7 @@ export struct AI制卡页 {
               }, (row: NotetypeFieldPreview): string => row.title)
               if (operation.kind === 'update_notetype_latex') {
                 Text($r('app.string.agent_latex_config_only'))
-                  .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+                  .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
               }
             } else if (operation.kind === 'restore_notetype') {
               Text($r('app.string.agent_restore_structure_warning'))
@@ -2400,7 +2669,7 @@ export struct AI制卡页 {
             } else {
               Text(this.取本地化格式($r('app.string.ai_agent_operation_target'),
                 [operation.kind, operation.noteId, operation.cardId]))
-                .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+                .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
               if (operation.kind === 'update_field' &&
                 ctx.message.变更草稿列表[ctx.itemIndex].risk === 'write') {
                 NoteFieldCard({ value: operation.after, fieldIndex: operation.fieldOrd,
@@ -2434,9 +2703,12 @@ export struct AI制卡页 {
         .onClick((): void => { this.准备执行草稿(ctx.messageIndex, ctx.itemIndex); })
     }
     .width('100%').padding(应用尺寸.间距_10)
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
-    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色, '', undefined, this.moduleOpacity))
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色, '', undefined, this.moduleOpacity, this.appearanceElements))
+    .background(this.renderGlassBackground(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色, '', undefined, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
   }
 
   private notetypeRestoreLayout(operation: DraftOperation): string {
@@ -2567,21 +2839,21 @@ export struct AI制卡页 {
         Text(this.取本地化格式($r('app.string.ai_agent_tool_round'), [
           ctx.message.工具过程[ctx.itemIndex].providerRound,
           ctx.message.工具过程[ctx.itemIndex].sequence
-        ])).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_tertiary'))
+        ])).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
         if (ctx.message.工具过程[ctx.itemIndex].legacySummary.length > 0) {
           Text(ctx.message.工具过程[ctx.itemIndex].legacySummary)
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+            .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         }
         Text($r('app.string.ai_agent_tool_arguments'))
           .fontSize(应用尺寸.字号_正文_小).fontWeight(FontWeight.Medium).width('100%')
         Text(ctx.message.工具过程[ctx.itemIndex].argumentsJson.length > 0 ?
           ctx.message.工具过程[ctx.itemIndex].argumentsJson : '—')
-          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+          .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         if (ctx.message.工具过程[ctx.itemIndex].outputJson.length > 0) {
           Text($r('app.string.ai_agent_tool_output'))
             .fontSize(应用尺寸.字号_正文_小).fontWeight(FontWeight.Medium).width('100%')
           Text(ctx.message.工具过程[ctx.itemIndex].outputJson)
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+            .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         }
         if (ctx.message.工具过程[ctx.itemIndex].errorCode.length > 0) {
           Text(`${this.取本地化文案($r('app.string.ai_agent_tool_error_code'))}: ` +
@@ -2596,25 +2868,25 @@ export struct AI制卡页 {
           }
           Text(`${this.取本地化文案($r('app.string.ai_agent_tool_received_keys'))}: ` +
             `${JSON.stringify(ctx.message.工具过程[ctx.itemIndex].receivedKeys)}`)
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+            .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           Text(`${this.取本地化文案($r('app.string.ai_agent_tool_allowed_keys'))}: ` +
             `${JSON.stringify(ctx.message.工具过程[ctx.itemIndex].allowedKeys)}`)
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+            .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           if (ctx.message.工具过程[ctx.itemIndex].validTemplateJson.length > 0) {
             Text($r('app.string.ai_agent_tool_template'))
               .fontSize(应用尺寸.字号_正文_小).fontWeight(FontWeight.Medium).width('100%')
             Text(ctx.message.工具过程[ctx.itemIndex].validTemplateJson)
-              .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+              .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           }
           Text(this.取本地化格式($r('app.string.ai_agent_tool_repeat_count'),
             [ctx.message.工具过程[ctx.itemIndex].repeatCount]))
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_tertiary')).width('100%')
+            .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary'))).width('100%')
         }
         if (ctx.message.工具过程[ctx.itemIndex].argumentsTruncated ||
           ctx.message.工具过程[ctx.itemIndex].outputTruncated ||
           ctx.message.工具过程[ctx.itemIndex].diagnosticTruncated) {
           Text($r('app.string.ai_agent_tool_truncated'))
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_tertiary')).width('100%')
+            .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary'))).width('100%')
         }
   }
 
@@ -2655,7 +2927,7 @@ export struct AI制卡页 {
         }
       } else if (ctx.message.timeline[ctx.itemIndex].kind === 'draft') {
         if (ctx.message.timeline[ctx.itemIndex].indexes.length > 0) {
-          Text(ctx.message.draftTargetLabel).fontColor($r('app.color.text_secondary'))
+          Text(ctx.message.draftTargetLabel).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           ForEach(ctx.message.timeline[ctx.itemIndex].indexes, (cardIndex: number) => {
             this.卡片项({ message: ctx.message, messageIndex: ctx.messageIndex, itemIndex: cardIndex })
           }, (cardIndex: number): string => `card-${cardIndex}`)
@@ -2663,7 +2935,7 @@ export struct AI制卡页 {
           this.变更草稿项({ message: ctx.message, messageIndex: ctx.messageIndex, itemIndex: ctx.message.timeline[ctx.itemIndex].index })
         } else {
           Text(ctx.message.streaming ? $r('app.string.ai_agent_draft_streaming') : $r('app.string.ai_agent_preview_only'))
-            .fontColor($r('app.color.text_secondary')).width('100%')
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           this.orderedAgentText({ text: ctx.message.timeline[ctx.itemIndex].text })
         }
         ForEach(ctx.message.timeline[ctx.itemIndex].images, (url: string) => {
@@ -2702,17 +2974,17 @@ export struct AI制卡页 {
         }, (block: AgentTimelineBlock): string => this.agentTimelineKey(ctx.messageIndex, block))
         if (ctx.message.timelineTruncated) {
           Text($r('app.string.ai_agent_history_timeline_truncated'))
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_tertiary')).width('100%')
+            .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary'))).width('100%')
         }
         if (ctx.message.timeline.length === 0) {
         if (ctx.message.推理摘要 !== '') {
           if (ctx.message.reasoningTruncated) {
             Text($r('app.string.ai_agent_history_reasoning_truncated'))
-              .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_tertiary'))
+              .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           }
         }
         AgentMarkdownText({ text: ctx.message.正文, textColor: ctx.message.是否错误 ?
-          $r('app.color.error_text') : $r('app.color.text_primary') })
+          $r('app.color.error_text') : appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')) })
 
         if (ctx.message.工具过程.length > 0) {
           Text($r('app.string.ai_agent_tool_process')).fontSize(应用尺寸.字号_正文_小).fontWeight(FontWeight.Medium)
@@ -2730,6 +3002,13 @@ export struct AI制卡页 {
         }
         }
 
+        if (this.deepSeekMediaReady && this.canReadAloud(ctx.message)) {
+          Button(this.speechMessageId === ctx.message.id ? $r('app.string.ai_agent_deepseek_tts_stop') : $r('app.string.ai_agent_deepseek_tts'))
+            .height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_按钮).fontColor(this.动作主色)
+            .backgroundColor(Color.Transparent).enabled(this.voiceState === '')
+            .attributeModifier(new PressFeedback()).stateEffect(false)
+            .onClick((): void => { this.toggleDeepSeekSpeech(ctx.message); })
+        }
         if (ctx.message.action !== null) {
           AgentActionCard({ action: ctx.message.action!, disabled: this.处理中,
             onConfirm: (): void => { this.resolveAction(ctx.messageIndex, true); },
@@ -2740,13 +3019,13 @@ export struct AI制卡页 {
           Button($r('app.string.ai_agent_task_resume')).enabled(!this.处理中)
             .height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_按钮)
             .backgroundColor(this.主色按钮背景色).fontColor($r('app.color.action_on_primary'))
-            .borderRadius(应用尺寸.圆角_胶囊)
+            .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_胶囊))
             .attributeModifier(new PressFeedback())
             .stateEffect(false)
             .onClick((): void => { this.resumePausedTask(ctx.messageIndex); })
         }
         if (ctx.message.timeline.length === 0 && ctx.message.卡片列表.length > 0) {
-          Text(ctx.message.draftTargetLabel).fontColor($r('app.color.text_secondary'))
+          Text(ctx.message.draftTargetLabel).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         }
         if (ctx.message.timeline.length === 0 && ctx.message.卡片列表.length > 0) {
           ForEach(ctx.message.卡片列表,
@@ -2787,7 +3066,7 @@ export struct AI制卡页 {
         // 每轮 AI 回复末尾固定挂 AI 生成免责声明（覆盖思考/正文/工具/来源/草稿整轮产物）
         Text($r('app.string.ai_agent_generated_disclaimer'))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .width('100%')
           .padding({ top: 应用尺寸.间距_4 })
       }
@@ -2812,9 +3091,9 @@ export struct AI制卡页 {
               onAction: (): void => { this.openTargetSelection(messageIndex); } })
           } else {
             Text(this.消息列表[messageIndex].clarification!.request.question)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             Text(this.消息列表[messageIndex].clarification!.supplementalText)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           }
         }.width('100%').alignItems(HorizontalAlign.Start)
       } else {
@@ -2839,7 +3118,7 @@ export struct AI制卡页 {
           if (this.消息列表.length === 0) {
             Text(this.selectedEditContext())
               .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               .width('100%')
               .textAlign(TextAlign.Center)
               .padding({ top: 应用尺寸.间距_12, bottom: 应用尺寸.间距_12 })
@@ -2879,7 +3158,7 @@ export struct AI制卡页 {
         left: 应用尺寸.页面内边距_水平,
         right: 应用尺寸.页面内边距_水平,
         top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
-        bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout)
+        bottom: SeriesVisual.scrollShadowEndInset(this.surfaceMaterial, 应用尺寸.页面底部间距(this.narrowDeckLayout))
       })
     }
     .layoutWeight(1)
@@ -2946,28 +3225,109 @@ export struct AI制卡页 {
               (ctx.message.themeChange!.saved ? $r('app.string.theme_change_apply_failed') :
                 $r('app.string.theme_change_save_unverified'))),
             actionLabel: $r('app.string.theme_change_undo'), tint: this.动作主色,
-            textColor: $r('app.color.text_secondary'),
+            textColor: appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')),
             isInteractive: !this.处理中 && !this.themeUndoBusy && !this.cardBatch.isRunning(),
             onAction: (): void => { this.undoThemeChange(ctx.messageIndex); } })
         } else if (ctx.message.themeUndoNotice.length > 0) {
           Text(ctx.message.themeUndoNotice).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary')).width('100%')
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         } else if (ctx.message.themeChange !== null) {
           Text(ctx.message.themeChange!.status === 'completed' ? $r('app.string.theme_change_completed') :
             (ctx.message.themeChange!.saved ? $r('app.string.theme_change_apply_failed') :
               $r('app.string.theme_change_save_unverified')))
-            .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+            .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         }
       }.width('100%').alignItems(HorizontalAlign.Start)
     }
   }
 
-  @Builder
-  private composerLabelWidth() {
-    ForEach(agentComposerLabelKeys(), (key: string) => {
-      Text(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, key))
-        .fontSize(应用尺寸.字号_按钮).maxLines(1).opacity(0).accessibilityLevel('no')
-    }, (key: string): string => `${this.uiLanguage}-${key}`)
+  private canReadAloud(message: 聊天消息): boolean {
+    return agentReplySpeechText(message).length > 0;
+  }
+
+  private async stopDeepSeekMedia(dispose: boolean = false): Promise<void> {
+    this.mediaGeneration++;
+    if (this.voiceTimer !== -1) clearTimeout(this.voiceTimer);
+    this.voiceTimer = -1;
+    this.deepSeekVoice.cancel();
+    this.voiceState = '';
+    this.speechMessageId = -1;
+    try { await this.voiceCapture.cancel(); } catch (error) { /* System may already have released the microphone. */ }
+    try {
+      if (dispose) await this.speechPlayer.释放(); else await this.speechPlayer.停止();
+    } catch (error) { /* The current presentation has been cancelled. */ }
+  }
+
+  private voiceFailureMessage(code: string): Resource {
+    switch (agentVoiceFailure(code)) {
+      case 'permission': return $r('app.string.ai_agent_deepseek_mic_permission');
+      case 'empty': return $r('app.string.ai_agent_deepseek_voice_empty');
+      case 'credential': return $r('app.string.ai_agent_deepseek_voice_credential');
+      case 'balance': return $r('app.string.ai_agent_deepseek_voice_balance');
+      case 'format': return $r('app.string.ai_agent_deepseek_voice_format');
+      case 'busy': return $r('app.string.ai_agent_deepseek_voice_busy');
+      case 'timeout': return $r('app.string.ai_agent_deepseek_voice_timeout');
+      default: return $r('app.string.ai_agent_deepseek_voice_failed');
+    }
+  }
+
+  private async toggleDeepSeekVoice(): Promise<void> {
+    if (!this.interfaceEnabled('voice')) return;
+    const generation = this.mediaGeneration;
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    try {
+      if (this.voiceState === '') {
+        this.voiceState = 'starting';
+        if (!await this.voiceCapture.start(context) || generation !== this.mediaGeneration) return;
+        this.voiceState = 'recording';
+        this.voiceTimer = setTimeout((): void => { this.toggleDeepSeekVoice(); }, AGENT_VOICE_SECONDS * 1000);
+        return;
+      }
+      if (this.voiceState !== 'recording') return;
+      if (this.voiceTimer !== -1) clearTimeout(this.voiceTimer);
+      this.voiceTimer = -1;
+      this.voiceState = 'transcribing';
+      const wav = await this.voiceCapture.finish();
+      if (generation !== this.mediaGeneration) return;
+      const text = await this.deepSeekVoice.transcribe(this.AI配置.apiKey, wav);
+      if (generation !== this.mediaGeneration) return;
+      this.错误信息 = '';
+      this.输入草稿 = this.输入草稿.trim().length > 0 ? this.输入草稿 + '\n' + text : text;
+      this.voiceState = '';
+    } catch (error) {
+      if (generation !== this.mediaGeneration) return;
+      this.voiceState = '';
+      this.错误信息 = this.取本地化文案(this.voiceFailureMessage(error instanceof Error ? error.message : ''));
+    }
+  }
+
+  private async toggleDeepSeekSpeech(message: 聊天消息): Promise<void> {
+    if (!this.deepSeekMediaReady || this.voiceState !== '' || !this.canReadAloud(message)) return;
+    const stop = this.speechMessageId === message.id;
+    const expected = this.mediaGeneration + 1;
+    await this.stopDeepSeekMedia();
+    if (stop || expected !== this.mediaGeneration || this.pageDisposed) return;
+    this.speechMessageId = message.id;
+    let path = '';
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      // 按 Unicode 字符截取，避免切断代理对。
+      const text = Array.from(agentReplySpeechText(message)).slice(0, 10000).join('');
+      const wav = await this.deepSeekVoice.speak(this.AI配置.apiKey, text);
+      if (expected !== this.mediaGeneration) return;
+      path = await writeAgentSpeech(context.cacheDir, wav);
+      if (expected !== this.mediaGeneration) return;
+      this.speechPlayer.onPlaybackError = (): void => {
+        if (expected === this.mediaGeneration) this.错误信息 = this.取本地化文案($r('app.string.ai_agent_deepseek_tts_failed'));
+      };
+      await this.speechPlayer.播放队列([path]);
+      await this.speechPlayer.waitForCompletion();
+    } catch (error) {
+      if (expected === this.mediaGeneration) this.错误信息 = this.取本地化文案($r('app.string.ai_agent_deepseek_tts_failed'));
+    } finally {
+      await removeAgentSpeech(path);
+      if (expected === this.mediaGeneration) this.speechMessageId = -1;
+    }
   }
 
   @Builder
@@ -2981,14 +3341,14 @@ export struct AI制卡页 {
                 Column({ space: 2 }) {
                   Text(file.name)
                     .fontSize(应用尺寸.字号_正文_小)
-                    .fontColor($r('app.color.text_primary'))
+                    .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                     .width('100%')
                   Text(this.导入文件状态文案(file))
                     .fontSize(应用尺寸.字号_正文_小)
                     .fontColor(file.errorCode.length === 0 ?
-                      $r('app.color.text_secondary') : $r('app.color.error_text'))
+                      appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')) : $r('app.color.error_text'))
                     .maxLines(2)
                     .width('100%')
                 }
@@ -3008,8 +3368,11 @@ export struct AI制卡页 {
               .width('100%')
               .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12, top: 4, bottom: 4 })
               .backgroundColor($r('app.color.surface_card'))
-              .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_卡片)
-              .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色, '', undefined, this.moduleOpacity))
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
+              .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色, '', undefined, this.moduleOpacity, this.appearanceElements))
+              .background(this.renderGlassBackground(SeriesVisual.surfaceFor(this.surfaceMaterial, this.seriesDark(), this.动作主色, '', undefined, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
             }, (file: AgentImportedFile): string => file.id)
           }
           .width('100%')
@@ -3020,76 +3383,57 @@ export struct AI制卡页 {
         .edgeEffect(EdgeEffect.Spring)
       }
 
-      Row({ space: 应用尺寸.间距_10 }) {
+      Column({ space: 应用尺寸.间距_4 }) {
         TextArea({
           placeholder: this.interfaceLabel('input'),
           text: this.输入草稿
         })
-          .attributeModifier(new FormTextAreaStyle())
-          .layoutWeight(1)
-          .height(应用尺寸.按钮高度 * 2 + 应用尺寸.间距_8)
+          .attributeModifier(new FormTextAreaStyle(this.appearanceElements, true))
+          .constraintSize({ minHeight: 48, maxHeight: 112 })
           .enabled(this.interfaceEnabled('input'))
           .onChange((值: string): void => {
             this.输入草稿 = 值;
           })
-        Column({ space: 应用尺寸.间距_8 }) {
-          Button() {
-            Stack() {
-              this.composerLabelWidth()
-              Text() { ForEach([themeTextKey(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(false)), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(false)), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
-                .fontSize(应用尺寸.字号_按钮)
-                .fontColor(this.动作主色)
-                .opacity(this.文件解析中 ? 0 : 1)
-              Text() { ForEach([themeTextKey(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(true)), this.themeAccentColors, this.getUIContext(), this.uiLanguage)], (_textKey: string) => { ThemeTextSpans(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, agentImportLabelKey(true)), this.themeAccentColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
-                .fontSize(应用尺寸.字号_按钮)
-                .fontColor(this.动作主色)
-                .opacity(this.文件解析中 ? 1 : 0)
-            }
-            .alignContent(Alignment.Center)
+        Row({ space: 应用尺寸.间距_4 }) {
+          IconActionButton({ source: $r('app.media.ic_home_new'), label: this.interfaceLabel('import'),
+            outlinedCircle: true, surface: $r('app.color.surface_card'), glyphColor: this.动作主色, isInteractive: this.interfaceEnabled('import'),
+            onAction: (): void => { this.选择并解析文件(); } })
+          if (this.文件解析中 || this.voiceState === 'transcribing') {
+            Text(this.interfaceLabel(this.文件解析中 ? 'import' : 'voice'))
+              .fontSize(应用尺寸.字号_正文_小)
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
+              .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
+          } else {
+            Blank()
           }
-            .height(应用尺寸.按钮高度)
-            .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-            .constraintSize({ minWidth: 0 })
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor(this.动作主色)
-            .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-            .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(this.interfaceEnabled('import'))
-            .attributeModifier(new PressFeedback())
-            .stateEffect(false)
-            .onClick((): void => { this.选择并解析文件(); })
-          Button() {
-            Stack() {
-              this.composerLabelWidth()
-              if (!this.处理中 && this.requestFeedback !== 'busy' && hasActionStatus(this.requestFeedback)) {
-                // 14vp 状态槽位于既有16vp左内边距，文案仍独立居中，不增加按钮宽度。
-                ActionStatus({ phase: this.requestFeedback,
-                  tint: $r('app.color.action_on_primary'), glyphSize: 12 })
-                  .position({ x: 1 - 应用尺寸.卡片内边距, y: '50%' }).markAnchor({ y: 7 })
-              }
-              Text(this.interfaceLabel('submit')).fontSize(应用尺寸.字号_按钮)
-                .fontColor($r('app.color.action_on_primary')).maxLines(1)
-            }
-            .alignContent(Alignment.Center)
+          if (this.deepSeekMediaReady) {
+            IconActionButton({
+              source: this.voiceState === 'recording' ? $r('app.media.ic_audio_recording') : $r('app.media.ic_audio_record_on'),
+              label: this.interfaceLabel('voice'), outlinedCircle: true, glyphColor: this.动作主色,
+              surface: this.voiceState === 'recording' ? $r('app.color.surface_selected') : $r('app.color.surface_card'),
+              isInteractive: this.interfaceEnabled('voice'), onAction: (): void => { this.toggleDeepSeekVoice(); }
+            })
           }
-            .height(应用尺寸.按钮高度)
-            .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
-            .constraintSize({ minWidth: 0 })
-            .fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.action_on_primary'))
-            .backgroundColor(this.处理中 ? this.主色按钮按下色 : this.主色按钮背景色)
-            .border(SurfaceBorder.options(应用尺寸.卡片边框, Color.Transparent)).borderRadius(应用尺寸.圆角_胶囊)
-            .enabled(this.interfaceEnabled('submit'))
-            .attributeModifier(new PressFeedback())
-            .stateEffect(false)
-            .onClick((): void => {
+          IconActionButton({ source: this.处理中 ? $r('app.media.ic_common_close') : $r('app.media.ic_common_arrow_up'),
+            label: this.interfaceLabel('submit'), outlinedCircle: true, solidSurface: true,
+            glyphColor: '#FFFFFF',
+            preserveIconFill: true,
+            surface: this.处理中 ? this.主色按钮按下色 : this.主色按钮背景色,
+            // 请求结果保留在消息区，发送入口始终显示发送／取消图标。
+            feedback: 'idle',
+            isInteractive: this.interfaceEnabled('submit'),
+            onAction: (): void => {
               if (this.处理中) { this.取消当前请求(); }
               else { this.发送(); }
-            })
-        }
+            }
+          })
+        }.width('100%')
       }
       .width('100%')
-      .alignItems(VerticalAlign.Top)
+      .padding(应用尺寸.间距_8)
+      .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
+      .border(SurfaceBorder.options(undefined, undefined, this.appearanceElements))
+      .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
     }
     .width('100%')
     .padding({
@@ -3102,8 +3446,14 @@ export struct AI制卡页 {
 
   private seriesDark(): boolean { return 解析是否深色(this.settingsThemeMode, this.systemDarkMode); }
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     NavDestination() {
+      PageActionShell({ surface: 'agent' }) {
       Stack() {
       GlassSource() {
 Column() {
@@ -3115,12 +3465,12 @@ Column() {
         } else {
           if (this.taskPlanState !== null) {
             Column({ space: 应用尺寸.间距_4 }) {
-              Text($r('app.string.agent_task_plan_title')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
-              Text(this.taskPlanState.objective).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).maxLines(1)
+              Text($r('app.string.agent_task_plan_title')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
+              Text(this.taskPlanState.objective).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).maxLines(1)
               Text(this.taskPlanState.steps.find((step): boolean => step.status === 'in_progress' || step.status === 'blocked')?.title ??
                 this.取本地化格式($r('app.string.agent_task_plan_progress'), [
                   `${this.taskPlanState.steps.filter((step): boolean => step.status === 'completed').length}`, `${this.taskPlanState.steps.length}`]))
-                .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).maxLines(2)
+                .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).maxLines(2)
             }.width('100%').alignItems(HorizontalAlign.Start).padding(应用尺寸.页面内边距_水平)
           }
           if (this.pageMode === 'assistant' && this.消息列表.length === 0) {
@@ -3151,11 +3501,23 @@ Column() {
       if (this.targetSelectionMessage >= 0) { this.createTargetDialog() }
       if (this.moreVisible && this.menuContentWidth > 0) { this.moreMenu() }
       }.width('100%').height('100%')
-    }
+
+      }
+}
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
-    .onShown((): void => { this.wheelSession.setVisible(true); appInterface.showPage('agent'); this.isAgentPageVisible = true; this.publishInterface(); })
-    .onHidden((): void => { this.closeMoreMenu(); this.wheelSession.setVisible(false); appInterface.hidePage('agent'); this.isAgentPageVisible = false; this.navigationSession?.cancel(); })
+    .onShown((): void => {
+      this.wheelSession.setVisible(true);
+      appInterface.showPage('agent');
+      this.isAgentPageVisible = true;
+      this.attachExternalAgent();
+      this.publishInterface();
+      this.resumeBackgroundTask();
+      if (AppStorage.get<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY) === true) {
+        recordAiActivity(this.getUIContext().getHostContext() as common.UIAbilityContext, false);
+      }
+    })
+    .onHidden((): void => { this.closeMoreMenu(); this.wheelSession.setVisible(false); appInterface.hidePage('agent'); this.isAgentPageVisible = false; this.navigationSession?.cancel(); this.stopDeepSeekMedia(); if (this.externalBridge !== null) externalMcpService.detach(this.externalBridge); })
     .opacity(this.转场透明度)
     .translate({ x: this.navigationOffset })
     .onBackPressed((): boolean => {

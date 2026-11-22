@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { resourceText } from '../../utils/UiFeedback';
 import { EMPTY_CARDS_ACTIONS } from '../../model/AppInterface';
 import { DialogFrame } from '../common/DialogFrame';
@@ -42,6 +43,7 @@ import type { 笔记空卡 } from '../../proto/messages/CardRenderingMessages';
 
 @Component
 export struct 空卡列表面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -255,7 +257,7 @@ export struct 空卡列表面板 {
     // 说明文案
     Text($r('app.string.empty_cards_description'))
       .fontSize(应用尺寸.字号_正文_小)
-      .fontColor($r('app.color.text_secondary'))
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       .width('100%')
 
     // busy 指示
@@ -264,10 +266,10 @@ export struct 空卡列表面板 {
         LoadingProgress()
           .width(20)
           .height(20)
-          .color($r('app.color.text_secondary'))
+          .color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         Text($r('app.string.empty_cards_checking'))
           .fontSize(应用尺寸.字号_正文_中)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }
       .width('100%')
       .justifyContent(FlexAlign.Center)
@@ -287,7 +289,7 @@ export struct 空卡列表面板 {
           Row() {
             Text(this.取本地化带参文本($r('app.string.empty_cards_count'), [this.笔记列表.length]))
               .fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
               .fontWeight(FontWeight.Medium)
               .layoutWeight(1)
             if (this.笔记列表.length > 0) {
@@ -304,7 +306,7 @@ export struct 空卡列表面板 {
           if (this.笔记列表.length === 0) {
             Text($r('app.string.empty_cards_none'))
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               .width('100%')
           }
 
@@ -327,10 +329,10 @@ export struct 空卡列表面板 {
           LoadingProgress()
             .width(20)
             .height(20)
-            .color($r('app.color.text_secondary'))
+            .color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           Text($r('app.string.empty_cards_processing'))
             .fontSize(应用尺寸.字号_正文_中)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         }
         .width('100%')
         .justifyContent(FlexAlign.Center)

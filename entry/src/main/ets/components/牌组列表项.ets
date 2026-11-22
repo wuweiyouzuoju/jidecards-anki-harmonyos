@@ -1,5 +1,7 @@
-import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceModuleRadius, appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 import { SeriesDeckSurface } from '../utils/SeriesVisual';
 import { LengthMetrics } from '@kit.ArkUI';
 import { disclosureAnimation } from '../utils/AppMotion';
@@ -17,6 +19,7 @@ import { 牌组汇总, 牌组色调, 牌组显示名 } from '../model/主页模�
 import { 应用尺寸 } from '../utils/应用尺寸';
 import { 颜色键 } from '../model/颜色主题';
 import { loadDeckBackground, releaseDeckBackground } from '../backend/DeckBackgroundImage';
+import { AppLog } from '../model/AppLog';
 
 // ========================================================
 // @块ID UI-DECK-LIST-001
@@ -51,6 +54,7 @@ import { loadDeckBackground, releaseDeckBackground } from '../backend/DeckBackgr
 
 @Component
 export struct 牌组列表项 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('themeMode') private themeMode: string = 'system';
@@ -152,7 +156,7 @@ export struct 牌组列表项 {
       }
       this.背景像素图 = pixels;
     } catch (error) {
-      console.warn('[deck-background] Preview unavailable: ' + String(error));
+      AppLog.warn('DeckListItem', '[deck-background] Preview unavailable: ' + String(error));
     }
   }
 
@@ -269,6 +273,11 @@ export struct 牌组列表项 {
     })
   }
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     Stack() {
       // 底层：背景图（objectFit=Cover 与 牌组定制面板 预览口径一致，
@@ -279,7 +288,7 @@ export struct 牌组列表项 {
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
-          .borderRadius(应用尺寸.圆角_牌组行)
+          .borderRadius(appearanceModuleRadius(this.appearanceElements, 应用尺寸.圆角_牌组行))
       }
       // Row 内容：箭头/手柄/色条/文字/计数
       Row({ space: this.narrow ? 应用尺寸.间距_6 : 应用尺寸.间距_12 }) {
@@ -292,7 +301,7 @@ export struct 牌组列表项 {
             .height(应用尺寸.色条高度)
             .backgroundColor(
               this.deck.tone === 牌组色调.None ? Color.Transparent : this.取色条颜色(this.deck.tone))
-            .borderRadius(应用尺寸.圆角_色条)
+            .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_色条))
         }
         Column({ space: this.narrow ? 应用尺寸.间距_3 : 应用尺寸.间距_5 }) {
           Text(牌组显示名(this.deck, this.uiLanguage))
@@ -300,7 +309,7 @@ export struct 牌组列表项 {
               (this.compactText() ? 应用尺寸.字号_正文 : 应用尺寸.字号_强调) : 应用尺寸.字号_标题)
             .lineHeight(this.narrow ? (this.compactText() ? 16 : 20) : 22)
             .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           if (!this.narrow || this.deck.description.trim().length > 0) {
@@ -308,7 +317,7 @@ export struct 牌组列表项 {
               .fontSize(this.narrow ?
                 (this.compactText() ? 应用尺寸.字号_说明 : 应用尺寸.字号_正文_小) : 应用尺寸.字号_正文_中)
               .lineHeight(this.compactText() ? 12 : 16)
-              .fontColor($r('app.color.text_secondary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
@@ -338,6 +347,7 @@ export struct 牌组列表项 {
       }
       .width('100%').height('100%')
       .backgroundColor(this.selected ? this.selectionTint() : Color.Transparent)
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, 应用尺寸.圆角_牌组行))
       .padding({
         left: (this.narrow ? 应用尺寸.间距_12 : 应用尺寸.间距_14) + this.deck.depth * 应用尺寸.间距_16,
         right: this.narrow ? 应用尺寸.间距_12 : 应用尺寸.间距_14,
@@ -364,12 +374,13 @@ export struct 牌组列表项 {
     .height(应用尺寸.deckRowHeight(this.narrow) * this.fontScale())
     .gestureModifier(new DeckRowMenuGesture(this.reorderMode, (): void => { this.openMenu(); }))
     .onMouse((event: MouseEvent): void => { this.handleMouse(event); })
-    .clip(true)
     // 选中不跳过材质，覆盖层位于背景图之上、文字之下。
     .attributeModifier(new SeriesDeckSurface(this.surfaceMaterial, this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark),
-      this.动作主色, this.pageTint, 应用尺寸.圆角_牌组行, this.moduleOpacity))
-    .border(this.reorderMode ? SurfaceBorder.options(应用尺寸.卡片边框, this.动作主色) :
-      SurfaceBorder.contentOptions(this.surfaceMaterial, this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark)))
-    .borderRadius(应用尺寸.圆角_牌组行)
+      this.动作主色, this.pageTint, 应用尺寸.圆角_牌组行, this.moduleOpacity, this.appearanceElements))
+    .background(this.renderGlassBackground(new SeriesDeckSurface(this.surfaceMaterial, this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark),
+      this.动作主色, this.pageTint, 应用尺寸.圆角_牌组行, this.moduleOpacity, this.appearanceElements)))
+    .border(this.reorderMode ? SurfaceBorder.options(应用尺寸.卡片边框, this.动作主色, this.appearanceElements) :
+      SurfaceBorder.contentOptions(this.surfaceMaterial, this.themeMode === 'dark' || (this.themeMode !== 'light' && this.systemDark), undefined, this.appearanceElements))
+    .borderRadius(appearanceModuleRadius(this.appearanceElements, 应用尺寸.圆角_牌组行))
   }
 }

@@ -1,6 +1,10 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { PAGE_TOOLBAR_SCOPE, PageToolbarActionScope } from '../model/PageToolbarActions';
+import { PageActionShell } from '../components/common/PageActionShell';
+import { appearanceElementRadius, appearanceElementColor, appearanceModuleBorder, appearanceModuleRadius } from '../utils/AppearanceElements';
 import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../model/SurfaceMaterial';
 import { GlassSource } from '../components/common/GlassSource';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { navigationEnterOffset } from '../utils/AppMotion';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { SurfaceBorder } from '../utils/SurfaceBorder';
@@ -44,6 +48,8 @@ import { namedResourceText } from '../utils/UiFeedback';
 
 @Component
 export struct 学习提醒页 {
+  @Provide(PAGE_TOOLBAR_SCOPE) private pageToolbarScope: PageToolbarActionScope = new PageToolbarActionScope();
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -341,7 +347,7 @@ export struct 学习提醒页 {
     Stack({ alignContent: Alignment.Center }) {
       Text($r('app.string.reminder_list_title'))
         .fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary')).width('44%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('44%')
         .textAlign(TextAlign.Center).maxLines(1).hitTestBehavior(HitTestMode.None)
       // 左返回 + 右新建按钮，铺满
       Row() {
@@ -430,9 +436,12 @@ export struct 学习提醒页 {
     .width('100%')
     .padding(应用尺寸.卡片内边距)
     .backgroundColor($r('app.color.surface_card'))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_卡片)
-    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.是否深色, this.动作主色, '', undefined, this.moduleOpacity))
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
+    .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, this.是否深色, this.动作主色, '', undefined, this.moduleOpacity, this.appearanceElements))
+    .background(this.renderGlassBackground(SeriesVisual.surfaceFor(this.surfaceMaterial, this.是否深色, this.动作主色, '', undefined, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
   }
 
   @Builder
@@ -443,8 +452,14 @@ export struct 学习提醒页 {
     })
   }
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     NavDestination() {
+      PageActionShell({ surface: 'reminders' }) {
       Stack() {
         // 下层：主内容
         GlassSource() {
@@ -482,7 +497,7 @@ Column() {
                 left: 应用尺寸.页面内边距_水平,
                 right: 应用尺寸.页面内边距_水平,
                 top: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout),
-                bottom: 应用尺寸.页面底部间距(this.narrowDeckLayout) + this.导航条高度
+                bottom: SeriesVisual.scrollShadowEndInset(this.surfaceMaterial, 应用尺寸.页面底部间距(this.narrowDeckLayout)) + this.导航条高度
               })
             }
             .layoutWeight(1)
@@ -523,7 +538,9 @@ Column() {
       .width('100%')
       .height('100%')
       .alignContent(Alignment.Center)
-    }
+
+      }
+}
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => {

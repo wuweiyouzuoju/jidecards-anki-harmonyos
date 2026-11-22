@@ -1,6 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor, appearanceElementRadius } from '../utils/AppearanceElements';
 import { GlassBubblePanel } from './common/GlassBubblePanel';
 import { ActionMenuPointerSide } from './common/ActionMenuLayout';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { popupAppearance } from './common/PopupAppearance';
 import { WINDOW_SAFE_TOP_KEY } from '../model/WindowSafeLayout';
 import { LengthMetrics } from '@kit.ArkUI';
@@ -18,10 +19,12 @@ import { SettingsToggleRow } from './common/SettingsToggleRow';
 import { MenuSurface } from './common/MenuSurface';
 import { StudyAnnotationView, AnnotationPoint, AnnotationPosition } from '../model/StudyAnnotationView';
 import { StudyContentViewport } from './StudyContentViewport';
+import { AppLog } from '../model/AppLog';
 
 /** Canvas 随组件释放，当前卡草稿由白板宿主持有；展开工具不改变画布坐标。 */
 @Component
 export struct StudyLocalWhiteboard {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private popupMaterial: string = 'flat';
   @Prop @Watch('visibilityChanged') isVisible: boolean = true;
   @Prop @Watch('publishInterface') fallbackReason: string = '';
@@ -44,6 +47,8 @@ export struct StudyLocalWhiteboard {
   @Prop rootX: number = 0;
   @Prop rootY: number = 0;
   onResetGlobalView: () => void = (): void => {};
+  @Prop @Watch('publishInterface') isScreenshotBusy: boolean = false;
+  onScreenshot: () => void = (): void => {};
   onGlobalTouch: (event: TouchEvent) => void = (): void => {};
   onGlobalNavigationAllowed: (event: BaseEvent) => boolean = (): boolean => false;
   onSinglePanAllowed: (event: BaseEvent) => boolean = (): boolean => false;
@@ -135,6 +140,7 @@ export struct StudyLocalWhiteboard {
       .map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id, titleKey: item.titleKey, iconKey: item.iconKey,
         title: this.label(item.id), enabled: item.id === 'undo' ? this.hasUndo : item.id === 'redo' ? this.hasRedo :
           item.id === 'clear' ? this.hasInk :
+          item.id === 'screenshot' ? this.canTakeScreenshot() :
           item.condition === this.reviewPhase ? this.settingsTool === '' : true,
         selected: item.id === 'pen' ? !this.eraserSelected :
           item.id === 'eraser' ? this.eraserSelected :
@@ -248,7 +254,7 @@ export struct StudyLocalWhiteboard {
     try {
       draw();
     } catch (error) {
-      console.error(`Study whiteboard canvas failed: ${error}`);
+      AppLog.error('StudyWhiteboard', `Study whiteboard canvas failed: ${error}`);
       this.ready = false;
       this.session.cancel();
       this.canvasFailed = true;
@@ -497,7 +503,7 @@ export struct StudyLocalWhiteboard {
           enableArrow: false,
           arrowWidth: MenuSurface.pointerSpan,
           arrowHeight: MenuSurface.pointerDepth,
-          radius: 应用尺寸.圆角_指标卡,
+          radius: appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_指标卡),
           transition: TransitionEffect.IDENTITY,
           onStateChange: (event: PopupStateChangeParam): void => {
             if (!event.isVisible) this.closeToolSettings('pen');
@@ -513,7 +519,7 @@ export struct StudyLocalWhiteboard {
           enableArrow: false,
           arrowWidth: MenuSurface.pointerSpan,
           arrowHeight: MenuSurface.pointerDepth,
-          radius: 应用尺寸.圆角_指标卡,
+          radius: appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_指标卡),
           transition: TransitionEffect.IDENTITY,
           onStateChange: (event: PopupStateChangeParam): void => {
             if (!event.isVisible) this.closeToolSettings('eraser');
@@ -531,7 +537,7 @@ export struct StudyLocalWhiteboard {
 
   @Builder
   private toolSettings(eraser: boolean) {
-    GlassBubblePanel({ panelWidth: Math.min(320, this.toolbarContentWidth - 2 * 应用尺寸.页面内边距_水平), pointerCenter: (Math.min(320, this.toolbarContentWidth - 2 * 应用尺寸.页面内边距_水平)) / 2,
+    GlassBubblePanel({ shadowVisible: false, panelWidth: Math.min(320, this.toolbarContentWidth - 2 * 应用尺寸.页面内边距_水平), pointerCenter: (Math.min(320, this.toolbarContentWidth - 2 * 应用尺寸.页面内边距_水平)) / 2,
       pointerSide: ActionMenuPointerSide.Top, content: (): void => { this.toolSettingsContent(eraser); } })
   }
   @Builder
@@ -539,7 +545,7 @@ export struct StudyLocalWhiteboard {
     Column({ space: 应用尺寸.间距_8 }) {
       Row({ space: 应用尺寸.间距_8 }) {
         Text(this.label(eraser ? 'eraser' : 'pen')).fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary')).layoutWeight(1)
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).layoutWeight(1)
         IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_close'), label: this.label('settings_close'),
           isInteractive: this.isInputEnabled, onAction: (): void => { this.closeToolSettings(); } })
       }.width('100%')
@@ -593,6 +599,11 @@ export struct StudyLocalWhiteboard {
     }, (generation: number): string => generation.toString())
   }
 
+  private canTakeScreenshot(): boolean {
+    return this.isVisible && this.isInputEnabled && this.ready && !this.canvasFailed &&
+      !this.isScreenshotBusy && this.settingsTool === '';
+  }
+
   @Builder
   private fixedToolbar() {
     Column({ space: 应用尺寸.间距_8 }) {
@@ -602,6 +613,8 @@ export struct StudyLocalWhiteboard {
             IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_common_close'), label: this.label('close'),
               isInteractive: this.isInputEnabled, onAction: (): void => { this.close(); } })
             if (this.globalNavigation) {
+              按下态按钮({ 文案: this.label('screenshot'), singleLine: true,
+                是否启用: this.canTakeScreenshot(), 点击回调: this.onScreenshot })
               按下态按钮({ 文案: this.label('reset_view'), singleLine: true,
                 是否启用: this.isInputEnabled, 点击回调: this.onResetGlobalView })
             }
@@ -619,7 +632,7 @@ export struct StudyLocalWhiteboard {
       }.width('100%').constraintSize({ maxWidth: this.toolbarContentWidth })
       .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,
         top: 应用尺寸.pageToolbarTop(this.状态栏高度, this.narrowDeckLayout, this.toolbarSafeTop), bottom: 应用尺寸.间距_8 })
-      .backgroundColor($r('app.color.surface_page'))
+      .backgroundColor(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page')))
   }
 
   build() {
@@ -629,7 +642,7 @@ export struct StudyLocalWhiteboard {
         if (this.canvasFailed) {
           Column({ space: 应用尺寸.间距_8 }) {
             Text($r('app.string.study_whiteboard_failed')).fontSize(应用尺寸.字号_正文)
-              .fontColor($r('app.color.text_primary'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             按下态按钮({ 文案: this.label('retry'), 是否启用: this.isInputEnabled,
               点击回调: (): void => { this.retryCanvas(); } })
           }.width('100%').height('100%').justifyContent(FlexAlign.Center)
@@ -646,7 +659,7 @@ export struct StudyLocalWhiteboard {
         }
         if (this.capacityReached) {
           Text($r('app.string.study_whiteboard_full')).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_primary')).padding(应用尺寸.间距_8)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).padding(应用尺寸.间距_8)
             .backgroundColor($r('app.color.surface_card')).hitTestBehavior(HitTestMode.None)
             .align(Alignment.Center)
         }

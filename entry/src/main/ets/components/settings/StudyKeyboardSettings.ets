@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { LengthMetrics } from '@kit.ArkUI';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogHeader } from '../common/DialogHeader';
@@ -21,6 +22,7 @@ import type { AppInterfaceControl } from '../../model/AppInterface';
 /** 完整绑定草稿；保存与 JIDE 共用校验和陈旧配置保护，不直接写 AppStorage。 */
 @CustomDialog
 export struct StudyKeyboardSettings {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   controller?: CustomDialogController;
   onClose: () => void = (): void => {};
   onBusyChange: (busy: boolean) => void = (_busy: boolean): void => {};
@@ -142,7 +144,7 @@ export struct StudyKeyboardSettings {
   private content() {
     Column({ space: 应用尺寸.间距_12 }) {
       Text($r('app.string.study_keyboard_help')).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       FormSelectRow({ label: $r('app.string.study_keyboard_command'), options: this.commandOptions(),
         selectedIndex: this.commandIndex, value: this.commandLabel(STUDY_KEYBOARD_ACTIONS[this.commandIndex].id),
         isInteractive: this.loaded && !this.busy, onSelect: (index: number): void => { this.commandIndex = index; } })
@@ -150,11 +152,11 @@ export struct StudyKeyboardSettings {
         selectedIndex: this.sideIndex, value: this.sideLabel(this.side()), isInteractive: this.loaded && !this.busy,
         onSelect: (index: number): void => { this.sideIndex = index; } })
       TextInput({ text: this.keyText, placeholder: resourceText(this.getUIContext(), $r('app.string.study_keyboard_key_hint')) })
-        .attributeModifier(new FormInputStyle()).enabled(this.loaded && !this.busy)
+        .attributeModifier(new FormInputStyle( undefined, this.appearanceElements)).enabled(this.loaded && !this.busy)
         .onChange((value: string): void => { this.keyText = value; })
       Row() {
         Text(this.capturing ? $r('app.string.study_keyboard_press_key') : $r('app.string.study_keyboard_record_hint'))
-          .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+          .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }.width('100%').focusable(true).id(this.captureId).onKeyPreIme((event: KeyEvent): boolean => this.capture(event))
       Flex({ wrap: FlexWrap.Wrap, space: { main: LengthMetrics.vp(8), cross: LengthMetrics.vp(8) } }) {
         按下态按钮({ 文案: this.capturing ? $r('app.string.study_keyboard_stop_record') : $r('app.string.study_keyboard_record'),
@@ -171,15 +173,15 @@ export struct StudyKeyboardSettings {
           .fontColor($r('app.color.error_text')).width('100%')
       }
       if (this.loaded && this.bindings.length === 0) {
-        Text($r('app.string.study_keyboard_empty')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        Text($r('app.string.study_keyboard_empty')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }
       ForEach(this.bindings, (binding: StudyKeyBinding, index: number) => {
         Row({ space: 应用尺寸.间距_8 }) {
           Column({ space: 应用尺寸.间距_4 }) {
             Text(studyChordLabel(binding.key) + ' · ' + this.sideLabel(binding.side))
-              .fontSize(应用尺寸.字号_按钮).fontColor($r('app.color.text_primary')).width('100%')
+              .fontSize(应用尺寸.字号_按钮).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
             Text(this.commandLabel(binding.command)).fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary')).width('100%')
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           }.layoutWeight(1)
           IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_study_delete'), label: $r('app.string.study_keyboard_remove'),
             isInteractive: !this.busy, onAction: (): void => { this.remove(index); } })

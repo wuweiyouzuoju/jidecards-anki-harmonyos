@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { navigationEnterOffset } from '../utils/AppMotion';
+import { PAGE_TOOLBAR_SCOPE, PageToolbarActionScope } from '../model/PageToolbarActions';
+import { PageActionShell } from '../components/common/PageActionShell';
 import { DataTransferSession, DataTransferState, initialTransferState } from '../model/home/DataTransferSession';
 import { appInterface } from '../backend/AppInterfaceService';
 import { AnkiDataTransfer } from '../backend/AnkiDataTransfer';
@@ -19,21 +20,22 @@ import type { SyncAuth } from '../proto/messages/SyncMessages';
 import { 牌组服务 } from '../backend/牌组服务';
 import { 后端会话 } from '../backend/后端会话';
 import { 解析是否深色, 主题模式 } from '../model/主题设置';
-import { 加载主题模式 } from '../model/主题存储';
 import { appThemeSession, appThemeColorSession } from '../backend/AppThemeService';
 import { 颜色主题, 默认颜色主题, 颜色键 } from '../model/颜色主题';
-import { 加载颜色主题 } from '../model/颜色主题存储';
 import { 加载已隐藏牌组ID列表, 取消隐藏全部牌组 } from '../model/隐藏牌组存储';
 import { activeHiddenDeckIds } from '../model/HiddenDecks';
 import { 平铺牌组树 } from '../model/牌组层级';
 import { 牌组汇总 } from '../model/主页模型';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import { CustomTransition } from '../utils/自定义转场';
+import { PageFirstFrame } from '../utils/PageFirstFrame';
 
 import { 浏览页参数 } from '../model/navigation/PageParams';
 
 @Component
 export struct 设置页 {
+  @Provide(PAGE_TOOLBAR_SCOPE) private pageToolbarScope: PageToolbarActionScope = new PageToolbarActionScope();
+  @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @State private settingsBackRequest: number = 0;
   @State private transfer: DataTransferState = initialTransferState();
@@ -42,11 +44,14 @@ export struct 设置页 {
     (state: DataTransferState): void => { this.transfer = state; },
     (): Promise<void> => this.加载牌组列表(),
     (): void => this.显示提示($r('app.string.transfer_done')));
-  private 打开数据迁移(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean): void {
+  private async 打开数据迁移(mode: 数据迁移模式, deckId: number, allowDeckSelection: boolean): Promise<void> {
     if (syncActivity.isCollectionBusy()) {
       this.显示提示($r('app.string.sync_wait_operation'));
       return;
     }
+    // 目录首屏不访问集合；仅在确实需要牌组候选的导出操作中读取。
+    if (allowDeckSelection) await this.加载牌组列表();
+    if (this.disposed) return;
     if (mode === 'importFile') this.transferSession.startImport();
     else this.transferSession.open(mode, deckId, allowDeckSelection);
   }
@@ -61,7 +66,8 @@ export struct 设置页 {
   @StorageLink('systemDarkMode') private 系统暗黑模式: boolean = false;
   @StorageLink('themeMode') private 主题模式值: 主题模式 = 'system';
   @StorageLink('colorTheme') private 颜色主题值: 颜色主题 = 默认颜色主题;
-  @State private 转场透明度: number = 1;
+  @State private 转场透明度: number = 0;
+  private readonly firstFrame: PageFirstFrame = new PageFirstFrame();
   @State private navigationOffset: number = 0;
 
   // 弹层状态
@@ -70,28 +76,25 @@ export struct 设置页 {
   // 牌组列表（用于导出选项）
   @State private 牌组列表: 导出牌组选项[] = [];
 
-  async aboutToAppear(): Promise<void> {
+  aboutToAppear(): void {
+    this.disposed = false;
     // 先注册再做异步加载，确保首帧入场也能接到统一淡入淡出回调。
-    CustomTransition.getInstance().注册NavParam('SettingsPage',
-      (isPush: boolean, isExit: boolean): void => {
-        this.转场透明度 = isExit ? 1 : 0;
-        this.navigationOffset = isExit ? 0 : navigationEnterOffset(isPush);
+    CustomTransition.getInstance().registerPage('SettingsPage',
+      (opacity: number, offset: number): void => {
+        this.转场透明度 = opacity;
+        this.navigationOffset = offset;
       },
-      (isPush: boolean, isExit: boolean): void => {
-        this.转场透明度 = isExit ? 0 : 1;
-        this.navigationOffset = 0;
-      }
+      (): Promise<void> => this.firstFrame.wait(this.getUIContext())
     );
-    this.主题模式值 = await 加载主题模式();
-    try { await initializeRedemption(); } catch (error) {
-      hilog.warn(0x0000, '设置页', 'Redemption initialization unavailable; fingerprint panel can retry');
-    }
-    this.颜色主题值 = await 加载颜色主题();
-    await this.加载牌组列表();
+    // 主题由应用会话与 StorageLink 发布，避免进入时重新读取并覆盖较新的设置。
+    initializeRedemption().catch((): void => {
+      hilog.warn(0x4342, '设置页', 'Redemption initialization unavailable; fingerprint panel can retry');
+    });
   }
 
   aboutToDisappear(): void {
     this.disposed = true;
+    this.firstFrame.complete();
     this.transferSession.dispose();
     CustomTransition.getInstance().注销NavParam('SettingsPage');
   }
@@ -233,6 +236,7 @@ export struct 设置页 {
 
   build() {
     NavDestination() {
+      PageActionShell({ surface: 'settings' }) {
       Stack() {
         设置面板({
           backRequest: this.settingsBackRequest,
@@ -296,7 +300,9 @@ export struct 设置页 {
       .width('100%')
       .height('100%')
       .alignContent(Alignment.Center)
-    }
+
+      }
+}
     .hideTitleBar(true)
     .backgroundColor(Color.Transparent)
     .onBackPressed((): boolean => {
@@ -306,6 +312,7 @@ export struct 设置页 {
       this.settingsBackRequest++;
       return true;
     })
+    .visibility(this.surfaceMaterial === 'glass' && this.转场透明度 <= 0 ? Visibility.Hidden : Visibility.Visible)
     .opacity(this.转场透明度)
     .translate({ x: this.navigationOffset })
     .onShown((): void => { appInterface.showPage('settings'); })

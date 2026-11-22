@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SliderStyle } from '../../utils/SliderStyle';
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { 颜色键 } from '../../model/颜色主题';
 
@@ -8,6 +10,7 @@ import { saveCardTextSize } from '../../utils/CardTextSizeStore';
 /** 在外观设置内统一调整卡片文字大小。 */
 @Component
 export struct CardTextSizeControl {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(CARD_TEXT_SIZE_KEY) @Watch('syncSavedSize') private savedSize: number = DEFAULT_CARD_TEXT_SIZE;
   @State private selectedSize: number = DEFAULT_CARD_TEXT_SIZE;
@@ -45,19 +48,19 @@ export struct CardTextSizeControl {
 
         Text(settingsItemText(this.getUIContext(), 'card_text_size', this.uiLanguage))
           .fontSize(15)
-          .fontColor($r('app.color.text_primary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           .textAlign(TextAlign.Start).layoutWeight(1)
         Text(`${this.selectedSize}%`)
           .fontSize(15)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .translate({ x: 0.5 })
       }
       .width('100%')
-      Slider({ value: this.selectedSize, min: MIN_CARD_TEXT_SIZE, max: MAX_CARD_TEXT_SIZE, step: 10 })
-        .selectedColor(this.actionColor)
+      Slider({ value: this.selectedSize, min: MIN_CARD_TEXT_SIZE, max: MAX_CARD_TEXT_SIZE, step: 10 }).attributeModifier(new SliderStyle(this.actionColor))
+
         .width('100%')
         .enabled(!this.saving)
-        .selectedColor(this.actionColor)
+
         .onChange((value: number, mode: SliderChangeMode): void => {
           this.selectedSize = value;
           if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) {

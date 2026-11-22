@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { FormRowLayout } from '../../utils/FormRowLayout';
 import { settingsItemText } from '../../utils/SettingsStructureText';
 import { SURFACE_MATERIAL_KEY, surfaceMaterialTitleKey } from '../../model/SurfaceMaterial';
@@ -11,6 +12,7 @@ import { SurfaceMaterialDialog } from './SurfaceMaterialDialog';
 
 @Component
 export struct SurfaceMaterialControl {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(SURFACE_MATERIAL_KEY) private style: string = 'flat';
   private readonly host: NativeDialogHost = new NativeDialogHost();
@@ -52,9 +54,12 @@ export struct SurfaceMaterialControl {
   }
 
   build() {
+    Column({ space: FormRowLayout.hintGap }) {
     FormSelectRow({ label: settingsItemText(this.getUIContext(), 'surface_material', this.uiLanguage),
       useCustomControl: true, customControl: (): void => {
         this.materialValue(localizedNamedResourceText(this.getUIContext(), this.uiLanguage, surfaceMaterialTitleKey(this.style)));
       } })
+    Text($r('app.string.appearance_material_entry_hint')).fontSize(12).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
+    }.width('100%')
   }
 }

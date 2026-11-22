@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { PAGE_TOOLBAR_SCOPE, PageToolbarActionScope } from '../model/PageToolbarActions';
+import { PageActionShell } from '../components/common/PageActionShell';
 import { WALLPAPER_KEY } from '../model/AppearanceCustomization';
 import { pageMaterialFill } from '../utils/GlassMaterial';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { NoteDraftPreview } from '../components/common/NoteDraftPreview';
 import { NoteDraftPreviewInput } from '../model/NoteDraftPreview';
 import { PAGE_SURFACE_KEY } from '../model/ThemeCatalog';
@@ -11,6 +13,7 @@ import { navigationEnterOffset } from '../utils/AppMotion';
 /** 页面只承载冻结的草稿，渲染与临时媒体收尾仍由已有预览会话负责。 */
 @Component
 export struct NoteDraftPreviewPage {
+  @Provide(PAGE_TOOLBAR_SCOPE) private pageToolbarScope: PageToolbarActionScope = new PageToolbarActionScope();
   @StorageProp('surface_material') private pageMaterial: string = 'flat';
   @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @Prop input: NoteDraftPreviewInput;
@@ -41,12 +44,15 @@ export struct NoteDraftPreviewPage {
 
   build() {
     NavDestination() {
+      PageActionShell({ surface: 'note_draft_preview' }) {
       Column() {
         NoteDraftPreview({ input: this.input, isDark: 解析是否深色(this.theme, this.systemDark),
           fullScreen: true, isVisible: this.visible, onClose: (): void => { this.close(); },
           onBackHandlerChange: (handler: (() => boolean) | null): void => { this.previewBack = handler; } })
       }.width('100%').height('100%').backgroundColor(pageMaterialFill(this.surface, this.pageMaterial, this.wallpaperPath))
-    }.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
+
+      }
+}.hideTitleBar(true).backgroundColor(Color.Transparent).opacity(this.opacityValue)
       .translate({ x: this.navigationOffset })
       .onShown((): void => { this.visible = true; })
       .onHidden((): void => { this.visible = false; })

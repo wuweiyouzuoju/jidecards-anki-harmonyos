@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../utils/AppearanceElements';
+import { insetMaterialFill } from '../utils/GlassMaterial';
 import { SurfaceSelect } from './common/SurfaceSelect';
 import { LengthMetrics } from '@kit.ArkUI';
 import { 按下态按钮 } from './common/按下态按钮';
@@ -47,6 +48,7 @@ import { interfaceControlText } from '../utils/AppInterfaceText';
 
 @Component
 export struct 提醒编辑面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop isDark: boolean = false;
@@ -169,7 +171,7 @@ export struct 提醒编辑面板 {
     Column({ space: 应用尺寸.间距_16 }) {
       Column({ space: 应用尺寸.间距_8 }) {
         Text(this.interfaceLabel('time')).fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
         Row() {
         SurfaceSelect({ options: this.小时选项(),
           selectedIndex: this.小时,
@@ -180,7 +182,7 @@ export struct 提醒编辑面板 {
           } }).layoutWeight(1)
         Text($r('app.string.reminder_edit_time_colon'))
           .fontSize(应用尺寸.字号_面板标题)
-          .fontColor($r('app.color.text_primary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           .margin({ left: 应用尺寸.间距_8, right: 应用尺寸.间距_8 })
         SurfaceSelect({ options: this.分钟选项(),
           selectedIndex: this.分钟,
@@ -194,18 +196,18 @@ export struct 提醒编辑面板 {
 
       Text(this.interfaceLabel('title'))
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .width('100%')
 
       TextInput({ placeholder: $r('app.string.reminder_edit_title_placeholder'), text: this.标题 })
         .width('100%')
         .height(应用尺寸.按钮高度)
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
-        .placeholderColor($r('app.color.text_tertiary'))
-        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-        .border(SurfaceBorder.options())
-        .borderRadius(应用尺寸.圆角_面板)
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
+        .placeholderColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
+        .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+        .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+        .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         .padding({ left: 应用尺寸.卡片内边距, right: 应用尺寸.卡片内边距 })
           .enabled(this.interfaceEnabled('title'))
         .onChange((value: string) => {
@@ -214,18 +216,18 @@ export struct 提醒编辑面板 {
 
       Text(this.interfaceLabel('content'))
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .width('100%')
 
       TextArea({ placeholder: $r('app.string.reminder_edit_content_placeholder'), text: this.内容 })
         .width('100%')
         .height(80)
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
-        .placeholderColor($r('app.color.text_tertiary'))
-        .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-        .border(SurfaceBorder.options())
-        .borderRadius(应用尺寸.圆角_面板)
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
+        .placeholderColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
+        .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+        .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+        .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         .padding(应用尺寸.间距_8)
         .enabled(this.interfaceEnabled('content'))
         .onChange((value: string) => {
@@ -244,7 +246,7 @@ export struct 提醒编辑面板 {
 
       Text($r('app.string.reminder_edit_placeholder_hint'))
         .fontSize(11)
-        .fontColor($r('app.color.text_tertiary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
         .width('100%')
       if (this.errorMessage !== '') {
         Text(this.errorMessage)

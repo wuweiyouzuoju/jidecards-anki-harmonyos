@@ -1,5 +1,6 @@
-import { RectShape } from '@kit.ArkUI';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../utils/AppearanceElements';
+import { RectShape } from '@kit.ArkUI';
 import { DialogFrame } from './common/DialogFrame';
 import { DialogHeader } from './common/DialogHeader';
 import { AppearanceReveal } from './common/AppearanceReveal';
@@ -15,6 +16,7 @@ import { currentMotionProfile, motionAnimation } from '../utils/AppMotion';
 import { prefersReducedMotion } from '../utils/ReducedMotion';
 import { GLASS_HOME_SOURCE } from '../utils/GlassBackdrop';
 import { completeGlassSuggestion } from '../utils/SurfaceMaterialStore';
+import { GLASS_SUGGESTION_PENDING_KEY } from '../model/SurfaceMaterial';
 import { 保存简洁模式 } from '../model/简洁模式存储';
 import { 颜色键 } from '../model/颜色主题';
 import { HomeIntroPage, HomeIntroBlock, HomeIntroAction, HOME_INTRO_PAGES, HOME_INTRO_ACTIONS,
@@ -26,6 +28,7 @@ import { namedResourceText, resourceText, showToastSafely } from '../utils/UiFee
 /** 一屏一个问题；答案紧随正文，外壳按内容收缩，长文字仍可滚动。 */
 @Component
 export struct HomeIntroPanel {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop isDark: boolean = false;
   onFinish: () => void = (): void => {};
   onOpenLicenses: () => void = (): void => {};
@@ -40,7 +43,11 @@ export struct HomeIntroPanel {
   @State private pendingAnswer: string = '';
   private isActive: boolean = false;
 
-  aboutToAppear(): void { this.isActive = true; this.publishInterface(); }
+  aboutToAppear(): void {
+    this.isActive = true;
+    if (AppStorage.get<boolean>(GLASS_SUGGESTION_PENDING_KEY) === false) this.pageIndex = 1;
+    this.publishInterface();
+  }
   aboutToDisappear(): void { this.isActive = false; appInterface.leave('intro'); }
   private currentPage(): HomeIntroPage { return HOME_INTRO_PAGES[homeIntroPageIndex(this.pageIndex)]; }
   private text(key: string, _locale: string = this.uiLanguage): string { return namedResourceText(this.getUIContext(), key); }
@@ -116,14 +123,14 @@ export struct HomeIntroPanel {
         Image(icon).width(28).height(28).flexShrink(0)
         Column({ space: 6 }) {
           Text(this.text(titleKey)).fontSize(18).fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary')).width('100%')
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
           Text(this.text(hintKey)).fontSize(14).lineHeight(21)
-            .fontColor($r('app.color.text_secondary')).width('100%')
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         }.layoutWeight(1).alignItems(HorizontalAlign.Start)
         if (this.pendingAnswer === id) { ActionStatus({ phase: 'busy', tint: this.primaryColor }) }
       }.width('100%').padding(18)
     }.width('100%').height('auto')
-      .backgroundColor($r('app.color.surface_page'))
+      .backgroundColor(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page')))
       .border({ width: this.choiceSelected(id) ? 2 : 0, color: this.primaryColor }).borderRadius(20)
       .enabled(!this.savingMode).attributeModifier(new PressFeedback()).stateEffect(false)
       .clipShape(new RectShape({ width: '100%', height: '100%' }).radius(20))
@@ -138,9 +145,9 @@ export struct HomeIntroPanel {
       if (page.id !== 'community') {
       Column({ space: 10 }) {
         Text(this.text(page.blocks[0].titleKey)).fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
         Text(this.text(page.blocks[0].bodyKey)).fontSize(应用尺寸.字号_正文).lineHeight(23)
-          .fontColor($r('app.color.text_secondary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }.alignItems(HorizontalAlign.Start).width('100%')
       }
       if (page.id === 'experience') {
@@ -148,7 +155,7 @@ export struct HomeIntroPanel {
         this.choice('used_anki', 'intro_answer_used', 'intro_answer_used_hint', $r('app.media.ic_intro_mode_experimental'))
       } else if (page.id === 'community') {
         Text($r('app.string.home_intro_about_revisit')).fontSize(14).lineHeight(21)
-          .fontColor($r('app.color.text_secondary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         AboutSettings({ 是否深色: this.isDark, centerCommunity: true, 打开许可证回调: this.onOpenLicenses })
       }
 
@@ -158,6 +165,9 @@ export struct HomeIntroPanel {
   }
   @Builder
   private headerContent() {
+    if (this.pageIndex === 0) {
+      this.appearanceFooter()
+    } else {
     DialogHeader({ title: this.currentPage().id === 'community' ? $r('app.string.settings_about') : $r('app.string.app_name'), showDivider: false,
       showClose: this.pageIndex > 0, closeEnabled: !this.savingMode,
       closeIcon: $r('app.media.ic_common_arrow_left'), closeLabel: $r('app.string.home_intro_previous'),
@@ -167,7 +177,7 @@ export struct HomeIntroPanel {
       actionIcon: this.currentPage().id === 'community' ? '' : $r('app.media.ic_common_arrow_right'),
       actionLabel: this.currentPage().id === 'community' ? $r('app.string.done') : $r('app.string.home_intro_next'),
       onAction: (): void => { this.selectAction(this.currentPage().id === 'community' ? 'finish' : 'next'); } })
-      .visibility(this.pageIndex === 0 ? Visibility.Hidden : Visibility.Visible)
+    }
   }
   @Builder
   private bodyContent() {
@@ -184,15 +194,15 @@ export struct HomeIntroPanel {
         PrimaryActionButton({ label: $r('app.string.glass_suggestion_confirm'), isInteractive: !this.savingMode,
           feedback: this.pendingAnswer === 'glass' ? 'busy' : '', onAction: (): void => { this.selectAction('glass'); } })
         按下态按钮({ 文案: $r('app.string.intro_keep_appearance'), compact: true, fillWidth: true,
-          字号: 应用尺寸.字号_正文, 字色: $r('app.color.text_secondary'),
+          字号: 应用尺寸.字号_正文, 字色: appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')),
           feedback: this.pendingAnswer === 'keep_material' ? 'busy' : '', 是否启用: !this.savingMode,
           点击回调: (): void => { this.selectAction('keep_material'); } })
     }.width('100%')
   }
 
   build() {
-    DialogFrame({ maximumWidth: 480, fixedHeight: 600, refractionSource: GLASS_HOME_SOURCE,
-      onPrepared: (): void => { this.framePrepared = true; }, showPreparation: true, fillBody: false, canDismiss: false, showFooter: this.pageIndex === 0,
-      header: () => { this.headerContent(); }, content: () => { this.bodyContent(); }, footer: () => { this.appearanceFooter(); } })
+    DialogFrame({ maximumWidth: 480, refractionSource: GLASS_HOME_SOURCE,
+      onPrepared: (): void => { this.framePrepared = true; }, showPreparation: true, fillBody: false, canDismiss: false, actionsAtBottom: this.pageIndex === 0,
+      header: () => { this.headerContent(); }, content: () => { this.bodyContent(); } })
   }
 }

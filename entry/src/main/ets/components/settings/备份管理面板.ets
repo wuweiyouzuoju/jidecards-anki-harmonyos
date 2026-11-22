@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { settingsIcon } from '../../utils/SettingsIcons';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -20,6 +21,7 @@ import { DataActionRow } from './DataActionRow';
 
 @Component
 export struct 备份管理面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -194,7 +196,7 @@ export struct 备份管理面板 {
         }.width('100%')
         Divider().color(SurfaceBorder.color())
         Text($r('app.string.backup_management_title')).fontSize(15).fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
         Text($r('app.string.backup_management_subtitle')).fontSize(13)
           .fontColor(设置面板色板_取(this.isDark).次文字).width('100%');
         SettingsToggleRow({ title: $r('app.string.backup_management_auto'), hint: $r('app.string.backup_management_auto_hint'), isOn: this.automaticEnabled,

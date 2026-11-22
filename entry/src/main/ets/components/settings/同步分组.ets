@@ -67,6 +67,7 @@ import { 设置分组卡片 } from './设置分组卡片';
 // ========================================================
 @Component
 export struct 同步分组 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop 简洁模式: boolean = true;
   @StorageProp(THEME_TEXT_COLORS_KEY) private themeAccentColors: string[] = [];
@@ -483,13 +484,13 @@ export struct 同步分组 {
     }
     TextInput({ placeholder: this.savedServer === '' ? settingsItemText(this.getUIContext(), 'sync_username', this.uiLanguage) :
       $r('app.string.sync_custom_username_hint'), text: this.用户名输入 })
-      .attributeModifier(new FormInputStyle())
+      .attributeModifier(new FormInputStyle( undefined, this.appearanceElements))
       .enabled(!this.登录中)
       .onChange((值: string) => {
         this.用户名输入 = 值;
       })
     TextInput({ placeholder: settingsItemText(this.getUIContext(), 'sync_password', this.uiLanguage), text: this.密码输入 })
-      .attributeModifier(new FormInputStyle())
+      .attributeModifier(new FormInputStyle( undefined, this.appearanceElements))
       .type(InputType.Password)
       .enabled(!this.登录中)
       .onChange((值: string) => {
@@ -690,6 +691,7 @@ export struct 同步分组 {
 // ========================================================
 @CustomDialog
 struct 自定义服务器弹窗 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   controller?: CustomDialogController;
   @Link serverInput: string;
   @Link serverError: string;
@@ -738,7 +740,7 @@ struct 自定义服务器弹窗 {
       .fontColor(色板.次文字)
       .width('100%')
     TextInput({ text: this.serverInput, placeholder: OFFICIAL_ANKIWEB_SYNC_UI_ENABLED ? $r('app.string.sync_server_placeholder') : $r('app.string.sync_custom_server_placeholder') })
-      .attributeModifier(new FormInputStyle())
+      .attributeModifier(new FormInputStyle( undefined, this.appearanceElements))
       .enabled(this.当前状态 === '未登录' && !this.登录中 && !this.settingsSaving)
       .onChange((value: string): void => { this.serverInput = value; })
   }
