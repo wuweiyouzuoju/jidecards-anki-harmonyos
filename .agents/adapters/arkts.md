@@ -33,6 +33,13 @@
 
 新增 API 以目标 SDK 的声明和官方文档核对模块、权限与版本，不凭其他项目的 Kit 用法推断。
 
+## 日志
+
+- 应用代码统一调用 `AppLog.debug/info/warn/error(tag, message)`（`model/AppLog.ts`），不直接调用 `console.*`；纯模型 `.ts` 同样可用。
+- 运行时由 `utils/HilogLogSink.ets` 输出到 hilog，全应用唯一 domain 为 `APP_LOG_DOMAIN`（`0x4342`）；`EntryAbility` 与卡片扩展进程启动时各安装一次。直接调用 `hilog` 的既有代码同样使用该 domain。
+- 日志不得包含 API Key、同步凭证或卡片正文；触摸、布局等高频回调只在首次或异常分支打印。
+- Node 测试中，`tools/tests/register-ts-hook.mjs` 让未注入的 `AppLog` 指向真实门面；需要断言日志时用 `platform-module-harness.mjs` 的 `appLogFor(替身)` 注入。
+
 ## @Component 结构约定
 
 组件字段不得与 ArkUI 继承的属性方法同名，例如 `enabled`、`width`、`height`、`visibility`；布尔状态使用语义明确的 `isAdvanceEnabled` 等名称。`arkts-component-fields.test.mjs` 提前拦截常见装饰器字段冲突，但只覆盖常见名称，实际 HAP 编译仍是完成条件。纯逻辑测试通过不得报告为组件编译通过。

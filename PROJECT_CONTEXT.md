@@ -17,6 +17,8 @@ HarmonyOS 本地闪卡客户端：ArkUI → 领域 Service → protobuf → C++ 
 | Node 与验证入口 | `package.json`、`npm test -- --list` |
 | 应用内 Agent 发布能力 | `entry/src/main/ets/model/ReleaseFeatures.ets` |
 
+发布鸿蒙应用市场版本时使用[记得闪卡发布流水线](docs/development/appgallery-release.md)。
+
 ## 编程 Agent 入口
 
 编程 Agent 只受根目录 [AGENTS.md](AGENTS.md)、[.agents/](.agents/) 和当前领域文档约束。跨任务决策写入受版本控制的 [docs/decisions/](docs/decisions/README.md)。`docs/superpowers/`、`.trae/` 和其他历史材料只用于追溯，不得作为执行计划或当前规则。
