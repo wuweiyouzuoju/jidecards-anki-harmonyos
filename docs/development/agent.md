@@ -524,7 +524,7 @@ JIDE 制卡和改卡草稿复用普通编辑器的 NoteFieldCard。字段展示�
 
 ## 官方 AI 与华为登录
 
-官方服务、所有 AI 入口的华为登录要求、实际 Token 结算与 IAP 边界见[官方 AI 决策](../decisions/2026-11-20-official-ai.md)；服务器配置和可执行验证见[官方 AI 服务](../../server/official-ai/README.md)。原自带 Key 和自定义接口保留，官方购买与正式消费按服务端配置开放。
+官方服务、所有 AI 入口的华为登录要求、实际 Token 结算与 IAP 边界见[官方 AI 决策](../decisions/2026-11-20-official-ai.md)。原自带 Key 和自定义接口保留，官方购买与正式消费按服务端配置开放。
 
 ### 官方AI额度配置
 

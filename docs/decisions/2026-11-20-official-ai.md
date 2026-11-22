@@ -1,6 +1,6 @@
 # 官方 AI：华为身份、服务端额度与实际 Token 结算
 
-[决策索引](README.md) · [应用内 Agent](../development/agent.md) · [服务端入口](../../server/official-ai/README.md)
+[决策索引](README.md) · [应用内 Agent](../development/agent.md)
 
 ## 选择
 
