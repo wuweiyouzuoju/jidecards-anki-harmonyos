@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { common } from '@kit.AbilityKit';
 import { http } from '@kit.NetworkKit';
+import { AccountProfileService } from './AccountProfileService';
 import { OfficialAIService } from './agent/OfficialAIService';
 import { 后端会话 } from './后端会话';
 import { 卡片服务 } from './卡片服务';
@@ -23,6 +24,12 @@ export class StudyLeaderboardService {
 
   /** @throws {Error} 用户取消授权或会话保存失败时交给界面处理。 */
   login(context: common.UIAbilityContext): Promise<void> { return this.account.login(context, false); }
+
+  /** @throws {Error} 授权失败时保持当前匿名设置。 */
+  async requestPublicIdentity(context: common.UIAbilityContext): Promise<string> {
+    await this.requiredToken();
+    return new AccountProfileService().requestHuaweiProfileCode(context);
+  }
 
   async view(filter: string, metric: string = 'answers', period: string = 'week'): Promise<LeaderboardBoard> {
     this.loadedToken = '';
@@ -114,14 +121,14 @@ export class StudyLeaderboardService {
   }
 
   /** @throws {Error} 仅当前会话可提交已经预览的成绩。 */
-  async publish(filter: string, preview: LeaderboardPreview, profileRevision?: number, metric: string = 'answers',
+  async publish(filter: string, preview: LeaderboardPreview, huaweiProfileCode?: string, metric: string = 'answers',
     supportsDuration: boolean = false, period: string = 'week'): Promise<LeaderboardBoard> {
     const body: LeaderboardRequest = this.boardRequest(filter, metric, period);
     body.score = preview.score;
     body.samples = preview.samples;
     if (preview.windows !== undefined) body.windows = preview.windows;
     if (supportsDuration && (preview.durationMs ?? 0) > 0) body.durationMs = preview.durationMs;
-    if (profileRevision !== undefined) body.profileRevision = profileRevision;
+    if (huaweiProfileCode !== undefined) body.huaweiProfileCode = huaweiProfileCode;
     return this.request('publish', body, await this.requiredToken());
   }
 
@@ -132,10 +139,10 @@ export class StudyLeaderboardService {
 
   /** @throws {Error} 会话失效或服务器拒绝时保留原公开身份，由页面提示重试。 */
   async setAnonymous(filter: string, metric: string, period: string, anonymous: boolean,
-    profileRevision?: number): Promise<LeaderboardBoard> {
+    huaweiProfileCode?: string): Promise<LeaderboardBoard> {
     const body: LeaderboardRequest = this.boardRequest(filter, metric, period);
     body.anonymous = anonymous;
-    if (!anonymous) body.profileRevision = profileRevision;
+    if (!anonymous) body.huaweiProfileCode = huaweiProfileCode;
     return this.request('privacy', body, await this.requiredToken());
   }
 

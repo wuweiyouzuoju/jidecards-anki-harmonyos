@@ -6,13 +6,14 @@ import { appearanceElementColor } from '../../utils/AppearanceElements';
 @Component
 export struct ProfileAvatarImage {
   @Prop avatar: string = DEFAULT_PROFILE_AVATAR;
+  @Prop allowHuaweiPhoto: boolean = false;
   @Prop diameter: number = 40;
   @StorageProp('appearance_elements_active') private appearanceElements: string = '';
 
   build() {
     Stack() {
       Text(profileAvatarSymbol(this.avatar) || profileAvatarSymbol(DEFAULT_PROFILE_AVATAR)).fontSize(this.diameter * 0.5)
-      if (isProfilePhoto(this.avatar)) {
+      if (isProfilePhoto(this.avatar) || (this.allowHuaweiPhoto && this.avatar.startsWith('https://'))) {
         Image(this.avatar).width(this.diameter).height(this.diameter).objectFit(ImageFit.Cover)
       }
     }.width(this.diameter).height(this.diameter)

@@ -43,13 +43,15 @@ test('pages, section switches, dialogs and overlays read the same current profil
   }
 });
 
-test('all nine destinations keep equivalent forward and return callbacks', () => {
+test('registered destinations keep equivalent forward and return callbacks', () => {
   const api = surfaceMotionApi('lively');
   for (const [file, name, opacity, offset] of [
     ['设置页', 'SettingsPage'], ['统计页', 'StatsPage'], ['学习提醒页', 'ReminderPage'],
     ['浏览页', 'BrowserPage'], ['添加笔记页', 'AddNotePage'], ['学习页', 'StudyPage'], ['AI制卡页', 'AiCardPage'],
     ['EditNotePage', 'EditNotePage', 'opacityValue', 'navigationOffset'],
-    ['NoteDraftPreviewPage', 'NoteDraftPreviewPage', 'opacityValue', 'navigationOffset']
+    ['NoteDraftPreviewPage', 'NoteDraftPreviewPage', 'opacityValue', 'navigationOffset'],
+    ['DeckOptionsPage', 'DeckOptionsPage', 'opacityValue', 'navigationOffset'],
+    ['StudyLeaderboardPage', 'StudyLeaderboardPage', 'opacityValue', 'navigationOffset']
   ]) {
     const source = read('pages/' + file + '.ets');
     const marker = source.includes('CustomTransition.getInstance().registerPage(') ?

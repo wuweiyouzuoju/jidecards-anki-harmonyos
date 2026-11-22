@@ -154,7 +154,7 @@ function createNavigation(background, motionStyle = 'restrained', waitForFrame =
   registry.注册NavParam = (name, start, end, prepare) => { originalRegister(name, start, end, prepare); callbacks.set(name, { start, end, prepare }); };
   // 使用页面实际注册回调；这里只替换平台动画，不复制生产透明度规则。
   for (const [file, name] of [['设置页', 'SettingsPage'], ['浏览页', 'BrowserPage'], ['学习页', 'StudyPage'],
-    ['添加笔记页', 'AddNotePage'], ['EditNotePage', 'EditNotePage']]) {
+    ['添加笔记页', 'AddNotePage'], ['EditNotePage', 'EditNotePage'], ['StudyLeaderboardPage', 'StudyLeaderboardPage']]) {
     const pageSource = readFileSync(new URL(`../../entry/src/main/ets/pages/${file}.ets`, import.meta.url), 'utf8');
     const begin = pageSource.search(/CustomTransition\.getInstance\(\)\.(?:注册NavParam|registerPage)\(/);
     const registration = pageSource.slice(begin, pageSource.indexOf('\n    );', begin) + 7);
@@ -187,7 +187,8 @@ function createNavigation(background, motionStyle = 'restrained', waitForFrame =
   const fades = [];
   const finishes = [];
   const snapshot = () => Object.fromEntries([['Home', home.homeTransitionOpacity],
-    ...Array.from(pages, ([name, page]) => [name, name === 'EditNotePage' ? page.opacityValue : page.转场透明度])]);
+    ...Array.from(pages, ([name, page]) => [name,
+      name === 'EditNotePage' || name === 'StudyLeaderboardPage' ? page.opacityValue : page.转场透明度])]);
   const frames = [];
   home.getUIContext = () => ({ animateTo: (options, update) => {
     fades.push(options);
@@ -216,6 +217,8 @@ test('home and nested transparent destinations never crossfade old and new conte
     ['pop', { name: 'SettingsPage', index: 1 }, { name: 'StudyPage', index: 0 }],
     ['push', { index: -1 }, { name: 'SettingsPage', index: 0 }],
     ['pop', { name: 'SettingsPage', index: 0 }, { index: -1 }],
+    ['push', { index: -1 }, { name: 'StudyLeaderboardPage', index: 0 }],
+    ['pop', { name: 'StudyLeaderboardPage', index: 0 }, { index: -1 }],
     ['push', { name: 'SettingsPage', index: 0 }, { name: 'BrowserPage', index: 1 }],
     ['pop', { name: 'BrowserPage', index: 1 }, { name: 'SettingsPage', index: 0 }],
     ['replace', { name: 'SettingsPage', index: 0 }, { name: 'BrowserPage', index: 0 }],

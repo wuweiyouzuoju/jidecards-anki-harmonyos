@@ -3172,12 +3172,18 @@
     {"name": "leaderboard_privacy_login", "value": "公開名義を変更するにはHuawei IDでログインしてください。"},
     {"name": "leaderboard_privacy_profile", "value": "先にHuaweiアカウント設定でニックネームと画像を保存してください。"},
     {"name": "leaderboard_privacy_hint", "value": "オンの場合は匿名番号とjIDEアイコン、オフの場合はニックネームと画像が公開されます。"},
+    {"name": "leaderboard_entry_title", "value": "ランキング"},
+    {"name": "leaderboard_huawei_profile_notice", "value": "許可すると、ランキングに HUAWEI ID のニックネームとアバターが表示されます。"},
+    {"name": "leaderboard_huawei_profile_required", "value": "公開で参加するには、HUAWEI ID のニックネームとアバターへのアクセスを許可してください。"},
     {"name": "leaderboard_title", "value": "学習ランキング"},
     {"name": "leaderboard_disclosure", "value": "ランキングを開くだけでは閲覧のみです。参加に同意すると、最近の解答回数と、対応している場合は学習時間を送信します。最近解答したカードを最大 6 枚無作為に選び、デッキ名と文章の抜粋を送信します。サーバーは科目を判定した後、サンプルを破棄します。成績は既定で匿名となり、24 時間表示され、いつでも取り下げられます。ニックネームとアバターの公開は任意です。"},
     {"name": "leaderboard_back_to_board", "value": "ランキングに戻る"},
     {"name": "leaderboard_preview_notice", "value": "今回のスコアは %d 回の解答です。公開前にデッキ名と抜粋を確認してください。"},
     {"name": "leaderboard_own_score", "value": "自分の成績 · %1$s · %2$s · %3$d 回"},
     {"name": "leaderboard_own_rank", "value": "現在 %d 位"},
+    {"name": "leaderboard_joined", "value": "学習ランキングに参加中"},
+    {"name": "leaderboard_not_joined", "value": "学習ランキングに未参加"},
+    {"name": "leaderboard_publishing", "value": "成績を公開しています…"},
     {"name": "leaderboard_expired", "value": "成績の表示期間が終了しました。再投稿するとランキングに戻ります。"},
     {"name": "leaderboard_filter", "value": "分類で絞り込む"},
     {"name": "leaderboard_login", "value": "HUAWEI ID でログイン"},
@@ -3236,7 +3242,7 @@
     {"name": "account_profile_changed", "value": "別の端末でプロフィールが更新されました。編集中の内容は保持されています。確認して再度保存してください。"},
     {"name": "account_profile_failed", "value": "プロフィールを同期できません。しばらくしてからお試しください。"},
     {"name": "account_session_expired", "value": "セッションの期限が切れました。HUAWEI ID で再ログインしてください。"},
-    {"name": "leaderboard_share_profile", "value": "ニックネームとアバターも公開する"},
+    {"name": "leaderboard_share_profile", "value": "HUAWEI ID のプロフィールを公開"},
     {"name": "leaderboard_profile_changed", "value": "プロフィールが変わりました。ランキングを更新してもう一度プレビューしてください。"}
   ]
 }

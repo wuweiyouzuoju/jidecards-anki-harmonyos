@@ -3172,12 +3172,18 @@
     {"name": "leaderboard_privacy_login", "value": "Sign in with your Huawei account to change your public identity."},
     {"name": "leaderboard_privacy_profile", "value": "Save your nickname and avatar in Huawei account settings first."},
     {"name": "leaderboard_privacy_hint", "value": "When on, the board shows your anonymous number and the jIDE icon. When off, it shows your nickname and avatar."},
+    {"name": "leaderboard_entry_title", "value": "Rankings"},
+    {"name": "leaderboard_huawei_profile_notice", "value": "The leaderboard uses your nickname and avatar after you authorize access through HUAWEI ID."},
+    {"name": "leaderboard_huawei_profile_required", "value": "To rank publicly, authorize access to your HUAWEI ID nickname and avatar."},
     {"name": "leaderboard_title", "value": "Study leaderboard"},
     {"name": "leaderboard_disclosure", "value": "Opening the leaderboard only reads rankings. If you agree to join, the app uploads recent answer counts and recorded study time where supported. It also randomly selects up to 6 recently answered cards and uploads their deck names and text excerpts. The server uses them to identify your subject and then discards the samples.\n\nScores are anonymous by default, visible for 24 hours, and can be removed at any time. Sharing your nickname and avatar is optional."},
     {"name": "leaderboard_back_to_board", "value": "Back to leaderboard"},
     {"name": "leaderboard_preview_notice", "value": "Your score is %d answers. Review the deck names and excerpts below before publishing."},
     {"name": "leaderboard_own_score", "value": "My score · %1$s · %2$s · %3$d answers"},
     {"name": "leaderboard_own_rank", "value": "Current rank %d"},
+    {"name": "leaderboard_joined", "value": "You’re on the study leaderboard"},
+    {"name": "leaderboard_not_joined", "value": "You haven’t joined the study leaderboard"},
+    {"name": "leaderboard_publishing", "value": "Publishing results…"},
     {"name": "leaderboard_expired", "value": "Your score has expired. Publish again to rejoin the rankings."},
     {"name": "leaderboard_filter", "value": "Filter by category"},
     {"name": "leaderboard_login", "value": "Sign in with HUAWEI ID"},
@@ -3236,7 +3242,7 @@
     {"name": "account_profile_changed", "value": "Your profile changed on another device. Your edits are kept. Review and save again."},
     {"name": "account_profile_failed", "value": "Profile sync is unavailable. Try again later."},
     {"name": "account_session_expired", "value": "Your session expired. Sign in with HUAWEI ID again."},
-    {"name": "leaderboard_share_profile", "value": "Also share my nickname and avatar"},
+    {"name": "leaderboard_share_profile", "value": "Show HUAWEI ID profile"},
     {"name": "leaderboard_profile_changed", "value": "Your profile changed. Refresh the rankings and preview again."}
   ]
 }

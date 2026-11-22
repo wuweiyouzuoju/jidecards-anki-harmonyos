@@ -3172,12 +3172,18 @@
     {"name": "leaderboard_privacy_login", "value": "공개 이름을 변경하려면 Huawei 계정에 로그인하세요."},
     {"name": "leaderboard_privacy_profile", "value": "Huawei 계정 설정에서 먼저 닉네임과 프로필 사진을 저장하세요."},
     {"name": "leaderboard_privacy_hint", "value": "켜면 익명 번호와 jIDE 아이콘이, 끄면 닉네임과 프로필 사진이 공개됩니다."},
+    {"name": "leaderboard_entry_title", "value": "순위"},
+    {"name": "leaderboard_huawei_profile_notice", "value": "권한을 부여하면 HUAWEI ID의 닉네임과 아바타가 순위표에 표시됩니다."},
+    {"name": "leaderboard_huawei_profile_required", "value": "공개로 참여하려면 HUAWEI ID 닉네임 및 아바타에 대한 접근을 허용하세요."},
     {"name": "leaderboard_title", "value": "학습 순위"},
     {"name": "leaderboard_disclosure", "value": "순위를 열면 목록만 조회합니다. 참여에 동의하면 최근 응답 수와 지원되는 경우 학습 시간을 전송합니다. 최근 응답한 카드에서 최대 6장을 무작위로 뽑아 덱 이름과 텍스트 일부를 전송합니다. 서버는 과목을 판별한 후 샘플을 삭제합니다. 점수는 기본적으로 익명이며 24시간 표시됩니다. 언제든 점수를 내릴 수 있고 닉네임과 아바타 공개는 선택 사항입니다."},
     {"name": "leaderboard_back_to_board", "value": "순위표로 돌아가기"},
     {"name": "leaderboard_preview_notice", "value": "이번 점수는 답변 %d회입니다. 게시 전에 덱 이름과 카드 발췌문을 확인하세요."},
     {"name": "leaderboard_own_score", "value": "내 점수 · %1$s · %2$s · %3$d회"},
     {"name": "leaderboard_own_rank", "value": "현재 %d위"},
+    {"name": "leaderboard_joined", "value": "학습 순위표에 참여 중"},
+    {"name": "leaderboard_not_joined", "value": "학습 순위표에 참여하지 않음"},
+    {"name": "leaderboard_publishing", "value": "성적을 게시하는 중…"},
     {"name": "leaderboard_expired", "value": "점수가 만료되었습니다. 다시 게시하면 순위에 표시됩니다."},
     {"name": "leaderboard_filter", "value": "분류 필터"},
     {"name": "leaderboard_login", "value": "HUAWEI ID로 로그인"},
@@ -3236,7 +3242,7 @@
     {"name": "account_profile_changed", "value": "다른 기기에서 프로필이 변경되었습니다. 편집 내용은 유지됩니다. 확인한 후 다시 저장하세요."},
     {"name": "account_profile_failed", "value": "프로필을 동기화할 수 없습니다. 나중에 다시 시도하세요."},
     {"name": "account_session_expired", "value": "세션이 만료되었습니다. HUAWEI ID로 다시 로그인하세요."},
-    {"name": "leaderboard_share_profile", "value": "닉네임과 아바타도 공개"},
+    {"name": "leaderboard_share_profile", "value": "HUAWEI ID 프로필 공개"},
     {"name": "leaderboard_profile_changed", "value": "프로필이 변경되었습니다. 순위를 새로 고치고 다시 미리 보세요."}
   ]
 }

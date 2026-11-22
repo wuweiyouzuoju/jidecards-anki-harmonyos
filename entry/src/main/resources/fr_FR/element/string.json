@@ -3172,12 +3172,18 @@
     {"name": "leaderboard_privacy_login", "value": "Connectez-vous avec votre compte Huawei pour modifier votre identité publique."},
     {"name": "leaderboard_privacy_profile", "value": "Enregistrez d’abord votre pseudo et votre avatar dans les réglages du compte Huawei."},
     {"name": "leaderboard_privacy_hint", "value": "Activé, le classement affiche votre numéro anonyme et l’icône jIDE. Désactivé, il affiche votre pseudo et votre avatar."},
+    {"name": "leaderboard_entry_title", "value": "Classements"},
+    {"name": "leaderboard_huawei_profile_notice", "value": "Après autorisation, le classement utilise le pseudo et l’avatar de votre compte HUAWEI ID."},
+    {"name": "leaderboard_huawei_profile_required", "value": "Pour figurer publiquement, autorisez l’accès au pseudo et à l’avatar HUAWEI ID."},
     {"name": "leaderboard_title", "value": "Classement des études"},
     {"name": "leaderboard_disclosure", "value": "Ouvrir le classement permet uniquement de le consulter. Si vous acceptez de participer, l’application envoie le nombre de réponses récentes et, si disponible, le temps d’étude. Elle tire au hasard jusqu’à 6 cartes récemment étudiées et envoie les noms des paquets et des extraits. Le serveur identifie la matière puis efface les échantillons. Le résultat est anonyme par défaut, visible 24 heures et retirable à tout moment. Le pseudo et l’avatar sont facultatifs."},
     {"name": "leaderboard_back_to_board", "value": "Retour au classement"},
     {"name": "leaderboard_preview_notice", "value": "Votre score est de %d réponses. Vérifiez les noms de paquets et les extraits avant de publier."},
     {"name": "leaderboard_own_score", "value": "Mon résultat · %1$s · %2$s · %3$d réponses"},
     {"name": "leaderboard_own_rank", "value": "Rang actuel %d"},
+    {"name": "leaderboard_joined", "value": "Vous figurez au classement"},
+    {"name": "leaderboard_not_joined", "value": "Vous ne participez pas au classement"},
+    {"name": "leaderboard_publishing", "value": "Publication des résultats…"},
     {"name": "leaderboard_expired", "value": "Votre résultat a expiré. Publiez-le de nouveau pour revenir au classement."},
     {"name": "leaderboard_filter", "value": "Filtrer par catégorie"},
     {"name": "leaderboard_login", "value": "Se connecter avec HUAWEI ID"},
@@ -3236,7 +3242,7 @@
     {"name": "account_profile_changed", "value": "Votre profil a été modifié sur un autre appareil. Vos modifications sont conservées. Vérifiez-les, puis enregistrez à nouveau."},
     {"name": "account_profile_failed", "value": "La synchronisation du profil est indisponible. Réessayez plus tard."},
     {"name": "account_session_expired", "value": "Votre session a expiré. Reconnectez-vous avec HUAWEI ID."},
-    {"name": "leaderboard_share_profile", "value": "Publier aussi mon pseudo et mon avatar"},
+    {"name": "leaderboard_share_profile", "value": "Afficher le profil HUAWEI ID"},
     {"name": "leaderboard_profile_changed", "value": "Votre profil a changé. Actualisez le classement et ouvrez à nouveau l’aperçu."}
   ]
 }

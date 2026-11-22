@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { AccountProfile } from './AccountProfile';
+
 
 export const LEADERBOARD_PREVIEW_KEY: string = 'leaderboardLoopbackPreview';
 export const LEADERBOARD_SURFACE: string = 'study_leaderboard';
@@ -18,16 +18,17 @@ export interface LeaderboardWindows { today: LeaderboardTotals; month: Leaderboa
 export interface LeaderboardPreview {
   score: number; durationMs?: number; samples: LeaderboardSample[]; windows?: LeaderboardWindows;
 }
-export interface LeaderboardEntry { alias: string; subject: string; subjects?: string[]; score: number; rank: number; nickname?: string; avatar?: string; }
+export interface LeaderboardEntry { alias: string; subject: string; subjects?: string[]; score: number; rank: number; nickname?: string; avatar?: string; anonymousLabel?: string; }
 export interface LeaderboardOwnEntry {
   alias: string; subject: string; subjects?: string[]; score: number | null; rank: number | null; active: boolean;
 }
+export interface LeaderboardPublicIdentity { nickname: string; avatar: string; }
 export interface LeaderboardBoard {
-  entries: LeaderboardEntry[]; mine: LeaderboardOwnEntry | null; signedIn: boolean; metrics?: string[]; periods?: string[]; anonymous?: boolean; anonymousAlias?: string; profile?: AccountProfile;
+  entries: LeaderboardEntry[]; mine: LeaderboardOwnEntry | null; signedIn: boolean; metrics?: string[]; periods?: string[]; anonymous?: boolean; anonymousAlias?: string; publicIdentity?: LeaderboardPublicIdentity;
 }
 export interface LeaderboardRequest {
   filter: string; metric?: string; period?: string; score?: number; durationMs?: number;
-  anonymous?: boolean; windows?: LeaderboardWindows; samples?: LeaderboardSample[]; profileRevision?: number;
+  anonymous?: boolean; windows?: LeaderboardWindows; samples?: LeaderboardSample[]; huaweiProfileCode?: string;
 }
 
 /** 交换末尾元素后移除，避免重复抽中同一张卡，也无需排序整个近期集合。 */

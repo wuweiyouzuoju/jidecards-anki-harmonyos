@@ -3172,12 +3172,18 @@
     {"name": "leaderboard_privacy_login", "value": "Đăng nhập tài khoản Huawei để thay đổi danh tính công khai."},
     {"name": "leaderboard_privacy_profile", "value": "Hãy lưu biệt danh và ảnh đại diện trong cài đặt tài khoản Huawei trước."},
     {"name": "leaderboard_privacy_hint", "value": "Bật để hiện số ẩn danh và biểu tượng jIDE. Tắt để hiện biệt danh và ảnh đại diện."},
+    {"name": "leaderboard_entry_title", "value": "Xếp hạng"},
+    {"name": "leaderboard_huawei_profile_notice", "value": "Sau khi bạn cấp quyền, bảng xếp hạng dùng biệt danh và ảnh đại diện từ HUAWEI ID."},
+    {"name": "leaderboard_huawei_profile_required", "value": "Để tham gia công khai, hãy cho phép dùng biệt danh và ảnh đại diện HUAWEI ID."},
     {"name": "leaderboard_title", "value": "Bảng xếp hạng học tập"},
     {"name": "leaderboard_disclosure", "value": "Mở bảng xếp hạng chỉ để xem. Khi bạn đồng ý tham gia, ứng dụng gửi số câu trả lời gần đây và thời gian học nếu được hỗ trợ. Ứng dụng chọn ngẫu nhiên tối đa 6 thẻ đã trả lời gần đây và gửi tên bộ thẻ cùng đoạn văn bản. Máy chủ xác định môn học rồi xóa mẫu. Điểm mặc định được ẩn danh, hiển thị trong 24 giờ và có thể gỡ bất cứ lúc nào. Bạn có thể chọn công khai biệt danh và ảnh đại diện."},
     {"name": "leaderboard_back_to_board", "value": "Quay lại bảng xếp hạng"},
     {"name": "leaderboard_preview_notice", "value": "Điểm của bạn là %d câu trả lời. Hãy kiểm tra tên bộ thẻ và đoạn trích trước khi đăng."},
     {"name": "leaderboard_own_score", "value": "Điểm của tôi · %1$s · %2$s · %3$d câu trả lời"},
     {"name": "leaderboard_own_rank", "value": "Hạng hiện tại %d"},
+    {"name": "leaderboard_joined", "value": "Bạn đã tham gia bảng xếp hạng"},
+    {"name": "leaderboard_not_joined", "value": "Bạn chưa tham gia bảng xếp hạng"},
+    {"name": "leaderboard_publishing", "value": "Đang công bố kết quả…"},
     {"name": "leaderboard_expired", "value": "Điểm đã hết hạn. Hãy đăng lại để xuất hiện trên bảng xếp hạng."},
     {"name": "leaderboard_filter", "value": "Lọc theo danh mục"},
     {"name": "leaderboard_login", "value": "Đăng nhập bằng HUAWEI ID"},
@@ -3236,7 +3242,7 @@
     {"name": "account_profile_changed", "value": "Hồ sơ đã thay đổi trên thiết bị khác. Các chỉnh sửa của bạn vẫn được giữ. Hãy kiểm tra rồi lưu lại."},
     {"name": "account_profile_failed", "value": "Không thể đồng bộ hồ sơ. Vui lòng thử lại sau."},
     {"name": "account_session_expired", "value": "Phiên đã hết hạn. Hãy đăng nhập lại bằng HUAWEI ID."},
-    {"name": "leaderboard_share_profile", "value": "Công khai cả biệt danh và ảnh đại diện"},
+    {"name": "leaderboard_share_profile", "value": "Công khai hồ sơ HUAWEI ID"},
     {"name": "leaderboard_profile_changed", "value": "Hồ sơ đã thay đổi. Hãy làm mới bảng xếp hạng và xem lại bản xem trước."}
   ]
 }

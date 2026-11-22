@@ -48,6 +48,12 @@ export class AccountProfileService {
     }
   }
 
+  /** @throws {Error} Account Kit 必须确认已授予华为资料权限。 */
+  async requestHuaweiProfileCode(context: common.UIAbilityContext): Promise<string> {
+    const data = await this.authorizeHuaweiProfile(context);
+    return data.authorizationCode ?? '';
+  }
+
   /** @throws {Error} 用户取消、账号不一致或资料获取失败时保留原资料。 */
   async importHuaweiProfile(context: common.UIAbilityContext): Promise<HuaweiProfileImport> {
     const token: string = await this.account.token();

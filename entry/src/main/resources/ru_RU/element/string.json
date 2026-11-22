@@ -3172,12 +3172,18 @@
     {"name": "leaderboard_privacy_login", "value": "Войдите в аккаунт Huawei, чтобы изменить публичный профиль."},
     {"name": "leaderboard_privacy_profile", "value": "Сначала сохраните имя и аватар в настройках аккаунта Huawei."},
     {"name": "leaderboard_privacy_hint", "value": "Если включено, видны анонимный номер и значок jIDE. Если выключено, видны имя и аватар."},
+    {"name": "leaderboard_entry_title", "value": "Рейтинги"},
+    {"name": "leaderboard_huawei_profile_notice", "value": "После авторизации в рейтинге используются имя и аватар вашего HUAWEI ID."},
+    {"name": "leaderboard_huawei_profile_required", "value": "Для открытого участия разрешите доступ к имени и аватару HUAWEI ID."},
     {"name": "leaderboard_title", "value": "Рейтинг обучения"},
     {"name": "leaderboard_disclosure", "value": "Открытие рейтинга только загружает список. Если вы согласитесь участвовать, приложение отправит число недавних ответов и, если поддерживается, время обучения. Оно случайно выберет до 6 недавно изученных карточек и отправит названия колод и отрывки текста. Сервер определит предмет и удалит образцы. Результат по умолчанию анонимен, виден 24 часа и может быть удалён в любое время. Публикация имени и аватара необязательна."},
     {"name": "leaderboard_back_to_board", "value": "Вернуться к рейтингу"},
     {"name": "leaderboard_preview_notice", "value": "Ваш результат — %d ответов. Проверьте названия колод и отрывки перед публикацией."},
     {"name": "leaderboard_own_score", "value": "Мой результат · %1$s · %2$s · %3$d ответов"},
     {"name": "leaderboard_own_rank", "value": "Текущее место: %d"},
+    {"name": "leaderboard_joined", "value": "Вы участвуете в рейтинге"},
+    {"name": "leaderboard_not_joined", "value": "Вы не участвуете в рейтинге"},
+    {"name": "leaderboard_publishing", "value": "Публикуем результаты…"},
     {"name": "leaderboard_expired", "value": "Срок показа результата истёк. Опубликуйте его снова, чтобы вернуться в рейтинг."},
     {"name": "leaderboard_filter", "value": "Фильтр по категории"},
     {"name": "leaderboard_login", "value": "Войти с HUAWEI ID"},
@@ -3236,7 +3242,7 @@
     {"name": "account_profile_changed", "value": "Профиль изменён на другом устройстве. Ваши правки сохранены. Проверьте их и сохраните профиль ещё раз."},
     {"name": "account_profile_failed", "value": "Синхронизация профиля недоступна. Попробуйте позже."},
     {"name": "account_session_expired", "value": "Сеанс истёк. Снова войдите с HUAWEI ID."},
-    {"name": "leaderboard_share_profile", "value": "Показать также моё имя и аватар"},
+    {"name": "leaderboard_share_profile", "value": "Показывать профиль HUAWEI ID"},
     {"name": "leaderboard_profile_changed", "value": "Профиль изменился. Обновите рейтинг и снова откройте предпросмотр."}
   ]
 }

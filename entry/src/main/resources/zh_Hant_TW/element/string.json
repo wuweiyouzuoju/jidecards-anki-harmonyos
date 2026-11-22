@@ -3172,12 +3172,18 @@
     {"name": "leaderboard_privacy_login", "value": "登入華為帳號後可修改公開身分。"},
     {"name": "leaderboard_privacy_profile", "value": "請先在華為帳號設定中儲存暱稱和頭像。"},
     {"name": "leaderboard_privacy_hint", "value": "開啟後，榜單只會顯示匿名編號和 jIDE 圖示。關閉後，榜單會公開你的暱稱和頭像。"},
+    {"name": "leaderboard_entry_title", "value": "排行榜"},
+    {"name": "leaderboard_huawei_profile_notice", "value": "將向華為申請頭像和暱稱授權。學習排行榜直接使用華為帳號資料。"},
+    {"name": "leaderboard_huawei_profile_required", "value": "公開參加須授權使用華為帳號的頭像和暱稱。"},
     {"name": "leaderboard_title", "value": "學習榜"},
     {"name": "leaderboard_disclosure", "value": "開啟排行榜只會讀取排名。確認參加後，應用程式會上傳近期作答次數，以及服務支援的有效學習時間，並隨機抽取最多 6 張近期作答過的卡片，上傳牌組名稱和文字片段。伺服器用樣本判斷學科，分類後不保留樣本文字。\n\n成績預設匿名，公開 24 小時，可隨時撤下。你可以選擇是否同時公開暱稱和頭像。"},
     {"name": "leaderboard_back_to_board", "value": "返回榜單"},
     {"name": "leaderboard_preview_notice", "value": "本次成績為 %d 次答題。確認上傳前，請檢查下方的牌組名稱和卡片片段。"},
     {"name": "leaderboard_own_score", "value": "我的成績 · %1$s · %2$s · %3$d 次"},
     {"name": "leaderboard_own_rank", "value": "目前排名第 %d 名"},
+    {"name": "leaderboard_joined", "value": "已參加學習榜"},
+    {"name": "leaderboard_not_joined", "value": "未參加學習榜"},
+    {"name": "leaderboard_publishing", "value": "正在發布成績…"},
     {"name": "leaderboard_expired", "value": "成績已過期，重新發布即可再次上榜。"},
     {"name": "leaderboard_filter", "value": "篩選分類"},
     {"name": "leaderboard_login", "value": "登入華為帳號"},
@@ -3236,7 +3242,7 @@
     {"name": "account_profile_changed", "value": "資料已在其他裝置更新。已保留你的編輯，確認後可再次儲存。"},
     {"name": "account_profile_failed", "value": "目前無法同步個人資料，請稍後再試。"},
     {"name": "account_session_expired", "value": "登入已過期，請重新登入華為帳號。"},
-    {"name": "leaderboard_share_profile", "value": "同時公開我的暱稱與頭像"},
+    {"name": "leaderboard_share_profile", "value": "公開華為帳號資料"},
     {"name": "leaderboard_profile_changed", "value": "個人資料已變更，請重新整理排行榜後再次預覽。"}
   ]
 }

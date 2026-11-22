@@ -3172,12 +3172,18 @@
     {"name": "leaderboard_privacy_login", "value": "登录华为账号后可修改公开身份。"},
     {"name": "leaderboard_privacy_profile", "value": "请先在华为账号设置中保存昵称和头像。"},
     {"name": "leaderboard_privacy_hint", "value": "开启后，榜单仅显示匿名编号和 jIDE 图标。关闭后，榜单公开你的昵称和头像。"},
+    {"name": "leaderboard_entry_title", "value": "榜单"},
+    {"name": "leaderboard_huawei_profile_notice", "value": "将向华为申请头像和昵称授权。学习榜直接使用华为账号资料。"},
+    {"name": "leaderboard_huawei_profile_required", "value": "公开参榜需要授权使用华为账号的头像和昵称。"},
     {"name": "leaderboard_title", "value": "学习榜"},
     {"name": "leaderboard_disclosure", "value": "打开学习榜只会读取榜单。确认参榜后，应用会上传近期答题次数，以及服务支持的有效学习时长。应用还会随机抽取最多 6 张近期答过的卡片，上传其牌组名和卡片文字片段。服务器用这些样本判断学科，分类后不保存样本文字。\n\n成绩默认匿名，公开 24 小时，可随时撤下。你可以选择是否同时公开昵称和头像。"},
     {"name": "leaderboard_back_to_board", "value": "返回榜单"},
     {"name": "leaderboard_preview_notice", "value": "本次成绩为 %d 次答题。确认上传前，请检查下方的牌组名和卡片片段。"},
     {"name": "leaderboard_own_score", "value": "我的成绩 · %1$s · %2$s · %3$d 次"},
     {"name": "leaderboard_own_rank", "value": "当前排名第 %d 位"},
+    {"name": "leaderboard_joined", "value": "已参加学习榜"},
+    {"name": "leaderboard_not_joined", "value": "未参加学习榜"},
+    {"name": "leaderboard_publishing", "value": "正在发布成绩…"},
     {"name": "leaderboard_expired", "value": "成绩已过期，重新发布可再次上榜。"},
     {"name": "leaderboard_filter", "value": "筛选分类"},
     {"name": "leaderboard_login", "value": "登录华为账号"},
@@ -3236,7 +3242,7 @@
     {"name": "account_profile_changed", "value": "资料已在其他设备更新。已保留你的编辑，确认后可再次保存。"},
     {"name": "account_profile_failed", "value": "暂时无法同步账号资料，请稍后重试。"},
     {"name": "account_session_expired", "value": "登录已过期，请重新登录华为账号。"},
-    {"name": "leaderboard_share_profile", "value": "同时公开账号昵称和头像"},
+    {"name": "leaderboard_share_profile", "value": "公开华为账号资料"},
     {"name": "leaderboard_profile_changed", "value": "账号资料已变更，请刷新榜单后重新预览。"}
   ]
 }

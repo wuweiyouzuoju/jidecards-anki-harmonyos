@@ -2192,7 +2192,9 @@ struct 首页 {
 
   private async deckRenamed(): Promise<void> {
     await this.加载主页数据();
-    if (!this.homeDisposed) this.显示提示($r('app.string.deck_rename_done'));
+    if (!this.homeDisposed && (this.加载状态 === 'error' || this.autoSyncCollectionBusy)) {
+      throw new Error('deck_rename_refresh_failed');
+    }
   }
 
   private async deckMoved(): Promise<void> {

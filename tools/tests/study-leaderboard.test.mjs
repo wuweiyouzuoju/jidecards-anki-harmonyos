@@ -18,8 +18,10 @@ const pending = () => {
   const promise = new Promise(done => { resolve = done; });
   return { promise, resolve };
 };
+const CustomTransition = { getInstance: () => ({ registerPage() {}, 注销NavParam() {} }) };
 const sample = { deck: '医学::具体牌组', text: 'PRIVATE CARD' };
 const profile = { nickname: 'PRIVATE NICKNAME', avatar: 'fox', revision: 5 };
+const publishedMine = { alias: '1234567890abcdef', subject: 'math', score: 77, rank: null, active: true };
 
 test('leaderboard uses the shared range and subject selectors below the common toolbar inset', () => {
   const page = readFileSync(new URL('../../entry/src/main/ets/pages/StudyLeaderboardPage.ets', import.meta.url), 'utf8');
@@ -42,16 +44,25 @@ test('sampling is without replacement and bounds excerpts without splitting emoj
 
 test('browsing and cancelling never submit, and one explicit confirmation publishes anonymously by default', async () => {
   const calls = [];
+  let mine = null;
+  const publication = pending();
   const appInterface = new AppInterfaceTracker();
   const Dialog = loadComponentLogic('pages/StudyLeaderboardPage.ets', 'StudyLeaderboardPage', {
-    ...leaderboard, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {}, ...accountProfile, appInterface, visibleInterfaceItems, namedResourceText: (_, key) => key,
+    ...leaderboard, CustomTransition, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {}, ...accountProfile, appInterface, visibleInterfaceItems, namedResourceText: (_, key) => key,
     interfaceItemText: (_, surface, item) => visibleInterfaceItems(surface, context).find(x => x.id === item).titleKey,
     StudyLeaderboardService: class {
-      async view() { return { entries: [], mine: null, signedIn: true, profile }; }
+      async view() { return { entries: [], mine, signedIn: true, profile }; }
+      async requestPublicIdentity() { calls.push('authorize'); return 'huawei-code'; }
       async preview() { calls.push('local'); return { score: 77, samples: [sample] }; }
       async publish(filter, preview, revision) {
         calls.push({ filter, preview, revision });
-        return { entries: [], mine: null, signedIn: true, profile };
+        await publication.promise;
+        mine = publishedMine;
+        return this.view();
+      }
+      async leave() {
+        mine = null;
+        return this.view();
       }
     }
   });
@@ -76,16 +87,47 @@ test('browsing and cancelling never submit, and one explicit confirmation publis
   dialog.confirmParticipation();
   await settle();
   assert.deepEqual(calls, ['local', { filter: 'all', preview: { score: 77, samples: [sample] }, revision: undefined }]);
+  assert.equal(dialog.disclosureOpen, true);
+  assert.equal(dialog.locked, true);
+  assert.equal(dialog.canPublish(), false);
+  publication.resolve();
+  await settle();
+  assert.equal(dialog.disclosureOpen, false);
+  assert.equal(dialog.canShow('sample'), false);
+  assert.equal(dialog.canShow('leave'), true);
+  const activeStructure = buildAgentAppStructure(context, 'study_leaderboard', '', localize, [], [], appInterface.snapshot());
+  assert.equal(activeStructure.surfaces[0].items.find(item => item.id === 'sample').visibility, 'hidden');
+  assert.equal(activeStructure.surfaces[0].items.find(item => item.id === 'leave').visibility, 'observed');
+
+  const reopened = new Dialog();
+  reopened.getUIContext = dialog.getUIContext;
+  reopened.aboutToAppear();
+  await settle();
+  assert.equal(reopened.disclosureOpen, false, 'an active publication survives reopening the page');
+  assert.equal(reopened.canShow('leave'), true);
+  reopened.aboutToDisappear();
+
+  mine = { ...publishedMine, active: false };
+  dialog.refresh();
+  await settle();
+  assert.equal(dialog.canShow('sample'), true);
+  assert.equal(dialog.canShow('leave'), false, 'expired results are eligible for rejoining');
 
   dialog.sample();
   dialog.shareProfile = true;
   dialog.confirmParticipation();
   await settle();
-  assert.equal(calls.at(-1).revision, profile.revision);
+  assert.equal(calls.at(-1).revision, 'huawei-code');
+  assert.equal(calls.at(-2), 'authorize');
+  assert.equal(dialog.canShow('leave'), true);
+  dialog.leave();
+  await settle();
+  assert.equal(dialog.canShow('leave'), false);
+  assert.equal(dialog.canShow('sample'), true);
   dialog.sample();
   assert.equal(dialog.shareProfile, false);
   dialog.closeDisclosure();
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   dialog.aboutToDisappear();
   assert.deepEqual(appInterface.snapshot(), []);
 });
@@ -95,8 +137,9 @@ test('the consent action signs a guest in before publishing and cancellation nev
   let signedIn = false;
   let cancel = true;
   let reads = 0;
+  let publishAttempts = 0;
   const Page = loadComponentLogic('pages/StudyLeaderboardPage.ets', 'StudyLeaderboardPage', {
-    ...leaderboard, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {},
+    ...leaderboard, CustomTransition, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {},
     appInterface: new AppInterfaceTracker(), visibleInterfaceItems,
     interfaceItemText: (_, _surface, id) => id, namedResourceText: (_, key) => key,
     StudyLeaderboardService: class {
@@ -112,7 +155,7 @@ test('the consent action signs a guest in before publishing and cancellation nev
       async preview() { calls.push('sample'); return { score: 77, samples: [sample] }; }
       async publish(_filter, _payload, revision) {
         calls.push(['publish', revision]);
-        return { signedIn, mine: null, entries: [] };
+        return { signedIn, mine: publishAttempts++ === 0 ? null : publishedMine, entries: [] };
       }
     }
   });
@@ -132,20 +175,30 @@ test('the consent action signs a guest in before publishing and cancellation nev
   page.confirmParticipation();
   await settle();
   assert.deepEqual(calls, ['login', 'login', 'sample', ['publish', undefined]]);
+  assert.equal(page.disclosureOpen, true, 'a reply without an active result leaves the dialog available to retry');
+  assert.equal(page.canPublish(), true);
+  assert.equal(page.canShow('leave'), false);
+  assert.equal(page.errorKey, 'leaderboard_unavailable');
+  page.confirmParticipation();
+  await settle();
+  assert.deepEqual(calls.slice(-2), ['sample', ['publish', undefined]]);
   assert.equal(page.disclosureOpen, false);
+  assert.equal(page.canShow('sample'), false);
+  assert.equal(page.canShow('leave'), true);
 });
 
 test('leaderboard settings save the current account’s privacy in place', async () => {
   const calls = [];
   const profile = { nickname: 'Private owner', avatar: 'fox', revision: 2 };
-  const makeBoard = anonymous => ({ signedIn: true, anonymous, entries: [], mine: null, profile });
+  const makeBoard = anonymous => ({ signedIn: true, anonymous, entries: [], mine: null, publicIdentity: profile });
   const Page = loadComponentLogic('pages/StudyLeaderboardPage.ets', 'StudyLeaderboardPage', {
-    ...leaderboard, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {},
+    ...leaderboard, CustomTransition, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {},
     appInterface: new AppInterfaceTracker(), visibleInterfaceItems,
     interfaceItemText: (_, _surface, item) => item, namedResourceText: (_, key) => key,
     resourceText: (_, _resource, number, label) => `${number}（${label}）`,
     StudyLeaderboardService: class {
       async view() { return makeBoard(true); }
+      async requestPublicIdentity() { return 'huawei-code'; }
       async setAnonymous(...args) {
         calls.push(args);
         return makeBoard(args[3]);
@@ -153,7 +206,7 @@ test('leaderboard settings save the current account’s privacy in place', async
     }
   });
   const page = new Page();
-  page.getUIContext = () => ({});
+  page.getUIContext = () => ({ getHostContext: () => ({}) });
   page.aboutToAppear();
   await settle();
   page.disclosureOpen = false;
@@ -166,12 +219,13 @@ test('leaderboard settings save the current account’s privacy in place', async
   assert.equal(page.rankText(100), '99+');
   const alias = '1234567890abcdef';
   const number = page.learnerName({ alias });
-  assert.match(number, /^\d{10}$/);
+  assert.match(number, /^JIDE-\d{10}$/);
+  assert.equal(page.learnerName({ alias, anonymousLabel: number }), number);
   assert.equal(page.anonymousName(alias, '我'), number + '（我）');
   assert.equal(page.learnerName({ alias, nickname: '小火车', avatar: 'fox' }), '小火车');
   assert.equal(page.myName({ alias }), 'Private owner（leaderboard_self）');
   assert.equal(page.board.anonymous, false);
-  assert.deepEqual(calls, [['all', 'answers', 'week', false, profile.revision]]);
+  assert.deepEqual(calls, [['all', 'answers', 'week', false, 'huawei-code']]);
   page.setAnonymous(true);
   await settle();
   assert.equal(page.board.anonymous, true);
@@ -185,14 +239,14 @@ test('the preview roster never supplies the current user’s identity or rank', 
   const profile = { nickname: 'Actual user', avatar: 'fox', revision: 2 };
   let authenticated = false;
   const Page = loadComponentLogic('pages/StudyLeaderboardPage.ets', 'StudyLeaderboardPage', {
-    ...leaderboard, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {},
+    ...leaderboard, CustomTransition, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {},
     appInterface: new AppInterfaceTracker(), visibleInterfaceItems,
     interfaceItemText: (_, _surface, item) => item, namedResourceText: (_, key) => key,
     resourceText: (_, _resource, name, self) => name + '（' + self + '）',
     StudyLeaderboardService: class {
       async viewLoopbackPreview() { return { entries: [placeholder], mine: null, signedIn: false }; }
       async viewPersonal() {
-        return authenticated ? { entries: [], mine, signedIn: true, anonymous: false, profile } : null;
+        return authenticated ? { entries: [], mine, signedIn: true, anonymous: false, publicIdentity: profile } : null;
       }
     }
   });
@@ -215,7 +269,7 @@ test('the preview roster never supplies the current user’s identity or rank', 
   assert.equal(page.myName(null), 'Actual user（leaderboard_self）');
   assert.equal(page.myAvatar(null), 'fox');
   page.board = { ...page.board, anonymous: true, anonymousAlias: '1234567890abcdef' };
-  assert.match(page.myName(null), /^\d{10}（leaderboard_self）$/);
+  assert.match(page.myName(null), /^JIDE-\d{10}（leaderboard_self）$/);
   assert.equal(page.myAvatar(null), undefined);
 });
 
@@ -224,7 +278,7 @@ test('populated leaderboard refreshes scores and requests the selected subject',
   const tracker = new AppInterfaceTracker();
   let score = 90;
   const Dialog = loadComponentLogic('pages/StudyLeaderboardPage.ets', 'StudyLeaderboardPage', {
-    ...leaderboard, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {}, appInterface: tracker, visibleInterfaceItems,
+    ...leaderboard, CustomTransition, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {}, appInterface: tracker, visibleInterfaceItems,
     namedResourceText: (_, key) => key, interfaceItemText: (_, _surface, item) => item,
     StudyLeaderboardService: class {
       async view(filter) {
@@ -258,7 +312,7 @@ test('a dismissed dialog cannot attach a late sample to a later publication', as
   let published = false;
   const tracker = new AppInterfaceTracker();
   const Dialog = loadComponentLogic('pages/StudyLeaderboardPage.ets', 'StudyLeaderboardPage', {
-    ...leaderboard, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {}, ...accountProfile, appInterface: tracker, visibleInterfaceItems,
+    ...leaderboard, CustomTransition, NavPathStack: class {}, Scroller: class {}, PageToolbarActionScope: class {}, ...accountProfile, appInterface: tracker, visibleInterfaceItems,
     namedResourceText: (_, key) => key, interfaceItemText: (_, _surface, item) => item,
     StudyLeaderboardService: class {
       async view() { return { signedIn: true, mine: null, entries: [] }; }

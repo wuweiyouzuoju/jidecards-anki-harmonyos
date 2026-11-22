@@ -3172,12 +3172,18 @@
     {"name": "leaderboard_privacy_login", "value": "Accedi con il tuo account Huawei per modificare la tua identità pubblica."},
     {"name": "leaderboard_privacy_profile", "value": "Salva prima il nickname e l’avatar nelle impostazioni dell’account Huawei."},
     {"name": "leaderboard_privacy_hint", "value": "Se attivo, la classifica mostra il numero anonimo e l’icona jIDE. Altrimenti mostra nickname e avatar."},
+    {"name": "leaderboard_entry_title", "value": "Classifiche"},
+    {"name": "leaderboard_huawei_profile_notice", "value": "Dopo l’autorizzazione, la classifica usa il soprannome e l’avatar del tuo HUAWEI ID."},
+    {"name": "leaderboard_huawei_profile_required", "value": "Per partecipare pubblicamente, autorizza l’accesso a soprannome e avatar del tuo HUAWEI ID."},
     {"name": "leaderboard_title", "value": "Classifica di studio"},
     {"name": "leaderboard_disclosure", "value": "Aprendo la classifica puoi solo consultarla. Se accetti di partecipare, l’app invia il numero di risposte recenti e, quando supportato, il tempo di studio. Seleziona a caso fino a 6 carte recenti e invia i nomi dei mazzi e gli estratti. Il server determina la materia e poi elimina i campioni. I risultati sono anonimi per impostazione predefinita, visibili per 24 ore e rimovibili in ogni momento. Soprannome e avatar sono facoltativi."},
     {"name": "leaderboard_back_to_board", "value": "Torna alla classifica"},
     {"name": "leaderboard_preview_notice", "value": "Il punteggio è di %d risposte. Controlla nomi dei mazzi ed estratti prima di pubblicare."},
     {"name": "leaderboard_own_score", "value": "Il mio punteggio · %1$s · %2$s · %3$d risposte"},
     {"name": "leaderboard_own_rank", "value": "Posizione attuale %d"},
+    {"name": "leaderboard_joined", "value": "Sei nella classifica di studio"},
+    {"name": "leaderboard_not_joined", "value": "Non partecipi alla classifica di studio"},
+    {"name": "leaderboard_publishing", "value": "Pubblicazione dei risultati…"},
     {"name": "leaderboard_expired", "value": "Il punteggio è scaduto. Pubblicalo di nuovo per tornare in classifica."},
     {"name": "leaderboard_filter", "value": "Filtra per categoria"},
     {"name": "leaderboard_login", "value": "Accedi con HUAWEI ID"},
@@ -3236,7 +3242,7 @@
     {"name": "account_profile_changed", "value": "Il profilo è stato modificato su un altro dispositivo. Le tue modifiche sono state mantenute. Controllale e salva di nuovo."},
     {"name": "account_profile_failed", "value": "La sincronizzazione del profilo non è disponibile. Riprova più tardi."},
     {"name": "account_session_expired", "value": "La sessione è scaduta. Accedi di nuovo con HUAWEI ID."},
-    {"name": "leaderboard_share_profile", "value": "Pubblica anche soprannome e avatar"},
+    {"name": "leaderboard_share_profile", "value": "Mostra il profilo HUAWEI ID"},
     {"name": "leaderboard_profile_changed", "value": "Il profilo è cambiato. Aggiorna la classifica e riapri l’anteprima."}
   ]
 }

@@ -25,6 +25,7 @@ import { WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY } from '../model/WindowSafe
 import { SurfaceSelect } from '../components/common/SurfaceSelect';
 import { 范围切换条 } from '../components/stats/范围切换条';
 import { 按下态按钮 } from '../components/common/按下态按钮';
+import { CustomTransition } from '../utils/自定义转场';
 
 const LEADERBOARD_GLASS_SOURCE: string = 'jide-glass-study-leaderboard';
 
@@ -35,7 +36,7 @@ export struct StudyLeaderboardPage {
   @StorageProp('系统语言') @Watch('publishInterface') private language: string = 'zh-Hans';
   @StorageProp(LEADERBOARD_PREVIEW_KEY) private loopbackPreview: boolean = false;
   @State private settingsOpen: boolean = false;
-  @State private disclosureOpen: boolean = true;
+  @State private disclosureOpen: boolean = false;
   @State private board: LeaderboardBoard | null = null;
   @State private shareProfile: boolean = false;
   @State private metric: string = 'answers';
@@ -46,6 +47,8 @@ export struct StudyLeaderboardPage {
   @State private busy: boolean = false;
   @State private locked: boolean = false;
   @State private errorKey: string = '';
+  @State private opacityValue: number = 0;
+  @State private navigationOffset: number = 0;
   private active: boolean = false;
   private readonly service: StudyLeaderboardService = new StudyLeaderboardService();
   pathStack: NavPathStack = new NavPathStack();
@@ -57,11 +60,24 @@ export struct StudyLeaderboardPage {
 
   aboutToAppear(): void {
     this.active = true;
-    this.refresh();
+    CustomTransition.getInstance().registerPage('StudyLeaderboardPage',
+      (opacity: number, offset: number): void => {
+        this.opacityValue = opacity;
+        this.navigationOffset = offset;
+      }
+    );
+    this.run(async (): Promise<void> => {
+      try {
+        await this.readBoard();
+      } finally {
+        if (this.active && !this.isParticipating()) this.disclosureOpen = true;
+      }
+    });
   }
 
   aboutToDisappear(): void {
     this.active = false;
+    CustomTransition.getInstance().注销NavParam('StudyLeaderboardPage');
     appInterface.leave(LEADERBOARD_SURFACE);
   }
 
@@ -70,7 +86,7 @@ export struct StudyLeaderboardPage {
   }
 
   private title(): string {
-    return interfaceItemText(this.getUIContext(), 'home_more', 'leaderboard', this.language);
+    return namedResourceText(this.getUIContext(), 'leaderboard_title');
   }
 
   private subject(id: string): string {
@@ -88,7 +104,7 @@ export struct StudyLeaderboardPage {
   private canShow(id: string): boolean {
     if (id === 'close') return true;
     if (this.disclosureOpen) return id === 'publish' ||
-      (id === 'share_profile' && (this.board?.profile?.revision ?? 0) > 0);
+      id === 'share_profile';
     if (this.settingsOpen) return id === 'anonymous' ||
       (id === 'login' && this.board?.signedIn === false);
     if (id === 'settings') return true;
@@ -98,8 +114,8 @@ export struct StudyLeaderboardPage {
     if (id === 'period') return this.periodsAvailable;
     if (this.board === null) return false;
     if (id === 'login') return !this.board.signedIn;
-    if (id === 'sample') return this.board.signedIn;
-    return id === 'leave' && this.board.mine !== null;
+    if (id === 'sample') return this.board.signedIn && !this.isParticipating();
+    return id === 'leave' && this.isParticipating();
   }
 
   private publishInterface(_locale: string = this.language): void {
@@ -120,7 +136,7 @@ export struct StudyLeaderboardPage {
       busy: this.busy, controlsComplete: true, items: controls,
       values: [{ id: 'phase', value: this.errorKey ? 'error' : phase }, { id: 'metric', value: this.metric },
         { id: 'period', value: this.period() }, { id: 'public_profile', value: this.shareProfile ? 'shared' : 'anonymous' },
-        { id: 'joined', value: !this.board?.signedIn ? 'unknown' : String(this.board.mine !== null) },
+        { id: 'joined', value: !this.board?.signedIn ? 'unknown' : String(this.isParticipating()) },
         { id: 'active', value: this.board?.mine === null || this.board?.mine === undefined ? 'unknown' : String(this.board.mine.active) }] });
   }
 
@@ -140,6 +156,8 @@ export struct StudyLeaderboardPage {
         case 'leaderboard_no_samples':
         case 'leaderboard_score_limit':
         case 'leaderboard_wait':
+        case 'account_profile_authorization_failed':
+        case 'leaderboard_huawei_profile_required':
         case 'leaderboard_login_failed':
           this.errorKey = code;
           break;
@@ -183,7 +201,7 @@ export struct StudyLeaderboardPage {
 
   private updateBoard(board: LeaderboardBoard): void {
     if (this.loopbackPreview && board.signedIn && this.board !== null) {
-      this.board = { entries: this.board.entries, mine: board.mine, signedIn: true, profile: board.profile,
+      this.board = { entries: this.board.entries, mine: board.mine, signedIn: true, publicIdentity: board.publicIdentity,
         anonymous: board.anonymous, anonymousAlias: board.anonymousAlias, metrics: this.board.metrics, periods: this.board.periods };
     } else {
       this.board = board;
@@ -194,13 +212,15 @@ export struct StudyLeaderboardPage {
 
   private isSignedIn(): boolean { return this.board?.signedIn === true; }
 
+  private isParticipating(): boolean { return this.board?.mine?.active === true; }
+
   private canPublish(): boolean {
     return this.disclosureOpen && !this.busy;
   }
 
   private confirmParticipation(): void {
     if (!this.canPublish()) return;
-    const revision: number | undefined = this.shareProfile ? this.board?.profile?.revision : undefined;
+    const shareProfile: boolean = this.shareProfile;
     this.run(async (): Promise<void> => {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       if (this.board === null) await this.readBoard();
@@ -212,13 +232,20 @@ export struct StudyLeaderboardPage {
         if (!this.active) return;
         if (!this.isSignedIn()) throw new Error('leaderboard_login_failed');
       }
+      if (this.isParticipating()) {
+        this.disclosureOpen = false;
+        return;
+      }
       const payload: LeaderboardPreview = await this.service.preview(context.filesDir,
         (): boolean => this.active, this.periodsAvailable);
       if (!this.active) return;
+      const code: string | undefined = shareProfile ? await this.requestPublicIdentity(context) : undefined;
+      if (!this.active) return;
       const board: LeaderboardBoard = await this.service.publish(
-        this.filter(), payload, revision, this.metric, this.durationAvailable, this.period());
+        this.filter(), payload, code, this.metric, this.durationAvailable, this.period());
       if (this.active) {
         this.updateBoard(board);
+        if (!this.isParticipating()) throw new Error('leaderboard_unavailable');
         this.disclosureOpen = false;
       }
     }, true);
@@ -279,13 +306,15 @@ export struct StudyLeaderboardPage {
   }
 
   private sample(): void {
-    if (!this.active || this.busy || this.board?.signedIn !== true || this.disclosureOpen) return;
+    if (!this.active || this.busy || !this.canShow('sample')) return;
     this.shareProfile = false;
+    this.errorKey = '';
     this.disclosureOpen = true;
     this.publishInterface();
   }
 
   private leave(): void {
+    if (!this.canShow('leave')) return;
     this.run(async (): Promise<void> => {
       const board: LeaderboardBoard = await this.service.leave(this.filter(), this.metric, this.period());
       if (this.active) this.updateBoard(board);
@@ -306,16 +335,26 @@ export struct StudyLeaderboardPage {
     this.publishInterface();
   }
 
+  private async requestPublicIdentity(context: common.UIAbilityContext): Promise<string> {
+    try {
+      return await this.service.requestPublicIdentity(context);
+    } catch (error) {
+      throw new Error('account_profile_authorization_failed');
+    }
+  }
+
   private canChangeAnonymous(): boolean {
-    return !this.busy && this.board?.signedIn === true && this.board.anonymous !== undefined &&
-      (this.board.anonymous === false || (this.board.profile?.revision ?? 0) > 0);
+    return !this.busy && this.board?.signedIn === true && this.board.anonymous !== undefined;
   }
 
   private setAnonymous(anonymous: boolean): void {
     if (!this.canChangeAnonymous() || this.board?.anonymous === anonymous) return;
     this.run(async (): Promise<void> => {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      const code: string | undefined = anonymous ? undefined : await this.requestPublicIdentity(context);
+      if (!this.active) return;
       const board: LeaderboardBoard = await this.service.setAnonymous(this.filter(), this.metric, this.period(),
-        anonymous, this.board?.profile?.revision);
+        anonymous, code);
       if (this.active) this.updateBoard(board);
     }, true);
   }
@@ -323,10 +362,7 @@ export struct StudyLeaderboardPage {
   private anonymousHint(): ResourceStr {
     if (this.board?.signedIn !== true) return $r('app.string.leaderboard_privacy_login');
     if (this.board.anonymous === undefined) return $r('app.string.leaderboard_unavailable');
-    if (this.board.anonymous && (this.board.profile?.revision ?? 0) < 1) {
-      return $r('app.string.leaderboard_privacy_profile');
-    }
-    return $r('app.string.leaderboard_privacy_hint');
+    return $r('app.string.leaderboard_huawei_profile_notice');
   }
 
   @Builder
@@ -357,13 +393,13 @@ export struct StudyLeaderboardPage {
     if (!Number.isFinite(number)) {
       return label || namedResourceText(this.getUIContext(), 'leaderboard_anonymous_learner');
     }
-    const displayNumber: string = String(1000000000 + number % 9000000000);
+    const displayNumber: string = 'JIDE-' + String(1000000000 + number % 9000000000);
     return label === '' ? displayNumber :
       resourceText(this.getUIContext(), $r('app.string.leaderboard_name_with_label'), displayNumber, label);
   }
 
   private learnerName(entry: LeaderboardEntry): string {
-    return entry.avatar === undefined ? this.anonymousName(entry.alias) :
+    return entry.avatar === undefined ? entry.anonymousLabel ?? this.anonymousName(entry.alias) :
       entry.nickname || namedResourceText(this.getUIContext(), 'leaderboard_learner_column');
   }
 
@@ -374,7 +410,7 @@ export struct StudyLeaderboardPage {
     }
     const published: LeaderboardEntry | undefined = this.board?.entries.find(
       (entry: LeaderboardEntry): boolean => entry.alias === mine?.alias);
-    const nickname: string = published?.nickname ?? this.board?.profile?.nickname ?? '';
+    const nickname: string = published?.nickname ?? this.board?.publicIdentity?.nickname ?? '';
     return nickname ? resourceText(this.getUIContext(), $r('app.string.leaderboard_name_with_label'), nickname, self) : self;
   }
 
@@ -390,7 +426,7 @@ export struct StudyLeaderboardPage {
   private myAvatar(mine: LeaderboardOwnEntry | null): string | undefined {
     if (this.board?.anonymous === true) return undefined;
     return this.board?.entries.find((entry: LeaderboardEntry): boolean => entry.alias === mine?.alias)?.avatar ??
-      this.board?.profile?.avatar;
+      this.board?.publicIdentity?.avatar;
   }
 
   @Builder
@@ -416,7 +452,7 @@ export struct StudyLeaderboardPage {
         .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
       Row({ space: 应用尺寸.间距_8 }) {
         if (avatar !== undefined) {
-          ProfileAvatarImage({ avatar: avatar, diameter: 32 })
+          ProfileAvatarImage({ avatar: avatar, diameter: 32, allowHuaweiPhoto: true })
         } else {
           Image($r('app.media.app_icon')).width(32).height(32).objectFit(ImageFit.Cover)
             .borderRadius(16).clip(true).accessibilityLevel('no')
@@ -479,7 +515,7 @@ export struct StudyLeaderboardPage {
       } else {
         ForEach(this.board.entries.slice(0, 30), (entry: LeaderboardEntry) => {
           this.entry(entry)
-        }, (entry: LeaderboardEntry): string => JSON.stringify([entry.alias, entry.rank, entry.score, entry.subject, entry.subjects, entry.nickname, entry.avatar]))
+        }, (entry: LeaderboardEntry): string => JSON.stringify([entry.alias, entry.rank, entry.score, entry.subject, entry.subjects, entry.nickname, entry.avatar, entry.anonymousLabel]))
       }
     }
     if (!this.disclosureOpen && this.canShow('login')) this.action('login', (): void => this.login(), true)
@@ -490,22 +526,14 @@ export struct StudyLeaderboardPage {
   @Builder
   private identityChoice() {
     Column({ space: 应用尺寸.间距_8 }) {
-      if (this.canShow('share_profile')) {
-        范围切换条({
-          当前索引: this.shareProfile ? 1 : 0,
-          标签集: [$r('app.string.leaderboard_publish_anonymous'), $r('app.string.leaderboard_share_profile')],
-          label: $r('app.string.leaderboard_identity'), isInteractive: !this.busy,
-          onRangeChange: (index: number): void => { this.shareProfile = index === 1; this.publishInterface(); }
-        })
-      } else {
-        Text($r('app.string.leaderboard_publish_anonymous')).width('100%').fontWeight(FontWeight.Medium)
-          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
-      }
+      范围切换条({
+        当前索引: this.shareProfile ? 1 : 0,
+        标签集: [$r('app.string.leaderboard_publish_anonymous'), $r('app.string.leaderboard_share_profile')],
+        label: $r('app.string.leaderboard_identity'), isInteractive: !this.busy,
+        onRangeChange: (index: number): void => { this.shareProfile = index === 1; this.publishInterface(); }
+      })
       if (this.shareProfile) {
-        Row({ space: 应用尺寸.间距_8 }) {
-          ProfileAvatarImage({ avatar: this.board?.profile?.avatar ?? '', diameter: 28 })
-          Text(this.board?.profile?.nickname ?? '').layoutWeight(1).maxLines(1)
-        }.width('100%')
+        this.note($r('app.string.leaderboard_huawei_profile_notice'))
       } else {
         this.note($r('app.string.leaderboard_anonymous_notice'))
       }
@@ -565,6 +593,9 @@ export struct StudyLeaderboardPage {
 
   @Builder
   private settingsBody() {
+    if (this.board?.signedIn === true) {
+      this.note(this.isParticipating() ? $r('app.string.leaderboard_joined') : $r('app.string.leaderboard_not_joined'))
+    }
     LeaderboardSettings({ fromBoard: true, anonymous: this.board?.anonymous !== false,
       anonymousHint: this.anonymousHint(), canChangeAnonymous: this.canChangeAnonymous(),
       onAnonymousChange: (anonymous: boolean): void => this.setAnonymous(anonymous) })
@@ -595,15 +626,18 @@ export struct StudyLeaderboardPage {
 
   @Builder
   private disclosureFooter() {
-    按下态按钮({ 文案: this.label('publish'), 是否启用: this.canPublish(), themeText: true,
-      fillWidth: true, autoHeight: true, 点击回调: (): void => this.confirmParticipation() })
+    Column({ space: 应用尺寸.间距_8 }) {
+      if (this.errorKey !== '') this.note(namedResourceText(this.getUIContext(), this.errorKey))
+      按下态按钮({ 文案: this.locked ? $r('app.string.leaderboard_publishing') : this.label('publish'),
+        是否启用: this.canPublish(), themeText: true, fillWidth: true, autoHeight: true,
+        点击回调: (): void => this.confirmParticipation() })
+    }.width('100%')
   }
 
   @Builder
   private disclosureContent() {
     this.identityChoice()
     this.note($r('app.string.leaderboard_disclosure'))
-    if (this.errorKey !== '') this.note(namedResourceText(this.getUIContext(), this.errorKey))
   }
 
   build() {
@@ -630,6 +664,7 @@ export struct StudyLeaderboardPage {
         }.width('100%').height('100%')
       }
     }.hideTitleBar(true).backgroundColor(Color.Transparent)
+      .opacity(this.opacityValue).translate({ x: this.navigationOffset })
       .onBackPressed((): boolean => { this.dismiss(); return true; })
       .onShown((): void => { appInterface.showPage(LEADERBOARD_SURFACE); this.publishInterface(); })
       .onHidden((): void => { appInterface.hidePage(LEADERBOARD_SURFACE); })

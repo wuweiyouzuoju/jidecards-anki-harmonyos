@@ -3172,12 +3172,18 @@
     {"name": "leaderboard_privacy_login", "value": "Melde dich mit deiner Huawei-ID an, um deine öffentliche Identität zu ändern."},
     {"name": "leaderboard_privacy_profile", "value": "Speichere zuerst deinen Spitznamen und dein Profilbild in den Huawei-Kontoeinstellungen."},
     {"name": "leaderboard_privacy_hint", "value": "Aktiviert zeigt die Rangliste eine anonyme Nummer und das jIDE-Symbol. Deaktiviert zeigt sie deinen Spitznamen und dein Profilbild."},
+    {"name": "leaderboard_entry_title", "value": "Rangliste"},
+    {"name": "leaderboard_huawei_profile_notice", "value": "Die Rangliste verwendet nach deiner Zustimmung den Namen und Avatar deiner HUAWEI ID."},
+    {"name": "leaderboard_huawei_profile_required", "value": "Erlaube für die öffentliche Teilnahme den Zugriff auf Namen und Avatar deiner HUAWEI ID."},
     {"name": "leaderboard_title", "value": "Lernrangliste"},
     {"name": "leaderboard_disclosure", "value": "Beim Öffnen werden nur Ranglisten gelesen. Wenn du zustimmst, sendet die App deine letzten Antwortzahlen und, soweit unterstützt, deine Lernzeit. Sie wählt bis zu 6 kürzlich beantwortete Karten zufällig aus und sendet Stapelnamen und Textausschnitte. Der Server bestimmt daraus das Fach und verwirft die Stichprobe. Ergebnisse sind standardmäßig anonym, 24 Stunden sichtbar und jederzeit entfernbar. Spitzname und Avatar sind optional."},
     {"name": "leaderboard_back_to_board", "value": "Zurück zur Rangliste"},
     {"name": "leaderboard_preview_notice", "value": "Dein Ergebnis sind %d Antworten. Prüfe vor dem Veröffentlichen die Stapelnamen und Auszüge."},
     {"name": "leaderboard_own_score", "value": "Mein Ergebnis · %1$s · %2$s · %3$d Antworten"},
     {"name": "leaderboard_own_rank", "value": "Aktueller Rang %d"},
+    {"name": "leaderboard_joined", "value": "Du bist auf der Lernrangliste"},
+    {"name": "leaderboard_not_joined", "value": "Du nimmst nicht an der Lernrangliste teil"},
+    {"name": "leaderboard_publishing", "value": "Ergebnisse werden veröffentlicht…"},
     {"name": "leaderboard_expired", "value": "Dein Ergebnis ist abgelaufen. Veröffentliche es erneut, um wieder teilzunehmen."},
     {"name": "leaderboard_filter", "value": "Nach Kategorie filtern"},
     {"name": "leaderboard_login", "value": "Mit HUAWEI ID anmelden"},
@@ -3236,7 +3242,7 @@
     {"name": "account_profile_changed", "value": "Dein Profil wurde auf einem anderen Gerät geändert. Deine Änderungen bleiben erhalten. Prüfe sie und speichere erneut."},
     {"name": "account_profile_failed", "value": "Das Profil kann momentan nicht synchronisiert werden."},
     {"name": "account_session_expired", "value": "Deine Sitzung ist abgelaufen. Melde dich erneut mit der HUAWEI ID an."},
-    {"name": "leaderboard_share_profile", "value": "Spitznamen und Avatar ebenfalls veröffentlichen"},
+    {"name": "leaderboard_share_profile", "value": "HUAWEI-ID-Profil anzeigen"},
     {"name": "leaderboard_profile_changed", "value": "Dein Profil wurde geändert. Aktualisiere die Rangliste und öffne die Vorschau erneut."}
   ]
 }
