@@ -15,4 +15,6 @@ npm run build:app -- --unsigned
 
 完整 verify 的 Windows 原生编排尚未迁移；Mac 编译使用本入口，仓库测试使用 `npm run verify -- repo`。构建验收与设备功能验收分别记录。
 
-迁移后的测试失配、SDK 诊断与实际验证见 [Mac 回归诊断](mac-regression-2026-10-25.md)。
+迁移后的测试失配、SDK 诊断与实际验证见 [Mac 回归诊断](../archive/development/mac-regression-2026-10-25.md)。
+
+鸿蒙电脑专用产物见[记得闪卡 PC 构建](pc-build.md)。

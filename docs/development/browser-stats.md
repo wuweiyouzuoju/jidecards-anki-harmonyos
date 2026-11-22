@@ -4,7 +4,7 @@
 
 刷新失败保留分页、局部行通知、菜单划选和结果撤销的当前入口见 [交互恢复与局部动效](interaction-feedback.md)。
 
-旗标与标星的实现、协议边界及验证记录见 [2026-10-03 对接记录](flags-marking-audit-2026-10-03.md)。
+旗标与标星的实现、协议边界及验证记录见 [2026-10-03 对接记录](../archive/development/flags-marking-audit-2026-10-03.md)。
 
 首页长按牌组提供直接浏览和查看统计，入口、公共色调菜单及参数责任见 [首页](home.md)。统计 `initialSnapshot.deckId/deckName` 在首屏同步带入范围，首笔查询与下拉选择一致；按 ID 校准加载后的索引，牌组统计不发布全库桌面卡片。`DeckScope.ts` 与浏览入口共用全名转义，默认入口仍为全库。回归 `stats-entry-runtime.test.mjs` 覆盖同步占用、迟到列表、用户切换和目标缺失。
 
@@ -20,6 +20,32 @@
 - 责任链：BrowserOperationController 管理操作快照、写入等待、同步占用及完成；页面负责搜索代次和 UI；统计口径来自 Core。
 - 快速反馈：`npm test -- browser / npm test -- ui`；完整验收见 [验证说明](verification.md)。
 
+## 设置模式与内容刷新
+
+设置正文的单项 `ForEach` 身份由 `sectionContentKey()` 同时包含分区、简洁模式和界面语言，不能只用分区名：在目录内切模式时分区仍是空字符串，ArkUI 会保留旧内容闭包，造成目录、说明和分组快照不更新。`interfaceModeChanged()` 统一观察已保存的实时模式（包括 UI 与 JIDE 的修改），回到目录并关闭旧分区动画；保存失败保留原模式与分区并提示错误。菜单选择统一调用 `changeInterfaceMode()`，不再复制保存和回目录逻辑。没有改变共同目录、权限或 JIDE 的模式操作能力。
+
+`settings-mode-refresh.test.mjs` 读取真实 ForEach 输入，模拟相同 key 保留子树，覆盖目录双向切换、分区切换后返回目录、语言失效及保存失败；设备验收不能由该模拟替代。2026-11-17 在 SettingsWide 覆盖安装后，验证实验版→简洁版时高级入口消失、数据说明更新且常规设置可打开；在常规内切回实验版后返回完整目录，高级入口恢复，复习设置可打开。HAP 构建及相关回归通过。设备文本证据位于本次聊天 `work/settings-performance/mode-directory-{initial,simple,full}.txt`。
+
+## 设置目录的同步工作
+
+`SettingsNavigation.filterSettingsEntries` 在空查询时只过滤入口可见性，不解析标题、说明和搜索关键词。设置面板的 `directoryEntries()` 按查询、简洁模式、Agent 入口权限及界面语言复用当前结果，宽屏行高、间距和条目构建不会重复扫描全部本地化关键词。缓存归面板实例持有，不缓存跨语言资源；真实搜索、模式切换与权限变化仍遵守共同目录声明，UI/JIDE 的入口和能力不变。回归见 `settings-directory-performance.test.mjs` 和 `ui-usability.test.mjs`。这约束同步工作量，实际打开耗时与动效仍须设备验证。
+
+设置模式由 `EntryAbility.initializeSimpleMode` 在创建首个页面前恢复；设置面板直接使用 `StorageLink` 的实时模式，不在每次进入时异步重读并回写。初始分区和动作在首屏构建前同步确定，避免先展示目录再跳转，也避免迟到的磁盘值覆盖刚保存的新模式。直接回归见 `settings-directory-performance.test.mjs`，启动与持久化回归见 `home-simple-mode.test.mjs`。
+
+设置页的 `PageFirstFrame` 经现有 `CustomTransition.registerPage` 的 preparation 接口等待首屏渲染空闲回调，再启动入场动画；目的地初始透明，准备阶段继续显示来源页。等待由页面实例持有，销毁、平台异常和250ms兜底都释放，不能把集合读取或网络请求放入此等待。回归入口为 `page-first-frame.test.mjs`、`page-entry-loading.test.mjs`。2026-11-17 在 SettingsWide 模拟器上用同一工作树的修复前后包覆盖安装并采集 hitrace：修复前目录构建所在 UI 帧31.49ms，动画在该帧结束前启动；修复后首次 UI 帧24.50ms，动画在后续帧启动，动画期间最大 UI 帧2.56ms。单次模拟器采样只证明布局与入场已错开，不证明真机帧率；总导航日志237ms与274ms包含不同的准备、调度时间，不能据此声称打开时间缩短。原始证据保存在本次聊天工作目录的 `work/settings-performance/`。默认签名包与该模拟器身份不同，最终沿用既有无签名调试身份以 `install -r` 安装，没有卸载或清数据；真机当时未连接，尚未验收。
+
+## 全服学习榜
+
+首页「更多」中的学习榜可匿名浏览，也可登录华为账号自愿发布。答题次数榜和有效时长榜使用 Core 全库答题次数与答题计时总量，分别降序，同分并列。时间范围支持今天、近 7 天和近 30 天，按发布时的 Anki 学习日口径统计。分类筛选按标签包含关系纳入参榜人，成绩仍为全库总量。每个账号在同一个榜单中只出现一次，类别并列展示。每个范围公开前 30 条。登录后，表头下方显示带公共描边的本人行，展示该筛选组合下的成绩和名次，超过 99 名统一显示「99+」。发布成绩展示 24 小时，退出立即撤下并删除榜单记录，可重新发布。
+
+`StudyLeaderboardService.ets` 复用 Core 图表统计及近期答题查询。打开页面立即显示普通说明弹窗，同时读取榜单。用户可用左上角关闭叉继续浏览，或在同一弹窗中了解上传的数据、最多六张卡片的抽样及公开范围后明确参榜。只有点击「同意并发布成绩」才读取成绩、抽样并上传。未登录时先完成华为账号授权，取消授权时不上传。牌组名最长 96 个 UTF-16 码元，卡面文字片段最长 240 个码元。
+
+服务器逐个样本按牌组名识别分类，名称无分类线索时查看该样本的卡面片段。多个明确分类合并去重，明确是杂牌组的样本标为「其他」，完全无法识别时归「其他」。此口径是粗分类。排行榜的分数来自客户端 Core 汇总，服务器验证会话、字段范围和发布间隔。服务端保存账号关联、推断类别、分数、发布时间和匿名编号；样本仅用于本次请求且不保留。发布时的公开身份默认为匿名，后台保留账号关联。选择公开才展示对应版本的昵称和头像。此后修改账号资料不改变已发布快照，可撤下后重新发布。
+
+`StudyLeaderboardPage.ets` 使用标准导航页展示可滚动榜单，进页即加载数据。参榜说明与学习榜设置使用共享 `DialogFrame` 和 `DialogHeader`，材质跟随应用外观。共同界面声明和实时观察向 JIDE 提供入口及状态，观察数据不包含账号昵称、牌组名或卡片样本。服务器接口与验证入口见 [官方服务](../../server/official-ai/README.md#账号资料与全服学习榜)，客户端用例见 `tools/tests/study-leaderboard.test.mjs`。
+
+本轮签名 HAP 构建通过，手机模拟器以覆盖安装验证统计页入口、隐私告知和服务不可用反馈。设置中验证「账号与常规」与原同步入口跳转。主机通过排行榜、账号、JIDE、统计、同步与本地化专项，以及服务端 HTTP 回归。公共服务更新、真实华为账号登录和两台设备上的资料同步仍需上线验收。
+
 ## 统计图表的内存边界
 
 间隔与稳定度的范围及中位数统一由 `model/统计分箱.ets` 的 `取分布分位` 从计数桶计算，保留展开序列后 `(n-1)×p` 的线性插值口径。禁止按卡片计数重复展开数组；临时内存只随桶数增长，直方图仍按原范围聚合。`stats-align-contract.test.mjs` 覆盖小分布与展开参考的一致性，以及两种图表在 uint32 大计数下的范围、柱数、总计和中位数。
@@ -28,21 +54,25 @@
 
 ## 浏览列表
 
+浏览预览的行入口和“预览所选”共用 `previewReadVersion` 作为读取代次。返回、导航隐藏和更新的预览请求使旧结果失效，隐藏后重新显示也不能接受先前请求。预览组件的交互启用状态同时取浏览页可见性与编辑页占用，隐藏时暂停媒体。`browser-desktop-ui.test.mjs` 通过延迟读取覆盖这三类取消与卡片/笔记身份转换。
+
+电脑分栏编辑由 `BrowserEditorPane` 持有草稿预览的导航代次、返回回调及可见性恢复；导航 `onPop` 和重新可见共同保证只恢复一次，旧预览回调不能清除新预览或访问已销毁编辑区。窗口缩窄再加宽时已有编辑区继续持有草稿，不自动改为搜索焦点对应的另一张卡片。独立编辑导航失败会清理 `editingPageOpen` 并显示失败，避免浏览页永久被占用。回归入口为 `browser-editor-lifecycle.test.mjs` 与 `browser-desktop-ui.test.mjs`；不改变保存、冲突校验、Core 写入或 JIDE 动作目录，`browser_editor` 仍由编辑区发布实际可见状态。
+
 ### 传统模式（2026-10-26）
 
 浏览右上角更多菜单最下方的“传统模式”项在现有卡片外观与 AnkiDroid 式多列表格间切换，选中态表示传统模式。偏好由 `BrowserPreferences` / `BrowserPreferencesStore` 的原串行队列保存；旧配置迁移默认保留现有外观。`traditionalCardsColumns`、`traditionalNotesColumns` 与原 `cardsColumns`、`notesColumns` 分开保存；切换外观不覆盖另一套列，卡片／笔记切换也保留各自列顺序。传统卡片默认 `noteFld/template/cardDue/deck`，传统笔记默认 `noteFld/note/template/noteTags`，来自上游 `BrowserConfig.kt`，不是 ViewModel 加载前的正反面临时两列。
 
 浏览区域达到 1000vp 时，初次加载有结果即在右侧打开焦点行，无有效焦点时打开首条结果。点击列表行切换编辑对象，沿用现有的草稿退出确认。全屏卡片预览覆盖分栏时暂停编辑轮盘，浏览更多菜单按左栏按钮实际位置对齐。
 
-传统模式在手机与宽窗口都采用等宽列、固定标题和无卡间空隙的连续行；每列正文最多三行，单元格左右各8vp，行上下各12vp，表格不再叠加页面水平边距和卡片内边距。多选时标题和正文都保留20vp复选框位与8vp间隔。普通外观的页面边距、卡间距及宽屏横向表格继续由原实现拥有。Core 行颜色映射为整行主题底色，选中／键盘焦点优先使用主题选中底色；传统模式不另占标记徽章和信息按钮的列宽。
+传统模式在手机与宽窗口都采用等宽列、固定标题和无卡间空隙的连续行；每列正文最多三行，单元格左右各8vp，行上下各12vp，表格不再叠加页面水平边距和卡片内边距。多选时标题和正文都保留20vp复选框位与8vp间隔。普通外观的页面边距、卡间距及宽屏横向表格继续由原实现拥有。Core 行颜色映射为整行主题底色，选中或聚焦时沿用普通卡片的动作色描边和圆角，保留 Core 行底色及左侧旗标色；传统模式不另占标记徽章和信息按钮的列宽。
 
 点击列标题替换该位置的内容，候选仅来自当前 Cards/Notes 可用 Core 列且排除其它已使用列。长按标题打开原显示列管理，可增加、删除、上移／下移，至少保留一列；关闭放弃草稿，确认才保存并重新读取结果。更多 → 显示设置 → 显示列同样管理当前外观的列。标题不会被误用作排序入口，排序仍走原排序选择器及 Core 完整结果排序。列替换与最近搜索候选共用按下态按钮，列重排复用笔记类型编辑器同款公共上下箭头，复选框／开关跟随当前动作主色。传统模式点击或 Enter 打开行直接编辑，宽窗口复用并排编辑；原外观点击仍先预览。多选、长按／右键范围选择、完整结果全选、预览所选、卡片信息、标签／牌组／旗标／标星／暂停／埋藏／到期／重置／重新定位／换类型／评分／导出／删除及撤销继续调用原拥有者，不另实现一套写入链。选择态、搜索中和写入中禁用外观切换与列变更；保存失败保留当前外观／草稿并显示错误。
 
-对照固定为 AnkiDroid `6b2dfdc6f382b2ed31bc8f60bdc72115726d53dd`：`CardBrowserFragment` 的标题单击／长按、`ColumnSelectionDialogFragment` 的未使用列候选、`BrowserColumnSelectionFragment` 的增减和顺序、`CardBrowserViewModel.onTap/handleRowLongPress/handleRightClick`、`BrowserMultiColumnAdapter` 的等权单元格与三行正文、`BrowserColumnCollection` / `libanki/BrowserConfig.kt` 的独立配置。路径、SHA256 和默认列快照在 `tools/tests/fixtures/ankidroid-browser-columns.json`，上游链接见 [本轮对照记录](browser-traditional-mode-2026-10-26.md)。列重排复用鸿蒙公共上移／下移按钮，上游 Android 使用拖动；字体、主题、原生菜单外壳沿用本项目，不声称 Android 像素一致。
+对照固定为 AnkiDroid `6b2dfdc6f382b2ed31bc8f60bdc72115726d53dd`：`CardBrowserFragment` 的标题单击／长按、`ColumnSelectionDialogFragment` 的未使用列候选、`BrowserColumnSelectionFragment` 的增减和顺序、`CardBrowserViewModel.onTap/handleRowLongPress/handleRightClick`、`BrowserMultiColumnAdapter` 的等权单元格与三行正文、`BrowserColumnCollection` / `libanki/BrowserConfig.kt` 的独立配置。路径、SHA256 和默认列快照在 `tools/tests/fixtures/ankidroid-browser-columns.json`，上游链接见 [本轮对照记录](../archive/development/browser-traditional-mode-2026-10-26.md)。列重排复用鸿蒙公共上移／下移按钮，上游 Android 使用拖动；字体、主题、原生菜单外壳沿用本项目，不声称 Android 像素一致。
 
 虚拟列表的数据源继续以业务 ID 发出局部通知；`卡片表格.renderedRowKey` 同时包含行内容和当前列上下文，防止 LazyForEach 复用旧 `cells` 快照，造成切换外观后新列空白。直接回归覆盖内容、激活列、列顺序及外观变化，设备已验证往返切换和替换／重排列后即时刷新。
 
-UI 与 JIDE 共用 `AppInterface.browser_more.traditional`；页面发布真实开关、当前可见列和禁用状态，替换窗发布 `browser_column_replace` 及真实候选。`get_browser_preferences` 读取同一配置；传统开关和两套列配置经既有提案、预览、确认及保存队列修改，不开放任意配置键。直接回归 `browser-traditional` 与 `ai-agent-maintenance`，认知回归 `ai-agent-app-structure`；HAP 和设备验收范围见本轮对照记录及[2026-10-27 模拟器验收](browser-traditional-device-2026-10-27.md)。
+UI 与 JIDE 共用 `AppInterface.browser_more.traditional`；页面发布真实开关、当前可见列和禁用状态，替换窗发布 `browser_column_replace` 及真实候选。`get_browser_preferences` 读取同一配置；传统开关和两套列配置经既有提案、预览、确认及保存队列修改，不开放任意配置键。直接回归 `browser-traditional` 与 `ai-agent-maintenance`，认知回归 `ai-agent-app-structure`；HAP 和设备验收范围见本轮对照记录及[2026-10-27 模拟器验收](../archive/development/browser-traditional-device-2026-10-27.md)。
 
 
 浏览页顶部保持“浏览”，多选时替换为选中数。卡片／笔记、状态、排序位于搜索下方：内容区达到600vp时同一行等宽排列，窄屏的模式与状态各半行，排序独占下一行，避免完整字段名与升降方向挤出箭头，三个入口均复用 `按下态按钮` 打开 `BrowserViewMenu` 的公共 `DialogFrame/DialogHeader`；选中项沿用公共菜单底色，右上角确认复用公共勾号按钮。模式、状态与排序先暂存草稿，确认才调用原页面回调，返回／关闭放弃草稿。搜索旁的 `IconActionButton` 与更多菜单共用筛选侧栏入口，使用普通工具按钮底色，不额外加筛选选中底色。模式／状态／排序入口也使用相同的普通按钮表面，当前值由文字表示。
@@ -60,6 +90,8 @@ UI 和 JIDE 共用 `browserToolbarItems`，实际观察发布当前模式、状�
 更多菜单主层提供筛选、全选搜索结果、查找替换、搜索工具、显示设置、回退、更多及最下方的传统模式八项，复用 `CardActionMenu` 的图文左对齐及互斥子面板。搜索工具包含搜索选项、最近搜索、保存当前搜索；显示设置包含显示列及三种副标题单选，选中项由公共 `AnchoredMenuItem` 复用 `SelectStyle.selectedOptionSurface` 和圆角填色，不另显示勾或预留勾号槽位；更多包含旗标名称；键盘及鼠标指引统一放在设置的学习帮助。分隔线只区分功能组。“搜索选项”保留忽略重音和辅助构建；“最近搜索”复用 `BrowserDisplayDialog(kind=recent)`，单独显示原持久化历史和空状态，不改变搜索数据或提交语义。目录由 `AppInterface.browser_more` 及三个子面板声明产生，宿主发布真实展开状态；系统返回先收起子面板，再关闭主菜单。多选菜单保留清空选择、预览所选、导出所选与立即评分。全选和 Shift 区间选择依据完整搜索 ID 顺序，覆盖未加载分页；空选择仍可执行全选，写入时禁用选择与快捷键。Notes 信息和所选预览先解析真实代表卡片；空笔记显示错误，不将 noteId 传给卡片接口。Cards 删除所选卡片、Notes 展开所属卡片，以及查找替换“全部”限于当前搜索结果的语义保持。
 
 `BrowserKeyboard.ts` 共用快捷键声明与精确修饰键匹配；`BrowserKeyAdapter.ets` 转换平台 KeyCode。Ctrl+A 全选，Ctrl+F 搜索，Ctrl+Alt+T 切换模式，方向键移动，Shift+方向键/点击扩展范围，Space 切换选择，Enter 打开，E 编辑，Delete 删除确认，Ctrl+Z/Ctrl+Shift+Z 撤销/重做，其它操作见应用内完整列表。输入、弹层、隐藏页面各自拥有输入；文本 Ctrl+A 不触发批量选择。编辑表单支持 Ctrl+Enter 保存（保留 Ctrl+S）和 Escape 请求关闭；完整对齐范围见下方“电脑键盘与上下文指引”。
+
+提交搜索时，浏览页把一次待交接焦点绑定到查询代次。只有当前查询返回非空结果且 `卡片表格` 确认列表已布局，浏览页才请求列表焦点。隐藏页面或继续编辑搜索词会取消交接，弹层打开时跳过交接。Ctrl+F 直接请求已存在的搜索框。焦点异常写诊断日志，搜索异常保留原重试入口。`browser-desktop-ui` 覆盖空结果、已布局列表复用、旧查询迟到、页面隐藏和重新进入输入框，实际 ArkUI 焦点与外接键盘仍按 D09/D34 真机验收。
 
 `BrowserPreferences.ts` 校验模式、排序、副标题、Cards/Notes 独立有序列及最多30项最近搜索；`BrowserPreferencesStore.ets` 在集合配置 `jideBrowserPreferences` 中合并局部修改并读回核实。手动与 JIDE 共用串行队列，确认提案保存前核对旧快照。通知刷新已挂载浏览页，草稿打开期间延后应用。默认排序读 Core `sortType/sortBackwards`；忽略重音使用真实 Core 布尔配置。每次搜索/分页在共享读取队列恢复模式与激活列；不能以缓存目录替代集合重开后的激活。整批行读取失败保留游标，单行缺失保留既有容错。
 
@@ -125,7 +157,7 @@ UI 和 JIDE 共用 `browserToolbarItems`，实际观察发布当前模式、状�
 
 ## 设置目录、浏览与统计摘要
 
-设置以 AnkiDroid 分类为参考，`SettingsNavigation.ts` 控制目录和模式内搜索：简洁版显示常规、复习、同步、外观、数据管理、学习帮助和关于；复习依次展示复习操作、学习布局，实验版在下方增加 FSRS 算法，另有高级设置及维护细项。颜色主题、主题动效、答题工具栏位置、评分振动和自定义服务器在两种模式都可配置；学习手势和四象限点击在两种模式均可配置并生效。AI 设置另受发布及解锁开关控制。`GeneralSettings.ets` 复用语言和首页偏好；`ReviewControlsSettings.ets` 在复习分类内复用评分触感及互斥的快捷答题方式（关闭、四象限点击、学习手势），`布局分组.ets` 仅负责复习工具栏位置并位于复习详情。详情取消旧主分组折叠，返回先退到目录；模式切换回目录而不重置偏好。数据库检查并入数据列表，维护会话拥有操作状态，主壳只订阅快照并适配服务。未对齐能力及后续接入位置见 `components/settings/SETTINGS_PARITY.md`，不创建无效开关。
+设置以 AnkiDroid 分类为参考，`SettingsNavigation.ts` 控制目录和模式内搜索：简洁版显示常规、复习、同步、外观、数据管理、学习帮助、高级和关于，其中高级只含排行榜，外部 Agent（仅电脑）和开发者调试只在实验版出现；复习依次展示复习操作、学习布局，实验版在下方增加 FSRS 算法，另有高级设置及维护细项。颜色主题、主题动效、答题工具栏位置、评分振动和自定义服务器在两种模式都可配置；学习手势和四象限点击在两种模式均可配置并生效。AI 设置另受发布及解锁开关控制。`GeneralSettings.ets` 复用语言和首页偏好；`ReviewControlsSettings.ets` 在复习分类内复用评分触感及互斥的快捷答题方式（关闭、四象限点击、学习手势），`布局分组.ets` 仅负责复习工具栏位置并位于复习详情。详情取消旧主分组折叠，返回先退到目录；模式切换回目录而不重置偏好。数据库检查并入数据列表，维护会话拥有操作状态，主壳只订阅快照并适配服务。未对齐能力及后续接入位置见 `components/settings/SETTINGS_PARITY.md`，不创建无效开关。
 
 浏览顶部采用卡片/笔记选择+搜索、状态选择+数量+排序两行，标题为“浏览”。状态与排序共用原生 Select 下拉形式；排序直接选择列和升降方向，转换为 Core 的 reverse 标志。浏览常规行透明、统计滚动区订阅 PAGE_SURFACE_KEY，主题背景贯穿内容区。`BrowserQuickFilter.ts` 通过 Core SearchNode AND 组合原搜索与状态，不破坏 OR 语义，保留分页、笔记 ID 和批量操作。默认副标题显示牌组与后端到期/新卡位置；筛选只影响展示。
 
@@ -152,13 +184,15 @@ UI 和 JIDE 共用 `browserToolbarItems`，实际观察发布当前模式、状�
 
 ### 牌组选项与 Core 升级
 
+完整牌组选项的预设卡与各设置分组，以及统计页的图表卡，按扣除页面内边距和安全区后的内容宽度排版。有效宽度能容纳两张各 520vp 的卡片与栏间距时，按原顺序每行放两张，否则每行一张。牌组名称、统计范围选择条仍占整行，简洁牌组选项只有一张常用设置卡。
+
 官方基线是 `UPSTREAM.lock` 锁定的 Anki 26.05（e64c6b1）。共同目录 `model/DeckOptionsCatalog.ts` 拥有分组、字段、调度器显隐、枚举顺序、步幅单位和轻松日映射，UI 与 JIDE 使用同一声明；数值边界由 `牌组配置表单.ets` 校验，Core 默认值来自真实读取结果。轻松日是独立分组，对 SM-2 和 FSRS 均可设置，按周一至周日显示最低/减少/正常；通常作用于未来间隔，FSRS 重新排程由单独开关控制。完整模式提供预设管理、预设/牌组/今日上限与保持率覆盖、单项恢复默认和官方保存模式。FSRS 参数展示一个有效向量，读取顺序 6→5→4；编辑后清除旧代际向量以恢复明确语义。自定义调度支持受限同步 JavaScript，完整模式可编辑集合级脚本；失败需明确确认才继续标准调度，不支持 await、DOM 或网络。运行时、状态保真与验证见[执行边界](../decisions/2026-10-07-custom-scheduling.md)。
 
 `deck-options-parity.test.mjs` 首先比较 `DECK_OPTIONS_UPSTREAM` 与 `UPSTREAM.lock`：升级 tag/commit 后先失败，必须重新核对官方 deck-options 界面、FTL、proto 和 Core 的字段、默认值、条件、取值、范围与保存模式，再同时更新 UI/JIDE 共同目录、编解码、校验、测试及基线。禁止只改版本断言以消除失败；未知字段仍须保真，新增字段明确接入或标明不可用。RPC 升级还要执行[协议门禁](verification.md#rpc-协议门禁)，按升级级别完成真实 Core、HAP 和设备验证。该版本门禁只能提醒审查，不会自动适配未来协议。
 
 持久化预设基线由 `DeckOptionsPresets` 保存，重命名和切换只改变草稿。各预设分别记住保存范围，切换时 UI 恢复对应选择；非当前草稿也按其范围准备请求，按需另存独立预设并保留修改，不改变其他牌组。选择仅被另一个牌组使用的预设后，牌组范围的字段修改同样隔离；显式名称在自动复制时保留，并避免与保留预设重名。全局 FSRS 控制器只提交 Default 原绑定的完整预设，避免 Core 用请求最后一项意外改绑；首次初始化沿同一工厂。
 
-直接行为回归覆盖分组条件、单位与边界、轻松日、预设暂存/取消/失败重试、多配置保存、未知字段、真实字段回调以及简洁模式；数值边界包括 float32 协议读回，合法的 70%/99% 与 SM-2 易度边界不能因舍入被拒绝。保持率字段沿用官方 SpinBox 的整数百分比显示，确认卡保留必要的小数以准确展示改动。复杂配置真实 Core 复查见[当日审查与修复](settings-integration-audit-2026-10-11.md)。JIDE 的确认写入另见 `ai-agent-deck-options.test.mjs` 和[助手说明](agent.md#应用设置读取与修改)。主机测试不证明布局或真实模型规划，设备仍需验收深浅主题、宽窄屏、大字体、模式切换、字段编辑/恢复默认、共享范围、确认/取消、返回和保存失败。
+直接行为回归覆盖分组条件、单位与边界、轻松日、预设暂存/取消/失败重试、多配置保存、未知字段、真实字段回调以及简洁模式；数值边界包括 float32 协议读回，合法的 70%/99% 与 SM-2 易度边界不能因舍入被拒绝。保持率字段沿用官方 SpinBox 的整数百分比显示，确认卡保留必要的小数以准确展示改动。复杂配置真实 Core 复查见[当日审查与修复](../archive/development/settings-integration-audit-2026-10-11.md)。JIDE 的确认写入另见 `ai-agent-deck-options.test.mjs` 和[助手说明](agent.md#应用设置读取与修改)。主机测试不证明布局或真实模型规划，设备仍需验收深浅主题、宽窄屏、大字体、模式切换、字段编辑/恢复默认、共享范围、确认/取消、返回和保存失败。
 
 ### FSRS 参数优化与学习负担模拟
 
@@ -202,12 +236,14 @@ UI 和 JIDE 共用 `browserToolbarItems`，实际观察发布当前模式、状�
 
 `backend/StatsWidgetPublisher.ets` 统一全库桌面卡片聚合和发布队列：首页仓库、统计页和 FSRS 刷新复用同一入口。调用方负责范围与请求代次校验；单牌组查询不发布，已接受推送按队列完整结束，失败不阻塞后续发布。它不决定哪个来源的数据更新，只保证接受顺序。布局及统计口径仍由现有组件和 Core 决定。回归为 `stats-session`、`stats-entry-runtime`、`home-data-repository` 和 `home-sync-refresh-runtime`。
 
+手机的 2×2「今日复习」卡片复用全库快照及其应用主题色，主题切换由原有的桌面卡片推送刷新。待学习合计新卡与学习中卡片，待复习单列，已完成沿用今日答题计数。旧快照缺少两项待办的拆分时展示占位符，下一次全库统计发布后补齐。卡片仅展示聚合数字，横屏待机显示还需设备支持和华为能力开通；2×4「学习统计」在待机屏保卡片列表中隐藏。
+
 `components/settings/AboutSettings.ets` 接管关于分组的链接、剪贴板、反馈/赞赏弹窗；许可证导航回调仍交设置壳。入口行复用 `SettingsActionRow`，图标统一取自 `SettingsIcons`；继续复用 `AboutActionDialog`、`ThemeTextSpans` 和 `utils/好评引导.ets`，QQ群号富说明保留复制并可换行。`settings-about-runtime` 验证外链降级、好评委托和弹窗释放，`ui-settings-components` 检查公共行与图标覆盖；真实系统弹窗、剪贴板及视觉需设备验收。
 
 
 ## 基础字段编辑与草稿保护
 
-`NoteFieldEditor` 的可视编辑／源码编辑切换按字段自身可用宽度适配：宽字段在输入区右侧竖排，上方可视、下方源码；窄字段在输入区上方横排。`NoteFieldLayout` 在 onMeasureSize 直接读取父布局约束并测量两个按钮、输入栏和可选源码说明，再由 onPlaceChildren 同帧定位；不通过初值为0的宽度状态和布局后的回调切换方向，避免宽屏进入编辑页先闪出顶部按钮。断点与侧栏宽度由 `NOTE_FIELD_EDITING_SUPPORT.modeControlWideMinWidth/modeControlRailWidth` 同时供 UI 和 JIDE 软件结构读取，位置声明为 `right_vertical_on_wide_fields_above_horizontal_on_narrow_fields`，不按机型或设备朝向猜测。新增页、独立编辑页、浏览／学习及 Agent 草稿的所有调用共用这一入口；原生测量只更改同一子节点的约束与位置，不重建输入框、草稿、选区或模式。布局容器独占间距：宽布局输入栏与右侧按钮间8vp，按钮顶底边分别对齐输入栏；窄布局两按钮间8vp、按钮行与输入栏间5vp；源码说明另在输入栏下方5vp，不计入按钮对齐高度。页面安全区和字段卡片内边距仍归原宿主。原生测量与连续窗口变化回归见 `note-field-layout.test.mjs`，编辑状态保护见 `note-rich-editor.test.mjs`。
+字段标题和独立富文本输入共用 `NoteFieldModeButton`。新增、编辑和 JIDE 草稿把 32vp 当前模式按钮放在字段标题行右侧；关联卡片的「显示文本」编辑器将同一个按钮放在输入栏上方右侧，与输入栏相隔 5vp。按钮在可视编辑与源码编辑之间切换，原有转换保护继续识别不能保真显示的 HTML。字段卡片与弹窗仍分别拥有原有内边距。JIDE 从 `NOTE_FIELD_EDITING_SUPPORT.modeControlPlacement` 读取布局，用 `note-field-layout.test.mjs` 检查共用接线，用 `note-rich-editor.test.mjs` 验证模式与草稿状态。
 
 2026-10-20 按用户指定恢复原边缘轮盘，移除未授权的字段下方工具面板与第二行预览顶栏。HelpLabel 的动作改由原生绝对定位容器承载，标题不再被44vp动作控件撑高；`addNoteInterfaceControls` 保留声明中的 iconKey，避免模板动作有热区却无图像。宽屏模拟器实际检查三字段在可视／源码两种模式下的输入容器与上下按钮边界，差值均为0px；窄窗口确认顶部横排，未保存笔记。证据为 `.local/editor-ui-native-result.json`、`editor-ui-wide-final.jpeg`、`editor-ui-narrow.png`。相关179项回归、图标投影30项、文档17项及增量签名HAP通过；这不代表全部硬件、主题、字体和键盘组合均已设备验收。
 
@@ -234,7 +270,7 @@ UI 和 JIDE 共用 `browserToolbarItems`，实际观察发布当前模式、状�
 
 设置类型编辑使用 `NotetypeFieldDraft.ts`：数组位置表示新顺序，ord 保留旧身份，新字段为 null；按旧 ord 保留元数据，禁止把位置当身份。回归入口：`note-editing-basics.test.mjs`、`note-creation-session.test.mjs`、`note-image-media.test.mjs` 和 `native/rsharmony/tests/note_editing.rs`。Core 主机测试验证显式 IO 牌组、c1/c6 建卡与字段重排/删除/新增后的内容和卡片身份。
 
-已有 IO 图形化往返和遮罩兼容范围见 [编辑交接](note-editing-handoff-2026-09-29.md)；未保存草稿预览和重复笔记处理见下文专节。基础编辑不等于 AnkiDroid 全面兼容。
+已有 IO 图形化往返和遮罩兼容范围见 [编辑交接](../archive/development/note-editing-handoff-2026-09-29.md)；未保存草稿预览和重复笔记处理见下文专节。基础编辑不等于 AnkiDroid 全面兼容。
 
 
 笔记编辑不再读取应用简洁模式；新增、浏览和学习编辑共用完整工具与布局。`NoteEditorWheelState` 只携带当前字段能力与编辑状态，`NOTE_FIELD_EDITING_SUPPORT.toolMenu.outerVisibility` 声明 `all_modes`，JIDE 观察发布真实 `cloze_enabled`，不再把应用模式作为工具限制。菜单初次无已选工具，不执行或弹窗；触摸和鼠标只旋转，保留已选格式，停稳不执行。可视编辑中的粗体、斜体、下划线、荧光为独立多选开关；其他工具及源码格式插入只高亮100ms，不保留开启状态。计时器随折叠、隐藏和销毁取消，迟到回调不能覆盖后续点击。共享工具声明记录开关ID、一次性反馈及持续时长，动态观察只把真实格式列为已开启。当前字段 activeIds 是唯一高亮事实来源，ForEach 复用条目不得缓存旧状态，最近一次点击也不得强制高亮已关闭的格式。折叠保留选择，再次展开经专用回调重置后续输入格式、退出原选区，不修改已有 HTML 或模式，不触发清除格式内容动作。菜单展开260ms／收起220ms，手柄复用 DisclosureChevron 随同一进度转向。鼠标两格切一项，大轴值每事件最多半项，触摸增益1.08。浮层沿用键盘避让、可穿透原生 Column 根节点、字段会话生命周期、握姿订阅和手动上下移动／长按切边。首次帮助关闭后只继续已点击动作一次。回归 note-editor-wheel、note-rich-editor 和 JIDE 共同声明；原生显示与多选、折叠／重开效果须设备验收。
@@ -277,6 +313,8 @@ UI 和 JIDE 共用 `browserToolbarItems`，实际观察发布当前模式、状�
 
 字段提供固定“新增音频”入口，独立媒体弹层提供音频选择、替换和录音。AudioViewPicker 返回的 provider URI 经 `backend/NoteAudioImport.ets` 按描述符完整读取、校验实际文件头并复制到应用缓存；不申请公共音频目录读写权限。支持 MP3、M4A、AAC、WAV、OGG、FLAC 容器，单文件上限 64 MiB；实际解码取决于设备。录音在点击时申请 MICROPHONE，以 AAC/单声道/44.1kHz 的 M4A 保存缓存，完成才加入附件，取消和后台中断不生成附件，最长 300 秒。AVRecorder 的 prepare 使用同一 API 的 callback 重载：当前 SDK Promise 重载将解释文字并入 @permission 导致误报，未修改 SDK、关闭检查或扩大警告基线。
 
+「生成朗读」与「导入音频」「录音」同在字段音频弹层。点击后在同一弹层输入、合成、试听和应用。朗读弹层、音频管理和字段附件都用现有三角图标播放，应用用公共确认勾，保留无障碍名称。普通字段用 Core 提取文字预填，含挖空或没有文字的字段从空输入开始；迟到的预填不会覆盖已输入的文字。汉字文本使用系统中文音色，其余文本使用英文音色，英文音色须先下载。修改生成文本后必须重新合成才可应用；确认将 WAV 追加到原字段附件草稿，保存卡片才进入媒体库。取消或后台打断会清理相应未使用文件。JIDE 只观察页面操作及可用状态，不读取输入或音频。语音服务失败时保留输入。中文首选音色失败可回退系统默认音色；英文音色不可用、系统未返回有效音频和缓存写入失败分别提示。API26 平板的仅合成回调可能返回通道值 3，按单声道封装 WAV。实测范围与证据见 [真机验收](device-acceptance.md)。
+
 音频弹层从上到下为整行操作、附件、保存说明。新增/录音及录音完成、暂停/继续、取消复用 `SettingsActionRow`：完整行可点击，标题与录音秒数可换行，行间使用公共轮廓色的1vp分隔线。录音主行尾部显示当前状态：空闲为普通麦克风，录制中为带红色声波的麦克风，暂停后“完成录音”为斜杠麦克风。独立的暂停/继续行分别使用两杠和播放图标，不把暂停图标放到完成入口。暂停后显示继续和已暂停秒数，暂停期间计时停止，继续保留同一录音文件。每个附件独立分组，文件名与播放/停止、替换放在一行，操作复用 `按下态按钮`；长文件名单行省略，原名称与播放目标保留。删除采用右上角公共叉号 `IconActionButton`，44vp 点击区提供完整的本地化无障碍名称，忙碌/录音时禁用并阻止迟到点击。`NoteAudioField` 拥有操作与附件排列，`NoteMediaDialog` 只将音频保存说明放在正文末尾，IO 与原禁用条件保持原责任。
 
 弹层16vp内边距只由 `DialogFrame` 提供，操作行不叠加水平边距；附件左右12vp、上下各8vp，内容按钮44vp，附件常规高度60vp。有删除入口时只在内容右侧额外预留44vp，删除热区距上/右各4vp；公共 `IconActionButton.cornerAligned` 使18vp图标在热区内靠右上并留4vp，因此图标自身距附件上/右各8vp，不占第二行或覆盖播放/替换。其他调用方保持默认居中。附件行和附件间距8vp，说明与音频区之间12vp分别由附件、字段和外壳拥有。弹层宽度为88%、最大560vp，系统安全区与宽窄变化只改变外壳可用范围。图片/视频导入沿用既有 `LabeledActionRow`，白板新增在其下使用独立的说明/新增行。
@@ -318,7 +356,7 @@ JIDE 与图标共用 `NOTE_FIELD_MEDIA_TOOLS` 的名称、图标、两类媒体�
 
 ### 制卡图片书画（2026-10-09）
 
-“图片和视频”管理保留原“新增图片或视频”，在其下增加“新增白板书画”。两行共用 `LabeledActionRow`，左侧以小正文和次要文字色说明导入限制、草稿生效及书画生成图片；右侧按钮文字沿用 `text_primary`，与已有辅助动作的浅色黑字、深色白字一致。白板新增保留笔形图标。图片预览右上角复用 `IconActionButton` 的 `ic_study_edit`，视频不显示书画入口。`NoteDrawingEditor` 在同一窗口切换编辑内容，支持空白画布尺寸、导入底图、手写及可选择、拖动、修改和删除的文字。手写优先复用 `StudyPenCanvasHost` 华为套件；不可用或新画布初始化失败时使用 `StudyWhiteboard`。已有华为笔迹加载失败时保留原图并报错，不用平面缩略图冒充可编辑笔迹。返回先取消书画，回到媒体草稿；编辑器完成只生成新图片，媒体完成才移交字段，保存笔记才导入 Core。
+白板书画弹窗正文达到 680vp 时，左侧显示可滚动的设置区，右侧画布使用剩余空间；窄屏保留上下布局。字段标题的图片和视频图标右侧使用同款白板图标按钮，直接打开空白画布。完成把图片加入字段草稿并返回编辑页，取消直接返回。媒体管理保留“新增图片或视频”入口。图片预览右上角复用 `IconActionButton` 的 `ic_study_edit`，视频不显示书画入口。`NoteDrawingEditor` 在同一窗口切换编辑内容，支持空白画布尺寸、导入底图、手写及可选择、拖动、修改和删除的文字。手写优先复用 `StudyPenCanvasHost` 华为套件；不可用或新画布初始化失败时使用 `StudyWhiteboard`。已有华为笔迹加载失败时保留原图并报错，不用平面缩略图冒充可编辑笔迹。返回先取消书画，回到媒体草稿；编辑器完成只生成新图片，媒体完成才移交字段，保存笔记才导入 Core。
 
 文字颜色选择紧接“书画 / 文字”按钮右侧，原版笔刷使用同一入口，外观复用公共 `SelectStyle`；窄窗由工具 Flex 换行，颜色不再独占整行。华为内部笔刷工具仍归套件。图片按钮有图片时显示“替换图片”，无图片时显示“添加图片”，UI 与 JIDE 共用 `noteDrawingImageActionKey`；替换只更换底图，保留笔迹和文字。点击文字显示按逐行实际字形边界合并的矩形框，拖框移动；左右边中点只拉伸宽度，上下边中点只拉伸高度，均改变宽高比；四角和双指保持当前宽高比缩放。点击空白处取消选择，再次点击可放置新文字。不提供字号选择框。文字对象使用 Tap/Pan/Pinch，不套按钮按压缩放，避免框与 Canvas 文字分离。变换期间只更新预览，结束才提交归一化坐标、源字号与轴向比例；取消、窗口尺寸变化保留源文档。字号保持 8～256，框点不进入 PNG。
 
@@ -465,3 +503,31 @@ NOTE_FIELD_STICKY_CONTROL向UI与JIDE提供名称、两态图标及位置，add_
 NoteFieldEditor 的展开入口打开 NoteFieldExpandedDialog，只承载当前字段；页内输入先卸载并保留112vp占位，其他字段保持原布局。弹窗复用同一字段值、模式、RichEditor/TextArea控制器和更新回调，关闭、遮罩与返回保留实时草稿，不提交整张笔记。输入节点就绪后恢复焦点；离页、禁用或进入后台关闭弹窗并拒绝迟到打开。DialogFrame独占安全区、键盘避让、16vp内边距和12vp标题间隔，正文填满剩余高度，输入框取工具行之外的可用空间；最大宽960vp，窄屏沿用公共弹窗宽度。NoteFieldEditing.expandPresentation与AppInterface的input_expansion_presentation同步向JIDE说明交互，input_expanded仍发布真实状态。回归note-rich-editor覆盖单窗口、共享草稿、关闭保留与迟到打开；真实输入法、富文本切换和键盘避让需设备验收。
 
 浏览搜索栏右侧的主题色多选计数由 `BrowserSelectionAccessory` 展示，直接读取页面拥有的选中 ID 数量，显示完整数字，不在 99 处封顶。徽标保留92vp最小宽度并随位数增长，搜索框消费剩余空间；读屏及 JIDE 的 `selected_count` 同样使用完整计数。回归：`browser-selection-accessory.test.mjs`。
+
+
+## 浏览首屏与切卡读取（2026-11-16）
+
+`BrowserSearchSession` 首次搜索仍取得 Core 完整有序 ID、暂停和标记集合，但只等待前20行（一个并发批次），后续由列表触底每次读取100行。完整结果计数、排序、未加载行的选择和失败分页游标语义不变；保留位置的刷新仍恢复已加载范围。首屏不再预先渲染200行的题目/答案。
+
+既有笔记的编辑表单先挂载字段，关联徽标在1000ms后读取；组件销毁取消未开始的计数，等待集合结束后与完成读取后均校验代次。`NoteLinksService.count` 使用编辑器已有笔记，只读关联图并计数出入边，不再重复取笔记或解析目标标题、卡片ID。完整关联面板继续用 `load` 取得实时目标与迁移校验，保存和草稿退出边界不变；图查询本身仍可能扫描全库，不把延迟计数等同于消除扫描成本。此改动不新增入口或能力，JIDE继续观察原表单的真实计数。
+
+回归入口：`browser-search-pagination`（首屏不请求屏幕外行、后续分页及旧结果隔离）、`browser-desktop`（集合模式恢复）、`note-links-editor`（快速切卡取消、迟到结果隔离）、`note-links`（计数不重读笔记/解析目标，错误可见）。Node与HAP验证不代表实际设备的加载耗时；大集合横屏连续切卡仍须单独计时验收。
+
+
+首轮主机验证（安装前）：`npm test -- browser` 729项通过；关联编辑/服务、架构边界、ArkTS组件字段及文档契约直接测试47项通过；`devecocli build` 增量签名HAP成功，未安装或重启设备。额外 `npm test -- ui` 为620通过、8失败，失败读取的入口均不在本轮加载改动中：`theme-configuration` 的 EntryAbility测试缺少 `startInstallationUsage`、`theme-text` 的玻璃按压颜色、`ui-action-status-layout` 的图标宿主缺少 `densityScale`、`ui-confirmation-layout` 的首页/长文字弹窗结构、`ui-usability` 的设置搜索结果。保留共享工作树中其它任务的实现与测试，不以此声称UI全套通过。
+
+
+后续真机定位：MatePad 11.5S（无线调试）使用既有ceshi/debug身份覆盖安装，4028条结果的首次数据就绪356ms、首张编辑读取57ms，两次后续切卡读取139ms/233ms。此计时由 `[BrowserPerf]` 的search ids、marks ready、list ready、editor ready分段提供，不包含所有原生输入/图片最终完成绘制的时间，不据此宣称端到端耗时。日志只记耗时、行数和就绪状态，不记录搜索文本、字段正文。
+
+`NoteFieldCard.displayParts` 在同一组件内按字段原文与可视/源码模式缓存媒体分段，避免布局中每次 `part` / `firstTextPart` 都重新扫描完整HTML；字段变化或模式切换立即重新解析，不跨笔记共享、不改草稿或原生编辑器生命周期。`note-media-management` 直接行为测试覆盖重复布局读取、正文/附件变更、源码往返与空字段，`npm test -- browser` 更新后730项通过。
+
+
+完整链路核查：用户指出笔记切换至少半秒后，从 `row clicked` 到首个 `input laid out` 实测475–561ms，说明RPC计时不能代表切卡体验。浏览编辑区现在传 `deferInputUntilVisible`，NoteFieldCard 首次入屏前仅保留字段标题和112vp占位，标题工具、输入与媒体预览整组首次可见才创建；出现后保留实例，滚出视口不销毁草稿。快捷键显式激活目标字段，未挂载字段仍使用父层完整fieldValues保存；其他新增/预览宿主默认立即挂载。关联计数延后1秒并随离页取消，避开快速切卡时的全库关联扫描。`note-media-management` 覆盖首次可见、保留、快捷键及销毁后的回调；`BrowserPerf` 的form initializing/form laid out/input laid out用于核对UI创建，不能用editor ready替代。
+
+
+整卡片按需挂载后的同设备玻璃模式三次测量：点击至首个输入布局345ms、273ms、353ms，表单初始化至根布局91–104ms；这批证据对应整卡片延迟挂载与1秒关联读取，尚不含随后外观解析缓存优化。应继续以row clicked/input laid out的同一次请求比较，不将较短的editor ready误报成用户延迟。字段滚入后须补设备验收，并保留未访问字段的原始保存值。
+
+
+2026-11-16设备收尾：最新包已用既有平板测试签名通过install -r，保留集合、媒体及签名身份。可见字段布局后再用下一轮任务创建编辑轮盘，避免自动轮盘先于输入布局；`note-rich-editor` 覆盖延后打开、隐藏与销毁后的迟到任务。最终这批玻璃模式样本点击至首输入布局为370ms、270ms、377ms（只到布局，不是屏幕像素呈现时间）；初次列表数据为510ms。与此前475–561ms相比有改善，但不能称零延迟，更不能用49–170ms的数据读取时间替代完整体验。用户实际观感仍须单独核对。
+
+验证：`npm test -- browser` 732项通过；材质/控件/共享玻璃/架构专项100项通过；外观快照缓存行为用例单独通过；系列基础glass-capture 11项通过，重建HAR及闪卡消费者哈希检查通过。HAP编译和签名成功，仓库构建脚本随后因6类现有SDK能力警告非零退出（设备互联的createMd/digest/update及音频/媒体能力）；不修改基线或声称完整门禁通过。额外UI现存失败沿用前述记录。

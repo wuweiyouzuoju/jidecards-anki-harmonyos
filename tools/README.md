@@ -1,6 +1,6 @@
 # 工具入口
 
-2026-10-07 在线 Core 验证使用 `native/rsharmony/examples/online_sync_check.rs`，凭证仅来自运行进程环境，隔离集合与合成数据清理；默认不下载整个远程媒体库。`audio_ui_fixture.rs` 生成设备用长音频包。命令、实际证据与平台边界见[互通回归](../docs/development/core-interop.md)及[本轮验收](../docs/development/ankidroid-high-priority-2026-10-07.md)。
+2026-10-07 在线 Core 验证使用 `native/rsharmony/examples/online_sync_check.rs`，凭证仅来自运行进程环境，隔离集合与合成数据清理；默认不下载整个远程媒体库。`audio_ui_fixture.rs` 生成设备用长音频包。命令、实际证据与平台边界见[互通回归](../docs/development/core-interop.md)及[本轮验收](../docs/archive/development/ankidroid-high-priority-2026-10-07.md)。
 
 从仓库根执行。默认验证只运行本地测试，不启动真实 Provider 请求或内容发行工具。
 
@@ -18,7 +18,7 @@
 | 仓库门禁 | `npm run verify -- repo` | Node、文档、架构和资源契约；CI 使用此模式 |
 | 原生门禁 | `npm run verify -- native` | 仓库门禁、Rust 主机测试和环境检查，不构建 HAP |
 | Anki / AnkiDroid 核心互通 | `npm run test:interop` | 锁定 Core 主机、生产 Rust ABI 与恢复行为，创建独立样本与报告；[前提与未验证范围](../docs/development/core-interop.md)，不操作设备或账号 |
-| 复杂设置 Core 审查 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/audit-settings-core.mjs` | Node 24、锁定 Rust/Core 依赖；生产编辑/会话/保存逻辑接真实临时集合，输出 `.local/settings-core-audit/report.json`。退出 1 为已复现问题，2 为执行异常，0 为列出范围通过；不替代 HAP、设备或在线同步，[范围与反例](../docs/development/settings-integration-audit-2026-10-11.md) |
+| 复杂设置 Core 审查 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/audit-settings-core.mjs` | Node 24、锁定 Rust/Core 依赖；生产编辑/会话/保存逻辑接真实临时集合，输出 `.local/settings-core-audit/report.json`。退出 1 为已复现问题，2 为执行异常，0 为列出范围通过；不替代 HAP、设备或在线同步，[范围与反例](../docs/archive/development/settings-integration-audit-2026-10-11.md) |
 | 本地代码沙箱 | `powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-agent-sandbox.ps1 -Target all` | 真实引擎测试与双架构 probe；正式构建自动使用 app 目标，[前提与范围](../native/agent-sandbox/README.md) |
 | 沙箱桥接验收 | `powershell -File tools/build-app.ps1 -Test`；`node tools/test-agent-sandbox-app.mjs <connect-key>` | 当前 signed 主包安装后运行测试模块，不访问卡库 |
 | 沙箱第三方许可 | `node tools/generate-agent-sandbox-notices.mjs --check` | 离线校验随包许可；升级后显式 --write 生成并审查 |

@@ -14,7 +14,7 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 | `npm test` | 全部 Node 行为与静态约束测试 | ArkTS 类型检查、Kit/ArkUI 实际行为 |
 | `npm run test:cards:browser` | 真实浏览器中的生产卡片会话、初次/翻面显示上下文等价、模板脚本/配色、状态和公式；CI 独立门禁 | ArkWeb、HAP、设备、任意第三方联网服务；依赖/浏览器前提见[工具入口](../../tools/README.md) |
 | `npm run test:interop` | 锁定 Core 的隔离 APKG/COLPKG、ID/历史/未知配置、取消及进程恢复；生成样本和报告，见[核心互通](core-interop.md) | Android/HarmonyOS 设备、Anki 桌面 GUI、真实在线同步 |
-| `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/audit-settings-core.mjs` | 临时集合中的生产牌组选项/预设、限额、FSRS、过滤牌组和图表偏好；0 为列出范围通过、1 为复现问题、2 为执行异常，见[设置审查](settings-integration-audit-2026-10-11.md) | HAP、ArkUI/设备、在线同步；需要锁定 Rust/Core 依赖 |
+| `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/audit-settings-core.mjs` | 临时集合中的生产牌组选项/预设、限额、FSRS、过滤牌组和图表偏好；0 为列出范围通过、1 为复现问题、2 为执行异常，见[设置审查](../archive/development/settings-integration-audit-2026-10-11.md) | HAP、ArkUI/设备、在线同步；需要锁定 Rust/Core 依赖 |
 | `npm run verify -- repo` | 可移植仓库门禁，CI 使用同一入口 | Rust、HAP、设备 |
 | `npm run doctor` | 本机工具链与版本诊断 | 实际构建、签名可用性 |
 | `npm run verify -- native` | 环境、全部 Node、Rust fmt/clippy 门禁和真实 Core 主机测试 | HAP 与设备 |
@@ -72,6 +72,8 @@ CI 在无本地 `tmp/` 和 `third_party/` 的干净检出上运行。测试临�
 升级前保存旧 schema，审查 `core-protocol.mjs --diff <旧schema> <新schema>` 的接口、字段、类型、默认、optional/oneof/枚举差异，再执行领域旧／新对照、真实 Core 和完整门禁。源指纹与生成检查不代表本次编译过 Core；ArkTS/HAP、远端 CI、设备及在线行为是独立证据。保留原锁定版本及构建入口列出的全部已跟踪 Core 补丁。
 
 ## HAP 警告门禁
+
+Mac 使用 `npm run build:app -- --skip-rust --clean` 执行签名构建与同一门禁。DevEco SDK 26.0.0.105 的设备能力检查会把 `@syscap` 的版本范围误作能力名的一部分。Mac 构建进程加载 `tools/sdk26-syscap-compat.cjs`，仅在版本范围内存在唯一且所有目标设备均声明支持的能力时，按能力名交给原检查器。SDK 文件与警告基线不改动，其他 SDK 版本沿用原检查。2026-11-13 clean 签名构建审计为 accepted=268、unexpected=0。
 
 `build-app.ps1` 保存本次 Hvigor 原始输出到 `.hvigor/last-build.log`，签名检查后调用 `tools/verify-build-warnings.mjs`。诊断按相对文件路径、完整消息和次数核对 `tools/build-warning-baseline.json`；未知格式、新增文件/消息或次数增加均返回非零，报告写入 `.hvigor/build-warning-report.json`。不读取追加的历史日志，也不修改依赖缓存或关闭编译检查。
 
@@ -151,6 +153,8 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 
 ## 设备验收
 
+集中执行与结果入口见[鸿蒙真机验收](device-acceptance.md)。各领域的“仍需真机验证”须映射到具体场景与实际证据；历史未验收记录不直接作为当前缺陷，已通过结论也不扩展到其他包、系统或设备。
+
 仅覆盖安装 `hdc -t <connect-key> install -r <signed-hap>`，然后 force-stop / 启动当前包。禁止 uninstall 清数据。
 本轮改首页任务协调时，检查：启动公告/入门顺序，以及开屏和菜单的直链入口均隐藏；设置手动同步返回首页；忙碌时外部 APKG 排队；前后台与离页后不冒出迟到弹窗。
 实际账户网络同步和用户文件导入需使用适当测试数据；没执行的场景单独报告。构建和安装成功不证明这些交互通过。
@@ -182,3 +186,10 @@ Node 24 测试使用内置 TypeScript 转换，运行时可能输出 `Experiment
 记得闪卡的展示版本采用根AGENTS声明的YY.MM.DD.序号；日期由公共版本管理工具按Asia/Shanghai当前日期+1天生成，尾段常规递增，versionCode独立增加。唯一实现仍为鸿蒙公共tools/version-manager/versions.py；工具的test_versions.py只使用临时工程验证日期合法性、跨日/跨年、序号和原x.y.z兼容，不对真实项目批量加版测试。
 
 `ui-window-mode-lifecycle.test.mjs`执行EntryAbility真实窗口同步队列，验证分屏冷启动、模式变化、最小化跳过、拒绝恢复与窗口销毁隔离；`theme-configuration.test.mjs`覆盖主题与配置事件。分屏实际保持、比例变化与焦点切换必须单独用系统窗口模式和矩形确认，不能只凭manifest支持字段或打开过系统分屏菜单认定通过。
+
+
+## 26.11.21.18 回归修复与构建复核
+
+3158 候选修复桌面置顶按钮的主题文字与公共按压反馈，并将带窗口操作和 AppInterface 的组件移到 `components/home/DesktopWindowTitleBar.ets`，保持 common 不新增业务依赖。既有界面回归按实际责任入口核对：DialogFrame 的子菜单采样等父弹窗准备完成；PopupPanel 的光学绘制层不参与固有尺寸，菜单不叠加对话框底色；普通浅色按钮沿用无边框设计，显式描边按钮和深色按钮保留自定义轮廓；对话框关闭不重复动画，设置内容身份包含模式和语言。修正这些入口迁移后失效的结构断言，保留并执行按压恢复、草稿身份、采样准备及双主题显式边框的实际行为验证。玻璃圆角回归按当前整面透镜场检验对称性及过渡连续性，不沿用旧的内缘零位移假设。
+
+音频会话、播放器和 Wikimedia 下载在调用前检查 SDK 声明的设备能力，平台缺失分别保留播放器回退或明确失败；公告缓存写入的可传播异常由安装注册接收边界捕获并在后续心跳重试。相关测试入口为 `audio-focus.test.mjs`、`native-audio-completion.test.mjs`、`ai-agent-image-download-write.test.mjs`、`official-announcement-flow-contract.test.mjs`。全仓回归使用 `npm run verify -- repo`；Mac 双架构 Release Core 与清理后签名构建使用 `npm run build:app -- --release` 及原生输入已确认后的 `--release --skip-rust --clean`。警告白名单不因本轮修复扩展，设备交互验收与包构建分别记录。

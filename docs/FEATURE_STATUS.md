@@ -4,9 +4,9 @@
 
 AnkiDroid 的源码定位与验证范围见 [对照入口](ANKIDROID_PARITY_AUDIT.md)；功能状态以本页与所链接的当前领域文档为准，历史审计不作为待办清单。
 
-2026-10-07 高优先级改进已接入：卡面单项音频与两个 Core 音频偏好、既有筛选牌组清空/重建及 JIDE 配置提案、导入结果按类别定位笔记。主机包/恢复回归、真实 AnkiWeb 双向集合同步和隔离服务器媒体往返已有结果，模拟器逐项验收见[本轮记录](development/ankidroid-high-priority-2026-10-07.md)。这些证据不代表 AnkiDroid Android 运行时已验收。
+2026-10-07 高优先级改进已接入：卡面单项音频与两个 Core 音频偏好、既有筛选牌组清空/重建及 JIDE 配置提案、导入结果按类别定位笔记。主机包/恢复回归、真实 AnkiWeb 双向集合同步和隔离服务器媒体往返已有结果，模拟器逐项验收见[本轮记录](archive/development/ankidroid-high-priority-2026-10-07.md)。这些证据不代表 AnkiDroid Android 运行时已验收。
 
-2026-10-04 的[Anki Core 接入盘点](development/ankicore-integration-audit-2026-10-04.md)保留当时范围，缺口表与 RPC CSV 不代表当前待办。当前 RPC 调用者由[Core 协议生成清单](development/core-protocol.md)维护，产品状态沿本页及领域文档核对；入口归属见 [UI 分工与接入进度](decisions/2026-10-04-ankicore-ui-routing.md#当前接入进度2026-10-05)。字段编辑配置消费、Core APKG 已存选项和混排 AV 顺序已接通。原 FSRS 面板可评价草稿并读取卡片历史覆盖，JIDE 接参数评价、历史计数、记忆状态诊断及确认后逐日模拟；字体文件导入仍未接通。
+2026-10-04 的[Anki Core 接入盘点](archive/development/ankicore-integration-audit-2026-10-04.md)保留当时范围，缺口表与 RPC CSV 不代表当前待办。当前 RPC 调用者由[Core 协议生成清单](development/core-protocol.md)维护，产品状态沿本页及领域文档核对；入口归属见 [UI 分工与接入进度](decisions/2026-10-04-ankicore-ui-routing.md#当前接入进度2026-10-05)。字段编辑配置消费、Core APKG 已存选项和混排 AV 顺序已接通。原 FSRS 面板可评价草稿并读取卡片历史覆盖，JIDE 接参数评价、历史计数、记忆状态诊断及确认后逐日模拟；字体文件导入仍未接通。
 
 ## 设备直连与键盘帮助
 
@@ -15,7 +15,7 @@ AnkiDroid 的源码定位与验证范围见 [对照入口](ANKIDROID_PARITY_AUDI
 
 ## 浏览增强与鸿蒙 PC 操作
 
-- 右上角更多菜单最下方的“传统模式”已接入：手机等宽多列、点标题换列、长按管理列和顺序、点击行直接编辑；两种外观及 Cards/Notes 各自保存列配置。固定 AnkiDroid 提交的源码对照、原生外观差异与设备待验范围见[本轮记录](development/browser-traditional-mode-2026-10-26.md)。
+- 右上角更多菜单最下方的“传统模式”已接入：手机等宽多列、点标题换列、长按管理列和顺序、点击行直接编辑；两种外观及 Cards/Notes 各自保存列配置。固定 AnkiDroid 提交的源码对照、原生外观差异与设备待验范围见[本轮记录](archive/development/browser-traditional-mode-2026-10-26.md)。
 
 - 已有普通界面入口：完整搜索结果全选、清空及 Shift 区间选择，Cards/Notes 各自显示列与排序/副标题偏好、最近搜索、忽略重音、所选预览与导出、立即评分，以及宽屏并排编辑。它们不依赖解锁 JIDE；JIDE 偏好提案复用同一保存入口。
 - 当前行为、责任与验证统一见[浏览列表](development/browser-stats.md#浏览列表)。源码入口为 `BrowserSearchSession`、`BrowserPreferences` / `BrowserPreferencesStore`、`BrowserKeyboard` 与 `BrowserEditorPane`；信息/预览先解析代表卡片，搜索与分页恢复集合模式和激活列，整批读取失败不消耗游标。

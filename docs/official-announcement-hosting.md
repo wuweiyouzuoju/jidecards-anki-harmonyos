@@ -1,11 +1,10 @@
-# 官方公告直链发布指南
+# 官方公告发布与收件
 
-> 现行运维文档。公告 Schema 以 `entry/src/main/ets/model/官方公告模型.ts` 为准，
-> 当前发布内容以 `hosting/announcement.json` 为准。
+ECS 管理控制台用于发布公告或向单个用户发送消息。当前鸿蒙和 iOS 通过正常上报心跳接收，两端都先保存再展示。主页只决定展示时机，学习时可延后弹窗。送达和已读随下一批心跳回传。默认前台间隔 10 秒，没有系统推送。旧 App 可继续查询 `/v1/announcements/query`。筛选、停用和回执字段见 [服务端说明](../server/installation-registration/README.md)。
 
-## 当前状态
+## 历史直链及兼容测试
 
-123 云盘远程公告暂不投入使用。客户端唯一开关为 `entry/src/main/ets/model/官方公告配置.ts` 的 `OFFICIAL_ANNOUNCEMENTS_ENABLED = false`；首页不发起公告检查、不安排检查定时器、不展示待展示公告，网络服务也在创建 HTTP 客户端之前返回。保留地址、解析和已读 ID 记录，后续启用时无需清理用户偏好。本地入门独立运行；幻彩赠送提醒已在 3.0.20 移除。以下接入、发布及送达说明仅在该开关启用后适用。
+以下 123 云盘内容用于说明历史静态清单和自定义 URL 测试。生产 App 使用 ECS 心跳。静态清单的解析由 `entry/src/main/ets/model/官方公告模型.ts` 维护。
 
 应用通过 123 云盘为 `announcement.json` 实际生成的公开 HTTPS 长链读取公告。不得根据 UID、目录名或 CDN 主域名自行拼接地址，客户端不得包含 Client ID、Client Secret、Token 或上传凭据。
 

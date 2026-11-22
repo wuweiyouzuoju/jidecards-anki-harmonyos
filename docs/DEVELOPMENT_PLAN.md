@@ -19,10 +19,10 @@
 
 | 项目 | 当前值 | 事实来源 |
 | --- | --- | --- |
-| 应用版本 | 26.11.09.9 / versionCode 3149 |
+| 应用版本 | 26.11.22.19 / versionCode 3159 |
 | 最低兼容 SDK | HarmonyOS 6.0.1（API 21） | `build-profile.json5` 的 `compatibleSdkVersion` |
-| 目标 SDK | HarmonyOS 6.1.0（API 23） | `build-profile.json5` 的 `targetSdkVersion` |
-| 编译 SDK | DevEco Studio 当前配套 6.1.0.105（API 23） | 本机 SDK 与 `UPSTREAM.lock` |
+| 目标 SDK | HarmonyOS 26.0.0（API 26） | `build-profile.json5` 的 `targetSdkVersion` |
+| 编译 SDK | DevEco Studio 当前配套 26.0.0.105（API 26） | 本机 SDK 与 `UPSTREAM.lock` |
 | Anki Core | 26.05，提交 `e64c6b1` | `UPSTREAM.lock` |
 | Rust | 1.92.0 | `rust-toolchain.toml` |
 | 原生目标 | ARM64 真机、x86_64 模拟器 | `rust-toolchain.toml` 与构建脚本 |
@@ -112,3 +112,7 @@ Core”或“兼容常用 Anki 数据与学习流程”，不要使用未经差�
 - 应用内 Agent 当前行为以 [Agent 领域说明](development/agent.md) 和发布开关源码为准；[agent-2-design.md](agent-2-design.md) 保留稳定设计概览。编程 Agent 规则以根 `AGENTS.md` 和 [coding-agent.md](development/coding-agent.md) 为准。
 - `docs/superpowers/` 下的文件全部是历史设计/执行记录，不是当前路线图。
 - 完成一次实现后，不在历史计划里伪造勾选状态；应更新本文、架构文档或发布记录。
+
+### 多设备应用接续
+
+已接入 HarmonyOS 系统应用接续生命周期和首页/普通学习状态恢复，协议、条件与验证入口见[学习与媒体](development/study-media.md#harmonyos-多设备应用接续)。两端需先同步卡库与复习记录；不传输或覆盖集合。真实双机接续尚待设备验收，模拟器不支持。

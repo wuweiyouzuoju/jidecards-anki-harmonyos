@@ -2,14 +2,16 @@
 
 [返回任务索引](../../PROJECT_CONTEXT.md)
 
-2026-10-07：既有筛选牌组的详情与列表菜单提供“清空筛选牌组”“重建筛选牌组”。`FilteredDeckCommands` 独占校验、串行写入、自动同步占用与集合刷新，`backend/FilteredDeckService.ets` 只适配真实 Core。维护动作保留笔记与原牌组关联；重建显示 Core 实际计数。共享 `deckRowMenuItems` 排除筛选牌组不适用的普通预设选项，UI/JIDE 观察采用同一动作声明和真实 busy/filtered 值。复杂配置经 JIDE 提案，不增加配置工作台。手动创建表单使用公共 `DialogHeader`、`FormSelectRow` 和 `SettingsToggleRow`；排序选项来自与 JIDE 共用的 `FilteredDeckOptions`，按当前语言读取。直接行为与真实 Core 撤销测试、模拟器6→0→6记录见[本轮验收](ankidroid-high-priority-2026-10-07.md)。
+首页列表、搜索和上次牌组恢复共用 `HiddenDecks.isHomeDeckHidden`。隐藏父牌组时保留子牌组的展开偏好，但整棵子树退出列表与搜索，详情若指向被隐藏的后代也清除。宽屏首次加载优先恢复上次选中的牌组；当前选择无效且无法恢复时，选择可见的默认牌组，否则选择列表第一项。窄屏不自动选择，回退不改写记忆和展开偏好。公告开关同时约束启动检查、待展示公告和 JIDE 观察值。读取公告途中收到暂停配置时，启动引导可继续，待展示公告保留至重新启用。首页回归包含预览取消、牌组学习历史及导航首帧准备失败的回退。
+
+2026-10-07：既有筛选牌组的详情与列表菜单提供“清空筛选牌组”“重建筛选牌组”。`FilteredDeckCommands` 独占校验、串行写入、自动同步占用与集合刷新，`backend/FilteredDeckService.ets` 只适配真实 Core。维护动作保留笔记与原牌组关联；重建显示 Core 实际计数。共享 `deckRowMenuItems` 排除筛选牌组不适用的普通预设选项，UI/JIDE 观察采用同一动作声明和真实 busy/filtered 值。复杂配置经 JIDE 提案，不增加配置工作台。手动创建表单使用公共 `DialogHeader`、`FormSelectRow` 和 `SettingsToggleRow`；排序选项来自与 JIDE 共用的 `FilteredDeckOptions`，按当前语言读取。直接行为与真实 Core 撤销测试、模拟器6→0→6记录见[本轮验收](../archive/development/ankidroid-high-priority-2026-10-07.md)。
 
 - 代码路径以下均相对 `entry/src/main/ets/`。
 - 责任链：首页映射 UI → HomeWorkCoordinator / HomeStartupSequence / HomeSyncPolicy 决策 → HomeDataRepository / 既有 Service。
 - 首页新建牌组菜单不再提供 AI 制卡/改卡。统计卡旁的独立 JIDE 图标通过 `onAgent` → `openAgent` 打开空白对话入口，配置预检和开发者开关保持在既有责任入口；按需目标选择、改卡搜索与确认见[应用内 Agent](agent.md#统一-ai-对话入口)。
 - 平板等直接展示的牌组详情将制卡、JIDE、预览放在滚动卡片外、上方的同一行纯图标操作，制卡贴左上角、预览与更多位于右侧且更多贴右上角，默认隐藏的 JIDE 在启用后紧邻左侧制卡按钮，按钮显隐不改变两端位置；常规按钮为44vp正方形且无额外外缘留白；右侧动作行从与左侧相同的 GridRow 上沿开始，高度复用左栏实测的 HomeHeaderLayout.actionsHeight，窄分栏同步收缩；动作行到卡片只贡献一次公共内容间距，因此两栏卡片上沿对齐。排序时左栏使用叉号退出与文字完成的独立工具栏，右侧动作行同时收起，两边卡片仅保留相同的内容顶部间距；JIDE 从真实详情观察值 header_actions_position 区分 above_card、hidden、toolbar_right。下方牌组名称独占整行并自然换行；手机详情将制卡、JIDE、预览三个图标直接排在顶栏右上角，左侧保留返回；共用主页 `IconActionButton.toolbarStyle`，JIDE 仍按原入口开关显隐。点击预览后显示 `DeckPreviewScopeMenu` 的四种范围，内容直接复用 `ActionMenuList` 的左对齐文字、行高、分隔线与按压反馈。`HomeDeckDetails` 为手机和宽屏持有唯一的无尖角 `AnchoredMenu`；手机点击预览图标后直接在工具栏下方展开范围，手机与宽屏菜单右缘均对齐详情栏内容边界，展开动画仍从预览按钮发起。工具栏通过 `onAreaChange` 发布窗口坐标与实际宽度，宿主仅转换一次本地坐标，避免右侧分栏重复叠加横向偏移；菜单宽度不超过实测内容宽度。预览范围显示时退出被遮住的 `deck_actions` 观察；选择范围或退出时关闭菜单。系统返回先关闭菜单，再退出详情。取卡读取独立集合快照，范围与数据边界见 [只读预览](study-media.md#卡片只读预览)。入口名称为 JIDE，仍进入标题为“JIDE 制卡”的页面。`HomeDeckDetails.onCreateWithAI` 转发到首页既有 `打开AI制卡`，使用当前牌组参数并保留同步等待、配置预检和开发者入口开关；验证见 `ui-shell-deck-actions.test.mjs`、`deck-preview-session.test.mjs`，长标签与长名称的设备观感单独验收。
 - 快速反馈：`npm test -- home`；完整验收见 [验证说明](verification.md)。
-- 牌组行长按与鼠标右键共用 `onMenu` → `onItemMenu` → 首页 `openDeckMenu`，传稳定牌组 ID；右键另传窗口 vp 坐标。根层 `HomeDeckRowMenu` 的长按展示复用真实 `牌组列表项` 作为浮起预览，原行保留布局但隐藏；下方复用 `AnchoredMenu` 与公共玻璃，不再显示重复牌组标题或顶部关闭按钮，外部点击与系统返回关闭；右键复用公共 `CardActionMenu` 在指针处显示同一份动作目录。宿主实测自身原点，只在此把窗口坐标转换一次，边缘避让与限高交给公共菜单。原列表行提供稳定节点ID，由首页打开菜单时测量窗口锚点；菜单按可用窗口抬起预览并限高滚动。动作使用公共左对齐菜单行；色调改为原生二级SelectionDialog并复用SelectionOptions，五色/无色条与持久枚举来自 `DeckTone.ts`。Esc/系统返回或二级遮罩/关闭只退出颜色窗口，返回父菜单；父菜单遮罩/系统返回退出整个菜单，忙碌与销毁守卫一致。UI/JIDE 共用 `deck_row_menu` / `deck_tones`、真实显隐、目标、忙碌与色调；`presentation` 区分 `lifted_deck_context_menu` / `pointer_context_menu`，`tone_presentation=secondary_dialog`明确颜色是独立窗口，`triggers=long_press,right_click`，关闭移除观察。首页把菜单计入公告/自动同步占用，目标删除后清理菜单。
+- 牌组行长按与鼠标右键共用 `onMenu` → `onItemMenu` → 首页 `openDeckMenu`，传稳定牌组 ID；右键另传窗口 vp 坐标。根层 `HomeDeckRowMenu` 的长按展示复用真实 `牌组列表项` 作为浮起预览，原行保留布局但隐藏；下方复用 `AnchoredMenu` 与公共玻璃，不再显示重复牌组标题或顶部关闭按钮，外部点击与系统返回关闭；右键复用公共 `CardActionMenu` 在指针处显示同一份动作目录。宿主实测自身原点，只在此把窗口坐标转换一次，边缘避让与限高交给公共菜单。原列表行提供稳定节点ID，由首页打开菜单时测量窗口锚点；菜单按可用窗口抬起预览并限高滚动。动作使用公共左对齐菜单行；色调使用同窗口二级 AnchoredMenu 并复用 SelectionOptions，与父菜单共享正文玻璃采样，五色/无色条与持久枚举来自 `DeckTone.ts`。Esc/系统返回或二级遮罩/关闭只退出色条子菜单，返回父菜单；父菜单遮罩/系统返回退出整个菜单，忙碌与销毁守卫一致。UI/JIDE 共用 `deck_row_menu` / `deck_tones`、真实显隐、目标、忙碌与色调；`presentation` 区分 `lifted_deck_context_menu` / `pointer_context_menu`，`tone_presentation=submenu`明确颜色是同窗口子菜单，`triggers=long_press,right_click`，关闭移除观察。首页把菜单计入公告/自动同步占用，目标删除后清理菜单。
 - 长按/右键打开菜单同步首页 `选中的牌组ID`，关闭后保留内部选择；窄屏（`xs`，无常驻详情）列表只以 `deckMenuId` 绘制色框，菜单关闭后自动隐藏色框，不清空业务目标。宽屏继续以内部选择绘制色框，与常驻详情一致。JIDE 的 `home.selectedId` 保留真实选择，`deck_list_highlighted_id` 单独发布当前可见色框目标。不调用普通点击的 `选择牌组`，避免手机详情覆盖菜单。排序模式或失效目标不改变选择。统计、浏览、添加卡片、新建子牌组、牌组选项与导出均携带冻结的目标 ID，同步等待后重验目标，不读取后来改变的选择。新建子牌组与牌组选项只接受普通牌组；首页 D 新建顶层牌组时清除上一次父牌组。添加/选项/导出沿原页面和数据迁移入口，不另造业务流程。浏览查询使用 Core 全名及子牌组范围，别名只显示；`DeckScope.ts` 转义引号、反斜杠及通配符。统计在 await 前初始化目标，缺失不扩大到全库。回归：`home-deck-menu.test.mjs`、`deck-tone-selection.test.mjs`、`stats-entry-runtime.test.mjs`；设备外观和实际鼠标事件仍需单独验收。
 - 首页常驻同步按钮由 `HomeSummaryHeader` 展示，空闲账号/Core 状态由 `HomeSyncStatusController` 读取；未登录或需要全量同步显示感叹号，普通待同步显示圆点，实际任务进度/冲突优先。已配对设备时先选择云同步或直连，选择直连后进入并展开对应设置区，见[同步入口与界面](sync-data.md#同步入口与界面2026-10-20)。云登录、同步和方向确认沿用原入口，JIDE 读取相同实时标记与名称；责任、竞态和验证见[同步按钮状态](sync-data.md#同步任务与页面可用性)。
 - JIDE 的 `open_deck_details` / `open_deck_options` 复用首页选择和原选项功能；详情宽窄布局、选择记忆与表单手动保存沿用原责任链。清栈动作保护下层新增/编辑输入，已有选项表单或首页尚无目标快照时拒绝切换；共同规则、动态认知与回归见[自动页面操作](agent.md#自动页面操作)。
@@ -19,6 +21,12 @@
 首页“更多”和“新建牌组”的窗口锚点由 `HomeSummaryHeader` 发布；首页菜单宿主 Stack 通过 `homeMenuHostChanged` 测量自身原点，`homeMenuAnchor` 在该边界减去宿主 X/Y，再把局部坐标传入 `AnchoredMenu`。桌面标题栏、导航容器偏移不能再计入菜单内部 margin；原点移动时收起旧菜单。右侧预览沿用 `HomeDeckDetails.menuAnchor` 的相同边界换算。按钮到菜单的最终间距仍由 `页面内容顶部间距` 贡献一次，安全区由公共菜单裁定。`home-header-layout.test.mjs` 执行真实锚点发布、首页转换和两个菜单传参，覆盖原点为零、标题栏/导航偏移、普通/紧凑密度及有/无安全区；JIDE 共用的菜单声明和 `anchored_no_arrow` 位置语义仍适用。Node 回归不能替代设备外观验收。
 
 2026-10-06 本项验证：新回归在旧菜单传参下捕捉到标题栏导致的 36vp 重复偏移；修正后首页几何、菜单装配、详情动作、JIDE 共同声明/观察、ArkTS 字段和文档共 104 项定向检查通过。`npm run build:app -- -SkipRust -ArtifactDirectory D:\Projects\jidecards-home-menu-fix-2026-10-06` 增量签名 HAP 通过，新增警告为 0。未安装设备，桌面/平板最终外观尚未设备验收。
+
+## 鸿蒙电脑窗口置顶
+
+PC 和二合一设备在自由窗口与普通最大化模式下显示置顶别针。主窗口隐藏系统标题栏的图标和名称区域，按 `getTitleButtonRect()` 避让系统三键，在同一行绘制应用标识、可拖动区域和别针。窗口三键仍由系统负责。别针通过 `Window.setWindowTopmost` 切换整个主窗口层级，关闭时显示空心别针，开启时显示实心别针，系统成功后同步无障碍状态及 `desktop_window_title_bar.window_pin`。关闭窗口重置状态。参见[华为自由窗口适配指南](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/application-adaptation-freeform-window/)。
+
+HarmonyOS 6.1.0（API 23）二合一模拟器验证：别针在最大化键左侧并与三键同一行。系统设置取得焦点后，已置顶的闪卡窗口仍在其上方。取消置顶后，系统设置窗口可盖住闪卡。验证了最大化、还原、最小化、关闭、拖动标题栏和双击最大化。
 
 ## 牌组上下文操作与 AnkiDroid 的对齐范围（2026-10-15）
 
@@ -51,6 +59,8 @@
 
 ## 牌组样式与顶级分栏
 
+鸿蒙电脑的首页内容区按窗口宽度铺开。未保存牌组样式时默认双列宽，外观可选三列宽，原有选择照常恢复。双列与三列共用顶级子树分组与原排序规则。首页摘要区能放下两个各 240vp 的卡片及间距时并排显示两个独立轮播，初始页分别为今日进度和记忆率。两个位置分别保存，切页、缩窗和重启后各自恢复。
+
 外观中的四种牌组样式由 `DeckListAppearance` / `DeckListAppearanceStore` 定义与持久化，详情见[牌组布局](appearance.md)。双列以整棵顶级子树为一个 FlowItem，通过 WaterFlow 按当前较短列接续，顶级牌组及全部已展开子牌组在同一列；`HomeDeckGroupSource` 仅派生展示快照，原牌组数据源继续拥有顺序与展开结果。拖动排序临时恢复单列，退出后恢复所选样式，避免把分组索引交给原单牌组排序回调。列表行、计数显隐与两行名称通过唯一 `deckItem` Builder 接线；单/双列同密度、同字体缩放下等高，所有牌组名称最多两行，窄版仅在名称需要两行且有描述时缩小字号。
 
 首页向 JIDE 发布实际 `deck_list_style`、`deck_list_grouping=top_level_subtree`、`deck_list_placement=shortest_column`（单列为 source_order）、当前列数和计数显隐；读取/确认修改共用设置入口。单列宽溢出建议单列窄，单列窄溢出建议双列窄，两级共用 TextActionDialog 的纵向完整文字动作，但分别记录回复。回归入口：`deck-width-layout.test.mjs`、`home-deck-width-layout-suggestion.test.mjs`；设备需验收完整顶级分栏、跨多层展开、长名称、排序切换及两级提示。
@@ -75,7 +85,7 @@
 
 2026-10-06 拖动回归修复：历史版本中菜单长按从排序时禁用改为 `parallelGesture` 后，子行仍参与长按竞争；已改为 `DeckRowMenuGesture` 动态清除排序模式的菜单识别器，同时修正单列模式切换时的 `onMove` 注册。定向排序、布局、首页装配、公共控件、ArkTS 和架构回归通过；增量签名 HAP 构建通过，警告门禁 unexpected=0。手机模拟器实际验证子牌组移动、保存和重新进入；另一台宽屏模拟器 `127.0.0.1:5557` 独立验证顶级牌组连续双向拖动、退出、重启后顺序保留、再次进入排序和普通选牌，保留 UI 布局证据，避免与使用第一台模拟器的编辑器检查互相干扰。最终包及记录位于 `D:\Projects\jidecards-reorder-fix-2026-10-06\final\`。平板当前为 release/app_gallery，覆盖安装被拒为 `9568322`（应用来源不受信任），安装后身份保持不变，不能称为真机已更新或验收通过。
 
-首页首行由 [HomeSummaryHeader](../../entry/src/main/ets/components/home/HomeSummaryHeader.ets) 组合卡片上方的一排纯图标动作和下方占满可用宽度的统计分页。更多独居左上角，JIDE、搜索、浏览、同步、＋新建依次向右上角对齐，最右端为新建；中间以伸缩留白分开左右两组，手机和平板详情分栏共用同一排列。六个入口共用 IconActionButton 的表面、圆角、主题色、尺寸与按压反馈，无可见文字，保留本地化无障碍名称。HomeHeaderLayout 根据实测宽度计算右侧五个按钮的四处间距、组宽及与更多之间的留白。按钮复用公共返回、更多的44vp正方形占位、图标最大18vp，宽窗口增加中间留白而不拉宽按钮；窄窗口共同收缩间距、按钮和图标，始终单排。顶部按钮和两处公共菜单弹窗直接复用统计卡的18vp卡片圆角；其他圆形 IconActionButton 保留原半径规则。统计卡保留168vp高度和八页共用的圆点留白、24vp标题区、居中正文及柱图基线，正文小于260vp时使用紧凑排版。关闭统计时动作行保持原位置和尺寸；排序模式隐藏动作行。同步与浏览直接从首页进入，同步状态与详情入口在同步按钮上。
+首页首行由 [HomeSummaryHeader](../../entry/src/main/ets/components/home/HomeSummaryHeader.ets) 组合卡片上方的一排纯图标动作和下方占满可用宽度的统计分页。更多独居左上角，JIDE、搜索、浏览、同步、＋新建依次向右上角对齐，最右端为新建；中间以伸缩留白分开左右两组，手机和平板详情分栏共用同一排列。六个入口共用 IconActionButton 的表面、圆角、主题色、尺寸与按压反馈，无可见文字，保留本地化无障碍名称。HomeHeaderLayout 根据实测宽度计算右侧五个按钮的四处间距、组宽及与更多之间的留白。按钮复用公共返回、更多的44vp正方形占位、图标最大18vp，宽窗口增加中间留白而不拉宽按钮；窄窗口共同收缩间距、按钮和图标，始终单排。顶部按钮和两处公共菜单弹窗直接复用统计卡的18vp卡片圆角；其他圆形 IconActionButton 保留原半径规则。统计卡以168vp为基础高度，随系统字号增加。横屏紧凑档同步收紧卡片高度、上下留白和计数行间距，为两排指标保留完整的标签行。八页共用的圆点留白、标题区、居中正文及柱图基线，正文小于260vp时使用紧凑排版。关闭统计时动作行保持原位置和尺寸；排序模式隐藏动作行。同步与浏览直接从首页进入，同步状态与详情入口在同步按钮上。
 
 首页安全区域由 EntryAbility 读取 TYPE_SYSTEM、TYPE_CUTOUT、TYPE_NAVIGATION_INDICATOR，取矩形实际边缘并集并转为 vp；监听规避区和窗口大小变化。首页与返回、更多顶栏共用应用尺寸.pageToolbarTop 的顶部基准和12vp水平外缘，按钮下方到统计卡共用页面内容顶部间距（常规12vp、紧凑8vp）。所有页面顶栏与其菜单锚点读取相同的真实安全上缘：普通系统栏保留原光学校准，摄像头挖孔超过系统栏时从安全边缘加分组间距起算，横屏同时避让侧边挖孔。HomeSummaryHeader 发布按钮行下方的实测窗口上缘、左缘和内容宽度；首页根层用公共 AnchoredMenu 分别向左/右对齐更多和新建菜单，无尖角。菜单宽度不超过列表面板可用宽度，横向只贡献一次安全区与页面间距。公共组件独占表面、全窗口外部点击关闭层及按安全高度限制的 Scroll，菜单正文只渲染 ActionMenuList，不嵌套滚动。原有其他宿主保留公共默认圆角和居中限宽方式。DialogFrame 将搜索和表单弹窗居中于实际安全矩形，并按安全高度限制正文滚动；遮罩保留覆盖整个窗口。几何回归覆盖无安全区、非零起点挖孔、窄/宽窗口与小高度；按用户要求本次不读取模拟器画面，设备外观由用户直接查看。
 
@@ -85,7 +95,7 @@ HomeSummaryHeader 不再区分手机双侧与详情分栏外缘布局，也不�
 
 2026-10-06 首页按钮占位与公共返回/更多统一：相关布局、界面认知、边界和白板回归通过；现有 ceshi 配置的增量签名构建成功，警告门禁 unexpected=0。已在 `7JDUN26418G04789` 通过 `install -r` 覆盖安装并重启，安装前后均为 debug / none，appIdentifier 保持 `6917611264192499746`，未卸载或清数据。产物与构建记录保存在 `.local/home-toolbar-unified-ceshi-2026-10-06/`，安装、包信息和启动日志为 `.local/home-toolbar-unified-tablet-*.log`。本次未读取设备画面，实际外观由用户直接验收。
 
-[HomeDeckSearchDialog](../../entry/src/main/ets/components/home/HomeDeckSearchDialog.ets) 复用 DialogFrame/DialogHeader：固定输入框、清除、可滚动结果、关闭及加载/失败重试。输入名称、完整路径或本机别名即时筛选全量牌组，折叠子牌组可检索，隐藏子树排除；选择时重查当前候选并调用原选择入口（会展开祖先路径）。搜索过程不更改首页列表折叠或集合数据。AppInterface 共同声明六个动作和 home_search，首页发布卡片上方、单排、统计显隐与完整控制状态，不再发布主页握姿能力；搜索发布当前查询、候选总数和加载状态。回归：home-header-layout、ui-shell-contract、ai-agent-entry-contract、sync-automatic；Node 与 HAP 不证明真机触摸、字体或最终布局已经验收。
+[HomeDeckSearchDialog](../../entry/src/main/ets/components/home/HomeDeckSearchDialog.ets) 复用 DialogFrame/DialogHeader：固定输入框、清除、可滚动结果、关闭及加载/失败重试。搜索弹窗的外壳和输入框均跟随当前材质。输入名称、完整路径或本机别名即时筛选全量牌组，折叠子牌组可检索，隐藏子树排除；选择时重查当前候选并调用原选择入口（会展开祖先路径）。搜索过程不更改首页列表折叠或集合数据。AppInterface 共同声明六个动作和 home_search，首页发布卡片上方、单排、统计显隐与完整控制状态，不再发布主页握姿能力；搜索发布当前查询、候选总数和加载状态。回归：home-header-layout、ui-shell-contract、ai-agent-entry-contract、sync-automatic；Node 与 HAP 不证明真机触摸、字体或最终布局已经验收。
 
 首页保留 NavPathStack、选择/快照、刷新与跨功能占用协调。`pages/navigation/HomeDestinations.ets` 只渲染目的地并映射路由参数，导航时机和返回刷新仍由首页负责；`utils/HomeNavigationTransition.ets` 拥有转场代次、淡入与背景冻结顺序，通过宿主回调更新首页透明度。新增页面或调整转场请进入对应模块。
 
@@ -111,7 +121,7 @@ HomeSummaryHeader 不再区分手机双侧与详情分栏外缘布局，也不�
 
 牌组详情页“更多”中的入口、设置面板标题与相关帮助统一称“牌组设置”（英文 `Deck settings`）。UI 和 JIDE 的界面目录共同读取 `deck_options_title`，资源键、内部类型及工具 ID 保留原名；改名同时维护本地化说明和 JIDE 的领域描述。父牌组选择列表的“父牌组选项”表示候选列表，不属于这个设置入口。
 
-123 云盘远程公告暂不启用，唯一开关在 `model/官方公告配置.ts`，首页检查、调度、展示和 `backend/官方公告服务.ets` 网络边界共用 `OFFICIAL_ANNOUNCEMENTS_ENABLED`。关闭时跳过远程流程，不创建 HTTP 请求或公告定时器，也不消费已读 ID；本地启动引导和幻彩提醒继续。首页向 `AppInterface` 发布 `official_announcements_enabled`，JIDE 通过 `get_app_structure` 读取实际停用状态。暂停状态的直接回归见 `page-operation-boundaries`、`official-announcement-flow-contract`，JIDE 读取回归在 `ai-agent-app-structure`，恢复启用后的协调流程仍由原行为测试覆盖。
+ECS 公告已启用，入口为 `model/官方公告配置.ts` 的 `/v1/announcements/query`。`官方公告服务` 复用安装识别码与上传凭证，按版本查询适用公告并携带本机已读 ID；确认后立即尝试回执，失败在下次查询补传。首页检查、调度、展示和网络边界共用 `OFFICIAL_ANNOUNCEMENTS_ENABLED`，JIDE 经 `AppInterface` 的 `official_announcements_enabled` 读取真实状态。已有弹窗、空闲展示、十分钟检查窗口和本机已读存储保持同一责任入口。后台发布和受众筛选由 `server/installation-registration/announcements.py` 拥有。
 
 首页 `homeActivity()` 只映射占用；`HomeWorkCoordinator` 拥有合并唤醒、外部导入串行消费与任务优先级（外部文件 → 待执行导航 → 手动同步 → 公告 → 引导），每次效果后重查占用。新增集合任务/弹层在映射处登记，释放时触发 `homeActivityChanged`；State 用 Watch，普通字段收尾显式唤醒。`HomeStartupSequence` 拥有入门与云端牌组引导的待展示和读取中状态；销毁禁止迟到展示，已接受导入仍完成并释放队列。公告网络结果经 `HomeAnnouncementController` 暂存，首页安全空闲时再展示，导航/后台不丢待展示项。`CloudDeckFeature` 拥有目录、选择、进度、重试、配额落盘和退出确认；`CloudDeckImportController` 编排串行下载/导入。首页只持有显示目标、忙碌及配额摘要，接收刷新与关闭通知，配额写入完成才释放忙碌。
 
@@ -126,7 +136,7 @@ HomeSummaryHeader 不再区分手机双侧与详情分栏外缘布局，也不�
 
 首次启动顺序为公告（如启用）→ 首页入门 → 云端牌组下载（符合资格且尚未完成时）。首页入门确认落盘并关闭后，`HomeStartupSequence` 在首页空闲时才检查云端引导。两个完成记录独立，重启从尚未完成的阶段继续。`home-work-coordinator` 和 `page-operation-boundaries` 覆盖顺序、落盘及占用恢复。
 
-宽版牌组溢出建议由 `主页牌组列表.onOverflowChange` 报告实际视口是否容得下可见行，经 `HomeWorkCoordinator.presentLayoutSuggestion` 在空闲首页展示；排在现有启动提示之后。确认直接复用宽窄偏好保存入口，处理记录持久化避免反复打扰，见[界面文档](appearance.md)。列表只负责几何事实，不持有弹窗或写设置。
+宽版牌组溢出建议由 `主页牌组列表.onOverflowChange` 报告实际视口是否容得下可见行，经 `HomeWorkCoordinator.presentLayoutSuggestion` 在空闲首页展示；排在现有启动提示之后。确认直接复用宽窄偏好保存入口，处理记录持久化避免反复打扰，见[界面文档](appearance.md)。列表只负责几何事实，不持有弹窗或写设置。 布局建议弹窗显式取样首页正文。普通页面采样源登记排除弹窗，弹窗仍独立预热供自己的小菜单使用，避免创建表单退出时下一弹窗等待已销毁的纹理。
 
 `HomeIntroPanel` 在公告处理后进入启动弹层序列。只有系统安装时间与更新时间相同且 `home_intro_completed_v1` 未完成时自动展示；安装信息无法读取时跳过。覆盖升级用户无论是否有历史完成标记，都不会直接看到引导。
 
@@ -274,6 +284,8 @@ EntryAbility 的冷/热启动都通过 `ExternalDeckOpen` 校验原始文件 URI
 
 HomeDeckDetails只转交shortcut ID并关闭预览菜单，首页重新校验当前牌组、经过既有同步占用延后入口。自定义学习initialPreset在首次挂载校验，加载Core可用数及标签后，读取该预设的本机记忆值；未保存过时统一使用20，不采用Core的extendNew/extendReview建议值作为输入。详情ForEach身份包含Core名称、描述和筛选类型，避免真实改名后旧标题留存。
 
+详情玻璃卡的滚动视口两侧延伸至详情列的外缘，顶部借用半个模块间距。正文以等量内边距维持和顶栏、底部操作的对齐。滚动裁切仍在视口外缘。阔直板模拟器覆盖安装后确认统计卡两侧投影可见，底部学习按钮位置不变。
+
 JIDE由详情发布实际可点击控件和opens；AppInterfaceControl.opens可覆盖静态声明，筛选牌组不会被误报为可调整额度。自定义学习发布实际目标、所选预设、输入值及确认/取消可用性，关闭时撤回观察，不增加任意点击或写入权限。回归：deck-detail-shortcut、custom-study-dialog/options、home-deck-rename、ai-agent-app-structure相关观察；新增导入与组件结构必须增量HAP及设备验收。
 
 快捷入口验收（3.8.10/3111）：56项定向检查通过（28项快捷路由/改名/自定义学习，26项文档/组件/架构，2项真实观察与JIDE聚合）。devecocli增量签名HAP通过。SettingsWide实测标题进入真实改名，提交99字符测试名称后自动换行、卡片增高、不溢出右栏，重开改名读回相同Core名称后恢复sadf；普通计数与牌组ID保留。实看新卡/复习各自预选正确额度模式，总数查询deck:"sadf"，学习中查询deck:"sadf" is:learn，返回刷新；额度表单仅打开后取消，未替用户调整额度。手机实测Book 1详情名称进入真实改名、取消及新卡打开自定义学习，无数据改动。最终两模拟器覆盖安装并重启；真机未重复已知来源信任失败的安装。深色和系统超大字体、筛选牌组设备逐项点击未在本轮复现，分别由公共材质与路由/观察回归覆盖。完整ai-agent-app-structure套件另有2项原设置认知失败（设置卡数期望9实际10、editor_wheel_on_entry未绑定），与本次路径无关，未修改其他任务。未全量verify或发布。
@@ -288,7 +300,7 @@ JIDE由详情发布实际可点击控件和opens；AppInterfaceControl.opens可�
 
 缺角与按钮辨识修正（3.8.15/3116）：共享GlassFusionTessellator的三角形裁切不能仅因顶点全在外侧，或裁后只有两个边界顶点，就丢弃弧内面积；通过中点检测及有限细分保留圆角，曲线求根容差用于边界细分。新增回归直接检查左上角弧内点被三角网格覆盖，14项共享融合回归通过，HAR已重建且仅同步jidecards。开始学习及横排/浮动显示答案非评分表面统一SeriesVisual.control，跟随顶部按钮的可辨边缘和透色，评分语义独立。55项应用定向回归及devecocli签名HAP通过，两模拟器覆盖安装重启；SettingsWide截图确认原斜切角恢复连续圆角、开始学习使用顶部按钮同款轮廓。未安装真机、未逐项设备验收深色和所有表面；其他在途融合生命周期改动保留。
 
-详情更多定位：HomeDeckRowMenu的centered模式由首页deckMenuFromDetails传入，把牌组预览与菜单整组放在整个安全窗口居中；手机和宽屏共用centeredDeckMenuPlacement。列表长按仍保持行预览及原列定位，右键仍按指针定位。JIDE运行时presentation发布centered_details_menu。
+历史详情更多定位（已由下文按钮锚点菜单替代）：HomeDeckRowMenu的centered模式由首页deckMenuFromDetails传入，把牌组预览与菜单整组放在整个安全窗口居中；手机和宽屏共用centeredDeckMenuPlacement。列表长按仍保持行预览及原列定位，右键仍按指针定位。JIDE运行时presentation发布centered_details_menu。
 
 详情更多居中验收（3.8.17/3118）：31项牌组菜单回归及17项文档回归通过，可信签名增量HAP构建、MatePad 11.5 S（7JDUN26418G04789）覆盖安装和重启成功。真机宽屏分栏点击右侧详情更多，截图确认菜单在整个窗口水平及垂直居中，牌组预览于后续调整恢复；手机安全窗口居中由几何行为测试覆盖，未重复手机设备验收。保留用户集合。
 
@@ -311,3 +323,63 @@ HomeDeckRowMenu的非指针分支统一挂载DialogBackdrop，详情更多和列
 
 
 3.8.38/3139验收：DialogBackdrop改用backgroundEffect显式模糊背后场景，饱和度/亮度均为1，保留原遮罩色；旧NONE+backdropBlur组合的截图仅呈压暗，不作为模糊成功证据。78项牌组菜单/材质/文档回归及devecocli签名HAP构建通过，纯菜单不参与尺寸层级的生命周期回归通过。Harmony_API23与SettingsWide均保留数据覆盖安装，分别实点详情更多和列表长按，四种入口截图显示整页强模糊、清晰菜单/预览及原阴影；外部点击后背景恢复。证据仅存于忽略目录.local/deck-menu-blur/。本轮实际设备为浅色，深色由同一半径和原主题遮罩实现并有材质矩阵回归，未宣称深色设备全验收。扩展UI审计仍有三项非本任务失败：DialogFrame根链源码形状、BrowserNotetypeFeature旧onSelect形状、AnkiWeb引导窗口surfaceWidth绑定；未修改其他任务实现以绕过这些审计。
+
+## 横屏大屏主页模式
+
+设置→常规→横屏大屏主页提供“顶部按钮”和“侧边栏”，内部值分别为classic、wheel。HomeLayout.ts拥有模式候选与独立动作声明；AppLayoutState.ts的isWideLandscapeWindow统一拥有横屏门槛，与主页分栏600vp首断点对齐，设置双列共用同一判断。只有已选wheel且窗口宽至少600vp、宽大于高时才显示侧边栏。尺寸来自主页宿主实测Area，不从手机/平板类型或Grid断点推断；竖屏、小窗口自动显示顶部按钮，但不改写已保存的选择。
+
+2026-11-14 横屏适配：主页分栏从600vp启用。侧边栏和设置双列复用同一宽度门槛，并要求宽大于高。主窗口跟随系统旋转开关。Pura X View模拟器实测744×440vp，启用紧凑布局。SettingsWide展开实测约940×665vp，主页使用44vp工具按钮。两个实例均验证横屏主页分栏和设置双列。Pura X View在设置页原地旋转，双向横屏各在摄像头边缘保留约39px，转回竖屏恢复单列。
+
+HomeLayoutStore在EntryAbility加载首屏前恢复home_layout_mode；新键不存在时默认classic，因此既有安装升级不自动切换。手动控件与JIDE确认执行共用saveHomeLayout→LocalPreferenceWrite，保存、回读成功后才广播，失败保留已确认外观并显示错误。常规设置的候选名称只使用“顶部按钮”“侧边栏”。
+
+侧边操作复用NoteEditorWheel的材质、按压、拖动手柄和收起状态，并采用矩形紧排面板，通过customTools/fixedSide承载已有业务动作；所有动作在两列方形按钮网格中同时可见，采用纯图标，完整名称保留给无障碍。主页动作没有格式选项、自动握姿、长按换边或旋转翻页。默认编辑器调用仍使用原有双圈文字工具、旋转与握姿行为。左右按动作数量独立计算面板宽高，不拉齐两侧面板高度。
+
+侧边栏左侧直接提供提醒、设置、回退、统计、搜索、浏览、同步、新建以及启用后的JIDE；四个抽出的入口不再经过主页更多。回退沿用CollectionHistoryDialog及集合忙碌守卫，同步沿用原任务/详情入口与红点、感叹号、忙碌/成功/失败反馈。右侧承载牌组制卡、预览、牌组更多与启用后的JIDE；这里的牌组更多是上下文操作，与取消的主页更多不同。关于统一在设置→关于，顶部按钮模式的主页更多仅保留设置、回退、统计、提醒。
+
+HomeDeckDetails只在actionWheelEnabled且非compact时关闭原动作行并挂载圆环；牌组详情的actionWheel消除额外顶部内容间距，使第一张牌组卡与左侧摘要卡共用GridRow上沿。顶部按钮模式仍沿用HomeSummaryHeader的原44vp动作行和卡片间距。排序模式隐藏两侧轮盘，退出/完成由原工具栏拥有。
+
+JIDE的home观察发布保存模式home_layout_mode和实际生效模式home_layout_effective；home_action_wheel/deck_action_wheel发布真实动作、禁用、侧边与收起状态。home_layout设置接通真实读取、规范值校验和原值校验后的确认写入，不能绕过确认。界面、设置目录与动作声明来自同一模型。
+
+专项：home-layout、note-editor-wheel、home-header-layout、ai-agent-app-structure、ai-agent-app-settings；新增门槛矩阵、缺失新键默认旧布局、重启恢复、保存失败及过期写入、四个入口实际回调、圆弧按钮边缘与相邻按钮不重叠。构建与设备结果单独记录，不以Node代替渲染验收。
+
+### 展开记忆、长按名称与其他页面
+
+主页左右轮盘展开状态分别保存到HomeLayout的HOME_LEFT_WHEEL_OPEN_KEY/HOME_RIGHT_WHEEL_OPEN_KEY，默认展开；HomeLayoutStore在首屏前恢复，手动切换通过LocalPreferenceWrite确认落盘。切换主页模式和窗口横竖变化不重置记忆。保存失败回到上次展开状态并提示，旧异步失败不能覆盖新一次选择。
+
+侧边操作长按通过已有showToastSafely入口显示系统Toast短提示（2000ms），只传真实本地化名称，不自绘主题色文字或指定位置；长按后的补发点击不能执行动作。系统管理提示样式、位置与消失，不持有自定义提示面板或计时器。原编辑器工具的长按格式动作保持原行为。
+
+
+特殊类型单独维护：设置的简洁版/实验版是互斥状态，两图标同时显示并以真实偏好标选中；侧边栏不再打开模式选择菜单。顶部按钮模式沿用原模式菜单。保存、取消、退出多选依然调用原拥有者的忙碌/草稿/选择守卫；搜索、统计范围、浏览卡片/笔记等正文选择器保留原控件，不作为无状态工具栏按钮收集。JIDE读取page_toolbar_*实时观察与设置两模式的真实selected状态。
+
+最终本轮：128项定向检查与签名增量HAP通过，复用SettingsWide及HomeCompare_PC覆盖安装。电脑实测主页左环收起后重启保留、右环独立展开，长按简洁版显示名称不误切换，简洁/实验实际切换后恢复；统计侧环返回、添加页侧环返回走通，未创建笔记。页面操作轮盘初始位于页面高度25%处，与编辑器60%位置的格式轮盘分开。未宣称全部页面动作、深色、大字体、真机或全量verify通过。
+
+方框紧排：侧边主页与页面动作统一由compactActionGrid/compactActionPosition计算，40vp按钮、4vp间隔、4vp面板内边距，边缘独立28vp收起手柄槽。旧mode值wheel及用户已保存的选择不变；编辑器格式工具仍用原轮盘。JIDE实际layout发布compact_grid，主页发布left_grid/right_grid。
+
+方框紧排设备验收：签名增量HAP与127项定向/字段/资源检查通过，复用两台既有模拟器覆盖安装。SettingsWide主页实看两列40vp方形按钮、4vp间隔，右侧按动作数缩为两行；电脑设置页实看左侧返回单键、右侧简洁/实验双键同行。展开记忆、长按名称、实际业务回调均复用已验证入口，未改动卡片数据。
+
+
+侧边栏新建入口：homeMenus在sideWheelLayout实际成立时使用居中DialogFrame，标题/关闭由DialogHeader拥有，正文继续复用主页操作面板的同一份选择和回调；顶部按钮模式仍用原AnchoredMenu。系统返回在居中弹窗分支直接关闭显示状态，锚定菜单分支保留closeRequest。主页操作面板的JIDE观察发布centered_dialog或button_anchored_popup，并只在弹窗分支登记真实关闭按钮；不会改变简洁/实验及渠道条件决定的选项数量。
+
+主页侧边操作面板按当前可见按钮逐行互换两列：未开启 JIDE 时，从上到下为设置/提醒、统计/回退、浏览/搜索、新建/同步（每组为左/右）。顶部按钮模式和其他页面保持原顺序；JIDE 的真实控件观察随最终按钮位置发布。
+
+主页左侧动作栏通过 page_action_center_fraction 保存会话内高度比例，默认 0.6；主页右侧牌组操作与编辑器格式工具位置独立。其他页面已恢复顶部按钮，不再参与位置接续。
+
+
+侧栏仅用于主页与牌组详情。其他 NavDestination 保留原顶部按钮及原菜单，PageActionShell 只透传内容并关闭动作迁移；设置恢复顶部返回及模式菜单，JIDE 的 settingsHeaderControls 同步使用原顶栏控件声明。
+
+顶部模式的更多和新建只使用 HomeSummaryHeader 实测的工具栏边界，侧边栏宿主不写入这份坐标。侧边栏预览在点击时读取实际按钮边界，菜单右缘与按钮右缘对齐，顶部沿用页面间距。侧边栏新建继续使用居中弹层；详情更多使用实测工具栏边界的 AnchoredMenu。
+
+
+牌组预览加载弹窗的标题和内容分别委托 `previewLoadingHeader`、`previewLoadingContent` 两个 `@Builder`。`@BuilderParam` 内直接调用自定义组件会在目标 SDK 编译产物中留下普通类调用，打开预览时发生 `class constructor cannot called without new`。`arkts-component-fields.test.mjs` 的同类扫描同时覆盖内置组件和仓库全部 `struct` 名称。3154 在宽屏模拟器复现了退出，3155 同一路径进入预览并保持进程存活。
+
+首页牌组列表与摘要卡共用父级内容边界。玻璃投影留白通过扩大列表视口并向外偏移实现，子项左右留白与视口扩展互相抵消；单列卡片与摘要卡等宽，双列卡片的合并外缘对齐摘要卡。列表首尾的投影留白不重复增加首卡间距。
+
+牌组详情预览范围菜单与首页更多共用 AnchoredMenu 默认展开、表面与 ActionMenuList。宽屏内嵌详情使用整个主页的 GLASS_HOME_SOURCE，与首页更多一致，避免右侧面板坐标用于局部快照；独立详情页的按钮菜单同样使用覆盖详情的 GLASS_HOME_SOURCE。四个范围和原卡片预览查询由 DeckPreviewScopeMenu/DeckPreviewSession 持有。
+
+牌组预览范围菜单纳入首页 `closeHomeActions` 的互斥关闭：打开首页更多、新建、牌组操作或离开主页时，通过 `menuDismissRequest` 关闭详情菜单；反向打开预览范围先关闭首页动作菜单。迟到的关闭通知只更新预览状态，不关闭新打开的菜单。行为回归见 `home-composition.test.mjs`。
+
+详情工具栏更多使用 `HomeDeckRowMenu.toolbarBounds` 接入公共 AnchoredMenu，JIDE 的 `presentation=anchored_details_menu`；按钮入口不再浮起牌组行。长按保留行预览，右键保留指针定位。详情预览范围统一采样覆盖详情的主页正文，两个菜单保留各自原动作与关闭守卫。
+
+首页左上角「更多」提供「学习榜」，用独立奖杯图标。打开后立即加载独立榜单页面，可直接浏览和筛选。主动参榜时显示抽样与公开范围说明。榜单类型和学科使用公共选择器，固定在顶栏下；进入和切换选项时自动加载。确认参榜说明后，为已登录用户准备本机随机样本，预览后仍要单独确认上传。游客可直接浏览。可从学习榜设置隐藏首页入口，偏好保存在本机，在「设置 → 高级设置 → 学习榜」重新开启。隐藏入口不撤销已发布成绩。
+
+学习榜顶栏右侧复用公共设置图标按钮，设置弹窗复用 `DialogFrame`、`LeaderboardSettings` 和 `SettingsToggleRow`。显示首页入口开关与高级设置共用同一份本机偏好。匿名设置按华为账号保存，修改后更新仍公开的成绩，不影响该账号的学习记录。

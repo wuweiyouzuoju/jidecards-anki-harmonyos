@@ -49,13 +49,23 @@ JSON为 `{ "v": 1, "guid": "当前笔记GUID", "targets": ["目标笔记GUID"], 
 
 ## 界面与JIDE
 
+新增/浏览编辑草稿中的关联预览遵循同一返回顺序：子预览先关闭内部菜单或引用返回栈，未消费时宿主关闭关联预览并回到原草稿关联面板，不能无条件调用子回调后一直停在预览。模板/草稿预览退出关联目标时同时恢复原 Web 音频启用策略。直接回归见 `note-links-editor.test.mjs`、`note-draft-preview.test.mjs` 和 `note-draft-preview-media.test.mjs`，覆盖内部消费、根层退出、草稿保留及不写入集合。
+
 正文引用在可视编辑及卡面使用当前主题的主色容器底色和小圆角，不新增下划线；样式只在运行时提供，不把色值或标记符写进笔记。原有正文格式和每处引用文字保留。
 
 选择器、草稿管理及即时管理均复用搜索牌组提取的LiveSearchField：标题下同款输入与清空按钮，DialogSearchHeader独占分隔线至搜索框12vp间距；输入停顿200ms自动查询，Enter立即查询，输入不被读取忙碌状态锁住。新输入立刻作废旧查询，空输入清结果，销毁取消定时及迟到结果；不再显示手动搜索按钮。同一组件用于首页牌组（本地即时筛选）和JIDE历史记录。
 
+引用选择器、草稿管理和即时管理共用固定高度，并跟随键盘和安全区上限。加载指示器延迟叠放于滚动区，引用文字栏始终预留高度。即时管理写入时保持搜索框可编辑，并保留当前搜索结果直到重新查询完成。即时管理由 `NoteLinksPanel` 显示搜索状态。输入关键词后，结果、加载或空结果提示直接出现在搜索框下方，清空后恢复「我引用」和「引用我」。点结果行把目标卡片 ID 交给浏览页共用的卡片预览，点行右侧的引用按钮才写入关系。预览返回时恢复搜索词并重新查询。学习页在关联面板及其预览打开时把普通按键交给浮层，Escape 和系统返回依次处理预览内菜单、关联预览和关联面板。学习入口通过现有笔记编辑和 JIDE 改卡页面处理目标卡片，保存后刷新目标卡面。
+
 所有入口组合公共组件：SettingsActionRow拥有行内文字、箭头和最小点击高度；页面Scroll独占左右各12vp，标签至引用入口的组间距归父Column（窄版8vp、普通12vp），不叠加外边距或安全区。DialogFrame独占选择器/管理弹窗的卡片内边距、键盘避让与安全区，正文只贡献8vp组间距，目标预览复用既有全屏组件；深浅色消费原主题。没有自定义窗口尺寸、复制箭头、颜色或阴影。
 
-共同声明为NOTE_FIELD_EDITING_SUPPORT/NOTE_LINK_SUPPORT和AppInterface。JIDE可发现外圈引用选择器、新增/编辑草稿管理、实际忙碌/数量/保存语义；不发布正文、搜索内容、目标GUID或标签草稿，不新增助手写入工具。只读目标预览的即时编辑控件明确禁用。
+共同声明为NOTE_FIELD_EDITING_SUPPORT/NOTE_LINK_SUPPORT和AppInterface。JIDE可发现外圈引用选择器、新增/编辑草稿管理、即时管理的结果数量和当前可用操作，以及实际忙碌和保存状态。观察只传递计数和控件状态。只读目标预览的即时关联编辑控件禁用。
+
+## 卡片关系网
+
+学习和卡片预览的「关联卡片」可打开关系网。已保存笔记的编辑面板可查看已保存的关系网，草稿引用由编辑面板管理。关系网默认展示中心笔记的直接出向与入向关系，双向引用共享一个节点并保留两个方向。通过现有预览打开选中节点的卡片，返回时恢复关系网中心。失联目标保留节点及箭头，禁用预览和设为中心。选中节点时高亮相邻连线，换中心时平滑缩放就位，遵循应用动效风格及减少动态效果设置。列表使用公共编辑分组卡片，分别包裹「我引用」和「引用我」的内容。
+
+[NoteLinksService.neighborhood](../../entry/src/main/ets/backend/NoteLinksService.ts) 复用单次关系库存和批量 GUID 解析，[NoteLinkGraph](../../entry/src/main/ets/model/NoteLinkGraph.ts) 投影为只读节点与边。 [NoteLinkGraphPanel](../../entry/src/main/ets/components/links/NoteLinkGraphPanel.ets) 管理选中和导航。[原生画布](../../entry/src/main/ets/components/links/NoteLinkGraphCanvas.ets) 用主题色、主题容器色和原生文字色绘制，不经过 ArkWeb 图层。[NoteLinkOrbit](../../entry/src/main/ets/model/NoteLinkOrbit.ts) 管理三维投影和视角。拖动绕中心旋转，松手后惯性减速，双指可缩放和平移。选中节点时停止自动旋转，点空白处恢复。系统关闭动效时保留直接拖动。 JIDE 通过 AppInterface 获取入口、可用操作和节点／边计数。
 
 ## 验证与打包
 
@@ -71,4 +81,4 @@ npm run build:app -- -SkipRust
 
 此轮不改原生/RPC或锁定Core；已有真实Core元数据/GUID查询回归入口仍为 `cargo test -p jidecards_core --features anki-core --locked --test note_links`。电脑验收使用独立临时收藏库，覆盖未准备的普通类型、保存钩子、正文引用、反向显示、移除、旧数据迁移及真实UI，输出合成演示APKG。浏览器覆盖生产卡片中的正文点击、运行时镜像、迟到代次及宽窄/深浅色/文字缩放；不是ArkUI/ArkWeb设备截图。
 
-本轮实际结果与未覆盖范围见[2026-10-23/24记录](note-links-verification-2026-10-24.md)，历史首次验收与编辑页增量范围见[2026-10-21/22记录](note-links-verification-2026-10-21.md)。最终安装及界面检查以交付包receipt为准。
+本轮实际结果与未覆盖范围见[2026-10-23/24记录](../archive/development/note-links-verification-2026-10-24.md)，历史首次验收与编辑页增量范围见[2026-10-21/22记录](../archive/development/note-links-verification-2026-10-21.md)。最终安装及界面检查以交付包receipt为准。

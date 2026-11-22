@@ -1,10 +1,36 @@
 # 同步与集合生命周期
 
+## 华为账号资料
+
+设置 → 账号与常规 → 华为账号，复用官方 AI 的华为 Account Kit 身份登录和 Asset Store 会话。资料页的华为登录在 Account Kit 请求中同时申请 profile 权限，首次获授权时把华为昵称与头像作为默认资料保存到服务端。已有资料版本不被登录覆盖。昵称可直接编辑并自动保存。点头像可选本机图片，或主动再次导入华为昵称与头像。导入以授权码换取服务器验证的账号标识，须与当前资料会话的账号一致。图片下载后重新编码为缩略图，再通过 AccountProfileService 使用原资料接口保存。取回资料与并发重试都按账号和资料版本隔离。自己修改的资料可在同一账号的其他设备重新进入页面时读取，在学习榜发布时另行决定是否公开。
+
+此处「同步」入口打开原同步设置。华为云空间整库备份使用设备系统的华为云空间，账号资料使用应用服务的私有记录，分别保留各自已有的登录和操作边界。退出本机账号会清理此设备共用的官方会话，云端资料及已发布成绩保留。撤下成绩通过排行榜执行。
+
+## 华为云空间同步
+
+同一华为账号的鸿蒙记得闪卡使用 Core File Kit 文件协同传输。当前界面提供单向上传和明确确认后的下载恢复，使用者要求与 Anki 整库备份对齐；不备份操作系统、应用外观偏好、账号凭证或 JIDE 对话。工作数据库始终留在本机。
+
+新上传使用版本 3 描述符和 Core 原生 COLPKG（`includeMedia=true, legacy=false`）：包含所有牌组、卡片、笔记类型与模板、集合配置、复习记录和媒体。`backend/cloud-sync/AnkiCollectionBackup.ets` 是整库归档和恢复验收入口；内部云备份不经过用户文件导出限制。导出消耗 Core collection 后始终修正会话状态并重开，失败不发布。版本 2 JSON 快照仍可下载恢复；旧 v1 目录存在数据时继续暂停，不能自动删除。
+
+`CloudCollectionSync.ts` 校验描述符，版本 2 元数据上限 64 MiB，版本 3 完整归档上限 4 GiB。版本 3 保存卡片、笔记、牌组和复习记录计数；版本 2 从最新快照提取有效对象计数，删除标记不计入。`CloudGenerationDisplayText.ets` 组合本地化时间及卡片数量，首页、设置、恢复确认与 JIDE 共用，空备份明确显示为 0。列表按时间降序，最新在上；无时间的记录在末尾。每台设备展示其最新完成版本，序号奇偶轮换两个存储槽，不是每次永久增加一份。
+
+`HuaweiCloudSync.ets` 负责传输、SHA-256 和文件长度校验。完整归档先确认云端实体可见，再发布完成标记，防止其他设备提前选到未上传完成的备份。文件位置 2（云端）与 3（本地及云端）均为已上云。系统历史完成通知不代表本次任务完成，所有本次目标必须独立核对；最多 32 个并发位置查询，发现进展后重置 180 秒无进展期限。整库备份包含媒体，变更后的上传传输完整压缩归档，不声称附件增量；相同归档哈希可跳过发布。旧版本 2 的内容寻址媒体仍保留，不能在迁移时删除可能被其他设备引用的数据；当前没有自动回收旧共享媒体。
+
+下载前重查选定设备、版本代次和序号，再校验完整文件。版本 3 复用 `数据迁移服务.ts` 的 COLPKG 替换及 `TransferRecovery.ts` 的安全副本、空间检查和中断恢复；Core 能成功打开且四项计数与备份一致后才标记提交，验收失败沿同一流程回滚。恢复前另建标准本地备份。成功或失败都会通知首页、卡片内容与 FSRS 设置重读；卡库租约在任务真正结束前不释放。版本 2 显式恢复的媒体以备份为准，创建比当前删除记录更新的版本，防止卡片恢复但图片或音频被旧删除记录吞掉；不同哈希最多 8 个并发准备，失败等待所有已启动任务收尾后才退出。
+
+上传、下载使用加粗上/下 SVG 箭头（3.5 单位描边）。界面与 JIDE 发布当前阶段、完成数/总数、单位和百分比：下载显示 KB/MB，旧格式附件准备显示文件数；压缩、备份和应用集合等系统未提供总量的阶段显示等待动画，不伪造总任务进度。文件云同步只提供文件完成状态，完整归档上云的文件级进度不是字节速度。
+
+本轮验证入口：`huawei-cloud-sync.test.mjs`、`data-transfer-files.test.mjs`、`sync-automatic.test.mjs` 及真实 Core 的 `native/rsharmony/tests/peer_collection.rs`。后者覆盖旧备份在本机删除后恢复，以及完整 COLPKG 牌组、模板、卡片、复习历史、图片和音频往返。2026-11-19 主机真实 Core 19 项通过；更新后的同步领域 443 项和界面/认知/依赖/本地化 59 项通过。双架构原生库及签名 HAP 编译成功，构建包装器仍因公告、音频、Wikimedia 的 5 类既有警告退出非零，不记为完整门禁通过。真机往返验收见下，主机测试不替代设备证据。
+
+设备诊断：MatePad 当前卡库及该设备最近两个版本只有默认空牌组。另一设备标识 `0aa659f9` 的 2026/11/17 14:07 版本，快照 SHA-256 核验通过，含 GRE 词汇牌组、7512 张卡片、7512 条笔记与 7512 个媒体文件（33,356,817 字节）。尚不能仅凭最近空快照判定此前数据丢失；不再次上传空卡库覆盖有效备份。设备仅覆盖安装，禁止卸载或清数据。
+
+2026-11-20 MatePad 真机验收：最新签名包以 `install -r` 覆盖安装成功。平板随后导入当前牌组后，版本 3 整库包上传成功，归档 68,320,972 字节，描述符计数为卡片 17,304、笔记 12,408、牌组 14（含默认牌组）、复习记录 0。日志显示 10:26:08 完成归档、10:27:00 云端实体与完成标记确认完成；10:29:36 输出 `Restored COLPKG cards=17304 notes=12408 decks=14 reviews=0`，恢复计数验收通过，用户反馈“现在好了”。这是同一平板已有云文件缓存条件下的上传与恢复证据，不代表异机冷下载速度；未验证非零复习记录在真机往返，相关保留由主机真实 Core 测试覆盖。此前旧版本附件恢复被本次覆盖安装中断，不能记为旧格式真机恢复通过。
+
 ## 同一网络设备配对（2026-10-14）
 
 ### 同步入口与界面（2026-10-20）
 
-首页同步按钮在已保存任一配对设备时先打开 `HomeSyncChoiceDialog`，选择云同步或设备直连；没有配对设备时沿用云同步，已有云同步任务直接打开详情。`DevicePairingStore.hasPairedDevices()` 串行只读偏好，不创建身份或启动发现。选择直连通过设置参数 `initialActionId=device_link` 进入同步分组并展开直连区域，再选择设备和范围。读取中和选择弹窗占用 `homeActivity.dialogOpen`，阻止自动同步/启动提示抢占；重复点击、返回、后台、导航和离页使旧读取失效，选择只生效一次。云同步和设置页的手动同步继续复用原 `HomeSyncController`。
+首页同步按钮打开 `HomeSyncChoiceDialog`。华为云空间须在设置的同步页成功上传或下载一次，才在首页显示。未登录 AnkiWeb 时首页同步图标保持普通状态，实际冲突或失败仍显示提醒。AnkiWeb 或自建服务器须登录并从同步设置成功同步一次，才在首页显示。注销或更换服务器会清除完成记录；设备直连需要已配对。华为云空间提供上传与下载两个操作。上传先展示完整备份范围并等待用户确认；下载由用户选择版本并确认后执行。云空间权限由系统设置中的应用开关控制，应用内确认不发起华为账号 OAuth。首页手动选择华为云空间或 AnkiWeb／自建服务器后打开原有同步弹窗，华为上传显示当前阶段与该阶段可计数的附件比例，卡库快照准备、等待快照上云与下载无总量时显示忙碌状态。关闭弹窗只收起展示，运行中再点同步重新展开，任务结束后刷新卡库。设备直连在相应设置分组选择设备并显示当前任务状态。没有可选方式时进入同步设置，已有 AnkiWeb 或自建服务器任务时直接打开详情。`DevicePairingStore.hasPairedDevices()` 串行只读偏好，不创建身份或启动发现。选择直连通过设置参数 `initialActionId=device_link` 进入同步分组并展开直连区域，再选择设备和范围。读取中和选择弹窗占用 `homeActivity.dialogOpen`，阻止自动同步/启动提示抢占；重复点击、返回、后台、导航和离页使旧读取失效，选择只生效一次。云同步和设置页的手动同步继续复用原 `HomeSyncController`。
 
 直连页先列全部卡库与媒体，再列仅学习进度，两者保持独立授权；全部同步已包含学习进度。连接条件、授权范围与清除撤销历史等细节放在标题旁的公共 `i` 帮助入口，复用设置宿主的说明浮层；主界面仅保留操作名称、简短范围和在线/忙碌/结果。使用 `SettingsActionRow`、`SettingsToggleRow`、公共分隔线与尺寸，无自定义帮助几何。每台设备内部由一个 Column 提供8vp组间距，公共开关/动作行拥有自身行内边距，左右沿用分组卡片16vp内边距；首页选择弹窗由 `DialogFrame` 拥有420vp上限、内边距、限高滚动和安全区。
 
@@ -97,12 +123,12 @@
 
 同步按钮与面板共用 `ActionStatus`；`SyncSession` 的 failure 与冲突 attention 分开，暂停/等待不展示成功。反馈责任与验证范围见 [交互恢复与局部动效](interaction-feedback.md)。
 
-不依赖账号的 Anki / AnkiDroid 核心回归见[核心互通](core-interop.md)：`npm run test:interop` 生成隔离 APKG/COLPKG 与结果报告。它不证明线上同步通过；2026-10-07 的独立真实 AnkiWeb 集合与隔离服务器媒体结果见[验收记录](ankidroid-high-priority-2026-10-07.md)，不扩大为完整线上故障矩阵通过。旗标／星标另有 [card_marking.rs](../../native/rsharmony/tests/card_marking.rs) 的临时 SimpleServer＋两个独立 Core Backend HTTP 同步回归，覆盖普通双向修改、全量、撤销、失败重试与重开；这是本机协议证据，未运行 Android/HarmonyOS 应用。社区调查未找到可直接采用的标记冲突修复后，按用户选择启用 JideCards 待同步标记优先：混合客户端冲突保留 JideCards 旗标／exact marked，整体记录仍按上游 mtime 选择；两个 JideCards 均待同步时由后同步端的标记胜出并传播。上传前为剩余待同步卡片／笔记准备更大的标准修订时间，故不是纯字段时间戳合并。名称仍走原集合配置规则，两个未修改 AnkiDroid 之间不受影响。见[源码对照](flags-marking-audit-2026-10-03.md)和[当前决策及社区来源](../decisions/2026-10-03-marking-sync-priority.md)。
+不依赖账号的 Anki / AnkiDroid 核心回归见[核心互通](core-interop.md)：`npm run test:interop` 生成隔离 APKG/COLPKG 与结果报告。它不证明线上同步通过；2026-10-07 的独立真实 AnkiWeb 集合与隔离服务器媒体结果见[验收记录](../archive/development/ankidroid-high-priority-2026-10-07.md)，不扩大为完整线上故障矩阵通过。旗标／星标另有 [card_marking.rs](../../native/rsharmony/tests/card_marking.rs) 的临时 SimpleServer＋两个独立 Core Backend HTTP 同步回归，覆盖普通双向修改、全量、撤销、失败重试与重开；这是本机协议证据，未运行 Android/HarmonyOS 应用。社区调查未找到可直接采用的标记冲突修复后，按用户选择启用 JideCards 待同步标记优先：混合客户端冲突保留 JideCards 旗标／exact marked，整体记录仍按上游 mtime 选择；两个 JideCards 均待同步时由后同步端的标记胜出并传播。上传前为剩余待同步卡片／笔记准备更大的标准修订时间，故不是纯字段时间戳合并。名称仍走原集合配置规则，两个未修改 AnkiDroid 之间不受影响。见[源码对照](../archive/development/flags-marking-audit-2026-10-03.md)和[当前决策及社区来源](../decisions/2026-10-03-marking-sync-priority.md)。
 
 - 代码路径以下均相对 `entry/src/main/ets/`。
 - 责任链：AutoSyncScheduler 保存意图；SyncActivity 拥有集合占用；SyncSession 执行同步，根同步面板展示快照。
 - 快速反馈：`npm test -- sync`；完整验收见 [验证说明](verification.md)。
-- 审查与修复记录：[2026-09-27 同步实现审查](sync-audit-2026-09-27.md)；媒体任务唯一启动/消费、首页统计独立队列和设置分组保护的当前契约见下文。
+- 审查与修复记录：[2026-09-27 同步实现审查](../archive/development/sync-audit-2026-09-27.md)；媒体任务唯一启动/消费、首页统计独立队列和设置分组保护的当前契约见下文。
 
 ## 自定义同步端点与证书边界
 
@@ -114,7 +140,7 @@
 
 首页常驻同步按钮的空闲标记对照本机 `D:/Projects/AnkiDroid/AnkiDroid/src/main/java/com/ichi2/anki/DeckPicker.kt` 的 `updateSyncIconFromState` 和 `deckpicker/DeckPickerViewModel.kt` 的 `fetchSyncIconState`：未登录与 Core `FULL_SYNC` 显示红色圆圈感叹号，`NORMAL_SYNC` 显示提示圆点，`NO_CHANGES` 无标记。`model/HomeSyncStatusController.ts` 独占检查代次和合并请求，调用既有 `同步服务.同步状态检查`；状态读取可联网，但不提交同步，不受自动同步开关控制。仅在前台首页、集合可用且无操作/弹窗/同步任务时读取，失败按 AnkiDroid 回到普通图标并记录诊断。账号/服务器变化、导航、后台、任务启动及销毁后的旧结果不得发布或保存重定向端点；返回首页、集合变更和任务关闭重新检查。实际任务的旋转圈、冲突/错误感叹号及排队文案优先于空闲标记。
 
-`HomeSummaryHeader` 将标记叠在原 `IconActionButton` 内，原按钮独占点击区域，标记不处理点击、不增加父级间距，也不参与外缘尺寸；宽窄按钮仍由 `HomeHeaderLayout` 缩放，安全区仍只由首页外层贡献。朗读名称与 `AppInterface` 同用 `homeSyncLabelKey`；首页发布真实 `sync_account_state`、`sync_indicator`、`sync_status` 给 JIDE。已配对设备时先选择同步方式；选择云同步且未登录时走原设置登录入口，需要全量同步时走原同步会话及方向确认，已有任务点击打开详情。直接回归：`tools/tests/home-sync-status.test.mjs`；真实联网和设备外观需单独验收。
+`HomeSummaryHeader` 将标记叠在原 `IconActionButton` 内，原按钮独占点击区域，标记不处理点击、不增加父级间距，也不参与外缘尺寸；宽窄按钮仍由 `HomeHeaderLayout` 缩放，安全区仍只由首页外层贡献。朗读名称与 `AppInterface` 同用 `homeSyncLabelKey`；首页发布真实 `sync_account_state`、`sync_indicator`、`sync_status` 给 JIDE。首页只列出已配置的同步方式；选择 AnkiWeb 或自建服务器且未登录时走原设置登录入口，需要全量同步时走原同步会话及方向确认，已有任务点击打开详情。直接回归：`tools/tests/home-sync-status.test.mjs`；真实联网和设备外观需单独验收。
 
 2026-10-06 验证：状态/竞态和 JIDE 读取用例、同步领域回归通过；首页唯一失败为 `home-composition.test.mjs` 的详情栏测试未装配 `detailHeaderActionHeight`，使用修改前首页源码仍复现。最终界面契约检查另有 `ui-shell-contract.test.mjs` 因共享工作区设置页按钮改动仍匹配旧返回文案而失败，本任务没有修改该入口或削弱断言。中间构建遇到同期设置/JIDE 的类型和图标资源错误；待这些输入就绪后，最终增量签名 HAP 复核通过，unexpected=0，含首页可见性守卫。记录和最终包在 `.local/home-sync-badge-2026-10-06/final-artifact/`，相关测试日志在上级目录。本次未安装设备，未验证真实联网和最终外观。
 

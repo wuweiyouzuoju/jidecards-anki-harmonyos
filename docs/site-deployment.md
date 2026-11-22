@@ -6,7 +6,7 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 ## 内容与构建
 
-产品、作者、SEO、功能、宣传词和图片元数据统一维护在 `hosting/data/works.json`。指南事实来源是 `hosting/data/harmonyos-anki-guide.json`。官网不再维护或展示应用市场具体版本号；下载入口保留，版本与上架能力以应用市场页面为准。源码版本由生成器读取 `AppScope/app.json5`，输出 `sourceVersion` / `sourceVersionCode`，用于官网主展示、源码更新、SoftwareSourceCode 和 Atom。SoftwareApplication 不填写市场 softwareVersion。2.9.22 宣传图保留独立的历史版本标注和 SHA-256 校验，不要求截图版本等于当前市场版本，不把旧图片改标为当前截图。
+产品、作者、SEO、功能、宣传词和图片元数据统一维护在 `hosting/data/works.json`。指南事实来源是 `hosting/data/harmonyos-anki-guide.json`。官网正式版本、上架状态和公开更新说明统一取自 `works[0].marketplace`，以作者确认的上架信息填写。JIDE 默认入口状态与对应版本证据记录在 `marketplace.jide`，由构建器生成进阶页、开发页及机器可读资料的同一条说明。源码版本仍独立读取 `AppScope/app.json5`，用于开发页与 SoftwareSourceCode。SoftwareApplication、产品页、Markdown、JSON 和 Atom 从正式版数据生成。2.9.22 宣传图保留独立的历史版本标注和 SHA-256 校验，不要求截图版本等于当前市场版本，不把旧图片改标为当前截图。
 
 `tools/build-site.mjs` 只负责构建编排。修改入口按责任划分：
 
@@ -16,20 +16,25 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 | `tools/site/layout.mjs` | 共享导航、页脚、下载入口、页面元数据、JSON-LD |
 | `tools/site/pages.mjs` | 首页、功能、指南、开发、更新、关于与 404 页面 |
 | `tools/site/feeds.mjs` | 逐页 Markdown、llms、页面索引、sitemap、robots、Atom |
-| `hosting/styles.css` | 响应式视觉；首页 Logo 在左、宣传词在右；手机导航使用原生 details |
+| `hosting/styles.css` | 响应式视觉；首页用原生 details 演示翻卡，手机导航同样支持禁用 JavaScript |
 | `hosting/assets/site-media.mjs` | 首次绘制后，按视口接近程度加载原图；下载失败恢复内嵌预览 |
 
 执行 `node tools/build-site.mjs` 同时更新所有输出，避免逐页手改 HTML。样式、Logo 和图片脚本地址使用内容摘要缓存键。应用的 `announcement.json` 和 `cloud-decks.json` 独立维护，网站重构不改变其协议。
 
-源码主仓库和镜像统一维护 `repository` / `repositoryMirrors`，生成器同步导航、正文、结构化数据和文本链接。`sourcePackage` 记录对应源码版本的 GitHub Release、签名 HAP 与校验文件地址；生成器校验标签和文件名与应用版本一致，HTML 和机器可读入口同时展示开发包与签名/设备授权限制。精确 SHA-256、字节数及构建证据随 Release 附件发布；HAP 不进入源码 Git 历史。官网下载仍优先指向应用市场页面，具体版本以该页面为准。
+源码主仓库和镜像统一维护 `repository` / `repositoryMirrors`，生成器同步导航、正文、结构化数据和文本链接。`sourcePackage` 记录对应源码版本的 GitHub Release、签名 HAP 与校验文件地址；生成器校验标签和文件名与应用版本一致，开发页、对应 Markdown 和完整资料展示开发包与设备授权限制。精确 SHA-256、字节数及构建证据随 Release 附件发布；HAP 不进入源码 Git 历史。官网下载仍优先指向应用市场页面，具体版本以该页面为准。
 
 官网可单独发布，不把尚未推送的本地发布文档或未上传的 Release 附件作为远端已存在的链接。发布新 HAP 时先验证源码并保存安装包，提交推送对应源码，再创建该提交的 Release、上传并核对附件，最后发布网站。
 
+## 官网视觉与布局
+
+- 站点使用浅紫底、白色阅读区、深紫正文和紫色行动按钮。颜色、圆角、页边距、段间距与最大内容宽度在 `hosting/styles.css` 的 `:root` 维护。主要操作用实心按钮，文档跳转用文字链接。
+- 首页按下载、核心用途、截图、正式版更新、迁移和答疑排列。用真实应用 Logo 和可操作的词汇卡做主视觉，截图注明拍摄版本。
+- 功能与指南页共用目录布局，宽屏将导航放在正文左侧，窄屏放到正文之前。更新页将说明与安装入口并排，窄屏按正文、安装的顺序排列。长表格在自己的容器内横向滚动。
+- 页面只使用一个一级标题，目录链接直达既有章节。菜单、翻卡和问答使用原生展开控件。修改共享样式时检查手机与桌面、键盘焦点和关闭 JavaScript 的导航。
+
 ## 图片与 Logo
 
-当前保留作者提供的七张 2.9.22 历史宣传图：主视觉、卡片学习、卡片编辑、卡片浏览、学习操作、复习统计、学习提醒。原始 PNG 字节存入 `hosting/assets/jidecards-2.9.22-*.png`；`screenshots` 记录公开路径、来源说明、版本、宽高和 SHA-256。每张图片提供正文说明、alt、figcaption 和完整原图链接，文字事实同时进入 Markdown、产品 JSON 和完整文本。
-
-替换图片时检查实际内容，复制作者提供的原始字节，然后更新所有元数据；生成器发现版本或摘要不匹配即失败。过时 `assets/app-*.png` 已加入 `.assetsignore`，不再进入线上资产清单。
+历史截图、2.9.22 宣传图及官网副本已按作者要求删除。`screenshots` 当前为空，生成器允许没有截图，并使用应用 Logo 作为分享图。后续仅接入当前版本实际运行截图，记录版本、宽高、来源与 SHA-256；缺图时不回退到旧图。
 
 Logo 原图由生成器从 `AppScope/resources/base/media/app_icon.png` 原样复制。页面先内嵌已有图标：导航与页脚用 32 像素 PNG，主体用 180 像素 Apple 图标，正文首次绘制无需等待 1024 像素原图。宣传图先使用同尺寸内嵌 SVG 占位；图片脚本等待两次 animation frame，确保正文先绘制一次，再用 IntersectionObserver 在图片距离视口 200 像素时赋予原图地址，配合原生 lazy 与低优先级下载。预留真实宽高避免下载后布局跳动；下载失败恢复内嵌预览。不支持观察器的浏览器在首次绘制后交给原生 lazy。
 
@@ -46,15 +51,17 @@ python -c 'from PIL import Image; from pathlib import Path; icon = Image.open("A
 | 页面 | 作用 |
 | --- | --- |
 | `/` | 品牌、下载、核心功能、学习用途、更新与开源入口 |
-| `/works/jidecards/` | 完整功能、历史宣传图、下载、版本和能力边界 |
+| `/works/jidecards/` | 下载、学习场景、应用截图和进阶资料入口 |
+| `/works/jidecards/technical/` | 卡片兼容性、同步原理、备份、快捷键和 JIDE 使用条件 |
 | `/guides/harmonyos-anki/` | 安装、迁移、制卡、FSRS、同步、统计与备份的完整指南 |
-| `/releases/` | 当前源码版本的全部编号更新说明 |
+| `/releases/` | 正式版更新说明 |
 | `/developers/` | 编程 Agent 的源码、责任和验证入口 |
 | `/about/` | 项目、作者与反馈 |
+| `/about/independent-development/` | 完整独立开发声明 |
 
-六个可索引页面各有 `/content/*.md`，HTML alternate 链接和 `/data/site-index.json` 提供对应地址。`/llms.txt` 是文档索引；`/llms-full.txt` 包含完整产品、指南、版本和开发资料；`/data/works.json` 与 `/data/harmonyos-anki-guide.json` 提供事实数据。`/sitemap.xml` 只列主域名页面，`/robots.txt` 允许抓取，`/releases.xml` 提供 Atom 更新订阅。静态服务通过 `assets.not_found_handling=404-page` 为缺失链接返回自定义 404 正文与 404 状态，页面标记 noindex。
+八个可索引页面各有 `/content/*.md`，HTML alternate 链接和 `/data/site-index.json` 提供对应地址。`/llms.txt` 是文档索引；`/llms-full.txt` 包含完整产品、指南、版本和开发资料；`/data/works.json` 与 `/data/harmonyos-anki-guide.json` 提供事实数据。`/sitemap.xml` 只列主域名页面，`/robots.txt` 允许抓取，`/releases.xml` 提供 Atom 更新订阅。静态服务通过 `assets.not_found_handling=404-page` 为缺失链接返回自定义 404 正文与 404 状态，页面标记 noindex。
 
-独立开发声明统一维护在 `hosting/data/works.json` 的 `developmentStatement`，同步生成首页、产品页、开发页、关于页、Markdown 与 llms；README 保留同一声明。当前声明明确作者为可塑性天赋（wuweiyouzuoju），截至目前全程由本人独立开发与维护，不存在团队开发或他人带领团队完成开发的情况。
+独立开发声明统一维护在 `hosting/data/works.json` 的 `developmentStatement`，完整正文生成至独立声明页、对应 Markdown 与完整资料，页脚提供声明链接。README 保留同一声明。当前声明明确作者为可塑性天赋（wuweiyouzuoju），截至目前全程由本人独立开发与维护，不存在团队开发或他人带领团队完成开发的情况。
 
 页面使用真实 Person、CreativeWork、SoftwareApplication、SoftwareSourceCode、BreadcrumbList、FAQPage 与文章元数据。作者与发布者均指向独立开发者 Person；项目作为 CreativeWork 标识，不虚构团队或组织。功能可见状态、源码版本与下载说明必须在 HTML、Markdown、JSON 和 llms 中一致，不虚构评分或评论。
 

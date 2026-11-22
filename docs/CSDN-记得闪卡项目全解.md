@@ -7,7 +7,7 @@ jidecards（记得闪卡）不是套壳背单词应用，而是一个用 ArkTS/A
 
 CSDN 标签建议：HarmonyOS, ArkTS, Rust, Anki, FSRS
 
-发布前图片处理：若 CSDN 无法转存 raw.githubusercontent.com 图片，请手动上传仓库 screenshots/ 下的同名文件并替换链接。
+历史截图已移除，发布时仅使用当前版本实际运行截图。
 -->
 
 # 把 Anki 26.05 Rust Core 接到 HarmonyOS：记得闪卡 jidecards 源码架构全解（欢迎共建）
@@ -32,7 +32,6 @@ CSDN 标签建议：HarmonyOS, ArkTS, Rust, Anki, FSRS
 
 这最后一点很重要：源码里“已经有”与用户安装后“已经开放”，是两件事。
 
-![记得闪卡首页](https://raw.githubusercontent.com/wuweiyouzuoju/jidecards-anki-harmonyos/main/screenshots/app-preview-01.png)
 
 ## 一、它已经不只是“能复习”的最小客户端
 
@@ -316,7 +315,6 @@ SyncCollection
 - 图片候选只接受当前 Scope 内由 Wikimedia 搜索返回的 candidateId；媒体写入失败会把已写图片移入回收站做补偿。
 - Provider API Key 存在 HarmonyOS Asset Store，而不是明文 Preferences。
 
-![记得闪卡 Agent 草稿确认](https://raw.githubusercontent.com/wuweiyouzuoju/jidecards-anki-harmonyos/main/screenshots/agent-edit-03-draft.png)
 
 如果后续重新开放 Agent，不能只把布尔值改成 `true`：应以已经完成的真机全链路验收为基线，针对准备发布的代码版本重新执行 Provider 请求、流式响应、图片、取消、高风险真实写入和商店合规回归。已经通过的主流程需要保持稳定，尚未覆盖的边界与组合场景则要继续补齐。
 

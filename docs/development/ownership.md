@@ -12,6 +12,8 @@ Core/私有协议的描述、生成、wire 与领域映射职责见 [Core 协议
 
 设备卡库/媒体直连的协议顺序归 [CollectionSync.ts](../../entry/src/main/ets/model/device-link/CollectionSync.ts)，租约及文件 IO 归 [DeviceCollectionStore.ets](../../entry/src/main/ets/backend/device-link/DeviceCollectionStore.ets)，认证、授权与任务状态归既有 DeviceLinkService。原生扩展 [peer_collection.rs](../../native/rsharmony/src/peer_collection.rs) 及子模块复用公开 Core API，独占设备版本、合并事务和媒体恢复，不改上游 Anki/FSRS/调度器。边界、限制、备份和验证入口见[同步扩展](sync-data.md#全部卡库与媒体同步扩展2026-10-16)。
 
+华为云空间传输及单任务归 `backend/cloud-sync/HuaweiCloudSync.ets`，版本选择与顺序归 `model/cloud-sync/CloudCollectionSync.ts`，设置与 JIDE 当前观察归 `HuaweiCloudSettings.ets`；原生合并继续归 peer_collection。范围、成本与未完成验收见[云空间决策](../decisions/2026-11-12-huawei-cloud-sync.md)。
+
 ## `entry`
 
 学习键盘的动作目录、默认绑定、组合键/卡面匹配、冲突及长按去重归 `model/StudyKeyboard.ts`，旧配置兼容归 `StudyControls.ts`。平台键码与修饰键归 `utils/StudyKeyAdapter.ets`，手动草稿归 `components/settings/StudyKeyboardSettings.ets`，保存继续归 `StudyControlsService.ets` / `LocalPreferenceWrite`。UI 和 JIDE 共用动作/控件声明与实际配置；执行只调用学习页既有操作。入口与验证见[学习操作配置](study-media.md#jide-专用学习操作配置2026-10-04)。
@@ -157,3 +159,7 @@ Anki 官方教程的选章与检索别名归 `tools/anki-manual-topics.json`，�
 首页首行布局归 `HomeSummaryHeader` / `HomeHeaderLayout`，统计数据和菜单状态归首页；更多/新建组件仅提供 ActionMenuList 正文，原生尖角锚点归首行。搜索筛选归纯模型 `HomeDeckSearch`，输入和实际候选观察归 `HomeDeckSearchDialog`，选择复用首页。握姿复用 StudyGripSession 和可指定能力键的 StudyGripSensor，不修改学习偏好或导航契约；见[首页](home.md)。
 
 笔记引用的电脑/鸿蒙协议、字段持久化、卡面桥与 UI 所有者见 [双端笔记引用](note-links.md)。
+
+## 外部 Agent 接入
+
+本机 MCP 的收帧/鉴权/回执复用归 `model/external-agent/LocalMcpProtocol.ts`，Socket 与连接资源归 `backend/external-agent/LocalMcpServer.ets`；`ExternalAgentBridge.ets` 只复用真实 Registry 并把结果交回原 JIDE 页面，不取得确认执行器。页面持有监听会话、原草稿/动作界面和确认；结果派生归 `ExternalRequestStatus.ts`。当前入口、生命周期、工单与验证边界见 [外部 Agent 本地 MCP](external-agent.md)。

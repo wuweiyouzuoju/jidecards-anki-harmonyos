@@ -1,5 +1,19 @@
 # jidecards 文档导航
 
+## 核心文档
+
+第一次阅读本项目，按以下顺序即可了解架构、规范和质量保障：
+
+| 文档 | 内容 |
+| --- | --- |
+| [当前架构](architecture.md) | 系统边界、ArkTS → Node-API → Rust Core 调用链、目录职责与数据流 |
+| [模块责任与边界](development/ownership.md) | 每个目录的所有者、修改入口、调用边界和对应测试 |
+| [编码规范](development/coding-standards.md) | 分层、命名、ArkTS 约束、资源、日志、注释、测试，以及每条规则的自动检查方式 |
+| [代码检查记录](quality/code-linter.md) | DevEco Code Linter 配置、检查范围、规则调整依据与当前结果 |
+| [验证与工具入口](development/verification.md) | 测试分级、HAP 警告门禁、协议检查、源码导出与设备验收 |
+| [长期决策](decisions/README.md) | 跨模块设计决策及其状态 |
+| [贡献指南](../CONTRIBUTING.md) | 开发环境、提交与验证要求 |
+
 ## 用户与贡献者入口
 
 - [项目 README](../README.md)：下载、功能、兼容范围、数据与构建入口。
@@ -9,17 +23,20 @@
 
 ## 当前文档
 
+- [外部 Agent 本地 MCP](development/external-agent.md)：PC/2in1 显式授权、JIDE 全工具接入、应用内确认与验证边界。
+
 - [弹窗玻璃与关闭契约](development/dialog-glass.md)：居中框、按钮菜单、公共责任、用户验证与待复验项。
 - [原生表面规范](development/material-standard.md)：当前材质、深色描边及主题实时刷新规则。
 
 - [电脑与鸿蒙的笔记引用](development/note-links.md)：共享协议、旧插件迁移、原生界面和可复现验证。
 
 - [Agent 任务入口](../PROJECT_CONTEXT.md)：按任务读取模块约束与验证入口。
+- [华为应用市场发布流水线](development/appgallery-release.md)：版本、正式签名 APP、版本说明、上传与升级草稿。
 - [本地验证与源码导出](development/verification.md)：领域测试、完整构建和设备验收。
 - [地区语言与长文案布局](development/localization.md)：资源、地区格式、编辑工具占位布局与设备矩阵。
 - [数据导入、导出与恢复](development/import-data.md)：APKG 选项、CSV 映射、笔记/卡片文本导出、取消、结果与中断恢复。
 - [Anki / AnkiDroid 核心互通回归](development/core-interop.md)：隔离样本、真实 Core 往返、取消与恢复、设备和在线未验证范围。
-- [本轮 Anki 补齐成果审查](development/anki-parity-review-2026-10-02.md)：2026-10-02 对七项成果、版本约束、实现问题和验收边界的检查记录。
+- [本轮 Anki 补齐成果审查](archive/development/anki-parity-review-2026-10-02.md)：2026-10-02 对七项成果、版本约束、实现问题和验收边界的检查记录。
 - [Core 协议生成与接通清单](development/core-protocol.md)：生成协议、当前调用者、差分和真实 Core 验证；产品能力仍沿领域入口核对。
 - [剩余接入的 UI 与 JIDE 分工](decisions/2026-10-04-ankicore-ui-routing.md)：较复杂 UI 通过 JIDE 接入，极简或无需新增 UI 的事项单独整理。
 
@@ -45,12 +62,14 @@
 
 ## 历史材料
 
-- [2026-10-11 设置接入审查](development/settings-integration-audit-2026-10-11.md)：当日复杂预设、FSRS、限额、过滤牌组和 JIDE 图表偏好的真实 Core 反例与验证记录；当前能力仍归设置及各领域拥有者。
-- [2026-10-10 过期知识与断言检查](development/stale-knowledge-audit-2026-10-10.md)：本轮发现、修复及验证范围，不替代当前领域事实。
+带日期的审查、验证和交接记录集中在 [archive/](archive/README.md)，只说明当时的状态，不代表当前实现。
+
+- [2026-10-11 设置接入审查](archive/development/settings-integration-audit-2026-10-11.md)：当日复杂预设、FSRS、限额、过滤牌组和 JIDE 图表偏好的真实 Core 反例与验证记录；当前能力仍归设置及各领域拥有者。
+- [2026-10-10 过期知识与断言检查](archive/development/stale-knowledge-audit-2026-10-10.md)：本轮发现、修复及验证范围，不替代当前领域事实。
 - [3.0.0 未发布草案](releases/3.0.0.md)：历史发布文案草案，不是已发布版本。
 - [源码架构长文](CSDN-记得闪卡项目全解.md)：2026-09-08 的历史源码导读快照，版本和统计数字不代表当前工作树。
 - [一次性设计与执行记录](superpowers/README.md)：按日期保留的 plan/spec 归档。
-- [2026-10-04 Anki Core 接入盘点](development/ankicore-integration-audit-2026-10-04.md)：当时的 22 组缺口和 232 个 RPC 快照；后续已接通项不再作为当前待办。
+- [2026-10-04 Anki Core 接入盘点](archive/development/ankicore-integration-audit-2026-10-04.md)：当时的 22 组缺口和 232 个 RPC 快照；后续已接通项不再作为当前待办。
 - [页面间距检查记录](UI_SPACING.md)：2026-09-14 的检查快照；当前尺寸以源码为准。
 
 ## 事实优先级
