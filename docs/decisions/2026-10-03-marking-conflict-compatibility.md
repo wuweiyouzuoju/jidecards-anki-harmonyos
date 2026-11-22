@@ -21,4 +21,4 @@
 
 该目标不是现有原版协议已经实现的保证。要修复原版 AnkiDroid 之间的缺口，需在共同 Core／协议中完成修订记录、同版本决胜及接受规则，或在原协议可表达范围内证明兼容修复。只改 JideCards，无法改变两台未修改 AnkiDroid 的执行行为；也不能假造修改时间把同步顺序变成编辑顺序。
 
-当前并发一致性要求仍未满足。验收：`cargo test -p jidecards_core --features anki-core --locked --test card_marking`；实际结果见[源码对照与验证](../development/flags-marking-audit-2026-10-03.md)。不安装设备，不访问用户集合或真实账户。
+当前并发一致性要求仍未满足。验收：`cargo test -p jidecards_core --features anki-core --locked --test card_marking`；实际结果见[源码对照与验证](../archive/development/flags-marking-audit-2026-10-03.md)。不安装设备，不访问用户集合或真实账户。

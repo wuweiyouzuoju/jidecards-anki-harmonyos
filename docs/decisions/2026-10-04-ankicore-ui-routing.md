@@ -2,7 +2,7 @@
 
 状态：当前入口归属决策。依据用户 2026-10-04 的要求，需要较复杂 UI 的配置能力通过 JIDE 提供，极简或无需新增 UI 的事项复用现有界面。下表按原 G 编号链接当前拥有者；后文保留原入口分工及历史验收，不作为待办或当前测试结果。
 
-[完整接入盘点](../development/ankicore-integration-audit-2026-10-04.md) · [决策索引](README.md) · [应用内 Agent](../development/agent.md)
+[完整接入盘点](../archive/development/ankicore-integration-audit-2026-10-04.md) · [决策索引](README.md) · [应用内 Agent](../development/agent.md)
 
 ## 当前接入进度（2026-10-05）
 
@@ -15,7 +15,7 @@
 | G13 | JIDE propose_update_notetype_latex 使用真实原始类型快照，复用双重确认卡展示源码/SVG 差异，提交前复查类型与跨牌组影响，保存后回读。只改指定配置；TeX 编译和生成预览仍未实现。 |
 | G16 | APKG 面板打开或选中文件后读取 GetImportAnkiPackagePresets；读取失败阻止提交，外部 URI 在等确认期间保留租约。 |
 | G22 | 从 Core 解码到声音/TTS 播放保持原顺序，仅合并相邻同类项。 |
-| G06/G17/G21（2026-10-07） | 已接 Core 音频偏好/单项播放、导入结果笔记定位、筛选牌组维护与 JIDE 配置提案；真实行为、HAP及模拟器验收见[本轮记录](../development/ankidroid-high-priority-2026-10-07.md)。 |
+| G06/G17/G21（2026-10-07） | 已接 Core 音频偏好/单项播放、导入结果笔记定位、筛选牌组维护与 JIDE 配置提案；真实行为、HAP及模拟器验收见[本轮记录](../archive/development/ankidroid-high-priority-2026-10-07.md)。 |
 | G01（2026-10-07） | 已接同步 JavaScript 沙箱、完整 SchedulingContext、原生候选校验和显式失败确认；现有高级选项支持编辑/清空集合脚本，JIDE 可读执行能力。异步、DOM 与网络脚本仍不支持；责任及验证入口见[自定义调度执行边界](2026-10-07-custom-scheduling.md)。 |
 | G04 | 手动牌组菜单和 JIDE 已共用真实 Core 改名、后代路径预览及冲突/过期校验；本机别名继续独立保留。入口与验证见[首页](../development/home.md#牌组真实改名与本机显示名称)。 |
 | G14 | 普通浏览界面与 JIDE 已共用 Cards/Notes 显示列、顺序、排序和真实 Core 偏好。当前行为与鸿蒙 PC 待验范围见[浏览列表](../development/browser-stats.md#浏览列表)。 |
