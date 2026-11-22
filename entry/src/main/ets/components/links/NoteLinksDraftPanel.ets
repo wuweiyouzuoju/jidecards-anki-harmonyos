@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
+import { NoteLinkGraphPanel } from './NoteLinkGraphPanel';
+import { EditorSectionCard } from '../common/EditorSectionCard';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogSearchHeader } from '../common/DialogSearchHeader';
 import { SettingsActionRow } from '../common/SettingsActionRow';
@@ -10,6 +13,7 @@ import { NoteLinkTarget, NoteLinkRow } from '../../model/NoteLinks';
 import { noteReferences, noteReferenceData, changeNoteReferences, stageNoteReferenceFields, noteReferenceUrl } from '../../model/NoteReferences';
 import { encodeNoteText } from '../../model/NoteRichText';
 import { noteLinksService } from '../../backend/NoteLinksService';
+import { AppInterfaceControl } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
 
 interface DraftReferenceRow { target: NoteLinkTarget; label: string; occurrence: number; key: string; }
@@ -17,29 +21,36 @@ interface DraftReferenceRow { target: NoteLinkTarget; label: string; occurrence:
 /** 编辑表单草稿的管理视图；不调用关联写入服务。 */
 @Component
 export struct NoteLinksDraftPanel {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop fields: string[] = [];
   @Prop sourceGuid: string = '';
   @Prop noteId: number = 0;
+  @Prop initialGraphCenter: number = 0;
+  @State private graphCenter: number = 0;
   @Prop @Watch('back') backRequest: number = 0;
   onClose: () => void = (): void => {};
   onChange: (fields: string[]) => void = (_fields: string[]): void => {};
-  onPreview: (ids: number[]) => void = (_ids: number[]): void => {};
+  onPreview: (ids: number[], graphCenter?: number) => void = (_ids: number[]): void => {};
   @State private rows: NoteLinkTarget[] = [];
   @State private incoming: NoteLinkRow[] = [];
   @State private results: NoteLinkTarget[] = [];
   @State private query: string = '';
-  @State private busy: boolean = false;
+  @State @Watch('observe') private busy: boolean = false;
   @State private searching: boolean = false;
   private searchGeneration: number = 0;
   @State private error: string = '';
-  @State private editingGuid: string = '';
+  @State @Watch('observe') private editingGuid: string = '';
   private editingOccurrence: number = -1;
   @State private label: string = '';
   private mounted: boolean = false;
   private generation: number = 0;
-  aboutToAppear(): void { this.mounted = true; this.load(); }
+  aboutToAppear(): void { this.mounted = true; this.graphCenter = this.initialGraphCenter; this.load(); }
   aboutToDisappear(): void { this.mounted = false; this.generation++; this.searchGeneration++; appInterface.leave('note_links_draft'); }
-  private back(): void { if (this.editingGuid !== '') this.editingGuid = ''; else this.onClose(); }
+  private back(): void {
+    if (this.graphCenter > 0) this.graphCenter = 0;
+    else if (this.editingGuid !== '') this.editingGuid = '';
+    else this.onClose();
+  }
   private targets(): string[] {
     const explicit: string[] = this.sourceGuid === '' ? [] : noteReferenceData(this.fields, this.sourceGuid).targets;
     return Array.from(new Set<string>(explicit.concat(noteReferences(this.fields).map((ref): string => ref.guid))));
@@ -59,10 +70,15 @@ export struct NoteLinksDraftPanel {
   }
   private observe(): void {
     if (!this.mounted) return;
+    const items: AppInterfaceControl[] = [
+      { id: 'close', titleKey: 'done', title: '', enabled: true, selected: false },
+      { id: 'search', titleKey: 'note_reference_search', title: '', enabled: true, selected: false }
+    ];
+    if (this.noteId > 0 && this.editingGuid === '') {
+      items.push({ id: 'graph', titleKey: 'note_link_graph_open_saved', title: '', enabled: !this.busy, selected: false });
+    }
     appInterface.observe({ surface: 'note_links_draft', sectionId: 'draft', selectedId: '', optionIds: [], optionLabels: [],
-      busy: this.busy, controlsComplete: true, items: [
-        { id: 'close', titleKey: 'done', title: '', enabled: true, selected: false },
-        { id: 'search', titleKey: 'note_reference_search', title: '', enabled: !this.busy, selected: false }],
+      busy: this.busy, controlsComplete: true, items,
       values: [{ id: 'outgoing_count', value: String(this.rows.length) }, { id: 'incoming_count', value: String(this.incoming.length) },
         { id: 'persistence', value: 'note_draft' }] });
   }
@@ -100,7 +116,7 @@ export struct NoteLinksDraftPanel {
     this.query = value; this.searchGeneration++; this.searching = false; this.results = []; this.error = ''; this.observe();
   }
   private async search(): Promise<void> {
-    if (this.busy || !this.mounted || this.query.trim() === '') return;
+    if (!this.mounted || this.query.trim() === '') return;
     const generation: number = ++this.searchGeneration; this.searching = true;
     try {
       const results: NoteLinkTarget[] = await noteLinksService.search(this.query, this.sourceGuid);
@@ -111,37 +127,52 @@ export struct NoteLinksDraftPanel {
   @Builder
   private header() {
     DialogSearchHeader({ title: $r('app.string.note_links_title'), onClose: (): void => { this.back(); },
-      query: this.query, placeholder: $r('app.string.note_links_search_hint'), searchEnabled: !this.busy, showSearch: this.editingGuid === '',
+      query: this.query, placeholder: $r('app.string.note_links_search_hint'), showSearch: this.editingGuid === '',
       onChange: (value: string): void => { this.queryChanged(value); }, onSearch: (): void => { this.search(); } })
   }
   @Builder
   private content() {
     Column({ space: 应用尺寸.间距_8 }) {
-      Text($r('app.string.note_reference_hint')).fontColor($r('app.color.text_secondary')).width('100%')
-      if (this.busy || this.searching) { LoadingProgress().width(32).height(32) }
+      Text($r('app.string.note_reference_hint')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       if (this.error !== '') {
         Text(this.error).fontColor($r('app.color.error_text')).width('100%')
         按下态按钮({ 文案: $r('app.string.note_links_reload'), 是否启用: !this.busy, 点击回调: (): void => { this.error = ''; this.load(); } })
       }
       if (this.editingGuid !== '') {
-        TextInput({ text: this.label }).attributeModifier(new FormInputStyle()).onChange((value: string): void => { this.label = value; })
+        TextInput({ text: this.label }).attributeModifier(new FormInputStyle( undefined, this.appearanceElements)).onChange((value: string): void => { this.label = value; })
         按下态按钮({ 文案: $r('app.string.done'), 是否启用: !this.busy && this.label.trim() !== '',
           点击回调: (): void => { this.changed(changeNoteReferences(this.fields, this.editingGuid, this.label, this.editingOccurrence)); } })
       } else {
-        Text($r('app.string.note_links_outgoing')).fontColor($r('app.color.text_secondary')).width('100%')
-        ForEach(this.displayRows(), (row: DraftReferenceRow) => {
-          SettingsActionRow({ title: row.label, isInteractive: !this.busy && row.target.cardIds.length > 0,
-            onAction: (): void => { this.onPreview(row.target.cardIds); } })
-          Row({ space: 应用尺寸.间距_8 }) {
-            按下态按钮({ 文案: $r('app.string.note_links_alias'), 是否启用: !this.busy && row.occurrence >= 0,
-              点击回调: (): void => { this.editingGuid = row.target.guid; this.editingOccurrence = row.occurrence; this.label = row.label; } })
-            按下态按钮({ 文案: $r('app.string.note_links_remove'), 是否启用: !this.busy, 点击回调: (): void => { this.remove(row.target.guid, row.occurrence); } })
+        if (this.noteId > 0) {
+          SettingsActionRow({ title: $r('app.string.note_link_graph_open_saved'), isInteractive: !this.busy,
+            onAction: (): void => { if (!this.busy) this.graphCenter = this.noteId; } })
+        }
+        Text($r('app.string.note_links_outgoing')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
+        EditorSectionCard() {
+          if (this.rows.length === 0) {
+            Text($r('app.string.note_links_empty'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           }
-        }, (row: DraftReferenceRow): string => row.key)
-        Text($r('app.string.note_links_incoming')).fontColor($r('app.color.text_secondary')).width('100%')
-        ForEach(this.incoming, (row: NoteLinkRow) => {
-          SettingsActionRow({ title: row.label, isInteractive: !this.busy && row.cardIds.length > 0, onAction: (): void => { this.onPreview(row.cardIds); } })
-        }, (row: NoteLinkRow): string => row.guid)
+          ForEach(this.displayRows(), (row: DraftReferenceRow) => {
+            SettingsActionRow({ title: row.label, isInteractive: !this.busy && row.target.cardIds.length > 0,
+              onAction: (): void => { this.onPreview(row.target.cardIds); } })
+            Row({ space: 应用尺寸.间距_8 }) {
+              按下态按钮({ 文案: $r('app.string.note_links_alias'), 是否启用: !this.busy && row.occurrence >= 0,
+                点击回调: (): void => { this.editingGuid = row.target.guid; this.editingOccurrence = row.occurrence; this.label = row.label; } })
+              按下态按钮({ 文案: $r('app.string.note_links_remove'), 是否启用: !this.busy, 点击回调: (): void => { this.remove(row.target.guid, row.occurrence); } })
+            }
+          }, (row: DraftReferenceRow): string => row.key)
+        }
+        Text($r('app.string.note_links_incoming')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
+        EditorSectionCard() {
+          if (this.incoming.length === 0) {
+            Text($r('app.string.note_links_empty'))
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
+          }
+          ForEach(this.incoming, (row: NoteLinkRow) => {
+            SettingsActionRow({ title: row.label, isInteractive: !this.busy && row.cardIds.length > 0, onAction: (): void => { this.onPreview(row.cardIds); } })
+          }, (row: NoteLinkRow): string => row.guid)
+        }
         ForEach(this.results, (target: NoteLinkTarget) => {
           SettingsActionRow({ title: target.title, isInteractive: !this.busy, onAction: (): void => { this.add(target); } })
         }, (target: NoteLinkTarget): string => target.guid)
@@ -149,6 +180,12 @@ export struct NoteLinksDraftPanel {
     }.width('100%')
   }
   build() {
-    DialogFrame({ header: () => { this.header(); }, content: () => { this.content(); }, onDismiss: (): void => { this.back(); } })
+    if (this.graphCenter > 0) {
+      NoteLinkGraphPanel({ initialCenter: this.graphCenter, onClose: (): void => { this.graphCenter = 0; },
+        onPreview: (ids: number[], center: number): void => { this.onPreview(ids, center); } })
+    } else {
+      DialogFrame({ protectPanelGestures: true, fixedHeight: 应用尺寸.noteReferenceDialogHeight,
+        bodyLoading: this.busy || this.searching, header: () => { this.header(); }, content: () => { this.content(); }, onDismiss: (): void => { this.back(); } })
+    }
   }
 }

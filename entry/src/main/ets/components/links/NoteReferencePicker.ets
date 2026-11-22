@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
 import { common } from '@kit.AbilityKit';
 import { DialogFrame } from '../common/DialogFrame';
 import { DialogSearchHeader } from '../common/DialogSearchHeader';
@@ -16,6 +17,7 @@ import { 解析是否深色, 主题模式 } from '../../model/主题设置';
 /** 只选择目标和当前引用文字；取消或预览不写入收藏库。 */
 @CustomDialog
 export struct NoteReferencePicker {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   controller?: CustomDialogController;
   sourceGuid: string = '';
   selectedText: string = '';
@@ -91,37 +93,38 @@ export struct NoteReferencePicker {
   @Builder
   private content() {
     Column({ space: 应用尺寸.间距_8 }) {
-      if (this.busy) { LoadingProgress().width(32).height(32) }
       if (this.error !== '') { Text(this.error).fontColor($r('app.color.error_text')).width('100%') }
       ForEach(this.rows, (target: NoteLinkTarget) => {
         SettingsActionRow({ title: target.title || target.guid, showDisclosure: false, isInteractive: !this.busy,
           onAction: (): void => { this.choose(target); } })
           .padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
           .backgroundColor(this.selected?.guid === target.guid ? $r('app.color.surface_selected') : Color.Transparent)
-          .borderRadius(应用尺寸.圆角_卡片)
+          .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
       }, (target: NoteLinkTarget): string => target.guid + target.title)
     }.width('100%')
   }
   @Builder
   private footer() {
-    if (this.selected !== null) {
-      Column({ space: 应用尺寸.间距_8 }) {
-        Text($r('app.string.note_reference_text')).fontColor($r('app.color.text_secondary')).width('100%')
-        Row({ space: 应用尺寸.间距_8 }) {
-        TextInput({ text: this.label }).attributeModifier(new FormInputStyle())
-          .layoutWeight(1)
+    Column({ space: 应用尺寸.间距_8 }) {
+      Text($r('app.string.note_reference_text'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
+      Row({ space: 应用尺寸.间距_8 }) {
+        TextInput({ text: this.selected === null ? '' : this.label })
+          .attributeModifier(new FormInputStyle(undefined, this.appearanceElements))
+          .layoutWeight(1).enabled(!this.busy && this.selected !== null)
           .onChange((value: string): void => { this.label = value; })
         IconActionButton({ source: $r('app.media.ic_common_preview'), label: $r('app.string.note_draft_preview'),
-          toolbarStyle: true, isInteractive: this.selected.cardIds.length > 0,
+          toolbarStyle: true, isInteractive: !this.busy && (this.selected?.cardIds.length ?? 0) > 0,
           onAction: (): void => { this.previewing = true; this.observe(); } })
-        }.width('100%')
       }.width('100%')
-    }
+    }.width('100%')
   }
+
   build() {
     Stack() {
-      DialogFrame({ nativeHost: true, header: () => { this.header(); }, content: () => { this.content(); },
-        showFooter: this.selected !== null, footer: () => { this.footer(); },
+      DialogFrame({ nativeHost: true, fixedHeight: 应用尺寸.noteReferenceDialogHeight, bodyLoading: this.busy,
+        header: () => { this.header(); }, content: () => { this.content(); },
+        showFooter: true, footer: () => { this.footer(); },
         onDismiss: (): void => { this.back(); } })
       if (this.previewing && this.selected !== null) {
         卡片预览页({ 卡片ID列表: this.selected.cardIds, 媒体目录: this.mediaDirectory(), isDark: 解析是否深色(this.theme, this.systemDark), linksReadOnly: true,
