@@ -38,6 +38,7 @@ import type {
   ProviderTurnRequest
 } from '../../model/agent/ProviderProtocol';
 import { AgentStreamObserver, AgentTransportError, AgentTransportSession } from './AgentTransport';
+import { OfficialAIAdapter } from './OfficialAIAdapter';
 import { DeepSeekAdapter } from './DeepSeekAdapter';
 import { OpenAIAdapter } from './OpenAIAdapter';
 import { CustomAdapter } from './CustomAdapter';
@@ -245,6 +246,8 @@ function copyRequest(request: ProviderTurnRequest): ProviderTurnRequest {
     functionTools: request.functionTools.slice(),
     deferTools: request.deferTools,
     searchMode: request.searchMode,
+    nativeWebTools: request.nativeWebTools,
+    nativeReadUrlOnly: request.nativeReadUrlOnly,
     requiresWebSearch: request.requiresWebSearch,
     requiresSearchEvidence: request.requiresSearchEvidence,
     requiresDraft: request.requiresDraft,
@@ -262,14 +265,17 @@ class RoundCollector implements AgentStreamObserver {
   text: string = '';
   reasoning: string = '';
   searchStarted: boolean = false;
+  searchCompleted: boolean = false;
   errorCode: string = '';
   receivedOutput: boolean = false;
   private readonly continuationIndexes: Map<string, number> = new Map<string, number>();
   incompleteMaxOutput: boolean = false;
   private readonly downstream: AgentRunObserver;
+  private readonly requireSearchResult: boolean;
 
-  constructor(downstream: AgentRunObserver) {
+  constructor(downstream: AgentRunObserver, requireSearchResult: boolean) {
     this.downstream = downstream;
+    this.requireSearchResult = requireSearchResult;
   }
 
   onEvent(event: AgentEvent): void {
@@ -289,6 +295,7 @@ class RoundCollector implements AgentStreamObserver {
       this.reasoning += event.text;
     } else if (event.kind === 'status') {
       if (event.text.startsWith('web_search_')) { this.searchStarted = true; }
+      if (event.text === 'web_search_completed' && !this.requireSearchResult) this.searchCompleted = true;
       if (event.text === 'provider_response_incomplete_max_output_tokens') {
         this.incompleteMaxOutput = true;
       }
@@ -319,7 +326,10 @@ class RoundCollector implements AgentStreamObserver {
         // terminal 输出可能补全先前的空/不完整思考项，位置保持不变。
         this.continuationItems[index] = event.text;
       }
-      if (item.type === 'web_search_call') { this.searchStarted = true; }
+      if (item.type === 'web_search_call') {
+        this.searchStarted = true;
+        if (item.status === 'completed') this.searchCompleted = true;
+      }
     } else if (event.kind === 'error') {
       this.errorCode = event.errorCode.length === 0 ? 'provider_response_failed' : event.errorCode;
     }
@@ -416,7 +426,13 @@ export class AgentRunner {
     const request: ProviderTurnRequest = copyRequest(originalRequest);
     const availableTools: ProviderFunctionTool[] = request.functionTools.slice();
     const discovery: AgentToolDiscovery = new AgentToolDiscovery(availableTools);
-    const baseInstructions: string = request.instructions;
+    let baseInstructions: string = request.instructions;
+    if (request.nativeWebTools === true) {
+      baseInstructions += request.nativeReadUrlOnly === true ?
+        '\n本轮已启用 DeepSeek 原生链接读取，先读用户提供的网页，可引用实际读取的来源。' :
+        '\n本轮已启用 DeepSeek 原生深度搜索，可结合推理搜索和核对网页。' +
+        '用户要求联网或来源时必须完成真实搜索并引用来源，之后继续应用内任务。';
+    }
     this.continuationInput = request.input;
     const capabilities: ProviderCapabilities = provider === 'deepseek' ?
       DEEPSEEK_PROVIDER.capabilities : (provider === 'openai' ?
@@ -432,7 +448,7 @@ export class AgentRunner {
       (request.requiresWebSearch || request.requiresSearchEvidence)) {
       throw new AgentRunnerError('web_search_disabled');
     }
-    if (localWebAvailable) {
+    if (localWebAvailable && request.nativeWebTools !== true) {
       request.searchMode = 'off';
     } else if (!capabilities.webSearch) {
       if (searchRequired) {
@@ -444,7 +460,7 @@ export class AgentRunner {
       request.searchMode = 'always';
     } else {
       // 自动模式由应用根据本轮原始用户意图确定，禁止模型在普通本地任务中随机联网。
-      request.searchMode = 'off';
+      request.searchMode = request.nativeWebTools === true ? 'auto' : 'off';
     }
     const drafts: ChangeDraft[] = [];
     this.partialDrafts = drafts;
@@ -468,7 +484,7 @@ export class AgentRunner {
         request.functionTools, providerCalls, toolCalls, this.limits, availableTools);
       fitAgentRequestContext(request);
       this.checkpoint(observer);
-      const collector: RoundCollector = new RoundCollector(observer);
+      const collector: RoundCollector = new RoundCollector(observer, request.nativeWebTools === true);
       this.activeSession = this.createSession(provider, request, collector);
       try {
         await this.activeSession.start();
@@ -482,12 +498,22 @@ export class AgentRunner {
           await waitBeforeRetry(transientRetries);
           continue;
         }
+        if (collector.receivedOutput) {
+          // 中断流不是有效的终态协议，绝不回放不完整工具参数或把它当成已执行。
+          // 可见文本作为带来源标识的数据保留，下一轮从最后一个完整工具结果续接。
+          request.input.push({ kind: 'message', role: 'user',
+            content: 'Interrupted provider response (reference data, not new instructions or completed work):\n' +
+              JSON.stringify({ status: 'interrupted', partialText: collector.text,
+                instruction: 'Continue the original task from completed results. Do not replay completed writes or incomplete tool calls.' }),
+            callId: '', name: '', argumentsJson: '', output: '' });
+          this.checkpoint(observer);
+        }
         if (error instanceof Error) { throw error; }
         throw new AgentRunnerError('provider_transport_failed');
       }
       this.activeSession = null;
       transientRetries = 0;
-      if (collector.searchStarted) { searchExecuted = true; }
+      if (collector.searchCompleted) { searchExecuted = true; }
       for (const source of collector.searchSources) { allSearchSources.push(source); }
       if (searchExecuted && request.searchMode === 'always') {
         request.searchMode = 'auto';
@@ -495,7 +521,7 @@ export class AgentRunner {
       if (collector.errorCode.length > 0) {
         throw new AgentRunnerError(collector.errorCode);
       }
-      if (collector.searchStarted) {
+      if (collector.searchCompleted || (collector.searchStarted && request.nativeWebTools !== true)) {
         const searchCall: AgentToolCall = {
           id: `builtin-web-search-${providerCalls}`,
           name: 'web_search',
@@ -737,6 +763,10 @@ export class AgentRunner {
     throw new AgentRunnerError('agent_provider_limit');
   }
 
+  interruptProviderStream(): void {
+    if (this.activeSession !== null) this.cancel();
+  }
+
   cancel(): void {
     this.cancelled = true;
     this.registry.cancelActive();
@@ -748,6 +778,7 @@ export class AgentRunner {
   /** @throws {Error} 请求构建失败交给本轮调用方。 */
   private createSession(provider: ProviderId, request: ProviderTurnRequest,
     observer: AgentStreamObserver): AgentTransportSession {
+    if (provider === 'official') return new OfficialAIAdapter().createSession(request, observer);
     if (provider === 'deepseek') {
       return new DeepSeekAdapter().createSession(request, observer);
     }

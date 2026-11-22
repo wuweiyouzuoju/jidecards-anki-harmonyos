@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor, appearanceTextColor } from '../../utils/AppearanceElements';
 import { AgentMarkdownBlock, AgentMarkdownRow, parseAgentMarkdown } from '../../model/agent/AgentMarkdown';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { AgentTextRun, parseAgentBoldRuns } from '../../model/agent/AgentTextFormatting';
@@ -11,6 +12,7 @@ interface MarkdownPosition { blockIndex: number; rowIndex: number; columnIndex: 
 /** 对话共用渲染入口；原生文字/表格与离线公式组合，不执行回复中的 HTML。 */
 @Component
 export struct AgentMarkdownText {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('contentChanged') text: string = '';
   @Prop textColor: ResourceColor = $r('app.color.text_primary');
   @Prop fontSize: number = 应用尺寸.字号_正文;
@@ -49,7 +51,7 @@ export struct AgentMarkdownText {
       ForEach(parseAgentBoldRuns(this.positionText(ctx)), (run: AgentTextRun) => {
         Span(run.text).fontWeight(ctx.rowIndex === 0 || run.bold ? FontWeight.Bold : FontWeight.Normal)
       })
-    }.fontSize(this.fontSize).fontColor(this.textColor).width('100%')
+    }.fontSize(this.fontSize).fontColor(appearanceTextColor(this.appearanceElements, this.textColor)).width('100%')
     .textAlign(this.positionAlignment(ctx))
     .copyOption(CopyOptions.LocalDevice)
   }
@@ -64,8 +66,8 @@ export struct AgentMarkdownText {
       }, (_cell: string, columnIndex: number): string => `${columnIndex}`)
     }.alignItems(VerticalAlign.Top)
     .width(this.columnWidth(ctx.blockIndex) * this.blocks[ctx.blockIndex].alignments.length)
-    .backgroundColor(ctx.rowIndex === 0 ? $r('app.color.surface_page') : $r('app.color.surface_card'))
-    .border(SurfaceBorder.options({ bottom: 1 }))
+    .backgroundColor(ctx.rowIndex === 0 ? appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page')) : $r('app.color.surface_card'))
+    .border(SurfaceBorder.options({ bottom: 1 }, undefined, this.appearanceElements))
   }
 
   @Builder
@@ -75,7 +77,7 @@ export struct AgentMarkdownText {
         ForEach(this.blocks[ctx.blockIndex].rows, (_row: AgentMarkdownRow, rowIndex: number) => {
           this.tableRow({ blockIndex: ctx.blockIndex, rowIndex: rowIndex, columnIndex: -1 })
         }, (_row: AgentMarkdownRow, rowIndex: number): string => `${rowIndex}`)
-      }.border(SurfaceBorder.options())
+      }.border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
     }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Auto).width('100%')
   }
 
@@ -88,7 +90,7 @@ export struct AgentMarkdownText {
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
       if (this.containsMath) {
-        AgentMathText({ text: this.text, textColor: this.textColor, fontSize: this.fontSize })
+        AgentMathText({ text: this.text, textColor: appearanceTextColor(this.appearanceElements, this.textColor), fontSize: this.fontSize })
       } else {
         ForEach(this.blocks, (_block: AgentMarkdownBlock, index: number) => {
           this.blockContent({ blockIndex: index, rowIndex: -1, columnIndex: -1 })

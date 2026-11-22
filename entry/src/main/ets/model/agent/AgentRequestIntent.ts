@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-function boundedCount(value: string, maximum: number): number {
+function positiveCount(value: string): number {
   const count: number = Number(value);
-  return Number.isSafeInteger(count) && count > 0 && count <= maximum ? count : 0;
+  return Number.isSafeInteger(count) && count > 0 ? count : 0;
 }
 
 /** 只识别带制卡量词的显式数量，避免把 1949 等知识内容误当卡片数。 */
-export function inferRequestedCardCount(text: string, maximum: number): number {
+export function inferRequestedCardCount(text: string): number {
   const compact: string = text.toLocaleLowerCase().replace(/\s+/g, '');
   const patterns: RegExp[] = [
-    /(\d{1,3})(?:张|道|个|条)(?:卡|题|闪卡)?/,
-    /(\d{1,3})(?:zhang|dao|ge|tiao)(?:ka|ti|flashcard)?/,
-    /(\d{1,3})(?:flashcards?|cards?)/
+    /(\d+)(?:张|道|个|条)(?:卡|题|闪卡)?/,
+    /(\d+)(?:zhang|dao|ge|tiao)(?:ka|ti|flashcard)?/,
+    /(\d+)(?:flashcards?|cards?)/
   ];
   for (const pattern of patterns) {
     const match: RegExpMatchArray | null = compact.match(pattern);
     if (match !== null && match.length > 1) {
-      const count: number = boundedCount(match[1], maximum);
+      const count: number = positiveCount(match[1]);
       if (count > 0) { return count; }
     }
   }

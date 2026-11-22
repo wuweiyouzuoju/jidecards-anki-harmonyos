@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { localeDate } from '../../utils/LocaleFormatting';
 import { AgentMemoryManager } from '../../model/agent/AgentMemoryManagement';
 import type { AgentMemoryRepository } from '../../model/agent/AgentMemoryManagement';
@@ -23,6 +24,7 @@ import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 
 @Component
 export struct AgentMemoryPanel {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) private narrowDeckLayout: boolean = false;
   repository: AgentMemoryRepository | null = null;
@@ -201,7 +203,7 @@ export struct AgentMemoryPanel {
     Scroll() {
       Column({ space: FormRowLayout.rowGap }) {
         Text($r('app.string.agent_memory_description')).fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         if (this.errorText !== '' && !this.editing) {
           Text(this.errorText).fontColor($r('app.color.error_text')).width('100%')
           按下态按钮({ 文案: $r('app.string.common_retry'), 是否启用: !this.busy,
@@ -220,11 +222,11 @@ export struct AgentMemoryPanel {
           }, onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('memory_filter_scope', view); } })
         if (this.loading) {
           LoadingProgress().width(应用尺寸.加载指示器尺寸).height(应用尺寸.加载指示器尺寸)
-            .color($r('app.color.text_secondary')).alignSelf(ItemAlign.Center)
+            .color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).alignSelf(ItemAlign.Center)
         }
         else if (this.errorText === '' && this.filtered().length === 0) {
           Text($r('app.string.agent_memory_empty')).fontSize(应用尺寸.字号_正文)
-            .fontColor($r('app.color.text_secondary')).width('100%').textAlign(TextAlign.Center)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%').textAlign(TextAlign.Center)
             .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
         }
         ForEach(this.filtered(), (memory: AgentMemory) => {
@@ -238,11 +240,11 @@ export struct AgentMemoryPanel {
                 label: $r('app.string.ai_agent_memory_delete'), isInteractive: !this.busy && !this.loading,
                 onAction: (): void => { this.remove(memory); } })
             }.width('100%')
-            Text(memory.text).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+            Text(memory.text).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
             Text(this.scopeLabel(memory.scope) + ' · ' + localeDate(memory.updatedAt, this.uiLanguage))
-              .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+              .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           }.width('100%').padding(应用尺寸.间距_10).backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-            .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+            .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         }, (memory: AgentMemory): string => memory.id)
       }.width('100%').alignItems(HorizontalAlign.Start)
         .padding({ left: 应用尺寸.页面内边距_水平, right: 应用尺寸.页面内边距_水平,

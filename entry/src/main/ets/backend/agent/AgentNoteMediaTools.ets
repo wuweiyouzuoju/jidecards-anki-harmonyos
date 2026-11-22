@@ -8,8 +8,7 @@ import { AgentDocumentStore } from './AgentDocumentStore';
 import { AgentDocumentAccess, AgentDocumentInfo } from '../../model/agent/AgentDocuments';
 import { agentNoteMediaItems, agentLocalMediaFilename, decodeAgentNoteMediaArguments,
   agentNoteMediaTools, AgentNoteMediaArguments, AgentNoteMediaItem } from '../../model/agent/AgentNoteMedia';
-import { AGENT_IMPORT_MAX_FILE_BYTES, AGENT_IMPORT_MAX_VIDEO_BYTES,
-  agentFileExtension, isSupportedAgentImageFile, isSupportedAgentVideoFile } from '../../model/agent/AgentFileImport';
+import { agentFileExtension, isSupportedAgentImageFile, isSupportedAgentVideoFile } from '../../model/agent/AgentFileImport';
 
 class NoteMediaReadHandler implements AgentReadToolHandler {
   private tools: AgentNoteMediaTools;
@@ -66,12 +65,15 @@ export class AgentNoteMediaTools {
     const file: fs.File = fs.openSync(path, fs.OpenMode.READ_ONLY);
     try {
       const stat: fs.Stat = fs.statSync(file.fd);
-      const limit: number = item.kind === 'video' ? AGENT_IMPORT_MAX_VIDEO_BYTES : AGENT_IMPORT_MAX_FILE_BYTES;
-      if (!stat.isFile() || stat.size <= 0 || stat.size > limit) throw new Error('note_media_file_size_invalid');
+      if (!stat.isFile() || stat.size <= 0) throw new Error('note_media_file_size_invalid');
       this.sequence++;
-      const document: AgentDocumentInfo = this.store.stage(conversationId, file,
+      const document: AgentDocumentInfo = await this.store.stage(conversationId, file,
         { id: `note-${args.noteId}-${Date.now()}-${this.sequence}`, name: filename, extension: agentFileExtension(filename),
           byteSize: stat.size, pageCount: 1, warningCode: '' });
+      if (version !== this.generation || conversationId !== this.access.currentConversationId()) {
+        this.store.discardStaged(conversationId, document.id);
+        throw new Error('cancelled');
+      }
       this.store.submit(conversationId, [document.id]);
       this.access.submit([document.id]);
       return JSON.stringify({ status: 'media_available', noteId: args.noteId, fieldOrd: item.fieldOrd,

@@ -2,7 +2,6 @@
 
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
-import { normalizeBatchLimit } from '../../model/agent/AgentPolicy';
 import type { ProviderId } from '../../model/agent/AgentTypes';
 import { DEEPSEEK_PROVIDER, OPENAI_PROVIDER, normalizeDeepSeekModel } from '../../model/agent/ProviderCatalog';
 import { loadAgentSearchSecret } from './AgentSecretStore';
@@ -17,13 +16,8 @@ const OPENAI_MODEL_KEY: string = 'ai_agent_openai_model';
 const CUSTOM_BASE_URL_KEY: string = 'ai_agent_custom_base_url';
 const CUSTOM_MODEL_KEY: string = 'ai_agent_custom_model';
 const CUSTOM_VISION_KEY: string = 'ai_agent_custom_vision';
-const BATCH_LIMIT_KEY: string = 'ai_agent_batch_limit';
 const WEB_ENABLED_KEY: string = 'ai_agent_web_enabled';
 const SEARCH_PROVIDER_KEY: string = 'ai_agent_search_provider';
-
-const LEGACY_API_KEY: string = 'ai_api_key';
-const LEGACY_BASE_URL_KEY: string = 'ai_base_url';
-const LEGACY_MODEL_KEY: string = 'ai_model';
 
 export interface AgentSettings {
   selectedProvider: ProviderId;
@@ -32,29 +26,21 @@ export interface AgentSettings {
   customBaseUrl: string;
   customModel: string;
   customVisionEnabled?: boolean;
-  batchLimit: number;
-}
-
-export interface LegacyAIConfiguration {
-  apiKey: string;
-  baseUrl: string;
-  model: string;
 }
 
 export function defaultAgentSettings(): AgentSettings {
   return {
-    selectedProvider: 'deepseek',
+    selectedProvider: 'official',
     deepseekModel: DEEPSEEK_PROVIDER.defaultModel,
     openaiModel: OPENAI_PROVIDER.defaultModel,
     customBaseUrl: '',
-    customModel: '',
-    batchLimit: normalizeBatchLimit(100)
+    customModel: ''
   };
 }
 
 /** 判断当前选中的 Provider 是否具备可发起请求的完整配置。 */
 export function isAgentProviderConfigured(settings: AgentSettings, secret: string): boolean {
-  const model: string = settings.selectedProvider === 'deepseek' ? settings.deepseekModel :
+  const model: string = settings.selectedProvider === 'official' ? DEEPSEEK_PROVIDER.defaultModel : settings.selectedProvider === 'deepseek' ? settings.deepseekModel :
     (settings.selectedProvider === 'openai' ? settings.openaiModel : settings.customModel);
   if (secret.trim().length === 0 || model.trim().length === 0) { return false; }
   return settings.selectedProvider !== 'custom' || settings.customBaseUrl.trim().startsWith('https://');
@@ -83,10 +69,10 @@ function stringValue(value: preferences.ValueType, fallback: string): string {
 }
 
 function providerValue(value: string): ProviderId {
-  if (value === 'openai' || value === 'custom') {
+  if (value === 'deepseek' || value === 'openai' || value === 'custom' || value === 'official') {
     return value;
   }
-  return 'deepseek';
+  return 'official';
 }
 
 /** @throws {Error} strict 用于设置表单，读取失败时禁止以默认值覆盖已有配置。 */
@@ -98,8 +84,7 @@ export async function loadAgentSettings(strict: boolean = false): Promise<AgentS
     return defaults;
   }
   try {
-    const provider: string = stringValue(await store.get(PROVIDER_KEY, defaults.selectedProvider), 'deepseek');
-    const batchValue: preferences.ValueType = await store.get(BATCH_LIMIT_KEY, defaults.batchLimit);
+    const provider: string = stringValue(await store.get(PROVIDER_KEY, defaults.selectedProvider), defaults.selectedProvider);
     return {
       selectedProvider: providerValue(provider),
       deepseekModel: normalizeDeepSeekModel(stringValue(
@@ -108,8 +93,7 @@ export async function loadAgentSettings(strict: boolean = false): Promise<AgentS
         await store.get(OPENAI_MODEL_KEY, defaults.openaiModel), defaults.openaiModel),
       customBaseUrl: stringValue(await store.get(CUSTOM_BASE_URL_KEY, ''), ''),
       customModel: stringValue(await store.get(CUSTOM_MODEL_KEY, ''), ''),
-      customVisionEnabled: await store.get(CUSTOM_VISION_KEY, false) === true,
-      batchLimit: normalizeBatchLimit(typeof batchValue === 'number' ? batchValue : defaults.batchLimit)
+      customVisionEnabled: await store.get(CUSTOM_VISION_KEY, false) === true
     };
   } catch (error) {
     if (strict) { throw new Error('agent_settings_unavailable'); }
@@ -129,7 +113,6 @@ export async function saveAgentSettings(settings: AgentSettings): Promise<void> 
   await store.put(CUSTOM_BASE_URL_KEY, settings.customBaseUrl.trim());
   await store.put(CUSTOM_MODEL_KEY, settings.customModel.trim());
   await store.put(CUSTOM_VISION_KEY, settings.customVisionEnabled === true);
-  await store.put(BATCH_LIMIT_KEY, normalizeBatchLimit(settings.batchLimit));
   await store.flush();
 }
 
@@ -142,17 +125,6 @@ export async function loadAgentWebEnabled(): Promise<boolean> {
   return (await loadAgentSearchSecret(provider)).trim().length > 0;
 }
 
-/** @throws {Error} 联网偏好提交失败，由设置入口展示失败。 */
-export async function saveAgentWebEnabled(value: boolean): Promise<void> {
-  if (value && (await loadAgentSearchSecret(await loadAgentSearchProvider())).trim().length === 0) {
-    throw new Error('web_search_key_missing');
-  }
-  const store: preferences.Preferences | null = await openStore();
-  if (store === null) { throw new Error('agent_settings_unavailable'); }
-  await store.put(WEB_ENABLED_KEY, value);
-  await store.flush();
-}
-
 /** @throws {Error} 搜索服务配置读取失败。 */
 export async function loadAgentSearchProvider(): Promise<AgentSearchProvider> {
   const store: preferences.Preferences | null = await openStore();
@@ -160,37 +132,14 @@ export async function loadAgentSearchProvider(): Promise<AgentSearchProvider> {
   return normalizeAgentSearchProvider(stringValue(await store.get(SEARCH_PROVIDER_KEY, 'deepseek'), 'deepseek'));
 }
 
-/** @throws {Error} 搜索服务配置保存失败。 */
-export async function saveAgentSearchProvider(provider: AgentSearchProvider): Promise<void> {
+/** @throws {Error} 联网凭证校验或偏好写入失败，由设置表单展示。 */
+export async function saveAgentWebSettings(provider: AgentSearchProvider, enabled: boolean): Promise<void> {
+  if (enabled && (await loadAgentSearchSecret(provider)).trim().length === 0) {
+    throw new Error('web_search_key_missing');
+  }
   const store: preferences.Preferences | null = await openStore();
-  if (store === null) { throw new Error('agent_settings_unavailable'); }
+  if (store === null) throw new Error('agent_settings_unavailable');
   await store.put(SEARCH_PROVIDER_KEY, provider);
-  await store.flush();
-}
-
-export async function loadLegacyAIConfiguration(): Promise<LegacyAIConfiguration> {
-  const store: preferences.Preferences | null = await openStore();
-  if (store === null) {
-    return { apiKey: '', baseUrl: '', model: '' };
-  }
-  try {
-    return {
-      apiKey: stringValue(await store.get(LEGACY_API_KEY, ''), ''),
-      baseUrl: stringValue(await store.get(LEGACY_BASE_URL_KEY, ''), ''),
-      model: stringValue(await store.get(LEGACY_MODEL_KEY, ''), '')
-    };
-  } catch (error) {
-    return { apiKey: '', baseUrl: '', model: '' };
-  }
-}
-
-/** 只有调用方确认 Asset Store 写入成功后才能调用。 */
-/** @throws {Error} 设置提交或旧密钥清理失败，由设置/迁移入口处理。 */
-export async function clearLegacyAgentSecret(): Promise<void> {
-  const store: preferences.Preferences | null = await openStore();
-  if (store === null) {
-    throw new Error('agent_settings_unavailable');
-  }
-  await store.delete(LEGACY_API_KEY);
+  await store.put(WEB_ENABLED_KEY, enabled);
   await store.flush();
 }

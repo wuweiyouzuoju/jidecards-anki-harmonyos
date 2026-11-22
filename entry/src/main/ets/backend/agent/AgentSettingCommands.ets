@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { WHEEL_GRIP_KEY } from '../../model/EditorWheelPreferences';
+import { saveHomeLayout } from '../../utils/HomeLayoutStore';
 import { saveEditorWheelPreference } from '../../utils/EditorWheelPreferencesStore';
 import { saveSurfaceMaterial } from '../../utils/SurfaceMaterialStore';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { common } from '@kit.AbilityKit';
 import { readAgentPreference } from './AgentPreferenceReader';
 import { decodeWritablePreference } from '../../model/agent/AgentPreferenceSettings';
@@ -19,6 +21,7 @@ import { saveCardTextSize } from '../../utils/CardTextSizeStore';
 import { saveDeckListStyle } from '../../utils/DeckListAppearanceStore';
 import { saveMotionStyle } from '../../utils/MotionStyleStore';
 import { saveStudyHaptics } from '../../utils/StudyHaptics';
+import { saveStudyTwoButtons } from '../../utils/StudyAnswerButtons';
 import { 统计服务 } from '../统计服务';
 import type { WritableGraphPreferences } from '../GraphPreferencesCommands';
 import { graphPreferencesSnapshot, saveGraphPreferences } from '../GraphPreferencesCommands';
@@ -39,12 +42,15 @@ export function saveAgentSettingValue(id: string, after: string, before: string)
     if (await readAgentSettingValue(id) !== before) throw new Error('setting_changed_since_proposal');
     switch (id) {
       case 'card_text_size': await saveCardTextSize(Number(after),Number(before)); break;
+      case 'home_layout': await saveHomeLayout(after,before); break;
       case 'deck_list_style': await saveDeckListStyle(after,before); break;
       case 'surface_material': await saveSurfaceMaterial(after,before); break;
+      case WHEEL_GRIP_KEY:
       case 'editor_wheel_on_entry':
       case 'editor_wheel_on_keyboard': await saveEditorWheelPreference(id,after === 'true',before === 'true'); break;
       case 'motion_style': await saveMotionStyle(after,before); break;
       case 'study_haptics': await saveStudyHaptics(after === 'true',before === 'true'); break;
+      case 'study_two_buttons': await saveStudyTwoButtons(after === 'true',before === 'true'); break;
       case 'simple_mode': await 保存简洁模式(after === 'true',before === 'true'); break;
       case 'home_today_summary': await 保存显示今日进度卡(after === 'true',before === 'true'); break;
       case 'study_layout': await 保存学习布局模式(after as 学习布局模式,before); break;

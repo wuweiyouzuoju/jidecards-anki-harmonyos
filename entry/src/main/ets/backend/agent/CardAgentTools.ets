@@ -104,7 +104,7 @@ function parseFieldUpdates(json: string): FieldUpdate[] {
   } catch (error) {
     throw new AgentToolSchemaError('invalid_tool_arguments');
   }
-  if (!Array.isArray(raw) || raw.length > 1000) {
+  if (!Array.isArray(raw)) {
     throw new AgentToolSchemaError('invalid_tool_arguments');
   }
   const result: FieldUpdate[] = [];
@@ -319,7 +319,6 @@ export class CardAgentTools {
     }
     if (name === 'get_card_statistics') {
       this.scope.assertReadableCardIds(args.cardIds);
-      this.scope.assertBatchCount(args.cardIds.length);
       const historyLimit: number = Math.min(200, args.limit === 0 ? 50 : args.limit);
       const values: AgentCardStatisticsView[] = [];
       for (const id of args.cardIds) {
@@ -422,7 +421,6 @@ export class CardAgentTools {
     this.scope.assertReadableDeckIds([args.targetDeckId]);
     this.scope.assertReadableNotetypeIds([args.targetNotetypeId]);
     this.scope.assertCreateTarget(args.targetDeckId, args.targetNotetypeId);
-    this.scope.assertBatchCount(args.createNotes.length);
     const capability: NotetypeCapabilities = await this.notetypes.获取笔记类型能力(args.targetNotetypeId);
     const imageAttachments: AgentImageAttachment[] = [];
     for (let index: number = 0; index < args.createNotes.length; index++) {

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { showToastSafely, resourceText, namedResourceText } from '../../utils/UiFeedback';
@@ -9,6 +10,7 @@ import type { AgentAppRecommendation } from '../../model/agent/AgentAppRecommend
 /** 空会话的单句提示；组件独占计时器，复制只写剪贴板。 */
 @Component
 export struct AgentEmptySuggestions {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('visibilityChanged') isPageVisible: boolean = false;
   @State private suggestionIndex: number = 0;
@@ -133,7 +135,7 @@ export struct AgentEmptySuggestions {
       Text(this.displayedSuggestionText())
         .fontSize(应用尺寸.字号_分区标题)
         .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .textAlign(TextAlign.Center)
         .width('100%')
         .constraintSize({ maxWidth: 应用尺寸.dialogWideMaxWidth })

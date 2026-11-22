@@ -3,7 +3,7 @@
 /** Agent 的纯数据契约；本文件不得导入 HarmonyOS Kit。 */
 
 export type AgentMode = 'create' | 'edit' | 'assistant';
-export type ProviderId = 'deepseek' | 'openai' | 'custom';
+export type ProviderId = 'deepseek' | 'openai' | 'custom' | 'official';
 export type SearchMode = 'auto' | 'always' | 'off';
 export type ToolRisk = 'read' | 'navigation' | 'setting_write' | 'write' | 'high_risk' | 'blocked';
 
@@ -146,6 +146,6 @@ export interface AgentTurnLimits {
 }
 
 export const DEFAULT_AGENT_TURN_LIMITS: AgentTurnLimits = {
-  maxProviderCalls: 32,
-  maxToolCalls: 96
+  maxProviderCalls: Number.POSITIVE_INFINITY,
+  maxToolCalls: Number.POSITIVE_INFINITY
 };

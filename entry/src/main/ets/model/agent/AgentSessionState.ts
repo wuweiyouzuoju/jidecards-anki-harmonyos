@@ -243,6 +243,19 @@ export function fitAgentRequestContext(request: ProviderTurnRequest): void {
     request.input.splice(0, request.input.length, ...retained);
     if (providerRequestFitsContext(request)) { return; }
   }
+  // 单个长任务也可跨越上下文窗口；仅在完整工具批次之后移出旧轮次。
+  const activeUser = original.slice().reverse().find((item: ProviderInputItem): boolean =>
+    item.kind === 'message' && item.role === 'user' && !item.content.startsWith(HISTORICAL_CONTEXT_PREFIX));
+  for (let index: number = 1; index < original.length; index++) {
+    if (original[index - 1].kind !== 'function_call_output' || original[index].kind === 'function_call_output') continue;
+    const retained = original.slice(index);
+    const progress = historicalContextMessage(original.slice(0, index));
+    if (activeUser !== undefined && !retained.includes(activeUser)) retained.unshift(activeUser);
+    retained.unshift(progress);
+    request.input.splice(0, request.input.length, ...retained);
+    if (providerRequestFitsContext(request)) return;
+  }
+  request.input.splice(0, request.input.length, ...original);
   throw new ProviderProtocolError('agent_context_limit');
 }
 

@@ -203,6 +203,7 @@ export function safeConversation(value: AgentConversation): AgentConversation {
         reasoningTruncated: message.reasoningTruncated === true || rawReasoning.length > MAX_TEXT_LENGTH ||
           sanitizeHistoryText(rawReasoning).length > reasoning.length,
         role: message.role, text: sanitizeHistoryText(message.text),
+        hasProviderText: typeof message.hasProviderText === 'boolean' ? message.hasProviderText : undefined,
         kind: message.kind === 'clarification' ? 'clarification' : 'normal',
         action: message.action === undefined ? undefined :
           historyAction(message.action),

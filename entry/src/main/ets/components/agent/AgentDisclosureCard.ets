@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { disclosureAnimation } from '../../utils/AppMotion';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -9,6 +10,7 @@ import { DisclosureChevron } from '../common/DisclosureChevron';
 
 @Component
 export struct AgentDisclosureCard {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop title: ResourceStr = '';
   @Prop status: ResourceStr = '';
   @Prop showStatus: boolean = false;
@@ -24,19 +26,19 @@ export struct AgentDisclosureCard {
     Column({ space: 应用尺寸.间距_4 }) {
       Row({ space: 应用尺寸.间距_8 }) {
         SymbolGlyph($r('sys.symbol.wrench_and_screwdriver'))
-          .fontSize(18).fontColor([$r('app.color.text_secondary')]).flexShrink(0)
+          .fontSize(18).fontColor([appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))]).flexShrink(0)
         Text(this.title)
           .fontSize(应用尺寸.字号_正文_小)
           .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           .layoutWeight(1)
         if (this.showStatus) {
           Text(this.status)
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .flexShrink(0)
         }
-        DisclosureChevron({ tint: $r('app.color.text_tertiary') })
+        DisclosureChevron({ tint: appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')) })
           .rotate({ angle: this.expanded ? 90 : 0 })
           .animation(disclosureAnimation())
           .flexShrink(0)
@@ -56,14 +58,14 @@ export struct AgentDisclosureCard {
         }
         .width('100%').constraintSize({ maxHeight: 240 })
         .align(Alignment.TopStart).scrollBar(BarState.Auto)
-        .border(SurfaceBorder.options({ top: 应用尺寸.卡片边框 }))
+        .border(SurfaceBorder.options({ top: 应用尺寸.卡片边框 }, undefined, this.appearanceElements))
       }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_面板)
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
     .clip(true)
   }
 }

@@ -121,7 +121,7 @@ export class AgentToolSchemaError extends Error {
 
   constructor(code: string, path: string = '', detailMessage: string = '',
     receivedKeys: string[] = [], allowedKeys: string[] = [], validTemplateJson: string = '') {
-    super(code === 'tool_batch_too_large' ? code : 'invalid_tool_arguments');
+    super('invalid_tool_arguments');
     this.code = code;
     this.path = path;
     this.detailMessage = detailMessage;
@@ -140,7 +140,7 @@ export class AgentToolSchemaError extends Error {
 }
 
 function validTemplate(toolName: string): string {
-  const tools = agentFunctionTools(1000, toolName === 'create_flashcards' ? 'create' : 'edit');
+  const tools = agentFunctionTools(toolName === 'create_flashcards' ? 'create' : 'edit');
   for (const item of tools) {
     if (item.name === toolName) { return item.exampleArgumentsJson; }
   }
@@ -165,7 +165,7 @@ function emptyArguments(): AgentToolArguments {
 
 interface ToolPropertySchema { properties: Record<string, Object>; }
 function allowedKeys(toolName: string): string[] {
-  const tools = agentFunctionTools(1000, toolName === 'create_flashcards' ? 'create' : 'edit');
+  const tools = agentFunctionTools(toolName === 'create_flashcards' ? 'create' : 'edit');
   for (const item of tools) {
     if (item.name === toolName) {
       return Object.keys((JSON.parse(item.parametersJson) as ToolPropertySchema).properties);
@@ -189,9 +189,6 @@ function validateIds(toolName: string, path: string, value: number[] | undefined
   }
   if (!Array.isArray(value)) {
     throw schemaError(toolName, 'invalid_type', path, `${path} must be an array of positive integer IDs`);
-  }
-  if (value.length > 1000) {
-    throw schemaError(toolName, 'tool_batch_too_large', path, `${path} exceeds the 1000 item safety limit`);
   }
   const output: number[] = [];
   const seen: Set<number> = new Set<number>();
@@ -287,10 +284,8 @@ function parseImageUpdates(toolName: string, json: string): AgentImageUpdate[] {
   } catch (error) {
     throw schemaError(toolName, 'invalid_json', 'imagesJson', 'imagesJson must be a JSON array');
   }
-  if (!Array.isArray(raw) || raw.length > 1000) {
-    throw schemaError(toolName, raw !== undefined && Array.isArray(raw) && raw.length > 1000
-      ? 'tool_batch_too_large' : 'invalid_value', 'imagesJson',
-      'imagesJson must be an array within the safety limit');
+  if (!Array.isArray(raw)) {
+    throw schemaError(toolName, 'invalid_value', 'imagesJson', 'imagesJson must be an array');
   }
   const result: AgentImageUpdate[] = [];
   for (let index: number = 0; index < raw.length; index++) {
@@ -320,9 +315,8 @@ function parseImageUpdates(toolName: string, json: string): AgentImageUpdate[] {
 }
 
 function validateCreateNotes(toolName: string, value: RawAgentCreateNote[] | undefined): AgentCreateNote[] {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 1000) {
-    const code: string = Array.isArray(value) && value.length > 1000 ? 'tool_batch_too_large' : 'invalid_value';
-    throw schemaError(toolName, code, 'cards', 'cards must be a non-empty array within the safety limit');
+  if (!Array.isArray(value) || value.length === 0) {
+    throw schemaError(toolName, 'invalid_value', 'cards', 'cards must be a non-empty array');
   }
   const result: AgentCreateNote[] = [];
   for (let noteIndex: number = 0; noteIndex < value.length; noteIndex++) {

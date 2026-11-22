@@ -106,6 +106,7 @@ export class AgentTransportSession {
   private cancelled: boolean = false;
   private destroyed: boolean = false;
   private ended: boolean = false;
+  private inactivityTimer: number = -1;
   private rawPrefix: Uint8Array = new Uint8Array(0);
 
   constructor(request: AgentStreamRequest, observer: AgentStreamObserver) {
@@ -125,12 +126,13 @@ export class AgentTransportSession {
       extraData: this.request.body,
       usingCache: false,
       connectTimeout: 15000,
-      readTimeout: 120000
+      readTimeout: 0
     };
     const dataCallback = (buffer: ArrayBuffer): void => {
       if (this.cancelled) {
         return;
       }
+      this.resetInactivityDeadline();
       const bytes: Uint8Array = new Uint8Array(buffer);
       this.rawPrefix = appendPrefix(this.rawPrefix, bytes, 65536);
       this.emitMessages(this.parser.push(bytes));
@@ -144,6 +146,7 @@ export class AgentTransportSession {
     };
     this.client.on('dataReceive', dataCallback);
     this.client.on('dataEnd', endCallback);
+    this.resetInactivityDeadline();
     try {
       const responseCode: number = await this.client.requestInStream(this.request.url, options);
       if (this.cancelled) {
@@ -157,6 +160,7 @@ export class AgentTransportSession {
         this.ended = true;
         this.emitMessages(this.parser.finish());
       }
+      if (!this.normalizer.hasTerminalEvent()) throw new AgentTransportError('network', 0, 'stream_interrupted');
     } catch (error) {
       if (error instanceof AgentTransportError) {
         throw error;
@@ -189,7 +193,14 @@ export class AgentTransportSession {
     }
   }
 
+  private resetInactivityDeadline(): void {
+    if (this.inactivityTimer !== -1) clearTimeout(this.inactivityTimer);
+    this.inactivityTimer = setTimeout((): void => { this.destroyClient(); }, 300000);
+  }
+
   private destroyClient(): void {
+    if (this.inactivityTimer !== -1) clearTimeout(this.inactivityTimer);
+    this.inactivityTimer = -1;
     if (this.destroyed) {
       return;
     }

@@ -136,6 +136,12 @@ export interface AgentHistoryProjection {
   audits: AgentHistoryAudit[];
   sources: SearchSource[];
 }
+export function agentReplySpeechText(message: 聊天消息): string {
+  if (message.角色 !== 'ai' || message.kind !== 'normal' || message.streaming || message.是否错误 ||
+    message.工具过程.some((trace: AgentToolTrace): boolean => /^external-\d+-\d+$/.test(trace.callId))) return '';
+  return message.providerText.trim();
+}
+
 export function projectAgentHistory(items: 聊天消息[], defaultTitle: string): AgentHistoryProjection {
       const messages: AgentHistoryMessage[] = [];
       const audits: AgentHistoryAudit[] = [];
@@ -153,6 +159,7 @@ export function projectAgentHistory(items: 聊天消息[], defaultTitle: string)
             text: message.角色 === 'ai' && message.providerText.length > 0 ?
               message.providerText : message.正文,
             kind: message.kind,
+            hasProviderText: message.角色 === 'ai' ? message.providerText.trim().length > 0 : undefined,
             action: message.action ?? undefined,
             clarification: message.clarification === null ? null : cloneAgentClarificationView(message.clarification),
             expanded: message.expanded
@@ -182,7 +189,7 @@ export function restoreAgentMessages(selected: AgentConversation, nextId: () => 
       message.action = item.action === undefined ? null : { id: item.action.id, kind: item.action.kind, payloadJson: item.action.payloadJson, status: item.action.status, resultJson: item.action.resultJson };
       message.clarification = item.clarification === null ? null : cloneAgentClarificationView(item.clarification);
       message.expanded = item.expanded;
-      message.providerText = item.text;
+      message.providerText = item.hasProviderText === false ? '' : item.text;
       message.推理摘要 = item.reasoning ?? '';
       message.reasoningIsSummary = item.reasoningIsSummary === true;
       message.reasoningTruncated = item.reasoningTruncated === true;
@@ -197,7 +204,9 @@ export function restoreAgentMessages(selected: AgentConversation, nextId: () => 
       let auditTarget: number | undefined = audit.messageId === undefined ? undefined : messagePositions.get(audit.messageId);
       if (auditTarget === undefined) {
         if (legacyAuditTarget < 0) {
-          restored.push(createAgentMessage(nextId(), 'ai', unassignedLabel, false));
+          const auditMessage: 聊天消息 = createAgentMessage(nextId(), 'ai', unassignedLabel, false);
+          auditMessage.providerText = '';
+          restored.push(auditMessage);
           legacyAuditTarget = restored.length - 1;
         }
         auditTarget = legacyAuditTarget;

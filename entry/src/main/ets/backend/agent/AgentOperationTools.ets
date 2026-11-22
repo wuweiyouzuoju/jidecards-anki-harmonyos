@@ -58,8 +58,8 @@ export class AgentOperationTools {
   }
   private arguments(name: string, json: string): OperationArguments {
     const args = decodeOperationArguments(name,json);
-    if (args.cardIds !== undefined) { this.scope.assertReadableCardIds(args.cardIds); this.scope.assertBatchCount(args.cardIds.length); }
-    if (args.noteIds !== undefined) { this.scope.assertReadableNoteIds(args.noteIds); this.scope.assertBatchCount(args.noteIds.length); }
+    if (args.cardIds !== undefined) { this.scope.assertReadableCardIds(args.cardIds); }
+    if (args.noteIds !== undefined) { this.scope.assertReadableNoteIds(args.noteIds); }
     if (args.deckId !== undefined) this.scope.assertReadableDeckIds([args.deckId]);
     if (args.notetypeId !== undefined) this.scope.assertReadableNotetypeIds([args.notetypeId]); return args;
   }
@@ -98,6 +98,6 @@ export class AgentOperationTools {
     if (name === 'propose_restore_backup') this.scope.assertOperationTarget('backups',args.name!);
     const draft = await agentOperationCoordinator.propose(name,JSON.stringify(args));
     this.scope.registerOperationTargets('operation_results',[draft.id]);
-    if (args.cardIds !== undefined || args.noteIds !== undefined) this.scope.assertBatchCount(draft.affectedCardIds.length); return draft;
+    return draft;
   }
 }

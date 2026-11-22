@@ -7,16 +7,17 @@ import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
 import { pdfService } from '@kit.PDFKit';
 import { textRecognition } from '@kit.CoreVisionKit';
+import { 后端会话 } from '../后端会话';
+import { CoreRpc } from '../../proto/generated/CoreRpc';
+import { encodeImportAnkiPackageRequest, decodeImportResponse } from '../../proto/messages/ImportExportMessages';
+import { ImportExportExportLimit, ImportExportExportNoteCsvRequest } from '../../proto/generated/CoreMessages';
+import { AgentTextPageWriter, streamAgentTextFile, ensureAgentDocumentSpace } from './AgentTextPaging';
 import { AgentDocumentStore, agentPdfPageText } from './AgentDocumentStore';
 import type { AgentDocumentInfo } from '../../model/agent/AgentDocuments';
 import {
-  AGENT_IMPORT_MAX_ARCHIVE_BYTES,
   AGENT_IMPORT_MAX_CONTEXT_CHARS,
-  AGENT_IMPORT_MAX_FILE_BYTES,
-  AGENT_IMPORT_MAX_VIDEO_BYTES,
   AGENT_IMPORT_MAX_OCR_PAGES,
   AGENT_IMPORT_MAX_PDF_PAGES,
-  AGENT_IMPORT_MAX_TEXT_BYTES,
   AgentImportedFile,
   agentFileExtension,
   isSupportedAgentDocumentFile,
@@ -170,7 +171,7 @@ function looksLikeBinary(content: string): boolean {
 
 /** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
 function readTextFromOpenFile(file: fs.File, size: number, extension: string): ParsedAgentContent {
-  const readSize: number = Math.min(size, AGENT_IMPORT_MAX_TEXT_BYTES);
+  const readSize: number = size;
   const bytes: Uint8Array = readFileBytes(file, readSize);
   let content: string = decodeTextPrefix(bytes);
   if (looksLikeBinary(content)) { throw new Error('binary_content'); }
@@ -269,28 +270,24 @@ function sortedFilesContaining(files: string[], segment: string, suffix: string)
 }
 
 /** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
-function combineMarkupFiles(files: string[], titlePrefix: string): ParsedAgentContent {
+function combineMarkupFiles(files: string[], titlePrefix: string, writer?: AgentTextPageWriter): ParsedAgentContent {
   const sections: string[] = [];
-  let total: number = 0;
-  let truncated: boolean = false;
   for (let index: number = 0; index < files.length; index++) {
     const text: string = agentMarkupToPlainText(readSandboxText(files[index]));
-    if (text.length === 0) { continue; }
-    const section: string = `${titlePrefix} ${index + 1}\n${text}`;
-    const remaining: number = AGENT_IMPORT_MAX_CONTEXT_CHARS - total;
-    if (remaining <= 0) { truncated = true; break; }
-    sections.push(section.slice(0, remaining));
-    total += Math.min(section.length, remaining);
-    if (section.length > remaining) { truncated = true; break; }
+    if (text.length === 0) continue;
+    const section: string = `${titlePrefix} ${index + 1}\n${text}\n\n`;
+    if (writer !== undefined) writer.append(section); else sections.push(section);
   }
-  return parsedContent(sections.join('\n\n'), truncated ? 'content_truncated' : '');
+  return parsedContent(sections.join('\n\n'));
 }
 
 /** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
-function parseDocx(unpacked: string, files: string[]): ParsedAgentContent {
+function parseDocx(unpacked: string, files: string[], writer?: AgentTextPageWriter): ParsedAgentContent {
   const primary: string = `${unpacked}/word/document.xml`;
   if (!pathExists(primary)) { throw new Error('parse_failed'); }
-  const sections: string[] = [agentMarkupToPlainText(readSandboxText(primary))];
+  const sections: string[] = [];
+  const primaryText: string = agentMarkupToPlainText(readSandboxText(primary));
+  if (writer !== undefined) writer.append(primaryText + '\n\n'); else sections.push(primaryText);
   const extras: string[] = [];
   for (const path of files) {
     const lower: string = path.toLocaleLowerCase();
@@ -303,66 +300,65 @@ function parseDocx(unpacked: string, files: string[]): ParsedAgentContent {
   extras.sort();
   for (const path of extras) {
     const text: string = agentMarkupToPlainText(readSandboxText(path));
-    if (text.length > 0) { sections.push(text); }
+    if (text.length > 0) {
+      if (writer !== undefined) writer.append(text + '\n\n'); else sections.push(text);
+    }
   }
   return parsedContent(sections.join('\n\n'));
 }
 
 /** @throws {Error} 幻灯片读取失败，由单文件导入入口转换为失败状态。 */
-function parsePptx(files: string[]): ParsedAgentContent {
+function parsePptx(files: string[], writer?: AgentTextPageWriter): ParsedAgentContent {
   const slides: string[] = sortedFilesContaining(files, '/ppt/slides/slide', '.xml');
   const filtered: string[] = [];
   for (const path of slides) {
     if (path.toLocaleLowerCase().indexOf('/_rels/') < 0) { filtered.push(path); }
   }
   if (filtered.length === 0) { throw new Error('parse_failed'); }
-  return combineMarkupFiles(filtered, '幻灯片');
+  return combineMarkupFiles(filtered, '幻灯片', writer);
 }
 
 /** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
-function parseXlsx(unpacked: string, files: string[]): ParsedAgentContent {
+function parseXlsx(unpacked: string, files: string[], writer?: AgentTextPageWriter): ParsedAgentContent {
   let shared: string[] = [];
   const sharedPath: string = `${unpacked}/xl/sharedStrings.xml`;
   if (pathExists(sharedPath)) { shared = extractAgentSharedStrings(readSandboxText(sharedPath)); }
   const sheets: string[] = sortedFilesContaining(files, '/xl/worksheets/sheet', '.xml');
   if (sheets.length === 0) { throw new Error('parse_failed'); }
   const sections: string[] = [];
-  let total: number = 0;
-  let truncated: boolean = false;
   for (let index: number = 0; index < sheets.length; index++) {
     const body: string = extractAgentWorksheetText(readSandboxText(sheets[index]), shared);
-    if (body.length === 0) { continue; }
-    const section: string = `工作表 ${index + 1}\n${body}`;
-    const remaining: number = AGENT_IMPORT_MAX_CONTEXT_CHARS - total;
-    if (remaining <= 0) { truncated = true; break; }
-    sections.push(section.slice(0, remaining));
-    total += Math.min(section.length, remaining);
-    if (section.length > remaining) { truncated = true; break; }
+    if (body.length === 0) continue;
+    const section: string = `工作表 ${index + 1}\n${body}\n\n`;
+    if (writer !== undefined) writer.append(section); else sections.push(section);
   }
-  return parsedContent(sections.join('\n\n'), truncated ? 'content_truncated' : '');
+  return parsedContent(sections.join('\n\n'));
 }
 
 /** @throws {Error} 附件读取或解包失败，传播到文件导入入口，禁止返回部分内容冒充成功。 */
 async function parseZipDocument(context: common.UIAbilityContext, source: fs.File,
-  size: number, extension: string, id: string): Promise<ParsedAgentContent> {
+  size: number, extension: string, id: string, writer?: AgentTextPageWriter): Promise<ParsedAgentContent> {
   const root: string = `${context.cacheDir}/ai-agent-import-${id}`;
   const zipPath: string = `${root}/source.zip`;
   const unpacked: string = `${root}/unpacked`;
   try {
     fs.mkdirSync(root);
     fs.mkdirSync(unpacked);
-    copyOpenFileToPath(source, size, zipPath);
+    await ensureAgentDocumentSpace(root, size);
+    await fs.copyFile(source.fd, zipPath);
     const originalSize: number = await zlib.getOriginalSize(zipPath);
-    if (originalSize > AGENT_IMPORT_MAX_ARCHIVE_BYTES) { throw new Error('archive_too_large'); }
+    await ensureAgentDocumentSpace(root, originalSize + size);
     await zlib.decompressFile(zipPath, unpacked);
     const files: string[] = [];
     collectFiles(unpacked, files);
-    if (extension === '.docx') { return parseDocx(unpacked, files); }
-    if (extension === '.pptx') { return parsePptx(files); }
-    if (extension === '.xlsx') { return parseXlsx(unpacked, files); }
+    if (extension === '.docx') { return parseDocx(unpacked, files, writer); }
+    if (extension === '.pptx') { return parsePptx(files, writer); }
+    if (extension === '.xlsx') { return parseXlsx(unpacked, files, writer); }
     const contentPath: string = `${unpacked}/content.xml`;
     if ((extension === '.odt' || extension === '.ods' || extension === '.odp') && pathExists(contentPath)) {
-      return parsedContent(agentMarkupToPlainText(readSandboxText(contentPath)));
+      const text: string = agentMarkupToPlainText(readSandboxText(contentPath));
+      if (writer !== undefined) { writer.append(text); return parsedContent(''); }
+      return parsedContent(text);
     }
     if (extension === '.epub') {
       const htmlFiles: string[] = [];
@@ -373,7 +369,7 @@ async function parseZipDocument(context: common.UIAbilityContext, source: fs.Fil
         }
       }
       htmlFiles.sort();
-      return combineMarkupFiles(htmlFiles, '章节');
+      return combineMarkupFiles(htmlFiles, '章节', writer);
     }
     throw new Error('parse_failed');
   } finally {
@@ -381,9 +377,65 @@ async function parseZipDocument(context: common.UIAbilityContext, source: fs.Fil
   }
 }
 
+/** @throws {Error} 仅在独立临时集合解析 APKG，不取得或修改用户卡库单例。 */
+async function parseAnkiPackage(context: common.UIAbilityContext, source: fs.File,
+  size: number, id: string, writer?: AgentTextPageWriter): Promise<ParsedAgentContent> {
+  const root: string = `${context.cacheDir}/ai-agent-apkg-${id}`;
+  const packagePath: string = `${root}/source.apkg`;
+  const textPath: string = `${root}/notes.txt`;
+  // 特例：生命周期只属于本附件；绝不能改成 获取实例()。
+  const session: 后端会话 = new 后端会话();
+  try {
+    fs.mkdirSync(root);
+    await ensureAgentDocumentSpace(root, size * 2);
+    await fs.copyFile(source.fd, packagePath);
+    if (fs.statSync(packagePath).size !== size) { throw new Error('read_failed'); }
+    const originalSize: number = await zlib.getOriginalSize(packagePath);
+    await ensureAgentDocumentSpace(root, originalSize + size);
+    await session.确保已打开(root);
+    const rpc: CoreRpc = new CoreRpc(session);
+    const summary = decodeImportResponse(await rpc.ImportExport_import_anki_package(
+      encodeImportAnkiPackageRequest(packagePath)));
+    if (summary.newNotes === 0) { throw new Error('no_extractable_text'); }
+    const limit: ImportExportExportLimit = new ImportExportExportLimit();
+    limit.setWholeCollection(new Uint8Array(0));
+    const request: ImportExportExportNoteCsvRequest = new ImportExportExportNoteCsvRequest();
+    request.setOutPath(textPath);
+    request.setWithHtml(false);
+    request.setWithTags(true);
+    request.setWithDeck(true);
+    request.setWithNotetype(true);
+    request.setLimit(limit.toBytes());
+    await rpc.ImportExport_export_note_csv(request.toBytes());
+    const output: fs.File = fs.openSync(textPath, fs.OpenMode.READ_ONLY);
+    try {
+      const outputSize: number = fs.statSync(output.fd).size;
+      let parsed: ParsedAgentContent;
+      if (writer !== undefined) {
+        await streamAgentTextFile(output, outputSize, writer, looksLikeBinary);
+        parsed = parsedContent('');
+      } else { parsed = readTextFromOpenFile(output, outputSize, '.txt'); }
+      if (summary.newNotes < summary.foundNotes && parsed.warningCode.length === 0) {
+        parsed.warningCode = 'partial_content';
+      }
+      return parsed;
+    } finally {
+      fs.closeSync(output);
+    }
+  } catch (error) {
+    const message: string = (error as Error).message;
+    if (message === 'archive_too_large' || message === 'no_extractable_text' || message === 'read_failed' || message === 'document_space_insufficient') {
+      throw error as Error;
+    }
+    throw new Error('parse_failed');
+  } finally {
+    try { session.关闭(); } finally { deletePathRecursively(root); }
+  }
+}
+
 /** @throws {Error} 读取或解包失败，由单文件导入入口转换为失败状态。 */
 async function parseBook(context: common.UIAbilityContext, source: fs.File,
-  size: number, extension: string, id: string): Promise<ParsedAgentContent> {
+  size: number, extension: string, id: string, writer?: AgentTextPageWriter): Promise<ParsedAgentContent> {
   if (!canIUse('SystemCapability.Reader.ReaderService.BookParser')) {
     throw new Error('readerkit_unavailable');
   }
@@ -394,20 +446,14 @@ async function parseBook(context: common.UIAbilityContext, source: fs.File,
     const handler: ESObject = await readerKit.bookParser.getDefaultHandler(path);
     const spines: ESObject[] = handler.getSpineList();
     const sections: string[] = [];
-    let total: number = 0;
-    let truncated: boolean = false;
     for (let index: number = 0; index < spines.length; index++) {
       const raw: string = await handler.getSpineItemContent(spines[index].index);
       const text: string = agentMarkupToPlainText(raw);
-      if (text.length === 0) { continue; }
-      const section: string = `章节 ${index + 1}\n${text}`;
-      const remaining: number = AGENT_IMPORT_MAX_CONTEXT_CHARS - total;
-      if (remaining <= 0) { truncated = true; break; }
-      sections.push(section.slice(0, remaining));
-      total += Math.min(section.length, remaining);
-      if (section.length > remaining) { truncated = true; break; }
+      if (text.length === 0) continue;
+      const section: string = `章节 ${index + 1}\n${text}\n\n`;
+      if (writer !== undefined) writer.append(section); else sections.push(section);
     }
-    return parsedContent(sections.join('\n\n'), truncated ? 'content_truncated' : '');
+    return parsedContent(sections.join('\n\n'));
   } finally {
     deletePathRecursively(path);
   }
@@ -523,11 +569,51 @@ function errorCodeOf(error: Error, knownText: boolean): string {
   if (message === 'binary_content' || message === 'archive_too_large' ||
     message === 'archive_too_many_entries' || message === 'encrypted_file' ||
     message === 'ocr_unavailable' || message === 'no_extractable_text' ||
-    message === 'readerkit_unavailable' || message === 'parse_failed') {
+    message === 'document_space_insufficient' || message === 'readerkit_unavailable' || message === 'legacy_office' || message === 'read_failed' || message === 'parse_failed') {
     return message === 'archive_too_many_entries' ? 'archive_too_large' : message;
   }
   if (knownText && message === 'encoding_unsupported') { return 'encoding_unsupported'; }
-  return knownText ? 'encoding_unsupported' : 'unsupported_type';
+  return knownText ? 'read_failed' : 'parse_failed';
+}
+
+/** @throws {Error} 格式解析失败由单文件入口转换成可见错误，不发布部分分页。 */
+async function parseFileContent(context: common.UIAbilityContext, file: fs.File, byteSize: number,
+  name: string, extension: string, id: string, ocr: AgentOcrSession,
+  writer?: AgentTextPageWriter): Promise<ParsedAgentContent> {
+  let parsed: ParsedAgentContent;
+  if (extension === '.apkg') {
+    parsed = await parseAnkiPackage(context, file, byteSize, id, writer);
+  } else if (isSupportedAgentTextFile(name)) {
+    if (writer !== undefined && !['.html', '.htm', '.xml', '.rtf'].includes(extension)) {
+      await streamAgentTextFile(file, byteSize, writer, looksLikeBinary);
+      parsed = parsedContent('');
+    } else { parsed = readTextFromOpenFile(file, byteSize, extension); }
+  } else if (isSupportedAgentImageFile(name)) {
+    parsed = await parseImage(file, ocr);
+  } else if (extension === '.pdf') {
+    parsed = await parsePdf(context, file, byteSize, id, ocr);
+  } else if (extension === '.epub' || extension === '.mobi' || extension === '.azw' ||
+    extension === '.azw3') {
+    try {
+      parsed = await parseBook(context, file, byteSize, extension, id, writer);
+    } catch (error) {
+      if (extension !== '.epub') { throw new Error((error as Error).message); }
+      if (writer !== undefined) writer.reset();
+      parsed = await parseZipDocument(context, file, byteSize, extension, id, writer);
+    }
+  } else if (isSupportedAgentDocumentFile(name)) {
+    parsed = await parseZipDocument(context, file, byteSize, extension, id, writer);
+  } else if (extension === '.doc' || extension === '.xls' || extension === '.ppt') {
+    throw new Error('legacy_office');
+  } else {
+    if (writer !== undefined && !['.html', '.htm', '.xml', '.rtf'].includes(extension)) {
+      await streamAgentTextFile(file, byteSize, writer, looksLikeBinary);
+      parsed = parsedContent('');
+    } else { parsed = readTextFromOpenFile(file, byteSize, extension); }
+    parsed.warningCode = 'plain_text_detected';
+  }
+  if (writer !== undefined && parsed.content.length > 0) writer.append(parsed.content);
+  return parsed;
 }
 
 async function parseSelectedFile(context: common.UIAbilityContext, uri: string,
@@ -544,49 +630,28 @@ async function parseSelectedFile(context: common.UIAbilityContext, uri: string,
     const stat: fs.Stat = fs.statSync(file.fd);
     byteSize = stat.size;
     if (byteSize <= 0) { return failedFile(id, name, extension, byteSize, 'empty_file'); }
-    if (byteSize > (isSupportedAgentVideoFile(name) ? AGENT_IMPORT_MAX_VIDEO_BYTES : AGENT_IMPORT_MAX_FILE_BYTES)) {
-      return failedFile(id, name, extension, byteSize, 'file_too_large');
-    }
     try {
       if (conversationId.length > 0 && (extension === '.pdf' || isSupportedAgentImageFile(name) || isSupportedAgentVideoFile(name))) {
-        const document: AgentDocumentInfo = new AgentDocumentStore(context).stage(conversationId, file,
+        const document: AgentDocumentInfo = await new AgentDocumentStore(context).stage(conversationId, file,
           { id: id, name: name, extension: extension, byteSize: byteSize, pageCount: 1, warningCode: '' });
         return { id: id, name: name, extension: extension, byteSize: byteSize,
           content: `${document.name} (${document.pageCount})`, errorCode: '', warningCode: '',
           documentId: document.id, pageCount: document.pageCount };
       }
-      let parsed: ParsedAgentContent;
-      if (isSupportedAgentTextFile(name)) {
-        parsed = readTextFromOpenFile(file, byteSize, extension);
-      } else if (isSupportedAgentImageFile(name)) {
-        parsed = await parseImage(file, ocr);
-      } else if (extension === '.pdf') {
-        parsed = await parsePdf(context, file, byteSize, id, ocr);
-      } else if (extension === '.epub' || extension === '.mobi' || extension === '.azw' ||
-        extension === '.azw3') {
-        try {
-          parsed = await parseBook(context, file, byteSize, extension, id);
-        } catch (error) {
-          if (extension !== '.epub') { throw new Error((error as Error).message); }
-          parsed = await parseZipDocument(context, file, byteSize, extension, id);
-        }
-      } else if (isSupportedAgentDocumentFile(name)) {
-        parsed = await parseZipDocument(context, file, byteSize, extension, id);
-      } else if (extension === '.doc' || extension === '.xls' || extension === '.ppt') {
-        return failedFile(id, name, extension, byteSize, 'legacy_office');
-      } else {
-        parsed = readTextFromOpenFile(file, byteSize, extension);
-        parsed.warningCode = 'plain_text_detected';
-      }
-      if (parsed.content.length === 0) {
-        return failedFile(id, name, extension, byteSize, 'no_extractable_text');
-      }
       if (conversationId.length > 0) {
-        const document: AgentDocumentInfo = new AgentDocumentStore(context).stage(conversationId, file,
-          { id: id, name: name, extension: extension, byteSize: byteSize, pageCount: 1, warningCode: parsed.warningCode }, parsed.content);
+        const document: AgentDocumentInfo = await new AgentDocumentStore(context).stage(conversationId, file,
+          { id: id, name: name, extension: extension, byteSize: byteSize, pageCount: 1, warningCode: '' }, '',
+          async (writer: AgentTextPageWriter): Promise<string> => {
+            const parsed: ParsedAgentContent = await parseFileContent(context, file!, byteSize, name, extension, id, ocr, writer);
+            return parsed.warningCode;
+          });
         return { id: id, name: name, extension: extension, byteSize: byteSize,
           content: `${document.name} (${document.pageCount})`, errorCode: '', warningCode: document.warningCode,
           documentId: document.id, pageCount: document.pageCount };
+      }
+      const parsed: ParsedAgentContent = await parseFileContent(context, file, byteSize, name, extension, id, ocr);
+      if (parsed.content.length === 0) {
+        return failedFile(id, name, extension, byteSize, 'no_extractable_text');
       }
       return successfulFile(id, name, extension, byteSize, parsed);
     } catch (error) {

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { ProviderFunctionTool } from './ProviderProtocol';
-import { normalizeBatchLimit } from './AgentPolicy';
 import type { AgentMode } from './AgentTypes';
 import { agentExtensionTools } from './AgentExtensionTools';
 import { AGENT_CARD_STYLE_SCHEMA } from './AgentCardStyle';
@@ -98,10 +97,10 @@ function rulesFor(name: string): string {
       (name === 'propose_update_card_style' || name === 'propose_update_note_type_templates' ?
         'Targets exactly one note type and affects ALL its cards across decks. Never promise selected-card-only styling. ' +
         'For colors/font/alignment prefer propose_update_card_style. Omitted templateJson/css stay unchanged; never send [] as a placeholder. ' +
-        'Pure style changes are one shared update, independent of the per-card batch limit. ' : '') +
+        'Pure style changes are one shared update. ' : '') +
       (name === 'propose_delete_deck' ?
         'deckIds accepts multiple discovered deck IDs in one draft. A selected parent includes its descendants; overlaps are merged. ' +
-        'The combined card impact must fit the batch limit. Deleting a filtered deck returns its cards; deleting a normal deck also removes cards borrowed into filtered decks. Core preserves and resets the default deck. ' : '') +
+        'Deleting a filtered deck returns its cards; deleting a normal deck also removes cards borrowed into filtered decks. Core preserves and resets the default deck. ' : '') +
       (name.startsWith('propose_delete_') || name === 'propose_change_note_type' ||
       name === 'propose_update_note_type_templates' || name === 'propose_update_card_style' ?
         'This high-risk draft requires separate user confirmations.' : 'User confirmation is required before writing.');
@@ -126,7 +125,7 @@ function tool(name: string, description: string, properties: string,
   };
 }
 
-const ID_ARRAY: string = '{"type":"array","items":{"type":"integer"},"maxItems":1000}';
+const ID_ARRAY: string = '{"type":"array","items":{"type":"integer"}}';
 const TEXT: string = '{"type":"string"}';
 const ID: string = '{"type":"integer","minimum":1}';
 const IMAGE_ATTACHMENT: string =
@@ -135,9 +134,8 @@ const IMAGE_ATTACHMENT: string =
   '"altText":{"type":"string","maxLength":200}},"required":["candidateId","fieldOrd"],"additionalProperties":false}';
 
 /** 当前模式的完整能力目录；Runner 按需发送定义，不存在通用 RPC/数据库/文件权限。 */
-export function agentFunctionTools(batchLimit: number = 100, mode: AgentMode = 'edit'): ProviderFunctionTool[] {
-  const createLimit: number = normalizeBatchLimit(batchLimit);
-  const notes: string = `{"type":"array","minItems":1,"maxItems":${createLimit},"items":{"type":"object","properties":{"fields":{"type":"array","items":{"type":"string"}},"sources":{"type":"array","maxItems":10,"items":{"type":"object","properties":{"documentId":{"type":"string","minLength":1,"maxLength":100},"page":{"type":"integer","minimum":1},"timestampSeconds":{"type":"number","minimum":0}},"required":["documentId","page"],"additionalProperties":false}},"images":{"type":"array","maxItems":1,"items":${IMAGE_ATTACHMENT}}},"required":[],"additionalProperties":{"type":"string"}}}`;
+export function agentFunctionTools(mode: AgentMode = 'edit'): ProviderFunctionTool[] {
+  const notes: string = `{"type":"array","minItems":1,"items":{"type":"object","properties":{"fields":{"type":"array","items":{"type":"string"}},"sources":{"type":"array","maxItems":10,"items":{"type":"object","properties":{"documentId":{"type":"string","minLength":1,"maxLength":100},"page":{"type":"integer","minimum":1},"timestampSeconds":{"type":"number","minimum":0}},"required":["documentId","page"],"additionalProperties":false}},"images":{"type":"array","maxItems":1,"items":${IMAGE_ATTACHMENT}}},"required":[],"additionalProperties":{"type":"string"}}}`;
   const tools: ProviderFunctionTool[] = [
     agentToolDiscoveryDefinition(),
     ...agentHistoryTools(),
@@ -202,7 +200,7 @@ export function agentFunctionTools(batchLimit: number = 100, mode: AgentMode = '
       `"notetypeIds":${ID_ARRAY},"templateJson":${TEXT},"css":${TEXT},"draftId":${TEXT},"reason":${TEXT}`,
       '"notetypeIds","draftId","reason"'),
     tool('propose_delete_deck', '提出批量删除多个牌组及其子牌组的高风险草稿；重叠范围合并，筛选牌组卡片归还原牌组，默认牌组由 Core 保留并重置。',
-      '"deckIds":{"type":"array","items":{"type":"integer","minimum":1},"minItems":1,"maxItems":1000},' +
+      '"deckIds":{"type":"array","items":{"type":"integer","minimum":1},"minItems":1},' +
       `"draftId":${TEXT},"reason":${TEXT}`, '"deckIds","draftId","reason"'),
     tool('propose_delete_note_type', '提出永久删除笔记类型及关联内容的高风险草稿。',
       '"notetypeIds":{"type":"array","items":{"type":"integer","minimum":1},"minItems":1,"maxItems":1},' +

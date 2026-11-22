@@ -51,7 +51,6 @@ export class AgentScope {
   private readonly imageCandidates: Map<string, AgentImageCandidate> =
     new Map<string, AgentImageCandidate>();
   private readonly draftIds: Set<string> = new Set<string>();
-  private batchLimit: number = 100;
   private createDeckId: number = 0;
   private createNotetypeId: number = 0;
   private createDraftSequence: number = 0;
@@ -123,17 +122,6 @@ export class AgentScope {
   assertReadableNoteIds(ids: number[]): void { this.assertIds(this.readableNoteIds, ids); }
   assertReadableDeckIds(ids: number[]): void { this.assertIds(this.readableDeckIds, ids); }
   assertReadableNotetypeIds(ids: number[]): void { this.assertIds(this.readableNotetypeIds, ids); }
-
-  configureBatchLimit(value: number): void {
-    if (!Number.isFinite(value) || value <= 0) { this.batchLimit = 100; return; }
-    this.batchLimit = Math.min(1000, Math.max(1, Math.floor(value)));
-  }
-
-  assertBatchCount(count: number): void {
-    if (!Number.isSafeInteger(count) || count < 0 || count > this.batchLimit) {
-      throw new AgentScopeError('tool_batch_too_large');
-    }
-  }
 
   configureCreateTarget(deckId: number, notetypeId: number): void {
     this.createDeckId = deckId;

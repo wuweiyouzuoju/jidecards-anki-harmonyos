@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { AgentHistoryRepository } from './AgentHistoryRepository';
+import type { AgentHistoryRepository } from './AgentHistoryRepository';
 import type { AgentHistorySearch } from './AgentHistoryRepository';
 import { parseAgentToolJsonObject, AgentToolSchemaError } from './AgentToolSchemas';
 

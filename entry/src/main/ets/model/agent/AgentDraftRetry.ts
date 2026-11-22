@@ -63,7 +63,9 @@ export function buildFailedOperationsRetryDraft(original: ChangeDraft,
     if (operation.kind !== 'delete_deck') continue;
     const impact: AgentDeckDeletionSnapshot | null = readAgentDeckDeletionSnapshot(operation.after);
     if (impact !== null) {
-      noteIds.push(...impact.noteIds); cardIds.push(...impact.cardIds); deckIds.push(...impact.deckIds);
+      for (const id of impact.noteIds) { noteIds.push(id); }
+      for (const id of impact.cardIds) { cardIds.push(id); }
+      for (const id of impact.deckIds) { deckIds.push(id); }
     }
   }
   const retriesNoteMutation: boolean = imageAttachments.some(

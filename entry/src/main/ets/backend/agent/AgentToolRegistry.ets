@@ -134,6 +134,13 @@ export class AgentToolRegistry {
     this.highRiskDraftHandlers.set(name, handler);
   }
 
+  /** 外部适配只发布当前真实注册的处理器；声明目录不能代替运行时可用性。 */
+  supports(name: string): boolean {
+    return ['request_clarification', 'request_create_target'].includes(name) || this.readHandlers.has(name) ||
+      this.draftHandlers.has(name) || this.highRiskDraftHandlers.has(name) || this.actionHandlers.has(name) ||
+      this.settingHandlers.has(name) || this.navigationHandlers.has(name);
+  }
+
   isDraftTool(name: string): boolean {
     return this.draftHandlers.has(name) || this.highRiskDraftHandlers.has(name);
   }

@@ -25,6 +25,7 @@ export interface AgentDocumentSource { documentId: string; page: number; timesta
 export interface AgentDocumentRepository {
   list(conversationId: string): AgentDocumentInfo[];
   read(conversationId: string, documentId: string, page: number, mode: string): Promise<AgentDocumentPage>;
+  cancelRead?(): void;
   saveNotes(conversationId: string, documentId: string, page: number, notes: string): void;
   readVideoInfo?(conversationId: string, documentId: string): Promise<AgentVideoInfo>;
   readVideoFrame?(conversationId: string, documentId: string, seconds: number, mode: string,
@@ -43,8 +44,8 @@ export function agentDocumentTools(): ProviderFunctionTool[] {
   const names: string[] = DOCUMENT_TOOLS;
   const descriptions: string[] = [
     '列出当前会话已提交的本地文件及真实文档 ID、页数；页数不是已读数。',
-    '读取文件指定页或文本分段；可请求页面图片，文字模型请使用 OCR。按 nextOffset 续读，nextPage 是下一页。',
-    '主动调用鸿蒙系统 OCR 识别 PDF 指定页或图片，可用于扫描件、补读或重试。无需模型视觉能力。',
+    '在本地拆分读取 PDF 页或文件文本段（含 APKG、Office、电子书、代码和文本）。用 page 选择分段，offset/length 选择段内范围，每次最多12000字符；按 nextOffset/nextPage 继续访问后续原文，不把整份文件送给模型。图片可请求页面图像，文字模型请使用 OCR。',
+    '识别 PDF 指定页或图片，默认用鸿蒙系统 OCR。list_documents 返回 deepSeekOcr=true 时使用 DeepSeek 云端 OCR。无需模型视觉能力。',
     '将已读取页面的摘要、表格、公式及不确定项存入资料笔记，供后续查阅；只写资料缓存，不写卡库或长期偏好。',
     '读取本地已有视频的画面用于理解或制卡；指定时间点或时间范围，每批最多4帧。视觉模型看画面，文字模型用系统OCR；不读取声音。'
   ];
@@ -106,6 +107,8 @@ export class AgentDocumentAccess {
   private repository: AgentDocumentRepository;
   private conversationId: string = '';
   private imageEnabled: boolean = false;
+  private deepSeekOcr: boolean = false;
+  setDeepSeekOcr(enabled: boolean): void { this.deepSeekOcr = enabled; }
   private submitted: Set<string> = new Set<string>();
   private readPages: Set<string> = new Set<string>();
   private readFrames: Set<string> = new Set<string>();
@@ -120,14 +123,14 @@ export class AgentDocumentAccess {
   }
   submit(ids: string[]): void { for (const id of ids) this.submitted.add(id); }
   currentConversationId(): string { return this.conversationId; }
-  cancel(): void { this.generation++; }
+  cancel(): void { this.generation++; this.repository.cancelRead?.(); }
   /** @throws {Error} 参数、会话范围、平台读取与取消失败由工具 Runner 报告。 */
   async execute(name: string, json: string): Promise<AgentDocumentToolOutput> {
     if (!isAgentDocumentTool(name)) throw new Error('tool_unavailable');
     const args: DocumentArguments = decode(name, json);
     const documents: AgentDocumentInfo[] = this.repository.list(this.conversationId).filter(
       (doc: AgentDocumentInfo): boolean => this.submitted.has(doc.id));
-    if (name === 'list_documents') return { outputJson: JSON.stringify({ documents: documents, visionAvailable: this.imageEnabled }) };
+    if (name === 'list_documents') return { outputJson: JSON.stringify({ documents: documents, visionAvailable: this.imageEnabled, deepSeekOcr: this.deepSeekOcr }) };
     const doc: AgentDocumentInfo | undefined = documents.find((item: AgentDocumentInfo): boolean => item.id === args.documentId);
     if (doc === undefined) throw new Error('document_not_in_session');
     if (name === 'read_video_frames') return this.readVideoFrames(doc, args);
@@ -143,7 +146,7 @@ export class AgentDocumentAccess {
     if (args.includeImage === true && !this.imageEnabled) throw new Error('document_model_vision_unavailable_use_ocr');
     const version: number = this.generation;
     const result: AgentDocumentPage = await this.repository.read(this.conversationId, doc.id, page,
-      name === 'ocr_document_page' ? 'ocr' : args.includeImage === true ? 'image' : 'text');
+      name === 'ocr_document_page' ? (this.deepSeekOcr ? 'deepseek_ocr' : 'ocr') : args.includeImage === true ? 'image' : 'text');
     if (version !== this.generation) throw new Error('cancelled');
     const offset: number = args.offset ?? 0;
     if (offset > result.text.length) throw new Error('document_offset_out_of_range');

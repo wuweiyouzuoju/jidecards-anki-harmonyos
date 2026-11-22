@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { SurfaceSelect } from '../common/SurfaceSelect';
 import { DirectorySelect } from '../common/DirectorySelect';
 import { DirectoryRow, DirectoryView, DirectoryChoice, directoryChoiceRows, directorySpecial } from '../../model/DirectoryTree';
@@ -21,6 +22,7 @@ interface AgentSelectOption { value: string; }
 
 @Component
 export struct AgentSetupCard {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @Prop mode: AgentMode = 'create';
   @Prop setup: AgentTaskSetup;
@@ -93,7 +95,7 @@ export struct AgentSetupCard {
       }.width('100%')
       Text(this.editContext)
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .width('100%')
     }
   }
@@ -104,8 +106,8 @@ export struct AgentSetupCard {
     }
     .alignItems(HorizontalAlign.Start)
     .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_面板)
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
     .padding(应用尺寸.卡片内边距)
     .width('100%')
   }

@@ -219,6 +219,9 @@ export class WikimediaImageService {
     const baseName: string = safePartName(draftId, index);
     const partPath: string = `${directory}/${baseName}.part`;
     silentlyDelete(partPath);
+    if (!canIUse('SystemCapability.Request.FileTransferAgent')) {
+      throw new WikimediaImageServiceError('download', 'File transfer is unavailable');
+    }
     const config: request.agent.Config = {
       action: request.agent.Action.DOWNLOAD,
       url: candidate.downloadUrl,
@@ -249,6 +252,7 @@ export class WikimediaImageService {
         try { task.off('progress', progress); } catch (error) { /* ignore cleanup */ }
       };
       const removeTask = (): void => {
+        if (!canIUse('SystemCapability.Request.FileTransferAgent')) return;
         try { request.agent.remove(task.tid).catch((): void => { /* ignore cleanup */ }); }
         catch (error) { /* ignore cleanup */ }
       };

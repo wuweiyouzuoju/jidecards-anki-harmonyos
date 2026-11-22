@@ -1,8 +1,11 @@
-import { SURFACE_MATERIAL_KEY, SURFACE_MATERIALS, DEFAULT_SURFACE_MATERIAL } from '../SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { WHEEL_GRIP_KEY } from '../EditorWheelPreferences';
+import { LANDSCAPE_MIN_WIDTH_VP } from '../AppLayoutState';
+import { HOME_LAYOUT_KEY, HOME_LAYOUT_MODES, DEFAULT_HOME_LAYOUT } from '../HomeLayout';
+import { SURFACE_MATERIAL_KEY, SURFACE_MATERIALS, DEFAULT_SURFACE_MATERIAL } from '../SurfaceMaterial';
 import { appLocaleValues } from '../AppLocales';
 import { STUDY_LAYOUT_MODES } from '../StudyLayout';
-import { DECK_LIST_STYLES, DECK_LIST_STYLE_KEY, isDeckListStyle } from '../DeckListAppearance';
+import { availableDeckListStyles, DECK_LIST_STYLE_KEY, isDeckListStyle } from '../DeckListAppearance';
 import { MOTION_STYLE_KEY, MOTION_STYLES, isMotionStyle } from '../MotionStyle';
 export type AgentPreferenceValue = boolean | number | string;
 
@@ -66,14 +69,17 @@ export interface AgentPreferenceDefinition {
 export function agentPreferenceDefinitions(): AgentPreferenceDefinition[] {
   return [
     { id: 'simple_mode', description: '简洁学习界面。', store: 'jidecards_settings', key: 'simple_mode', defaultValue: true, allowedValues: [], encoding: 'native' },
+    { id: 'home_layout', description: `设置→常规→横屏大屏主页：classic顶部按钮（默认，升级用户保持原版）；wheel侧边栏，只在窗口宽至少${LANDSCAPE_MIN_WIDTH_VP}vp且宽大于高时启用。新版提醒、设置、回退、统计直接显示，没有主页更多。关于在设置里。保存的选择在竖屏或小窗口仍保留，显示临时回到旧版。`, store: 'jidecards_settings', key: HOME_LAYOUT_KEY, defaultValue: DEFAULT_HOME_LAYOUT, allowedValues: HOME_LAYOUT_MODES, encoding: 'native' },
     { id: 'home_today_summary', description: '首页是否展示今日学习进度。', store: 'jidecards_settings', key: 'home_show_today_summary', defaultValue: true, allowedValues: [], encoding: 'native' },
     { id: 'study_haptics', description: '学习操作触觉反馈偏好，不保证设备支持振动。', store: 'jidecards_settings', key: 'studyHapticsEnabled', defaultValue: true, allowedValues: [], encoding: 'native' },
+    { id: 'study_two_buttons', description: '设置→复习→双按钮评分：普通卡答案面仅显示忘记与良好，底部和悬浮栏共用。默认关闭；手势与键盘仍按各自绑定评分。', store: 'jidecards_settings', key: 'studyTwoButtons', defaultValue: false, allowedValues: [], encoding: 'native' },
     { id: 'card_text_size', description: '卡片文字缩放百分比，50–200；模板可以有自己的字号。', store: 'jidecards_settings', key: 'cardTextSizePercent', defaultValue: 100, allowedValues: [], encoding: 'native' },
-    { id: 'deck_list_style', description: '外观中的牌组样式：single_wide 单列宽、single_narrow 单列窄、double_wide 双列宽、double_narrow 双列窄；所有样式的牌组名称最多两行，描述最多一行；双列按顶级牌组整棵子树分栏，隐藏新/学/复计数；同密度单/双列等高，窄版仅在原字号名称需要两行且有描述时缩小字号以容纳两行名称和一行描述；排序时临时单列，沿用同一名称排版规则。窄样式同步紧凑页面间距。', store: 'jidecards_settings', key: DECK_LIST_STYLE_KEY, defaultValue: 'single_wide', allowedValues: DECK_LIST_STYLES, encoding: 'native' },
+    { id: 'deck_list_style', description: '外观中的牌组样式：single_wide 单列宽、single_narrow 单列窄、double_wide 双列宽、double_narrow 双列窄，电脑默认双列宽并支持 triple_wide 三列宽；所有样式的牌组名称最多两行，描述最多一行；多列按顶级牌组整棵子树分栏，隐藏新/学/复计数；同密度单/双列等高，窄版仅在原字号名称需要两行且有描述时缩小字号以容纳两行名称和一行描述；排序时临时单列，沿用同一名称排版规则。窄样式同步紧凑页面间距。', store: 'jidecards_settings', key: DECK_LIST_STYLE_KEY, defaultValue: 'single_wide', allowedValues: availableDeckListStyles(true), encoding: 'native' },
     { id: 'study_layout', description: '普通闪卡工具栏：bottom 底部，float 自由拖动，smart 智感握姿自动换边；需要设备支持并开启系统智感握姿，不支持时仍可拖动。选择题与白板沿用原操作区。', store: 'jidecards_study_layout', key: 'study_layout_mode', defaultValue: 'bottom', allowedValues: STUDY_LAYOUT_MODES, encoding: 'native' },
     { id: 'theme_motion', description: '主题背景动效偏好。', store: 'jidecards_redemption', key: 'motion', defaultValue: true, allowedValues: [], encoding: 'native' },
-    { id: 'surface_material', description: '外观材质：新用户默认 flat，经一次推荐确认后可切换 glass；flat 保留原有白/黑表面，无阴影、模糊和高光；glass 页面模块共用玻璃参数，表面随当前主题主色轻微染色，内容底色比按钮更实，详情内部分组不重复叠色；弹窗本体有限透明；搜索栏和编辑轮盘分别使用输入与工具浮层材质，玻璃档深色模块统一清晰轮廓与高光。幻彩主题与动态背景保持独立。', store: 'jidecards_settings', key: SURFACE_MATERIAL_KEY, defaultValue: DEFAULT_SURFACE_MATERIAL, allowedValues: SURFACE_MATERIALS, encoding: 'native' },
+    { id: 'surface_material', description: '外观材质：新用户默认 flat，经一次推荐确认后可切换 glass；flat 保留原有白/黑表面，无阴影、模糊和高光；glass 常驻模块使用半透明底色和系统背景模糊；默认浅色32%白底、深色35%炭灰底，不染主题色，模块内部输入框等内嵌区域不重复叠色；模块、按钮和弹窗填色不透明度分别保存；搜索栏和编辑轮盘分别使用输入与工具浮层材质，玻璃档深色模块统一清晰轮廓与高光。幻彩主题与动态背景保持独立。', store: 'jidecards_settings', key: SURFACE_MATERIAL_KEY, defaultValue: DEFAULT_SURFACE_MATERIAL, allowedValues: SURFACE_MATERIALS, encoding: 'native' },
     { id: 'editor_wheel_on_entry', description: '设置→编辑：进入编辑页时默认打开编辑轮盘；默认true，手动打开不受影响。', store: 'jidecards_settings', key: 'editor_wheel_on_entry', defaultValue: true, allowedValues: [], encoding: 'native' },
+    { id: WHEEL_GRIP_KEY, description: '设置→编辑→编辑轮盘：智感握姿默认开启，设备支持时随握姿自动换边；关闭后仍可手动换边。', store: 'jidecards_settings', key: WHEEL_GRIP_KEY, defaultValue: true, allowedValues: [], encoding: 'native' },
     { id: 'editor_wheel_on_keyboard', description: '设置→编辑：键盘展开时默认打开编辑轮盘；默认true，与进入页开关独立。', store: 'jidecards_settings', key: 'editor_wheel_on_keyboard', defaultValue: true, allowedValues: [], encoding: 'native' },
     { id: 'motion_style', description: '外观中的动效风格：restrained 克制（默认），lively 灵动。控制菜单、弹窗、页面、按压和工具反馈；两档均不增加卡片翻转动画，与动态背景和学习震动偏好独立。', store: 'jidecards_settings', key: MOTION_STYLE_KEY, defaultValue: 'restrained', allowedValues: MOTION_STYLES, encoding: 'native' },
     { id: 'automatic_backups', description: '本地自动备份开关，不表示已有备份数量。', store: 'jidecards_settings', key: 'automatic_backups', defaultValue: true, allowedValues: [], encoding: 'native' },

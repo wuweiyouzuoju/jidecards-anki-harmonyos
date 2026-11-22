@@ -125,6 +125,11 @@ export class AgentSessionController {
       closeUnansweredCalls(this.input);
       this.paused = true;
       const code: string = error instanceof Error ? error.message : '';
+      // 失败同样是可恢复状态；不能仅靠页面 finally 才保存工具与检索进度。
+      if (code !== 'agent_checkpoint_failed') {
+        try { this.checkpointListener?.(); }
+        catch (checkpointError) { throw new AgentRunnerError('agent_checkpoint_failed'); }
+      }
       if ((error instanceof AgentRunnerError && (code === 'agent_provider_limit' || code === 'agent_tool_limit' ||
         code === 'agent_repeated_tool_failure' || code === 'agent_no_valid_draft')) ||
         code === 'cancelled') {

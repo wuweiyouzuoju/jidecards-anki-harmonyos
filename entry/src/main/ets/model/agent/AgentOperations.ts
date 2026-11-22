@@ -38,7 +38,7 @@ export interface AgentOperationBackend {
 }
 
 const ID: OperationSchema = { type: 'integer', minimum: 1 };
-const IDS: OperationSchema = { type: 'array', items: ID, minItems: 1, maxItems: 1000 };
+const IDS: OperationSchema = { type: 'array', items: ID, minItems: 1 };
 const TEXT: OperationSchema = { type: 'string', maxLength: 4000 };
 const NAME: OperationSchema = { type: 'string', minLength: 1, maxLength: 200 };
 const JSON_TEXT: OperationSchema = { type: 'string', minLength: 1, maxLength: 60000 };
@@ -53,7 +53,7 @@ function definition(domain: string, name: string, titleKey: string, description:
   return { domain: domain, name: name, titleKey: titleKey, description: description, risk: risk,
     parametersJson: JSON.stringify(raw), exampleArgumentsJson: JSON.stringify(operationExample(schema)),
     rules: risk === 'read' ? 'Read only. Only use discovered IDs. Page through complete results; never equate returned rows with total matches.' :
-      'Call alone. Creates an app-owned exact proposal; zero writes before confirmation. Only discovered IDs, exact target scope and batch limit. ' +
+      'Call alone. Creates an app-owned exact proposal; zero writes before confirmation. Only discovered IDs and exact target scope. ' +
       (risk === 'high_risk' ? 'Two app confirmations required. ' : '') +
       'Recheck current state at execution. Cancelled pickers and partial/unknown outcomes are not success. Never retry uncertain writes automatically. No arbitrary RPC, paths, credentials or storage keys.' };
 }
@@ -138,7 +138,7 @@ function validateValue(value: Object, schema: OperationSchema, path: string): vo
       (schema.required ?? []).some((key): boolean => raw[key] === undefined)) throw new Error('invalid_operation_argument:' + path);
     for (const key of Object.keys(raw)) validateValue(raw[key], properties[key], path + '.' + key);
   } else if (schema.type === 'array') {
-    if (!Array.isArray(value) || value.length < (schema.minItems ?? 0) || value.length > (schema.maxItems ?? 1000) ||
+    if (!Array.isArray(value) || value.length < (schema.minItems ?? 0) || (schema.maxItems !== undefined && value.length > schema.maxItems) ||
       new Set<Object>(value).size !== value.length) throw new Error('invalid_operation_argument:' + path);
     for (const item of value) validateValue(item, schema.items!, path);
   } else if (schema.type === 'integer') {

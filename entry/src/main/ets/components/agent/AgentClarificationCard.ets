@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormTextAreaStyle } from '../../utils/FormTextAreaStyle';
@@ -14,6 +15,7 @@ import { parseAgentBoldRuns, AgentTextRun } from '../../model/agent/AgentTextFor
 /** 澄清以普通问题呈现；提交后只保留问题，回答由独立用户消息承载。 */
 @Component
 export struct AgentClarificationCard {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop clarification: AgentClarificationView;
   @Prop noticeText: string = '';
   @StorageProp(颜色键.主色按钮背景) private primaryBackground: string = '#2F5FD0';
@@ -48,7 +50,7 @@ export struct AgentClarificationCard {
           .width(20).height(20).margin(0).flexShrink(0)
           .radioStyle({
             checkedBackgroundColor: this.primaryBackground,
-            uncheckedBorderColor: $r('app.color.text_secondary'),
+            uncheckedBorderColor: appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')),
             indicatorColor: $r('app.color.action_on_primary')
           })
           .accessibilityText(option.label)
@@ -60,17 +62,17 @@ export struct AgentClarificationCard {
           Row({ space: 应用尺寸.间距_8 }) {
             Text(option.label)
               .fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary')).layoutWeight(1)
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).layoutWeight(1)
             if (option.id === this.clarification.request.recommendedOptionId) {
               Text($r('app.string.ai_agent_clarification_recommended'))
                 .fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary')).flexShrink(0)
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).flexShrink(0)
             }
           }.width('100%')
           if (option.description.length > 0) {
             Text(option.description)
               .fontSize(应用尺寸.字号_正文_小)
-              .fontColor($r('app.color.text_secondary')).width('100%')
+              .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           }
         }
         .layoutWeight(1).alignItems(HorizontalAlign.Start)
@@ -78,10 +80,10 @@ export struct AgentClarificationCard {
       .width('100%').constraintSize({ minHeight: 应用尺寸.按钮高度 })
       .padding(应用尺寸.间距_10)
       .backgroundColor(option.id === this.clarification.selectedOptionId ?
-        $r('app.color.surface_page') : $r('app.color.surface_card'))
+        appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page')) : $r('app.color.surface_card'))
       .border(SurfaceBorder.options(2, option.id === this.clarification.selectedOptionId ?
-        this.primaryBackground : SurfaceBorder.color()))
-      .borderRadius(应用尺寸.圆角_卡片)
+        this.primaryBackground : SurfaceBorder.color(), this.appearanceElements))
+      .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
       .enabled(this.isEditable())
       .attributeModifier(new PressFeedback())
       .onClick((): void => { this.selectOption(option.id); })
@@ -91,7 +93,7 @@ export struct AgentClarificationCard {
         text: this.clarification.supplementalText,
         placeholder: $r('app.string.ai_agent_clarification_supplement_hint')
       })
-        .attributeModifier(new FormTextAreaStyle())
+        .attributeModifier(new FormTextAreaStyle( this.appearanceElements))
         .height(72)
         .enabled(this.isEditable())
         .onChange((value: string): void => { this.changeSupplement(value); })
@@ -120,7 +122,7 @@ export struct AgentClarificationCard {
         })
       }
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .width('100%')
       if (this.isEditable()) { this.answerControls(); }
       if (this.noticeText.length > 0) {
@@ -131,7 +133,7 @@ export struct AgentClarificationCard {
     .width('100%').alignItems(HorizontalAlign.Start)
     .padding(应用尺寸.卡片内边距)
     .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_面板)
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
   }
 }

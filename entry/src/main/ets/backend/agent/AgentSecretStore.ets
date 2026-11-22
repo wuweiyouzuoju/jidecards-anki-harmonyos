@@ -81,3 +81,7 @@ export async function saveAgentSearchSecret(secret: string, provider: AgentSearc
   if (provider === 'deepseek') throw new Error('web_search_key_managed_by_provider');
   await saveSecret(`web.${provider}`, secret, true);
 }
+
+export async function loadExternalMcpToken(): Promise<string> { return loadSecret('external-mcp', true); }
+/** @throws {Error} 外部 MCP 访问令牌安全存储失败；调用方必须保留失败状态。 */
+export async function saveExternalMcpToken(token: string): Promise<void> { await saveSecret('external-mcp', token, true); }

@@ -1,5 +1,6 @@
-import { WALLPAPER_KEY } from '../../model/AppearanceCustomization';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { WALLPAPER_KEY } from '../../model/AppearanceCustomization';
 import { pageMaterialFill } from '../../utils/GlassMaterial';
 import { localeDate } from '../../utils/LocaleFormatting';
 import { localizedResourceText } from '../../utils/UiFeedback';
@@ -19,6 +20,7 @@ import { AppInterfaceControl } from '../../model/AppInterface';
 import { interfaceItemText, interfaceItemTitleKey } from '../../utils/AppInterfaceText';
 @Component
 export struct AgentHistoryList {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private material: string = 'flat';
   @StorageProp(WALLPAPER_KEY) private wallpaperPath: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -109,7 +111,7 @@ export struct AgentHistoryList {
       if (!this.searching && this.visible().length === 0) {
         Text($r('app.string.ai_agent_history_none'))
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
           .padding({ top: 应用尺寸.间距_16, bottom: 应用尺寸.间距_16 })
           .textAlign(TextAlign.Center)
@@ -123,14 +125,14 @@ export struct AgentHistoryList {
                     Text(item.title)
                       .fontSize(应用尺寸.字号_正文)
                       .fontWeight(FontWeight.Medium)
-                      .fontColor($r('app.color.text_primary'))
+                      .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                       .maxLines(1)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                   }
                   .width('100%')
                   Text(localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.ai_agent_history_message_count'), `${item.messageCount}`) + ` · ${this.格式化历史时间(item.updatedAt)}`)
                     .fontSize(应用尺寸.字号_正文_小)
-                    .fontColor($r('app.color.text_secondary'))
+                    .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
                     .width('100%')
                 }
                 .layoutWeight(1)
@@ -144,8 +146,8 @@ export struct AgentHistoryList {
               .padding(应用尺寸.间距_10)
               .backgroundColor(item.id === this.conversationId ?
                 this.选中背景色 : $r('app.color.surface_card'))
-              .border(SurfaceBorder.options())
-              .borderRadius(应用尺寸.圆角_面板)
+              .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+              .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
               }
             }, (item: AgentConversationSummary): string => item.id + String(item.updatedAt))
         }

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { DESKTOP_HOME_LAYOUT_KEY, availableDeckListStyles } from '../../model/DeckListAppearance';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { agentSettingDefinitions, decodeSettingsArguments, requestedThemeMode } from '../../model/agent/AgentSettingsTools';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { isAppThemeMode } from '../../model/settings/ThemeModeSession';
@@ -98,10 +100,11 @@ export class AgentAppSettingsTools {
   private allowedMode: AppThemeMode | null = null;
   private interfaceTools: ProviderFunctionTool[] = [];
   private webProvider: string = '';
+  private nativeWebTools: boolean = false;
   private navigationReadiness: () => AgentNavigationReadiness[] = (): AgentNavigationReadiness[] => [];
 
-  setInterfaceTools(tools: ProviderFunctionTool[], webProvider: string = ''): void {
-    this.interfaceTools = tools.slice(); this.webProvider = webProvider;
+  setInterfaceTools(tools: ProviderFunctionTool[], webProvider: string = '', nativeWebTools: boolean = false): void {
+    this.interfaceTools = tools.slice(); this.webProvider = webProvider; this.nativeWebTools = nativeWebTools;
   }
   setNavigationReadiness(read: () => AgentNavigationReadiness[]): void { this.navigationReadiness = read; }
 
@@ -137,13 +140,13 @@ export class AgentAppSettingsTools {
       const savedSimple: boolean = simple === undefined ? (await readAgentPreference('simple_mode')).value === true : simple;
       return JSON.stringify(buildAgentAppStructure({ simple: savedSimple,
         agent: AppStorage.get<boolean>(AI_AGENT_CHANNELS_APP_STORAGE_KEY) ?? false,
-        cloudDeck: await isCloudDeckAvailable(), themeHasTextures: themeDefinition(activeColor).backgroundTextures.length > 0 },
+        cloudDeck: await isCloudDeckAvailable(), themeHasTextures: themeDefinition(activeColor).backgroundTextures.length > 0, desktop: deviceInfo.deviceType === '2in1' },
         args.surface, args.sectionId, (key: string): string => context.resourceManager.getStringByNameSync(key),
-        agentSettingDefinitions(), this.interfaceTools, appInterface.snapshot(),
+        agentSettingDefinitions(AppStorage.get<boolean>(DESKTOP_HOME_LAYOUT_KEY) === true), this.interfaceTools, appInterface.snapshot(),
         AppStorage.get<boolean>(APP_FOREGROUND_KEY) === false ? '' : appInterface.currentPage(),
-        appInterface.currentContextPage(), this.navigationReadiness(), this.webProvider));
+        appInterface.currentContextPage(), this.navigationReadiness(), this.webProvider, this.nativeWebTools));
     }
-    if (name === 'list_settings') { return JSON.stringify({ settings: agentSettingDefinitions() }); }
+    if (name === 'list_settings') { return JSON.stringify({ settings: agentSettingDefinitions(AppStorage.get<boolean>(DESKTOP_HOME_LAYOUT_KEY) === true) }); }
     if (name === 'list_theme_colors') {
       const contents: string[] = AppStorage.get<string[]>(UNLOCKED_CONTENTS_KEY) ?? [];
       const colors: AgentThemeColorView[] = THEME_CATALOG.map((theme: ThemeDefinition): AgentThemeColorView =>
@@ -223,6 +226,10 @@ export class AgentAppSettingsTools {
     } else if (name === 'propose_set_fsrs') {
       change = { settingId: 'fsrs_enabled', before: `${await readFsrsEnabled()}`, after: `${args.enabled}` };
     } else if (name === 'propose_set_setting') {
+      if (args.settingId === 'deck_list_style' &&
+        !availableDeckListStyles(AppStorage.get<boolean>(DESKTOP_HOME_LAYOUT_KEY) === true).includes(args.value)) {
+        throw new Error('invalid_setting_value');
+      }
       change = { settingId: args.settingId, before: await readAgentSettingValue(args.settingId), after: args.value };
     } else { throw new Error('tool_unavailable'); }
     return createAgentAction('setting_change', JSON.stringify(change));

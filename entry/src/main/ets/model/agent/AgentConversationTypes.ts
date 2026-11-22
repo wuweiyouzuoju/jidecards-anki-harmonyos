@@ -16,6 +16,7 @@ export interface AgentHistoryMessage {
   action?: AgentAction;
   role: string;
   text: string;
+  hasProviderText?: boolean;
   kind: string;
   clarification: AgentClarificationView | null;
   expanded: boolean;

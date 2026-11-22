@@ -10,7 +10,7 @@ import type { CollectionPreferencesAction, StudyControlsAction, ExportSubsetActi
 import type { ChangeDraft, DraftOperation } from '../../model/agent/AgentTypes';
 import { validateStudyControls, effectiveStudyKeyboard } from '../../model/StudyControls';
 import { STUDY_KEYBOARD_ACTIONS } from '../../model/StudyKeyboard';
-import { STUDY_GESTURE_INPUTS, STUDY_GESTURE_ACTIONS, completeStudyGestures, assertStudyGestureEdit } from '../../model/StudyGestureConfig';
+import { STUDY_GESTURE_SUPPORT, STUDY_GESTURE_INPUTS, STUDY_GESTURE_ACTIONS, completeStudyGestures, assertStudyGestureEdit } from '../../model/StudyGestureConfig';
 import { SIMPLE_MODE_KEY } from '../../model/AppLayoutState';
 import type { StudyControls } from '../../model/StudyControls';
 import { reviewPreferences } from '../ReviewPreferencesService';
@@ -81,7 +81,7 @@ export class AgentMaintenanceTools {
       keyboardActions: STUDY_KEYBOARD_ACTIONS, effectiveKeyboard: effectiveStudyKeyboard(controls),
       gestureInputs: STUDY_GESTURE_INPUTS, gestureActions: STUDY_GESTURE_ACTIONS,
       gestureExperimentalOnly: true, gestureEditable: AppStorage.get<boolean>(SIMPLE_MODE_KEY) === false,
-      effectiveGestureConfig: completeStudyGestures(controls.gestureConfig, AppStorage.get<boolean>(SIMPLE_MODE_KEY) !== false) ?? null,
+      gestureCompatibility: STUDY_GESTURE_SUPPORT, effectiveGestureConfig: completeStudyGestures(controls.gestureConfig, AppStorage.get<boolean>(SIMPLE_MODE_KEY) !== false) ?? null,
       gestureFormat: 'gestureConfig:{version:1,enabled:boolean,tapLayout:"four"|"nine",bindings:[{input:"up",command:"replay",side:"both"}]}. Bindings replace the complete list, unbound/none inputs do nothing. four_* and nine_* bindings are stored separately. Ratings only on answer; flip only on question. Choice feedback preserves right-swipe continue. Scroll, editing, dialogs and whiteboard keep their input. Shake needs an available accelerometer and foreground study.',
       keyboardFormat: 'keyboard:{version:1,bindings:[{key:"ctrl+shift+f5",command:"replay",side:"both"}]}; keys must be [] when keyboard is present. Empty bindings disables all study shortcuts. Sides: question/answer/both. Exact Ctrl/Shift/Alt modifiers; raw device keys: code:N. Physical system Back remains owned by navigation.',
       screenAwakeEffect: 'Only the visible foreground study page borrows the window state; device support is not guaranteed.' });
@@ -142,7 +142,6 @@ export class AgentMaintenanceTools {
     let draft: ChangeDraft;
     if (name === 'propose_duplicate_note') {
       this.scope.assertReadableNoteIds([args.noteId!]); this.scope.assertReadableDeckIds([args.deckId!]);
-      this.scope.assertBatchCount(1);
       const note = await this.notes.获取笔记(args.noteId!);
       const type: string = await this.types.获取笔记类型旧版(note.notetypeId);
       this.scope.registerReadableNotetypeIds([note.notetypeId]);
@@ -165,8 +164,6 @@ export class AgentMaintenanceTools {
           before: before, after: patchAgentNotetypeLatex(before, { latexPre: args.latexPre,
             latexPost: args.latexPost, latexSvg: args.latexSvg }) };
       } else if (name === 'propose_restore_notetype') {
-        this.scope.assertBatchCount(impact.cardIds.length);
-        this.scope.assertBatchCount(impact.noteIds.length);
         const kind: number = agentRestoreStockKind(before, args.forceKind);
         const payload: RestoreNotetypeAction = { forceKind: args.forceKind,
           stockJson: await this.types.获取标准笔记类型JSON(kind) };

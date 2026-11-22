@@ -3,6 +3,7 @@ import type { ProviderFunctionTool } from './ProviderProtocol';
 import type { AppThemeMode } from '../settings/ThemeModeSession';
 import type { ThemeId } from '../ThemeCatalog';
 import { isThemeId } from '../settings/ThemeColorSession';
+import { availableDeckListStyles } from '../DeckListAppearance';
 import { agentPreferenceDefinitions, agentWritablePreferenceIds, decodeWritablePreference } from './AgentPreferenceSettings';
 import { SETTINGS_ENTRIES } from '../SettingsNavigation';
 import { appInterfaceSurfaceIds } from '../AppInterface';
@@ -20,7 +21,7 @@ export interface AgentSettingDefinition {
 }
 
 /** 只列已接通能力；不提供任意偏好键、RPC 或凭证读取。 */
-export function agentSettingDefinitions(): AgentSettingDefinition[] {
+export function agentSettingDefinitions(desktop: boolean = false): AgentSettingDefinition[] {
   const definitions: AgentSettingDefinition[] = [
     { id: 'theme_mode', description: '应用深浅色偏好；system 跟随系统，与闪卡模板 CSS 配色独立。',
       valueType: 'enum', allowedValues: ['system', 'light', 'dark'], scope: 'device',
@@ -38,7 +39,8 @@ export function agentSettingDefinitions(): AgentSettingDefinition[] {
     const writable: boolean = agentWritablePreferenceIds().includes(preference.id);
     definitions.push({ id: preference.id, description: preference.description,
       valueType: preference.encoding === 'string_boolean' ? 'boolean' : typeof preference.defaultValue,
-      allowedValues: preference.encoding === 'string_boolean' ? [] : preference.allowedValues.slice(),
+      allowedValues: preference.id === 'deck_list_style' ? availableDeckListStyles(desktop).slice() :
+        preference.encoding === 'string_boolean' ? [] : preference.allowedValues.slice(),
       scope: 'device', writable: writable, writeTool: writable ? 'propose_set_setting' : '',
       effect: writable ? 'confirmed_persistent' : 'read_only' });
   }
@@ -83,7 +85,7 @@ export function agentSettingsFunctionTools(): ProviderFunctionTool[] {
     { name: 'propose_set_setting', description: '修改 list_settings 中 writable=true 的简单设置；value 为规范值字符串，开关 true/false，字号50–200，布局bottom/float/smart，语言使用 language.allowedValues 中的地区代码（配置通知后刷新），统计范围使用列出的整数。graph_preferences 为完整可写 JSON {calendarFirstDayOfWeek:0|1|5|6,cardCountsSeparateInactive:boolean,futureDueShowBacklog:boolean}；browserLinksSupported 只读，禁止提交。确认后共用原保存入口。',
       parametersJson: `{"type":"object","properties":{"settingId":{"type":"string","enum":${JSON.stringify(agentWritablePreferenceIds())}},"value":{"type":"string","minLength":1,"maxLength":4000}},"required":["settingId","value"],"additionalProperties":false}`,
       exampleArgumentsJson: '{"settingId":"card_text_size","value":"130"}',
-      rules: 'Call alone. Creates a proposal, never writes before user confirmation. Use list_settings for supported IDs and actual scope. Values are exact: card_text_size is an integer percentage 50–200; deck_list_style uses single_wide, single_narrow, double_wide or double_narrow; study_haptics uses true or false; motion_style uses restrained or lively; surface_material uses flat (default, no glass blur, highlight or shadow) or glass. Surface material does not change the color theme, iridescent textures or background motion preference. Motion styles change native interface feedback, never add card flip animations or change dynamic background and haptics preferences. Double columns hide new/learning/review counts; narrow styles use compact page spacing. Card scaling does not change template CSS; haptics preference does not guarantee device vibration. Confirmation rechecks the saved value. Stale proposals fail. After an unverified write read get_settings before making a new proposal.' },
+      rules: 'Call alone. Creates a proposal, never writes before user confirmation. Use list_settings for supported IDs and actual scope. Values are exact: card_text_size is an integer percentage 50–200; home_layout uses classic (Top buttons, default) or wheel (Sidebar, only for landscape windows at least 840vp wide); deck_list_style uses single_wide, single_narrow, double_wide, double_narrow, or triple_wide on PC; study_haptics uses true or false; motion_style uses restrained or lively; surface_material uses flat (default, no glass blur, highlight or shadow) or glass. Surface material does not change the color theme, iridescent textures or background motion preference. Motion styles change native interface feedback, never add card flip animations or change dynamic background and haptics preferences. Multiple columns hide new/learning/review counts; narrow styles use compact page spacing. Card scaling does not change template CSS; haptics preference does not guarantee device vibration. Confirmation rechecks the saved value. Stale proposals fail. After an unverified write read get_settings before making a new proposal.' },
     { name: 'get_deck_options', description: '读取真实牌组的学习选项、共享预设使用数量与牌组覆盖限额；不修改配置。',
       parametersJson: '{"type":"object","properties":{"deckId":{"type":"integer","minimum":1}},"required":["deckId"],"additionalProperties":false}',
       exampleArgumentsJson: '{"deckId":1}',

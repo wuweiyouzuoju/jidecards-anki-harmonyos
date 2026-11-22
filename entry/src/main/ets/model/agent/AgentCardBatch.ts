@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { AutoSyncScheduler, autoSyncScheduler } from '../AutoSyncScheduler';
-import { SyncActivity, syncActivity } from '../SyncSettings';
+import { autoSyncScheduler } from '../AutoSyncScheduler';
+import type { AutoSyncScheduler } from '../AutoSyncScheduler';
+import { syncActivity } from '../SyncSettings';
+import type { SyncActivity } from '../SyncSettings';
 
 export interface AgentBatchCard {
   fields: string[];

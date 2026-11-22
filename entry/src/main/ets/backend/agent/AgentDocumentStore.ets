@@ -8,11 +8,13 @@ import { util } from '@kit.ArkTS';
 import type { AgentDocumentInfo, AgentDocumentPage, AgentDocumentRepository } from '../../model/agent/AgentDocuments';
 import { normalizeAgentDocumentText } from '../../model/agent/AgentDocumentText';
 import { UTF8编码 } from '../../proto/core/utf8';
+import { DeepSeekMediaService } from './DeepSeekMediaService';
+import { AgentTextPageWriter, ensureAgentDocumentSpace } from './AgentTextPaging';
 import { AgentVideoReader } from './AgentVideoReader';
 import { AgentVideoInfo } from '../../model/agent/AgentVideo';
 import { isSupportedAgentVideoFile } from '../../model/agent/AgentFileImport';
 
-interface StoredDocument extends AgentDocumentInfo { submitted: boolean; textPages: string[]; }
+interface StoredDocument extends AgentDocumentInfo { submitted: boolean; textPages: string[]; textPageFiles?: boolean; }
 
 /** 使用 API 12 已有的图形文字对象，避免调用 API 23 的 getTextContent。SDK 返回阅读顺序。 */
 export function agentPdfPageText(page: pdfService.PdfPage): string {
@@ -26,29 +28,14 @@ export function agentPdfPageText(page: pdfService.PdfPage): string {
   return normalizeAgentDocumentText(sections.join('\n'));
 }
 
-/** @throws {Error} URI 授权期内完整复制，失败交给 stage 的导入错误边界；文件名不参与路径。 */
-function copyDocumentFile(source: fs.File, size: number, path: string): void {
-  const target: fs.File = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
-  try {
-    for (let offset: number = 0; offset < size;) {
-      const buffer: ArrayBuffer = new ArrayBuffer(Math.min(65536, size - offset));
-      const read: number = fs.readSync(source.fd, buffer, { offset: offset, length: buffer.byteLength });
-      if (read <= 0) throw new Error('read_failed');
-      let written: number = 0;
-      while (written < read) {
-        const count: number = fs.writeSync(target.fd, buffer.slice(written, read));
-        if (count <= 0) throw new Error('read_failed');
-        written += count;
-      }
-      offset += read;
-    }
-    fs.fsyncSync(target.fd);
-  } finally { fs.closeSync(target); }
-}
-
 /** API 21 的持久资料区；会话拥有文档授权，逐页懒读取，缓存与原始文件分开。 */
 export class AgentDocumentStore implements AgentDocumentRepository {
   private directory: string;
+  private deepSeekOcrKey: string = '';
+  private cloudReadGeneration: number = 0;
+  private cloudOcr: DeepSeekMediaService | null = null;
+  setDeepSeekOcrKey(key: string): void { this.deepSeekOcrKey = key; }
+  cancelRead(): void { this.cloudReadGeneration++; this.cloudOcr?.cancel(); }
   constructor(context: common.Context) { this.directory = `${context.filesDir}/agent-documents`; }
   private folder(conversationId: string, id: string = ''): string {
     if (!/^[A-Za-z0-9._-]{1,100}$/.test(conversationId) || (id.length > 0 && !/^[A-Za-z0-9._-]{1,100}$/.test(id)) ||
@@ -91,25 +78,46 @@ export class AgentDocumentStore implements AgentDocumentRepository {
     return document;
   }
   /** @throws {Error} 完整复制或文档验证失败时，导入入口显示失败，不发布半成品。 */
-  stage(conversationId: string, source: fs.File, info: AgentDocumentInfo, text: string = ''): AgentDocumentInfo {
+  async stage(conversationId: string, source: fs.File, info: AgentDocumentInfo,
+    text: string = '', extractText?: (writer: AgentTextPageWriter) => Promise<string>): Promise<AgentDocumentInfo> {
     const folder: string = this.folder(conversationId, info.id);
     this.ensure(folder);
-    copyDocumentFile(source, info.byteSize, `${folder}/original`);
-    const pages: string[] = [];
-    let count: number = 1;
-    if (info.extension === '.pdf') {
-      const document: pdfService.PdfDocument = this.openPdf(`${folder}/original`);
-      try { count = document.getPageCount(); } finally { document.releaseDocument(); }
-      if (count < 1) throw new Error('parse_failed');
-    } else if (text.length > 0) {
-      for (let offset: number = 0; offset < text.length; offset += 12000) pages.push(text.slice(offset, offset + 12000));
-      count = pages.length;
+    const original: string = `${folder}/original`;
+    try {
+      await ensureAgentDocumentSpace(folder, info.byteSize * 2);
+      await fs.copyFile(source.fd, original);
+      if (fs.statSync(original).size !== info.byteSize) throw new Error('read_failed');
+      const pages: string[] = [];
+      let count: number = 1;
+      let warning: string = info.warningCode;
+      if (extractText !== undefined) {
+        const writer: AgentTextPageWriter = new AgentTextPageWriter(folder);
+        warning = await extractText(writer);
+        count = writer.finish();
+        if (count < 1) throw new Error('no_extractable_text');
+      } else if (info.extension === '.pdf') {
+        const document: pdfService.PdfDocument = this.openPdf(original);
+        try { count = document.getPageCount(); } finally { document.releaseDocument(); }
+        if (count < 1) throw new Error('parse_failed');
+      } else if (text.length > 0) {
+        const writer: AgentTextPageWriter = new AgentTextPageWriter(folder);
+        writer.append(text); count = writer.finish();
+      }
+      const stored: StoredDocument = { id: info.id, name: info.name, extension: info.extension, byteSize: info.byteSize,
+        pageCount: count, warningCode: warning, submitted: false, textPages: pages,
+        textPageFiles: extractText !== undefined || text.length > 0 };
+      this.writeJson(`${folder}/manifest.json`, stored);
+      return { id: stored.id, name: stored.name, extension: stored.extension, byteSize: stored.byteSize,
+        pageCount: stored.pageCount, warningCode: stored.warningCode };
+    } catch (error) {
+      try { fs.rmdirSync(folder); } catch (cleanupError) { /* The failed snapshot has no published manifest. */ }
+      throw error as Error;
     }
-    const stored: StoredDocument = { id: info.id, name: info.name, extension: info.extension, byteSize: info.byteSize,
-      pageCount: count, warningCode: info.warningCode, submitted: false, textPages: pages };
-    this.writeJson(`${folder}/manifest.json`, stored);
-    return { id: stored.id, name: stored.name, extension: stored.extension, byteSize: stored.byteSize,
-      pageCount: stored.pageCount, warningCode: stored.warningCode };
+  }
+  discardStaged(conversationId: string, id: string): void {
+    try {
+      if (!this.manifest(conversationId, id).submitted) fs.rmdirSync(this.folder(conversationId, id));
+    } catch (error) { /* A stale import may already have been removed with the conversation. */ }
   }
   /** @throws {Error} 提交标记写入失败时保留附件供用户重试，不假装已交给模型。 */
   submit(conversationId: string, ids: string[]): void {
@@ -140,14 +148,20 @@ export class AgentDocumentStore implements AgentDocumentRepository {
     return JSON.parse(fs.readTextSync(path)) as AgentDocumentPage;
   }
   /** @throws {Error} 图片编码失败传播到页面工具。 */
-  private async pack(pixelMap: image.PixelMap): Promise<string> {
+  private async jpeg(pixelMap: image.PixelMap): Promise<ArrayBuffer> {
     const packer: image.ImagePacker = image.createImagePacker();
     try {
       const bytes: ArrayBuffer = await packer.packToData(pixelMap, { format: 'image/jpeg', quality: 85 });
       if (bytes.byteLength > 2 * 1024 * 1024) throw new Error('document_image_too_large');
-      return `data:image/jpeg;base64,${new util.Base64Helper().encodeToStringSync(new Uint8Array(bytes))}`;
+      return bytes;
     } finally { await packer.release(); }
   }
+  /** @throws {Error} 页面图片编码失败传播到工具。 */
+  private async pack(pixelMap: image.PixelMap): Promise<string> {
+    const bytes = await this.jpeg(pixelMap);
+    return `data:image/jpeg;base64,${new util.Base64Helper().encodeToStringSync(new Uint8Array(bytes))}`;
+  }
+
   /** @throws {Error} OCR 不可用或识别失败传播到页面工具。 */
   private async ocr(pixelMap: image.PixelMap): Promise<string> {
     let ready: boolean = false;
@@ -162,19 +176,23 @@ export class AgentDocumentStore implements AgentDocumentRepository {
   }
   /** @throws {Error} 页面/OCR/图像读取失败返回真实工具错误；页面可独立重试。 */
   async read(conversationId: string, id: string, pageNumber: number, mode: string): Promise<AgentDocumentPage> {
+    const cloudReadGeneration = this.cloudReadGeneration;
     const document: StoredDocument = this.manifest(conversationId, id);
     if (!document.submitted) throw new Error('document_not_in_session');
     if (isSupportedAgentVideoFile(document.name)) throw new Error('document_video_requires_read_video_frames');
     if (!Number.isSafeInteger(pageNumber) || pageNumber < 1 || pageNumber > document.pageCount) throw new Error('document_page_out_of_range');
     const folder: string = this.folder(conversationId, id);
     const cached: AgentDocumentPage | null = this.cachedPage(folder, pageNumber);
-    if (mode === 'text' && cached !== null) {
+    if (cached !== null && (mode === 'text' || (mode === 'deepseek_ocr' && cached.method === 'deepseek_ocr'))) {
       if (cached.text.length === 0 && cached.warning.length === 0) cached.warning = 'no_text_use_ocr_or_image';
       return cached;
     }
     const result: AgentDocumentPage = { documentId: id, page: pageNumber, text: '', method: 'text',
       notes: cached?.notes ?? '', warning: document.warningCode };
-    if (document.textPages.length > 0) {
+    if (document.textPageFiles === true) {
+      if (mode !== 'text') throw new Error('document_page_image_unavailable');
+      result.text = fs.readTextSync(`${folder}/text-${pageNumber}.txt`);
+    } else if (document.textPages.length > 0) {
       if (mode !== 'text') throw new Error('document_page_image_unavailable');
       result.text = document.textPages[pageNumber - 1];
     } else {
@@ -206,7 +224,16 @@ export class AgentDocumentStore implements AgentDocumentRepository {
           }
         }
         if (pixelMap !== null) {
-          if (mode === 'ocr') { result.text = await this.ocr(pixelMap); result.method = 'ocr'; }
+          if (mode === 'deepseek_ocr') {
+            const bytes = await this.jpeg(pixelMap);
+            if (cloudReadGeneration !== this.cloudReadGeneration) throw new Error('cancelled');
+            const service = this.cloudOcr ?? new DeepSeekMediaService();
+            this.cloudOcr = service;
+            const recognized = await service.recognize(this.deepSeekOcrKey, bytes);
+            result.text = normalizeAgentDocumentText(recognized.text);
+            result.method = 'deepseek_ocr';
+            if (recognized.truncated) result.warning = 'deepseek_ocr_page_truncated';
+          } else if (mode === 'ocr') { result.text = await this.ocr(pixelMap); result.method = 'ocr'; }
           else { result.image = { imageUrl: await this.pack(pixelMap) }; result.method = 'page_image'; }
         }
       } finally {

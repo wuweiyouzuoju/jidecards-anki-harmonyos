@@ -80,23 +80,24 @@ export class AgentAppNavigationSession {
       executes: 'after_successful_reply', completed: false });
   }
 
-  async finish(success: boolean, generation: number = this.generation): Promise<void> {
-    if (generation !== this.generation) return;
+  async finish(success: boolean, generation: number = this.generation): Promise<boolean> {
+    if (generation !== this.generation) return false;
     const args: AppNavigationArguments | null = this.pending;
     this.pending = null;
     this.userRequest = '';
-    if (!success || args === null) return;
+    if (!success || args === null) return false;
     // 去掉可选的 undefined 字段后重新验证，不让运行时快照扩大参数权限。
     const clean: AppNavigationArguments = JSON.parse(JSON.stringify(args)) as AppNavigationArguments;
     const action = validateAppNavigation(clean, this.host.context());
     this.assertAvailable(action.id);
     this.host.assertReadableTarget(clean);
     const deckName: string = await this.host.readTarget(clean);
-    if (generation !== this.generation) return;
+    if (generation !== this.generation) return false;
     validateAppNavigation(clean, this.host.context());
     this.assertAvailable(action.id);
     this.host.navigate({ action: args.action, surface: action.surface, deckId: args.deckId,
       deckName: deckName, noteId: args.noteId, cardId: args.cardId, sectionId: args.sectionId, query: args.query, notesMode: args.notesMode });
+    return true;
   }
 
   private hostBlockReason(action: string): string {

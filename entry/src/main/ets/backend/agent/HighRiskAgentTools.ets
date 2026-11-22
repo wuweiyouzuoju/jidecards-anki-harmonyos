@@ -13,7 +13,6 @@ import { readAgentDeckDeletionImpact } from './AgentDeckDeletionImpact';
 import { agentDeletionRoots, findAgentDeletionDeck, agentDeletionFullName } from '../../model/agent/AgentDeckDeletion';
 import type { AgentDeckDeletionSnapshot } from '../../model/agent/AgentDeckDeletion';
 import type { AgentNotetypeImpact } from './AgentNotetypeImpact';
-import { MAX_BATCH_LIMIT } from '../../model/agent/AgentPolicy';
 import type { AgentToolArguments } from '../../model/agent/AgentToolSchemas';
 import { AgentToolSchemaError, decodeAgentToolArguments } from '../../model/agent/AgentToolSchemas';
 import { 卡片服务 } from '../卡片服务';
@@ -32,12 +31,6 @@ function uniqueIds(values: number[]): number[] {
     if (!seen.has(value)) { seen.add(value); result.push(value); }
   }
   return result;
-}
-
-function assertHardLimit(cardIds: number[]): void {
-  if (cardIds.length > MAX_BATCH_LIMIT) {
-    throw new AgentToolSchemaError('high_risk_batch_too_large');
-  }
 }
 
 function highRiskDraft(id: string, summary: string, operations: DraftOperation[],
@@ -137,15 +130,11 @@ export class HighRiskAgentTools {
         before: JSON.stringify(note), after: ''
       });
     }
-    assertHardLimit(uniqueIds(cardIds));
-    this.scope.assertBatchCount(uniqueIds(cardIds).length);
     return highRiskDraft(args.draftId, args.reason, operations, args.noteIds, cardIds, [], []);
   }
 
   private async proposeDeleteCards(args: AgentToolArguments): Promise<ChangeDraft> {
     this.scope.assertReadableCardIds(args.cardIds);
-    assertHardLimit(args.cardIds);
-    this.scope.assertBatchCount(args.cardIds.length);
     const operations: DraftOperation[] = [];
     const noteIds: number[] = [];
     for (const cardId of args.cardIds) {
@@ -168,8 +157,6 @@ export class HighRiskAgentTools {
     const templates: number[] = parseMapping(args.templateMappingJson);
     const cardIds: number[] = [];
     for (const noteId of args.noteIds) { cardIds.push(...await this.notes.获取笔记的卡片(noteId)); }
-    assertHardLimit(uniqueIds(cardIds));
-    this.scope.assertBatchCount(uniqueIds(cardIds).length);
     const operation: DraftOperation = {
       kind: 'change_note_type', noteId: 0, cardId: 0, deckId: 0, fieldOrd: -1,
       before: JSON.stringify(info.input),
@@ -197,11 +184,6 @@ export class HighRiskAgentTools {
       css: styleOnly ? applyAgentCardStyle(current.css, args.style) : (args.hasCss ? args.css : current.css) };
     if (styleOnly) { payload.style = args.style; }
     const impact: AgentNotetypeImpact = await readAgentNotetypeImpact(id);
-    // A shared CSS update is one operation. Template structure changes retain the destructive batch ceiling.
-    if (templates !== JSON.stringify(current.tmpls)) {
-      assertHardLimit(impact.cardIds);
-      this.scope.assertBatchCount(impact.cardIds.length);
-    }
     const operation: DraftOperation = {
       kind: 'update_template', noteId: 0, cardId: 0, deckId: 0, fieldOrd: -1,
       before: before, after: JSON.stringify(payload)
@@ -235,16 +217,9 @@ export class HighRiskAgentTools {
     for (const deck of roots) {
       const impact: AgentDeckDeletionSnapshot = await readAgentDeckDeletionImpact(deck);
       impact.name = agentDeletionFullName(tree, deck.deckId);
-      cardIds.push(...impact.cardIds); noteIds.push(...impact.noteIds); deckIds.push(...impact.deckIds);
-      if (uniqueIds(cardIds).length > MAX_BATCH_LIMIT) {
-        throw new AgentToolSchemaError('high_risk_batch_too_large', 'deckIds',
-          `The combined deck scope exceeds ${MAX_BATCH_LIMIT} cards. Select a smaller scope.`);
-      }
-      try { this.scope.assertBatchCount(uniqueIds(cardIds).length); }
-      catch (error) {
-        throw new AgentToolSchemaError('tool_batch_too_large', 'deckIds',
-          `The combined deck scope affects ${uniqueIds(cardIds).length} cards, exceeding the configured batch limit.`);
-      }
+      for (const id of impact.cardIds) { cardIds.push(id); }
+      for (const id of impact.noteIds) { noteIds.push(id); }
+      for (const id of impact.deckIds) { deckIds.push(id); }
       operations.push({ kind: 'delete_deck', noteId: 0, cardId: 0, deckId: deck.deckId, fieldOrd: -1,
         before: JSON.stringify(deck), after: JSON.stringify(impact) });
     }
@@ -265,8 +240,6 @@ export class HighRiskAgentTools {
     const noteIds: number[] = await this.searches.搜索笔记({ search: query, order: { kind: 'none' } });
     const cardIds: number[] = [];
     for (const noteId of noteIds) { cardIds.push(...await this.notes.获取笔记的卡片(noteId)); }
-    assertHardLimit(uniqueIds(cardIds));
-    this.scope.assertBatchCount(uniqueIds(cardIds).length);
     const operation: DraftOperation = {
       kind: 'delete_note_type', noteId: 0, cardId: 0, deckId: 0, fieldOrd: -1,
       before: JSON.stringify(capability), after: ''

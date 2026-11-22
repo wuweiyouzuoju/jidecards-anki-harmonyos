@@ -2,6 +2,7 @@
 import { MATH_ASSET_BASE } from '../MathRendering';
 import type { AgentTextRun } from './AgentTextFormatting';
 import { parseAgentBoldRuns } from './AgentTextFormatting';
+import { AppLog } from '../AppLog';
 
 export interface AgentMathPart { kind: string; text: string; }
 export interface AgentMathAppearance {
@@ -141,7 +142,7 @@ export const AGENT_MATH_RUNTIME: string = String.raw`
     var content = document.getElementById('content');
     var packet = JSON.stringify({ revision: rendered, width: innerWidth,
       height: Math.max(1, Math.ceil(content.getBoundingClientRect().height)), failed: failed === true });
-    if (packet !== lastLayout) { lastLayout = packet; console.info('__JIDE_AGENT_MATH_LAYOUT__' + packet); }
+    if (packet !== lastLayout) { lastLayout = packet; AppLog.info('AgentMath', '__JIDE_AGENT_MATH_LAYOUT__' + packet); }
   }
   function replaceMarkup(content, markup) {
     var available = new Map();

@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { CONTINUATION_SUPPORT, continuationSession } from '../ContinuationSession';
 import { AI_CONTENT_EXPORT_SUPPORT } from '../AiContentExportPolicy';
 import { NOTE_LINK_SUPPORT } from '../NoteLinks';
 import { INTERACTION_FEEDBACK_SUPPORT } from '../InteractionFeedback';
 import type { InteractionFeedbackSupport } from '../InteractionFeedback';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { SETTINGS_ENTRIES, settingsEntryVisible } from '../SettingsNavigation';
 import { SETTINGS_GROUPS, visibleSettingsGroups, settingsItemVisible } from '../SettingsStructure';
 import type { SettingsGroup, SettingsItem } from '../SettingsStructure';
@@ -23,6 +24,22 @@ import type { NoteFieldEditingSupport } from '../NoteFieldEditing';
 import { EXTERNAL_DECK_OPEN_SUPPORT } from '../ExternalDeckOpen';
 import type { ExternalDeckOpenSupport } from '../ExternalDeckOpen';
 
+const TODAY_REVIEW_WIDGET = {
+  id: 'today_review_card',
+  titleKey: 'today_review_widget_name',
+  descriptionKey: 'today_review_widget_description',
+  size: '2×2',
+  location: 'HarmonyOS phone service widgets. Landscape standby requires a supported phone and Huawei approval.'
+};
+
+interface AgentSystemWidget {
+  id: string;
+  title: string;
+  description: string;
+  size: string;
+  location: string;
+}
+
 export interface AgentNavigationCapability {
   id: string; surface: string; title: string; tool: string; available: boolean; requiresDeck: boolean;
   requiredArguments: string[]; optionalArguments: string[];
@@ -35,7 +52,7 @@ export interface AgentPageDestination {
 /** 指纹覆盖共同声明与本轮能力；不是持久缓存，也不把用户状态写入长期记忆。 */
 export function agentInterfaceRevision(tools: ProviderFunctionTool[]): string {
   const source: string = JSON.stringify([APP_PAGE_ROUTES, APP_INTERFACE_SURFACES, SETTINGS_ENTRIES,
-    SETTINGS_GROUPS, SETTINGS_HEADER_ITEMS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_LINK_SUPPORT, AGENT_SEARCH_PROVIDERS, NOTE_FIELD_EDITING_SUPPORT, INTERACTION_FEEDBACK_SUPPORT, EXTERNAL_DECK_OPEN_SUPPORT, AI_CONTENT_EXPORT_SUPPORT, tools]);
+    SETTINGS_GROUPS, SETTINGS_HEADER_ITEMS, APP_NAVIGATION_ACTIONS, AGENT_APP_RECOMMENDATIONS, CARD_RENDERING_SUPPORT, NOTE_LINK_SUPPORT, AGENT_SEARCH_PROVIDERS, NOTE_FIELD_EDITING_SUPPORT, INTERACTION_FEEDBACK_SUPPORT, EXTERNAL_DECK_OPEN_SUPPORT, AI_CONTENT_EXPORT_SUPPORT, CONTINUATION_SUPPORT, TODAY_REVIEW_WIDGET, tools]);
   let hash: number = 2166136261;
   for (let index: number = 0; index < source.length; index++) { hash = Math.imul(hash ^ source.charCodeAt(index), 16777619); }
   return (hash >>> 0).toString(16);
@@ -66,6 +83,7 @@ export interface AgentInterfaceSurface {
   id: string; title: string; instructions: string; parent: string; declaredItemCount: number; items: AgentInterfaceItem[];
 }
 export interface AgentAppStructure {
+  continuation: Object;
   webAccess: AgentWebAccessInfo;
   externalDeckOpen: ExternalDeckOpenSupport;
   interactionFeedback: InteractionFeedbackSupport;
@@ -73,6 +91,7 @@ export interface AgentAppStructure {
   noteLinks: Object;
   noteEditing: NoteFieldEditingSupport;
   aiContentExport: Object;
+  systemWidgets: AgentSystemWidget[];
   revision: string; destinations: AgentPageDestination[]; actions: AgentNavigationCapability[];
   source: string; coverage: string[]; limitation: string; simpleMode: boolean;
   observations: AppInterfaceObservation[]; tools: AgentInterfaceTool[];
@@ -88,6 +107,7 @@ export interface AgentWebAccessInfo {
   provider: string;
   providers: AgentSearchProviderInfo[];
   execution: string;
+  nativeDeepSeekTools: boolean;
 }
 export interface AgentInterfaceRecommendation extends AgentAppRecommendation { prompt: string; reason: string; }
 export interface AgentInterfaceTool { name: string; description: string; }
@@ -97,7 +117,7 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
   localize: (key: string) => string, settings: AgentSettingDefinition[], tools: ProviderFunctionTool[],
   observations: AppInterfaceObservation[], foregroundSurface: string = '',
   contextSurface: string = foregroundSurface, navigationReadiness: AgentNavigationReadiness[] = [],
-  webProvider: string = ''): AgentAppStructure {
+  webProvider: string = '', nativeWebTools: boolean = false): AgentAppStructure {
   const sourceSurface: string = foregroundSurface === 'agent' ? contextSurface : foregroundSurface;
   const views: AppInterfaceObservation[] = observations.map((view: AppInterfaceObservation): AppInterfaceObservation => {
     const declaration = APP_INTERFACE_SURFACES.find((surface): boolean => surface.id === view.surface);
@@ -119,13 +139,13 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
     for (const section of SETTINGS_ENTRIES) {
       if (sectionId !== '' && sectionId !== section.id) continue;
       const visible: boolean = settingsEntryVisible(section, context.simple, context.agent);
-      const visibleGroups: SettingsGroup[] = visibleSettingsGroups(section.id, context.simple, context.agent);
+      const visibleGroups: SettingsGroup[] = visibleSettingsGroups(section.id, context.simple, context.agent, context.desktop === true);
       const cards: AgentInterfaceGroup[] = SETTINGS_GROUPS.filter((group: SettingsGroup): boolean =>
         group.sectionId === section.id).map((group: SettingsGroup): AgentInterfaceGroup => ({
           id: group.id, title: localize(group.titleKey), visible: visibleGroups.some((entry): boolean => entry.id === group.id),
           items: sectionId === '' ? [] : group.items.map((item: SettingsItem): AgentInterfaceItem => {
             const capability = settings.find((setting: AgentSettingDefinition): boolean => setting.id === item.settingId);
-            let visibility: string = !visible || (group.fullOnly && context.simple) ||
+            let visibility: string = !visible || (group.desktopOnly === true && context.desktop !== true) || (group.fullOnly && context.simple) ||
               !settingsItemVisible(item, context.simple, context.themeHasTextures) ? 'hidden' : 'available_in_section';
             if (visibility !== 'hidden' && item.condition === 'agent_disabled' && context.agent) visibility = 'hidden';
             if (visibility !== 'hidden' && item.condition === 'agent_enabled' && !context.agent) visibility = 'hidden';
@@ -147,6 +167,7 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
   const surfaces: AgentInterfaceSurface[] = [];
   for (const surface of APP_INTERFACE_SURFACES) {
     if (surfaceId !== 'app' && surfaceId !== surface.id) continue;
+    if (surface.id === 'external_mcp_settings' && (context.simple || context.desktop !== true)) continue;
     const visibleIds: string[] = visibleInterfaceItems(surface.id, context).map((item): string => item.id);
     const observation = views.find((view: AppInterfaceObservation): boolean => view.surface === surface.id);
     surfaces.push({ id: surface.id, title: localize(observation?.titleKey ?? surface.titleKey), parent: surface.parent,
@@ -168,14 +189,21 @@ export function buildAgentAppStructure(context: AppInterfaceContext, surfaceId: 
           settingId: '', readTool: '', writeTool: '', sensitive: false }))) });
   }
   return { source: 'shared_ui_declarations_and_live_observations', externalDeckOpen: EXTERNAL_DECK_OPEN_SUPPORT,
+    continuation: { support: CONTINUATION_SUPPORT, available: continuationSession.capture() !== null, pending: continuationSession.hasPending() },
     interactionFeedback: INTERACTION_FEEDBACK_SUPPORT, cardRendering: CARD_RENDERING_SUPPORT, noteLinks: NOTE_LINK_SUPPORT,
     webAccess: { available: names.includes('web_search'), provider: names.includes('web_search') ? webProvider : '',
-      providers: AGENT_SEARCH_PROVIDERS,
-      execution: 'Use declared web_search/read_webpage tools; DeepSeek uses Search/Fetch with its saved model key. ' +
-        'Chat requests do not automatically search. Availability follows the app web switch and this turn; ' +
+      providers: AGENT_SEARCH_PROVIDERS, nativeDeepSeekTools: nativeWebTools,
+      execution: (nativeWebTools ? 'DeepSeek Flash native deep-thinking search and URL reading are enabled for this turn. ' +
+        'Provider search events and returned sources supply evidence. ' : '') + 'Use declared web_search/read_webpage tools; DeepSeek uses Search/Fetch with its saved model key. ' +
+        'Native tools are enabled only when nativeDeepSeekTools is true. Availability follows the app web switch and this turn; ' +
         'tool success supplies evidence, not links in generated text. Fetch is separately billed by DeepSeek.' },
     noteEditing: NOTE_FIELD_EDITING_SUPPORT, aiContentExport: AI_CONTENT_EXPORT_SUPPORT,
-    settingsHeader: surfaceId === 'app' || surfaceId === 'settings' ? settingsHeaderItems(context.simple).map((item): AgentInterfaceItem => {
+    systemWidgets: surfaceId === 'app' && context.desktop !== true ? [{
+      id: TODAY_REVIEW_WIDGET.id, title: localize(TODAY_REVIEW_WIDGET.titleKey),
+      description: localize(TODAY_REVIEW_WIDGET.descriptionKey),
+      size: TODAY_REVIEW_WIDGET.size, location: TODAY_REVIEW_WIDGET.location
+    }] : [],
+    settingsHeader: surfaceId === 'app' || surfaceId === 'settings' ? settingsHeaderItems(context.simple, views.find((view): boolean => view.surface === 'settings')?.items?.some((item): boolean => item.id === 'simple' || item.id === 'full') === true).map((item): AgentInterfaceItem => {
       const control = views.find((view): boolean => view.surface === 'settings')?.items?.find((entry): boolean => entry.id === item.id);
       return { id: item.id, title: control?.title ?? localize(item.titleKey), iconKey: control?.iconKey ?? item.iconKey,
         opens: '', visibility: control === undefined ? 'available_in_surface' : 'observed', condition: '',

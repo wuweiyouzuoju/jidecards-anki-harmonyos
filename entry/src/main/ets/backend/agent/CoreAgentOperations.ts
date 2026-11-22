@@ -1,5 +1,5 @@
-import { aiContentExportPolicy } from '../AiContentExportService';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { aiContentExportPolicy } from '../AiContentExportService';
 import type { AgentOperationBackend, OperationArguments, OperationSnapshot } from '../../model/agent/AgentOperations';
 import { operationDefinition } from '../../model/agent/AgentOperations';
 import { 卡片服务 } from '../卡片服务';
@@ -32,7 +32,7 @@ import { validateSchedulingScript } from '../../model/CustomScheduling';
 import type { Card } from '../../proto/messages/CardsMessages';
 import type { EditableNote } from '../../proto/messages/NoteMessages';
 import type { DeckTreeNode } from '../../proto/messages/DeckMessages';
-import type { DeckConfigsForUpdateView, DeckConfig } from '../../proto/messages/DeckConfigMessages';
+import type { DeckConfigsForUpdateView, DeckConfig, UpdateDeckConfigsInput } from '../../proto/messages/DeckConfigMessages';
 import type { CustomStudyCram } from '../../proto/messages/SchedulerMessages';
 import { 自定义学习预设, BURY_SUSPEND_MODE_SUSPEND, BURY_SUSPEND_MODE_BURY_USER } from '../../proto/messages/SchedulerMessages';
 
@@ -220,7 +220,7 @@ export class CoreAgentOperations implements AgentOperationBackend {
       upsertBrowserSavedSearch(items, args.name!, args.query ?? '', items.some((item): boolean => item.name === args.name!) ? args.name! : '');
     if (!result.ok) throw new Error('saved_search_' + result.reason); return serializeBrowserSavedSearches(result.items);
   }
-  private presetRequest(view: DeckConfigsForUpdateView, args: OperationArguments) {
+  private presetRequest(view: DeckConfigsForUpdateView, args: OperationArguments): UpdateDeckConfigsInput {
     const presets = new DeckOptionsPresets(view); const current = copyDeckConfig(presets.current().config);
     if (!presets.entries.some((entry): boolean => entry.config.id === args.presetId)) throw new Error('preset_missing');
     presets.select(String(args.presetId), current);

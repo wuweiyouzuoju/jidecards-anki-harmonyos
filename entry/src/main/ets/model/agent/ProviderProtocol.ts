@@ -39,6 +39,9 @@ export interface ProviderTurnRequest {
   /** 宿主目录按需暴露；仅供 Runner 使用，不序列化到提供商请求。 */
   deferTools?: boolean;
   searchMode: SearchMode;
+  /** DeepSeek Flash 原生深度搜索与链接读取；由本轮联网配置确定。 */
+  nativeWebTools?: boolean;
+  nativeReadUrlOnly?: boolean;
   /** 用户是否明确要求联网；为 true 时必须观察到真实服务端搜索过程。 */
   requiresWebSearch: boolean;
   /** 用户是否明确要求引用/来源；为 true 时必须观察到真实 HTTPS 来源。 */
@@ -48,7 +51,7 @@ export interface ProviderTurnRequest {
   /** 0=未显式指定；正数=最终创建草稿必须恰好等于该数量。 */
   expectedDraftCount: number;
   reasoningEffort: string;
-  maxOutputTokens: number;
+  maxOutputTokens?: number;
   /** 本机序列化字符额度，不等同于服务端 token 窗口。 */
   contextBudgetChars?: number;
 }
@@ -91,6 +94,7 @@ interface ResponsesReasoningContent {
 export interface ResponsesOpaqueOutputInput {
   type: string;
   id?: string;
+  status?: string;
   content?: ResponsesReasoningContent[];
   summary?: object[];
   encrypted_content?: string;
@@ -121,6 +125,8 @@ interface ResponsesReasoning {
   summary: string;
 }
 
+interface ResponsesSafetyCheck { level: string; }
+
 interface ResponsesRequestBody {
   model: string;
   instructions: string;
@@ -128,10 +134,11 @@ interface ResponsesRequestBody {
   tools: ResponsesTool[];
   tool_choice: string | ResponsesNamedToolChoice;
   reasoning: ResponsesReasoning;
-  max_output_tokens: number;
+  max_output_tokens?: number;
   stream: boolean;
   store: boolean;
   include: string[];
+  safety_check?: ResponsesSafetyCheck;
 }
 
 export class ProviderProtocolError extends Error {
@@ -251,10 +258,13 @@ function serializeResponsesPayload(request: ProviderTurnRequest): string {
     });
   }
   if (request.searchMode !== 'off') {
-    tools.push({ type: 'web_search' });
+    if (request.nativeWebTools === true) {
+      if (request.nativeReadUrlOnly !== true) tools.push({ type: 'deepseek_web_search' });
+      tools.push({ type: 'deepseek_read_url' });
+    } else tools.push({ type: 'web_search' });
   }
   let toolChoice: string | ResponsesNamedToolChoice = 'auto';
-  if (request.searchMode === 'always') {
+  if (request.searchMode === 'always' && request.nativeWebTools !== true) {
     toolChoice = { type: 'web_search' };
   }
   const body: ResponsesRequestBody = {
@@ -267,11 +277,19 @@ function serializeResponsesPayload(request: ProviderTurnRequest): string {
       effort: request.reasoningEffort.length === 0 ? 'medium' : request.reasoningEffort,
       summary: 'auto'
     },
-    max_output_tokens: Math.max(1, Math.floor(request.maxOutputTokens)),
     stream: true,
     store: false,
     include: ['web_search_call.action.sources']
   };
+  if (request.maxOutputTokens !== undefined) {
+    if (!Number.isSafeInteger(request.maxOutputTokens) || request.maxOutputTokens < 1) {
+      throw new ProviderProtocolError('invalid_provider_input');
+    }
+    body.max_output_tokens = request.maxOutputTokens;
+  }
+  if (request.model === 'deepseek-flash' && /^https:\/\/api\.deepseek\.com(?:\/|$)/.test(request.baseUrl)) {
+    body.safety_check = { level: 'high' };
+  }
   return JSON.stringify(body);
 }
 

@@ -2,10 +2,6 @@
 
 /** 文件经平台解析或保存为按页资料；Provider 只接收读取工具返回的文本与页面图片。 */
 export const AGENT_IMPORT_MAX_FILES: number = 10;
-export const AGENT_IMPORT_MAX_FILE_BYTES: number = 20 * 1024 * 1024;
-export const AGENT_IMPORT_MAX_VIDEO_BYTES: number = 64 * 1024 * 1024;
-export const AGENT_IMPORT_MAX_TEXT_BYTES: number = 4 * 1024 * 1024;
-export const AGENT_IMPORT_MAX_ARCHIVE_BYTES: number = 48 * 1024 * 1024;
 export const AGENT_IMPORT_MAX_CONTEXT_CHARS: number = 160000;
 export const AGENT_IMPORT_MAX_PDF_PAGES: number = 120;
 export const AGENT_IMPORT_MAX_OCR_PAGES: number = 30;
@@ -34,7 +30,7 @@ const SUPPORTED_TEXT_EXTENSIONS: string[] = [
 ];
 
 const SUPPORTED_DOCUMENT_EXTENSIONS: string[] = [
-  '.pdf', '.docx', '.pptx', '.xlsx', '.odt', '.ods', '.odp',
+  '.apkg', '.pdf', '.docx', '.pptx', '.xlsx', '.odt', '.ods', '.odp',
   '.epub', '.mobi', '.azw', '.azw3'
 ];
 
@@ -94,8 +90,10 @@ export function buildAgentImportedFilesContext(files: AgentImportedFile[]): stri
     const file: AgentImportedFile = accepted[index];
     const content: string = file.documentId === undefined ? file.content :
       JSON.stringify({ documentId: file.documentId, name: file.name, pageCount: file.pageCount, warning: file.warningCode }) +
-      '\n图片/文档使用 read_document_page 或 ocr_document_page；视频使用 read_video_frames 按时间读取画面。页数不代表已读数量，采样画面不代表连续视频或声音已读。';
-    sections.push(`\n--- 导入文件 ${index + 1}：${file.name} ---\n${content}\n--- 文件结束 ---`);
+      '\n图片/文档使用 read_document_page 或 ocr_document_page；视频使用 read_video_frames 按时间读取画面。本地已分段保存全文，按 page、offset、length 读取，按 nextOffset/nextPage 续读；单次返回上限不是文件总长度限制。页数不代表已读数量，采样画面不代表连续视频或声音已读。';
+    const packageHint: string = file.extension === '.apkg' ?
+      '\n这是从 APKG 独立临时集合提取的笔记字段、标签、牌组和类型文本；未导入用户卡库，不包含可读取的包内图片/音频或复习记录。' : '';
+    sections.push(`\n--- 导入文件 ${index + 1}：${file.name} ---\n${content}${packageHint}\n--- 文件结束 ---`);
   }
   return sections.join('\n');
 }
@@ -108,16 +106,17 @@ export function mergeAgentImportedFiles(existing: AgentImportedFile[], selected:
     if (result.length >= AGENT_IMPORT_MAX_FILES) break;
     const remaining: number = Math.max(0, AGENT_IMPORT_MAX_CONTEXT_CHARS - used);
     const valid: boolean = file.errorCode.length === 0;
-    const exhausted: boolean = valid && remaining === 0;
-    const truncated: boolean = valid && file.content.length > remaining;
-    const content: string = exhausted ? '' : (valid ? file.content.slice(0, remaining) : file.content);
+    const paged: boolean = file.documentId !== undefined && file.documentId.length > 0;
+    const exhausted: boolean = valid && !paged && remaining === 0;
+    const truncated: boolean = valid && !paged && file.content.length > remaining;
+    const content: string = exhausted ? '' : (valid && !paged ? file.content.slice(0, remaining) : file.content);
     result.push({
       id: file.id, name: file.name, extension: file.extension, byteSize: file.byteSize, content: content,
       documentId: file.documentId, pageCount: file.pageCount,
       errorCode: exhausted ? 'context_limit' : file.errorCode,
       warningCode: exhausted ? '' : (truncated ? 'content_truncated' : file.warningCode)
     });
-    if (valid) used += content.length;
+    if (valid && !paged) used += content.length;
   }
   return result;
 }

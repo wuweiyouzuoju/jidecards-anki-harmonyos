@@ -33,6 +33,8 @@ interface RawOutputItem {
   arguments?: string;
   content?: RawContentPart[];
   action?: RawWebSearchAction;
+  page?: RawActionSource;
+  status?: string;
 }
 
 interface RawResponseError {
@@ -93,6 +95,8 @@ function errorEvent(code: string): AgentEvent {
 }
 
 export class ResponsesEventNormalizer {
+  private terminal: boolean = false;
+  hasTerminalEvent(): boolean { return this.terminal; }
   private pendingCalls: Map<string, PendingFunctionCall> = new Map<string, PendingFunctionCall>();
   private emittedCallItems: Set<string> = new Set<string>();
   private emittedSourceUrls: Set<string> = new Set<string>();
@@ -100,6 +104,7 @@ export class ResponsesEventNormalizer {
 
   accept(message: SseMessage): AgentEvent[] {
     if (message.done) {
+      this.terminal = true;
       return [emptyEvent('completed')];
     }
     if (message.data.length === 0) {
@@ -118,6 +123,7 @@ export class ResponsesEventNormalizer {
   }
 
   reset(): void {
+    this.terminal = false;
     this.pendingCalls.clear();
     this.emittedCallItems.clear();
     this.emittedSourceUrls.clear();
@@ -126,6 +132,7 @@ export class ResponsesEventNormalizer {
 
   private normalize(raw: RawResponseEvent): AgentEvent[] {
     const type: string = raw.type === undefined ? '' : raw.type;
+    if (type === 'response.completed' || type === 'response.incomplete' || type === 'response.failed') this.terminal = true;
     if (type === 'response.output_text.delta' && typeof raw.delta === 'string') {
       return [textEvent('text_delta', raw.delta)];
     }
@@ -231,6 +238,7 @@ export class ResponsesEventNormalizer {
   private finalContinuations(response: RawResponse | undefined): AgentEvent[] {
     const events: AgentEvent[] = [];
     for (const item of response?.output ?? []) {
+      events.push(...this.sourcesFromItem(item));
       if (item.type === 'reasoning' || item.type === 'web_search_call') this.appendContinuation(events, item);
     }
     return events;
@@ -317,7 +325,14 @@ export class ResponsesEventNormalizer {
 
   private sourcesFromItem(item: RawOutputItem): AgentEvent[] {
     const events: AgentEvent[] = [];
-    if (item.action !== undefined && Array.isArray(item.action.sources)) {
+    if (item.type === 'web_search_call') {
+      events.push(textEvent('status', item.status === 'completed' ? 'web_search_completed' : 'web_search_in_progress'));
+    }
+    if (item.page !== undefined && item.status === 'completed') {
+      const event = this.sourceFromActionSource(item.page);
+      if (event !== null) events.push(event);
+    }
+    if (item.status !== 'failed' && item.action !== undefined && Array.isArray(item.action.sources)) {
       for (const source of item.action.sources) {
         const event: AgentEvent | null = this.sourceFromActionSource(source);
         if (event !== null) { events.push(event); }

@@ -31,7 +31,6 @@ export interface AgentTaskSnapshot {
   userText: string;
   localContext: string;
   omittedMedia: boolean;
-  batchLimit: number;
 }
 
 interface AgentProviderTaskConfiguration {
@@ -45,7 +44,6 @@ interface AgentProviderTaskConfiguration {
   fieldNames: string[];
   noteTypeKind: number;
   clozeFieldOrds: number[];
-  batchLimit: number;
 }
 
 export type AgentReadinessReason =
@@ -65,7 +63,7 @@ export function buildAgentTaskProviderText(snapshot: AgentTaskSnapshot): string 
     mode: snapshot.mode, deckId: snapshot.deckId, deckName: snapshot.deckName,
     notetypeId: snapshot.notetypeId, notetypeName: snapshot.notetypeName,
     fieldNames: snapshot.fieldNames.slice(), noteTypeKind: snapshot.noteTypeKind,
-    clozeFieldOrds: snapshot.clozeFieldOrds.slice(), batchLimit: snapshot.batchLimit,
+    clozeFieldOrds: snapshot.clozeFieldOrds.slice(),
     templateCount: snapshot.templateCount, templatePreviews: snapshot.templatePreviews?.slice()
   };
   const mediaNotice: string = snapshot.omittedMedia ?

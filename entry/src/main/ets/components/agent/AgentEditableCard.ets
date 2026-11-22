@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { NoteFieldCard } from '../editor/NoteFieldCard';
@@ -10,6 +11,7 @@ import { ThemeTextSpans, themeTextKey } from '../common/ThemeText';
 import type { 卡片草稿 } from '../../model/agent/AgentConversationView';
 @Component
 export struct AgentEditableCard {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop card: 卡片草稿 = { fields: [], 已选中: true, 状态: 'draft', 失败提示: '' };
   @Prop fieldNames: string[] = [];
@@ -50,7 +52,7 @@ export struct AgentEditableCard {
         Text($r('app.string.ai_card_card_index', `${this.index + 1}`))
           .fontSize(应用尺寸.字号_正文)
           .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           .layoutWeight(1)
           .opacity(this.card.已选中 ? 1 : 0.5)
 
@@ -89,8 +91,8 @@ export struct AgentEditableCard {
     }
     .width('100%')
     .padding(应用尺寸.间距_10)
-    .backgroundColor(insetMaterialFill($r('app.color.surface_page')))
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_面板)
+    .backgroundColor(insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))))
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
   }
 }

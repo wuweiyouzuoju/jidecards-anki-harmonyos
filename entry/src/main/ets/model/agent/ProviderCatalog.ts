@@ -91,6 +91,7 @@ export function builtInProviders(): ProviderCatalogEntry[] {
 
 /** 能力按本轮实际模型确定；自定义模型由用户声明，文字模型仍可调用系统 OCR。 */
 export function providerSupportsImages(provider: ProviderId, model: string, customVisionEnabled: boolean = false): boolean {
+  if (provider === 'official') return false;
   if (provider === 'deepseek') return model === 'deepseek-flash';
   if (provider === 'openai') return OPENAI_PROVIDER.capabilities.image;
   return customVisionEnabled;

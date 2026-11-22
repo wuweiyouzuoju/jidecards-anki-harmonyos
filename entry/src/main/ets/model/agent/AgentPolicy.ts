@@ -4,8 +4,6 @@ import type { ToolRisk } from './AgentTypes';
 import { extensionToolRisk } from './AgentExtensionTools';
 import { operationDefinition } from './AgentOperations';
 
-export const DEFAULT_BATCH_LIMIT: number = 100;
-export const MAX_BATCH_LIMIT: number = 1000;
 
 export interface AgentSearchSourceEvent {
   kind: 'search_source';
@@ -121,22 +119,6 @@ export function toolRiskOf(toolName: string): ToolRisk {
     default:
       return extensionToolRisk(toolName);
   }
-}
-
-export function normalizeBatchLimit(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) {
-    return DEFAULT_BATCH_LIMIT;
-  }
-  return Math.min(MAX_BATCH_LIMIT, Math.max(1, Math.floor(value)));
-}
-
-export function splitAffectedCardIds(cardIds: number[], requestedLimit: number): number[][] {
-  const limit: number = normalizeBatchLimit(requestedLimit);
-  const batches: number[][] = [];
-  for (let offset: number = 0; offset < cardIds.length; offset += limit) {
-    batches.push(cardIds.slice(offset, offset + limit));
-  }
-  return batches;
 }
 
 export function registerToolCallId(seenIds: Set<string>, toolCallId: string): boolean {

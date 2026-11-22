@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor, appearanceTextColor } from '../../utils/AppearanceElements';
 import { webview } from '@kit.ArkWeb';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { ColorMetrics } from '@kit.ArkUI';
@@ -11,6 +12,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 /** 含公式的整段正文使用一个离线文档；尺寸回执不授予任何应用动作能力。 */
 @Component
 export struct AgentMathText {
+  @StorageProp('appearance_elements_active') @Watch('contentChanged') private appearanceElements: string = '';
   @Prop @Watch('contentChanged') text: string = '';
   @Prop @Watch('contentChanged') textColor: ResourceColor = $r('app.color.text_primary');
   @Prop @Watch('contentChanged') fontSize: number = 应用尺寸.字号_正文;
@@ -37,10 +39,10 @@ export struct AgentMathText {
   /** @throws {Error} 资源颜色或字体换算失败由挂载/更新入口回退到原文。 */
   private appearance(): AgentMathAppearance {
     const context = this.getUIContext();
-    return { color: ColorMetrics.resourceColor(this.textColor).color,
+    return { color: ColorMetrics.resourceColor(appearanceTextColor(this.appearanceElements, this.textColor)).color,
       fontSize: context.px2vp(context.fp2px(this.fontSize)), alignment: this.alignment, bold: this.bold,
       tableColor: ColorMetrics.resourceColor($r('app.color.surface_card')).color,
-      headerColor: ColorMetrics.resourceColor($r('app.color.surface_page')).color,
+      headerColor: ColorMetrics.resourceColor(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))).color,
       borderColor: ColorMetrics.resourceColor(SurfaceBorder.color()).color };
   }
 
@@ -97,7 +99,7 @@ export struct AgentMathText {
 
   build() {
     if (this.failed) {
-      Text(this.text).fontSize(this.fontSize).fontColor(this.textColor).width('100%')
+      Text(this.text).fontSize(this.fontSize).fontColor(appearanceTextColor(this.appearanceElements, this.textColor)).width('100%')
         .copyOption(CopyOptions.LocalDevice)
     } else {
       Web({ src: '', controller: this.controller, renderMode: RenderMode.SYNC_RENDER })

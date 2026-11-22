@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { appLocaleName } from '../../model/AppLocales';
 import { PrimaryActionButton } from '../common/PrimaryActionButton';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -24,6 +25,7 @@ interface AnalysisPreview { query: string; totalMatched: number; alreadyRead: nu
 /** 用户确认的是可见提案内容，技术参数不进入默认确认界面。 */
 @Component
 export struct AgentActionCard {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop action: AgentAction;
   @Prop disabled: boolean = false;
@@ -108,90 +110,90 @@ export struct AgentActionCard {
     if (this.action.kind === 'browser_preferences' || this.action.kind === 'filtered_deck_change' || this.action.kind === 'deck_options_change' || this.action.kind === 'collection_preferences' || this.action.kind === 'study_controls' || this.action.kind === 'export_subset' || this.action.kind === 'fsrs_simulation') {
       ForEach(maintenancePreviewRows(this.action, (key: string): string => namedResourceText(this.getUIContext(), key)),
         (row: MaintenancePreviewRow) => {
-          Text(row.title).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+          Text(row.title).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
           Text(row.before === '' ? row.after : this.maintenanceBeforeAfter(row.before, row.after))
-            .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+            .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
         }, (row: MaintenancePreviewRow): string => row.title)
       Text(this.action.kind === 'browser_preferences' ? $r('app.string.browser_preferences_hint') : this.action.kind === 'filtered_deck_change' ? $r('app.string.filtered_deck_change_hint') : this.action.kind === 'deck_options_change' ? $r('app.string.agent_deck_options_change_hint') : this.action.kind === 'fsrs_simulation' ? $r('app.string.agent_fsrs_simulation_hint') :
         this.action.kind === 'export_subset' ? $r('app.string.agent_export_subset_hint') :
         this.action.kind === 'collection_preferences' ? $r('app.string.agent_collection_preferences_hint') : $r('app.string.ai_agent_setting_device_scope'))
-        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+        .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     } else if (this.action.kind === 'create_deck') {
-      Text(this.design().name).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+      Text(this.design().name).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
     } else if (this.action.kind === 'reorder_decks') {
       Text($r('app.string.deck_reorder_local_hint')).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%')
-      Text($r('app.string.deck_reorder_before')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
+      Text($r('app.string.deck_reorder_before')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       Text(this.reorder().before.map((entry: DeckOrderEntry): string => entry.path).join('\n'))
-        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
-      Text($r('app.string.deck_reorder_after')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
+      Text($r('app.string.deck_reorder_after')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       Text(this.reorder().after.map((entry: DeckOrderEntry): string => entry.path).join('\n'))
-        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
     } else if (this.action.kind === 'rename_deck') {
       Text($r('app.string.deck_rename_hint')).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       ForEach(this.rename().changes, (change: DeckPathChange) => {
         Text(`${change.before} → ${change.after}`).fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary')).width('100%').copyOption(CopyOptions.LocalDevice)
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%').copyOption(CopyOptions.LocalDevice)
       }, (change: DeckPathChange): string => String(change.id))
     } else if (this.action.kind === 'reparent_decks') {
       Text($r('app.string.deck_move_hint')).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       ForEach(this.reparent().changes, (change: DeckPathChange) => {
         Text(`${change.before} → ${change.after}`).fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary')).width('100%').copyOption(CopyOptions.LocalDevice)
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%').copyOption(CopyOptions.LocalDevice)
       }, (change: DeckPathChange): string => String(change.id))
     } else if (this.action.kind === 'create_notetype') {
       Text(this.design().name).fontSize(应用尺寸.字号_标题).fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       Text(this.design().kind === 'cloze' ? $r('app.string.note_type_cloze') : $r('app.string.note_type_basic'))
-        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+        .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       Text($r('app.string.ai_agent_design_fields')).fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       ForEach(this.design().fields, (name: string, index: number) => {
         Text(`${index + 1}. ${name}`).fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       }, (name: string, index: number): string => `${index}-${name}`)
       Text($r('app.string.ai_agent_preview_front')).fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       AgentStylePreview({ style: this.design().style ?? {}, sampleText: this.layoutText(false), showHint: false })
       Text($r('app.string.ai_agent_preview_back')).fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       AgentStylePreview({ style: this.design().style ?? {}, sampleText: this.layoutText(true), showHint: false })
       Text($r('app.string.ai_agent_layout_preview_hint')).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     } else if (this.action.kind === 'memory_change') {
       Text(this.memory().operation === 'delete' ? $r('app.string.ai_agent_memory_delete') :
         (this.memory().operation === 'update' ? $r('app.string.ai_agent_memory_update') : $r('app.string.ai_agent_memory_create')))
-        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       if (this.memory().before !== null) {
         Text($r('app.string.ai_agent_memory_before')).fontWeight(FontWeight.Medium)
-          .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+          .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
         Text(this.memory().before!.text)
-          .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+          .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       }
       if (this.memory().operation !== 'delete') {
         Text($r('app.string.ai_agent_memory_after')).fontWeight(FontWeight.Medium)
-          .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+          .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
         Text(this.memory().text)
-          .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+          .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       }
       Text(this.memory().scope === 'global' ? $r('app.string.ai_agent_memory_global') : this.memory().scope)
-        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+        .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     } else if (this.action.kind === 'setting_change') {
       Text(this.settingLabel())
-        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       Text($r('app.string.ai_agent_setting_before_after', this.settingValue(this.setting().before), this.settingValue(this.setting().after)))
-        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       Text(this.settingScope())
-        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+        .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     } else {
       Text(this.analysis().query.length > 0 ? this.analysis().query : $r('app.string.ai_agent_edit_all_decks'))
-        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       Text($r('app.string.ai_agent_analysis_count', `${this.analysis().totalMatched}`, `${this.analysis().alreadyRead}`))
-        .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       Text($r('app.string.ai_agent_analysis_cost')).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     }
   }
 
@@ -202,7 +204,7 @@ export struct AgentActionCard {
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
       Text(this.title()).fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       this.preview()
       if (this.action.status === 'pending') {
         Column({ space: 应用尺寸.间距_8 }) {
@@ -214,17 +216,17 @@ export struct AgentActionCard {
       } else {
         if (this.action.kind === 'setting_change' && this.action.resultJson.includes('"status":"partial"')) {
           Text(this.action.resultJson.includes('"saved":true') ? $r('app.string.ai_agent_setting_apply_failed') :
-            $r('app.string.ai_agent_setting_save_unverified')).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary')).width('100%')
+            $r('app.string.ai_agent_setting_save_unverified')).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         }
         Text(this.action.status === 'completed' ? $r('app.string.ai_agent_action_completed') :
           (this.action.status === 'cancelled' ? $r('app.string.ai_agent_action_cancelled') :
             (this.action.status === 'executing' ? $r('app.string.ai_agent_action_executing') : $r('app.string.ai_agent_action_failed'))))
-          .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary')).width('100%')
+          .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
     }
     .width('100%').alignItems(HorizontalAlign.Start).padding(应用尺寸.卡片内边距)
-    .border(SurfaceBorder.options())
-    .borderRadius(应用尺寸.圆角_面板)
+    .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+    .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
     .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
   }
 }
