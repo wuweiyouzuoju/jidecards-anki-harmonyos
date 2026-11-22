@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { GlassMesh, GlassPoint } from './GlassOptics';
+import { GlassMesh, GlassPoint, glassMeshAxis } from './GlassOptics';
 
 export interface GlassFusionRect { x: number; y: number; width: number; height: number; radius: number; }
 export interface GlassFusionGeometry { source: GlassFusionRect; target: GlassFusionRect; }
@@ -110,9 +110,12 @@ export class GlassFusionTessellator {
   private vertices: FusionVertex[] = [];
   private intersections: FusionVertex[] = [];
   private intersectionCount: number = 0;
+  private lensCenterX: number = 0;
+  private lensCenterY: number = 0;
   private positionPool: GlassPoint[] = [];
   private texturePool: GlassPoint[] = [];
   private polygon: FusionVertex[] = [];
+  private gridIndices: number[] = [];
   readonly mesh: GlassFusionMesh = {positions:[],texture:[],indices:[],edge:[]};
   constructor(width: number, height: number, density: number = 1, cellBudget: number = GLASS_FUSION_MAX_CELLS) {
     this.width=Math.max(1,width);this.height=Math.max(1,height);this.density=Math.max(0.1,density);
@@ -160,7 +163,10 @@ export class GlassFusionTessellator {
   private triangle(a: FusionVertex,b: FusionVertex,c: FusionVertex,field: GlassFusionField,band: number,depth: number = 0): void {
     // 浮点平移后边界零点可能落在外侧；先细分接近边缘的单元，不能依赖精确符号。
     if(depth<1 && !(a.distance<=0&&b.distance<=0&&c.distance<=0)) {
-      const span: number=Math.max(Math.hypot(a.x-b.x,a.y-b.y),Math.hypot(b.x-c.x,b.y-c.y),Math.hypot(c.x-a.x,c.y-a.y));
+      const abX: number = a.x - b.x, abY: number = a.y - b.y;
+      const bcX: number = b.x - c.x, bcY: number = b.y - c.y;
+      const caX: number = c.x - a.x, caY: number = c.y - a.y;
+      const span: number = Math.sqrt(Math.max(abX * abX + abY * abY, bcX * bcX + bcY * bcY, caX * caX + caY * caY));
       if(Math.min(a.distance,b.distance,c.distance)<=span) {
         const ab: FusionVertex=this.midpoint(a,b,field),bc: FusionVertex=this.midpoint(b,c,field),ca: FusionVertex=this.midpoint(c,a,field);
         this.triangle(a,ab,ca,field,band,depth+1);this.triangle(ab,b,bc,field,band,depth+1);
@@ -178,9 +184,9 @@ export class GlassFusionTessellator {
       return;
     }
     if(a.distance<=0&&b.distance<=0&&c.distance<=0) {
-      const points: FusionVertex[] = [a, b, c];
       for (let index: number = 0; index < 3; index++) {
-        const start: FusionVertex = points[index], end: FusionVertex = points[(index + 1) % 3];
+        const start: FusionVertex = index === 0 ? a : index === 1 ? b : c;
+        const end: FusionVertex = index === 0 ? b : index === 1 ? c : a;
         if (Math.abs(start.distance) < 0.00001 && Math.abs(end.distance) < 0.00001 &&
           Math.abs(field.distance((start.x + end.x) / 2, (start.y + end.y) / 2)) < 0.00001)
           this.mesh.edge.push(this.mesh.positions[this.emit(start,field,band)],this.mesh.positions[this.emit(end,field,band)]);
@@ -228,8 +234,11 @@ export class GlassFusionTessellator {
   private sample(v: FusionVertex,field: GlassFusionField,band: number): void {
     if(v.sampled) return;
     v.sampled=true;v.texture.x=v.x;v.texture.y=v.y;
-    if(v.distance>=-0.00001||v.distance<=-band) return;
+    if(v.distance>=-0.00001) return;
     const t: number=clamp(-v.distance/band), fade: number=t*t*(3-2*t);
+    v.texture.x += (this.lensCenterX - v.x) * 0.02 * fade;
+    v.texture.y += (this.lensCenterY - v.y) * 0.02 * fade;
+    if (v.distance <= -band) return;
     const shift: number=Math.min(10*this.density,band*0.3)*4*fade*(1-fade);
     const epsilon: number=Math.max(0.25,band);
     v.texture.x-=shift*(field.distance(v.x+epsilon,v.y)-field.distance(v.x-epsilon,v.y))/(2*epsilon);
@@ -240,12 +249,41 @@ export class GlassFusionTessellator {
     this.mesh.clipRect = r;
     const columns: number = Math.max(8, Math.min(64, Math.ceil(r.width / (4 * this.density))));
     const rows: number = Math.max(8, Math.min(64, Math.ceil(r.height / (4 * this.density))));
-    for (let row: number = 0; row <= rows; row++) for (let column: number = 0; column <= columns; column++) {
-      const x: number = r.x + column / columns * r.width, y: number = r.y + row / rows * r.height;
-      this.emit(this.allocateVertex(x, y, field.distance(x, y)), field, band);
-      if (row < rows && column < columns) {
-        const index: number = row * (columns + 1) + column;
-        this.mesh.indices.push(index, index + 1, index + columns + 1, index + 1, index + columns + 2, index + columns + 1);
+    const edge: number = Math.min(r.radius, r.width / 2, r.height / 2) + 2 * band;
+    const xs: number[] = glassMeshAxis(r.width, columns, edge);
+    const ys: number[] = glassMeshAxis(r.height, rows, edge);
+    // 内部折射为固定2%仿射变换。保留边界共用顶点，用中心扇形替代内部小三角形。
+    const margin: number = edge - band;
+    const left: number = xs.findIndex((x: number): boolean => x >= margin);
+    const top: number = ys.findIndex((y: number): boolean => y >= margin);
+    const right: number = xs.length - 1 - left;
+    const bottom: number = ys.length - 1 - top;
+    const merge: boolean = left >= 0 && top >= 0 && right - left >= 2 && bottom - top >= 2;
+    const stride: number = xs.length;
+    for (let row: number = 0; row < ys.length; row++) for (let column: number = 0; column < stride; column++) {
+      if (merge && row > top && row < bottom && column > left && column < right) continue;
+      const x: number = r.x + xs[column], y: number = r.y + ys[row];
+      this.gridIndices[row * stride + column] = this.emit(this.allocateVertex(x, y, field.distance(x, y)), field, band);
+    }
+    for (let row: number = 0; row + 1 < ys.length; row++) for (let column: number = 0; column + 1 < stride; column++) {
+      if (merge && row >= top && row < bottom && column >= left && column < right) continue;
+      const index: number = row * stride + column;
+      const a: number = this.gridIndices[index], b: number = this.gridIndices[index + 1];
+      const c: number = this.gridIndices[index + stride], d: number = this.gridIndices[index + stride + 1];
+      this.mesh.indices.push(a, b, c, b, d, c);
+    }
+    if (merge) {
+      const x: number = r.x + r.width / 2, y: number = r.y + r.height / 2;
+      const center: number = this.emit(this.allocateVertex(x, y, field.distance(x, y)), field, band);
+      for (let column: number = left; column < right; column++) {
+        const a: number = top * stride + column, b: number = bottom * stride + column;
+        this.mesh.indices.push(this.gridIndices[a], this.gridIndices[a + 1], center,
+          this.gridIndices[b + 1], this.gridIndices[b], center);
+      }
+      for (let row: number = top; row < bottom; row++) {
+        const a: number = row * stride + left, b: number = row * stride + right;
+        this.mesh.indices.push(this.gridIndices[a + stride], this.gridIndices[a], center,
+          this.gridIndices[b], this.gridIndices[b + stride], center);
       }
     }
     const radius: number = Math.min(r.radius, r.width / 2, r.height / 2);
@@ -273,8 +311,11 @@ export class GlassFusionTessellator {
     const p: number=clamp(progress);
     const field: GlassFusionField=new GlassFusionField(g,p);
     const band: number=Math.min(36*this.density,Math.min(g.target.width,g.target.height)*0.4);
-    if (p === 0 || p === 1) return this.terminal(p === 0 ? g.source : g.target, field, band);
-    const bounds: GlassFusionRect=field.bounds(this.width,this.height);
+    const bounds: GlassFusionRect = p === 0 ? g.source : p === 1 ? g.target : field.bounds(this.width, this.height);
+    this.lensCenterX = bounds.x + bounds.width / 2; this.lensCenterY = bounds.y + bounds.height / 2;
+    // 源按钮在40%形变后已完全合并，余下形态是精确圆角矩形。
+    // 复用静态玻璃的轴向稀疏网格和原生裁切，免去递归细分与逐段轮廓绘制。
+    if (p === 0 || p >= 0.4) return this.terminal(glassFusionStageRect(g, p), field, band);
     if(bounds.width<=0||bounds.height<=0) return this.mesh;
     // 小圆钮也获得完整网格预算；不让整段行程的空白区域稀释轮廓精度。
     // 拓扑预算在一次转场中固定，避免宽高比变化导致网格数跳变。

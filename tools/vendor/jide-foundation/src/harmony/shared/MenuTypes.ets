@@ -30,6 +30,7 @@ export function sharedMenuScope(): SharedMenuScope {
 export interface SharedMenuGlyph { letter: string; color: ResourceColor; }
 export interface SharedMenuTheme {
   material: string; dark: boolean; foreground: boolean; reducedMotion: boolean; supported: boolean;
+  outlineWidth?: number; outlineColor?: string; cornerRadius?: number;
   panelOpacity: number; lineColor: ResourceColor; text: ResourceColor; secondaryText: ResourceColor;
   danger: ResourceColor; iconFill: ResourceColor; hover: ResourceColor; accent: string;
 }
@@ -49,4 +50,10 @@ export class SharedMenuTokens {
   static readonly gap: number = 8;
   static readonly pointerDepth: number = 6;
   static readonly pointerSpan: number = 20;
+}
+
+/** 玻璃表面的投影由实际宿主绘制一次。 */
+export function sharedGlassShadow(dark: boolean, visible: boolean = true): ShadowOptions {
+  return { radius: visible ? 16 : 0, color: visible ? dark ? '#38000000' : '#1C17243A' : '#00000000',
+    offsetX: 0, offsetY: visible ? 5 : 0 };
 }

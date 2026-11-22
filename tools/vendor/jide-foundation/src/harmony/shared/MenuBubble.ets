@@ -16,6 +16,7 @@ export struct SharedGlassBubblePanel {
   exitTransitionFor: ((x: string, y: string) => TransitionEffect) | undefined = undefined;
   @Prop flatTransition: TransitionEffect = TransitionEffect.IDENTITY;
   @Prop showContourStroke: boolean = true;
+  @Prop shadowVisible: boolean = true;
   @Prop panelWidth: number = 180;
   @Prop pointerCenter: number = 66;
   @Prop pointerSide: ActionMenuPointerSide = ActionMenuPointerSide.Right;
@@ -35,7 +36,7 @@ export struct SharedGlassBubblePanel {
   }
   private contourCommands(): string {
     return actionMenuBubbleOutline(this.panelWidth, this.panelHeight, this.pointerCenter,
-      this.getUIContext().vp2px(1), 1, SharedMenuTokens.radius,
+      this.getUIContext().vp2px(1), 1, this.theme.cornerRadius ?? SharedMenuTokens.radius,
       SharedMenuTokens.pointerDepth, SharedMenuTokens.pointerSpan, this.pointerSide);
   }
   @Builder
@@ -61,7 +62,7 @@ export struct SharedGlassBubblePanel {
   }
   build() {
     SharedGlassPanel({ trigger: this.trigger, enterScale: this.enterScale, enterAnimation: this.enterAnimation, exitTransition: this.exitTransitionFor === undefined ? this.exitTransition : this.exitTransitionFor(this.motionCenterX(), this.motionCenterY()), flatTransition: this.flatTransition, theme: this.theme, backgroundSource: this.backgroundSource, captureAllowed: this.captureAllowed, source: this.source, role: 'menu', radius: 0,
-      centerX: this.motionCenterX(), centerY: this.motionCenterY(),
+      shadowVisible: this.shadowVisible, centerX: this.motionCenterX(), centerY: this.motionCenterY(),
       geometryReady: this.panelHeight > 0,
       panelWidth: this.panelWidth + (this.vertical() ? 0 : SharedMenuTokens.pointerDepth), contourPath: this.contourCommands(), onPrepared: this.onPrepared,
       content: (): void => { this.body(); } })
