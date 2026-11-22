@@ -10,6 +10,7 @@
     "protocol:check": "node tools/core-protocol.mjs --check",
     "protocol:generate": "node tools/core-protocol.mjs --generate",
     "protocol:test-core": "node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/test-protocol-core.mjs",
+    "lint:arkts": "node tools/check-arkts-lint.mjs",
     "verify": "node tools/verify.mjs",
     "impact": "node tools/change-impact.mjs",
     "choice:validate": "node tools/choice-package.mjs validate",

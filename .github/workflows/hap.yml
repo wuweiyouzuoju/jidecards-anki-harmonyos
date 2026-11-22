@@ -15,5 +15,20 @@ jobs:
         with:
           clean: false
       - run: npm ci
+      - name: Install HarmonyOS dependencies
+        run: ohpm install
+      - name: Check ArkTS lint
+        id: arkts-lint
+        run: npm run lint:arkts
+      - name: Upload ArkTS lint reports
+        if: always() && steps.arkts-lint.outputs.metadata != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: arkts-lint
+          path: |
+            ${{ steps.arkts-lint.outputs.report }}
+            ${{ steps.arkts-lint.outputs.metadata }}
+          include-hidden-files: true
+          if-no-files-found: warn
       - name: Validate repository, Core and signed HAP
         run: npm run verify

@@ -5,8 +5,10 @@
 运行：
 
 ```sh
-devecocli check lint entry/src/main/ets --format json --output-path <report.json>
+npm run lint:arkts
 ```
+
+需要 PATH 上可用的 DevEco CLI 和支持 JSON 报告的 DevEco Studio。命令扫描应用主源码，将完整 JSON 与提交、CLI 版本、范围和时间元数据写入 `.hvigor/arkts-lint/`。错误、工具失败或报告异常均返回非零，警告和建议保留在报告中。[定时及手动 DevEco 工作流](../../.github/workflows/hap.yml)归档本轮结果。
 
 首次全量检查约需 7 分钟。报告中的 `filesChecked` 表示有检查结果的文件数，而不是扫描的文件总数。
 
@@ -30,17 +32,17 @@ devecocli check lint entry/src/main/ets --format json --output-path <report.json
 
 ## 当前结果
 
-2026-11-22 全量检查（831 个 ArkTS/TS 源文件，不含生成代码）：
+2026-11-22，基线提交 `18baa1a1`，DevEco CLI 1.3.0-stable。本次扫描范围为 `entry/src/main/ets`，按配置排除生成代码。
 
 | 级别 | 数量 |
 | --- | --- |
 | Error | 0 |
-| Warning | 150 |
+| Warning | 148 |
 | Suggestion | 2 |
 
 首次检查时为 10,481 个 error。其中约 10,250 个是上表所述的分析器误报，通过规则调整处理；真实问题已在代码中修复，包括 43 处纯类型导入、3 处多余的 `await` 和 1 处缺失的返回类型。
 
-warning 按规则分布及处理状态：
+初次归档的 150 条 warning 按规则分布及处理状态：
 
 | 规则 | 数量 |
 | --- | --- |

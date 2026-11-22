@@ -17,6 +17,7 @@ Node 24.x 与 `package.json` / CI 一致。首次准备或 lockfile 变化后运
 | `node --experimental-transform-types --import ./tools/tests/register-ts-hook.mjs tools/audit-settings-core.mjs` | 临时集合中的生产牌组选项/预设、限额、FSRS、过滤牌组和图表偏好；0 为列出范围通过、1 为复现问题、2 为执行异常，见[设置审查](../archive/development/settings-integration-audit-2026-10-11.md) | HAP、ArkUI/设备、在线同步；需要锁定 Rust/Core 依赖 |
 | `npm run verify -- repo` | 可移植仓库门禁，CI 使用同一入口 | Rust、HAP、设备 |
 | `npm run doctor` | 本机工具链与版本诊断 | 实际构建、签名可用性 |
+| `npm run lint:arkts` | DevEco 扫描应用主源码，归档报告，error 阻断 | ArkTS 编译及真机验证 |
 | `npm run verify -- native` | 环境、全部 Node、Rust fmt/clippy 门禁和真实 Core 主机测试 | HAP 与设备 |
 | `npm run verify` | 环境、全部 Node、Rust 主机、双架构 Rust 与签名 HAP 构建 | 设备交互验收 |
 | `npm run build:app` | 当前配置的完整应用构建 | 行为测试 |
