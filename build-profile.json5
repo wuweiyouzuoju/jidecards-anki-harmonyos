@@ -4,7 +4,20 @@
       {
         name: 'default',
         compatibleSdkVersion: '6.0.1(21)',
-        targetSdkVersion: '6.1.0(23)',
+        targetSdkVersion: '26.0.0',
+        runtimeOS: 'HarmonyOS',
+        buildOption: {
+          strictMode: {
+            useNormalizedOHMUrl: true,
+          },
+        },
+      },
+      {
+        name: 'pc',
+        bundleName: 'com.jide.kapian.pc',
+        label: '$string:app_name_pc',
+        compatibleSdkVersion: '6.0.1(21)',
+        targetSdkVersion: '26.0.0',
         runtimeOS: 'HarmonyOS',
         buildOption: {
           strictMode: {
@@ -32,6 +45,10 @@
           applyToProducts: [
             'default',
           ],
+        },
+        {
+          name: 'pc',
+          applyToProducts: ['pc'],
         },
       ],
     },

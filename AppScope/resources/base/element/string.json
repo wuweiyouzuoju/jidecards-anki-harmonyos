@@ -3,6 +3,7 @@
     {
       "name": "app_name",
       "value": "记得闪卡"
-    }
+    },
+    { "name": "app_name_pc", "value": "记得闪卡 PC" }
   ]
 }

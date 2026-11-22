@@ -1,9 +1,10 @@
 {
   app: {
+    cloudFileSyncEnabled: true,
     "bundleName": "com.jide.kapian",
     vendor: 'jidecards contributors',
-    versionCode: 3149,
-    versionName: '26.11.09.9',
+    versionCode: 3159,
+    versionName: '26.11.22.19',
     icon: '$media:app_icon',
     label: '$string:app_name'
   }

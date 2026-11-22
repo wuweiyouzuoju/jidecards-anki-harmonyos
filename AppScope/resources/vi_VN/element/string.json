@@ -3,6 +3,7 @@
     {
       "name": "app_name",
       "value": "JIDE Flashcards"
-    }
+    },
+    { "name": "app_name_pc", "value": "JIDE Flashcards PC" }
   ]
 }
