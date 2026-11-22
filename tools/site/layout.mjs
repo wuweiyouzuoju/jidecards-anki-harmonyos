@@ -22,15 +22,15 @@ export function createLayout(content) {
   const repoLinks = repositories.map(item => `<a href="${esc(item.url)}">${esc(item.name)} ${arrow}</a>`).join('');
   const sourceLink = (file, label) => `<a href="${esc(repo)}/blob/main/${esc(file)}">${esc(label)} ${arrow}</a>`;
   const logo = (className, size, alt = '记得闪卡 Logo') => `<img class="${className}" src="${size <= 38 ? content.logoSmallPreview : content.logoPreview}" data-full-src="${work.brand.logo}?v=${assets.logo}" alt="${esc(alt)}" width="${size}" height="${size}" loading="lazy" decoding="async" fetchpriority="low">`;
-  const sourcePackage = work.sourcePackage;
-  const download = `<div class="actions"><a class="button" href="${esc(work.marketplace.url)}">免费下载 ${arrow}</a><a class="button secondary" href="${esc(repo)}">查看源码 ${arrow}</a></div><p class="download-meta">源码 ${esc(work.sourceVersion)} · ${esc(work.platform)} · 华为应用市场搜索「记得闪卡」，下载版本以市场页面为准</p><p class="download-meta"><a href="${esc(sourcePackage.downloadUrl)}">${esc(sourcePackage.tag.slice(1))} 签名 HAP 开发包 ${arrow}</a> · <a href="${esc(sourcePackage.checksumsUrl)}">SHA-256 校验</a> · <a href="${esc(sourcePackage.releaseUrl)}">构建说明</a><br>${esc(sourcePackage.installNote)}</p>`;
+  const market = work.marketplace;
+  const download = `<div class="actions"><a class="button" href="${esc(market.url)}">华为应用市场免费下载 ${arrow}</a></div><p class="download-meta">${esc(market.version)} 已上架 · ${esc(work.platform)}</p>`;
   const application = {
     '@type': 'SoftwareApplication', '@id': `${origin}/#app`, name: work.name, alternateName: work.alternateName,
     url: work.url, operatingSystem: work.platform, applicationCategory: 'EducationalApplication',
     description: work.summary, author: { '@id': `${origin}/#author` },
     publisher: { '@id': `${origin}/#author` }, sameAs: [work.marketplace.url],
     subjectOf: { '@id': `${origin}/#source` },
-    downloadUrl: work.marketplace.url, installUrl: work.marketplace.url,
+    downloadUrl: market.url, installUrl: market.url, softwareVersion: market.version,
     image: `${origin}${work.brand.logo}`, screenshot: work.screenshots.map(item => ({ '@type': 'ImageObject', url: `${origin}${item.path}`, caption: item.caption, description: item.description, width: item.width, height: item.height })),
     isAccessibleForFree: work.marketplace.price === 0,
     offers: { '@type': 'Offer', price: work.marketplace.price, priceCurrency: work.marketplace.priceCurrency, url: work.marketplace.url },
@@ -53,10 +53,10 @@ export function createLayout(content) {
     const navLinks = nav.map(([url, label]) => `<a href="${url}"${url === pathname ? ' aria-current="page"' : ''}>${label}</a>`).join('');
     const trail = pathname === '/' || noindex ? [] : [{ name: '首页', url: `${origin}/` }, { name: breadcrumbTitle, url: `${origin}${pathname}` }];
     const breadcrumb = trail.length ? [{ '@type': 'BreadcrumbList', itemListElement: trail.map((item, index) => ({ '@type': 'ListItem', position: index + 1, name: item.name, item: item.url })) }] : [];
-    const heroImage = work.screenshots[0];
+    const heroImage = work.screenshots[0] ?? { path: work.brand.logo, width: work.brand.width, height: work.brand.height };
     const structured = { '@context': 'https://schema.org', '@graph': [
       { '@type': 'Person', '@id': `${origin}/#author`, name: author.name, url: author.url, sameAs: [author.github], jobTitle: '独立开发者' },
-      { '@type': 'CreativeWork', '@id': `${origin}/#project`, name: '记得闪卡项目', url: origin, creator: { '@id': `${origin}/#author` }, description: work.developmentStatement, sameAs: repositories.map(item => item.url), image: { '@type': 'ImageObject', url: `${origin}${work.brand.logo}`, width: work.brand.width, height: work.brand.height } },
+      { '@type': 'CreativeWork', '@id': `${origin}/#project`, name: '记得闪卡项目', url: origin, creator: { '@id': `${origin}/#author` }, description: `由 ${author.name} 独立开发与维护。`, sameAs: repositories.map(item => item.url), image: { '@type': 'ImageObject', url: `${origin}${work.brand.logo}`, width: work.brand.width, height: work.brand.height } },
       website, application, sourceCode,
       { '@type': 'WebPage', '@id': `${origin}${pathname}#webpage`, url: `${origin}${pathname}`, name: title, description, inLanguage: 'zh-CN', isPartOf: { '@id': website['@id'] }, about: { '@id': application['@id'] } },
       ...graph, ...breadcrumb
@@ -70,7 +70,7 @@ export function createLayout(content) {
   <meta name="description" content="${esc(description)}">
   <meta name="author" content="${esc(author.name)}">
   <meta name="robots" content="${noindex ? 'noindex' : 'index, follow, max-image-preview:large'}">
-  <meta name="theme-color" content="#f8f9ff">
+  <meta name="theme-color" content="#f8f7fd">
   <link rel="canonical" href="${origin}${pathname}">
   <link rel="icon" href="/favicon.ico?v=${assets.logo}" sizes="16x16 32x32 48x48">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=${assets.logo}">
@@ -97,16 +97,16 @@ export function createLayout(content) {
   <header class="site-header"><nav class="nav shell" aria-label="主导航">
     <a class="brand" href="/">${logo('brand-logo', 38)}<span><strong>记得闪卡</strong><small>jidecards</small></span></a>
     <div class="nav-links">${navLinks}</div>
-    <a class="nav-source" href="${esc(repo)}">GitHub ${arrow}</a>
-    <details class="mobile-nav"><summary aria-label="展开导航"><span aria-hidden="true">☰</span><span>菜单</span></summary><div>${navLinks}<a href="${esc(repo)}">GitHub ${arrow}</a></div></details>
+    <a class="nav-download" href="${esc(market.url)}">下载应用 ${arrow}</a>
+    <details class="mobile-nav"><summary ><span aria-hidden="true">☰</span><span>菜单</span></summary><div>${navLinks}<a href="${esc(market.url)}">华为应用市场 ${arrow}</a></div></details>
   </nav></header>
-  <main id="content" class="shell ${className}">${trail.length ? `<nav class="breadcrumb" aria-label="面包屑"><a href="/">首页</a><span aria-hidden="true">/</span><span>${esc(breadcrumbTitle)}</span></nav>` : ''}${body}</main>
+  <main id="content" class="shell ${className}">${trail.length ? `<nav class="breadcrumb" aria-label="面包屑"><a href="/">首页</a><span aria-hidden="true">/</span><span aria-current="page">${esc(breadcrumbTitle)}</span></nav>` : ''}${body}</main>
   <footer class="footer"><div class="shell"><div class="footer-grid">
-    <div class="footer-brand"><a class="brand" href="/">${logo('brand-logo', 38)}<span><strong>记得闪卡</strong><small>${esc(work.brand.headline.join(''))}</small></span></a><p>${esc(work.platform)} 原生开源闪卡应用。</p><p>源码 ${esc(work.sourceVersion)} · ${esc(work.license)}</p></div>
+    <div class="footer-brand"><a class="brand" href="/">${logo('brand-logo', 38)}<span><strong>记得闪卡</strong><small>JideCards</small></span></a><p>${esc(work.platform)} 原生开源闪卡应用。</p><p>正式版 ${esc(market.version)}</p></div>
     <nav aria-label="产品与文档"><h2>产品与文档</h2><a href="/works/jidecards/#download">免费下载</a><a href="/works/jidecards/">功能介绍</a><a href="${guide.pathname}">使用指南</a><a href="/releases/">更新说明</a></nav>
     <nav aria-label="开源项目"><h2>开源项目</h2>${repoLinks}<a href="/developers/">开发文档</a><a href="${esc(repo)}/issues">问题反馈 ${arrow}</a></nav>
     <nav aria-label="机器可读资料"><h2>机器可读资料</h2><a href="/llms.txt">llms.txt · 索引</a><a href="/llms-full.txt">llms-full.txt · 完整资料</a><a href="/data/site-index.json">页面与内容 JSON</a><a href="/data/works.json">产品数据 JSON</a><a href="/sitemap.xml">网站地图</a></nav>
-  </div><div class="footer-bottom"><p>由 <a href="/about/">${esc(author.name)}</a> 独立开发与维护 · <a href="/about/#independent-development">独立开发声明</a> · 非 Anki 官方客户端。</p><a href="/releases.xml">订阅版本更新 ${arrow}</a></div></div></footer>
+  </div><div class="footer-bottom"><p>由 <a href="/about/">${esc(author.name)}</a> 独立开发与维护 · <a href="/about/independent-development/">独立开发声明</a> · 非 Anki 官方客户端。</p><a href="/releases.xml">订阅版本更新 ${arrow}</a></div></div></footer>
   <script type="module" src="/assets/site-media.mjs?v=${assets.media}"></script>
 </body>
 </html>

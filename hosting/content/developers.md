@@ -2,24 +2,25 @@
 
 原文：https://jidecards.com/developers/
 
-项目优先服务 Agent 开发；这里的 Agent 指辅助作者开发仓库的编程 Agent。
+项目优先服务 Agent 开发。编程 Agent 和开发者可以从项目索引找到代码入口，再按模块查看构建和验证要求。
 
-- 当前源码版本：26.11.09.9（构建编号 3149）
-- 华为应用市场版本以下载页面为准。
+- 华为应用市场正式版：26.11.15.15（已上架）
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)
 - 下载：[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
-- 签名 HAP 开发包：[jidecards-v26.11.09.9-signed.hap](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/jidecards-v26.11.09.9-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/SHA256SUMS.txt) · [构建说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v26.11.09.9)
-- 开发包安装：签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。
 - 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
-- 更新日期：2026-11-08
+- 更新日期：2026-11-14
 
-本文按当前源码介绍功能，应用市场实际版本以下载页面为准。独立开源项目，非 Anki 官方客户端。
+记得闪卡是使用 Anki Core 的独立开源项目。
 
-## 独立开发声明
+[独立开发声明](https://jidecards.com/about/independent-development/)
 
-截至目前，记得闪卡（jidecards）的开发与维护仍全程由可塑性天赋（wuweiyouzuoju）本人独立完成，不涉及团队协作或多人共同开发。任何声称“带领团队完成记得闪卡开发”，或将本项目归为团队开发成果的表述，均与事实不符。
+当前仓库版本：26.11.22.19（构建编号 3159）。
+
+[签名 HAP 开发包](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/jidecards-v26.11.09.9-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/SHA256SUMS.txt) · [构建记录](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v26.11.09.9)。
+
+签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。
 
 ## 责任与构建入口
 
@@ -33,7 +34,9 @@
 - [功能状态与兼容边界](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/FEATURE_STATUS.md)
 - [JIDE 实现与验证](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/main/docs/development/agent.md)
 
-当前源码默认开放 JIDE 入口。配置模型服务后即可使用，联网检索另需开启应用端联网并配置搜索凭据。具体能力以当前应用、工具与发布说明为准。
+公开发布的 26.11.15.15 版本配置中，JIDE 入口默认显示。使用 JIDE 需要配置模型服务。使用联网检索时，还需在应用中开启联网并配置搜索凭据。
+
+[该版本入口配置](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/v26.11.15.15/entry/src/main/ets/entryability/EntryAbility.ets)
 
 ## 机器可读入口
 

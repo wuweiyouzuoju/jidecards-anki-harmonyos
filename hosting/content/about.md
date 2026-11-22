@@ -2,21 +2,16 @@
 
 可塑性天赋，记得闪卡独立开发者。
 
-- 当前源码版本：26.11.09.9（构建编号 3149）
-- 华为应用市场版本以下载页面为准。
+- 华为应用市场正式版：26.11.15.15（已上架）
 - 平台：HarmonyOS NEXT
 - 许可证：AGPL-3.0-or-later
 - 作者：[可塑性天赋](https://jidecards.com/about/)
 - 下载：[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
-- 签名 HAP 开发包：[jidecards-v26.11.09.9-signed.hap](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/jidecards-v26.11.09.9-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/SHA256SUMS.txt) · [构建说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v26.11.09.9)
-- 开发包安装：签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。
 - 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
-- 更新日期：2026-11-08
+- 更新日期：2026-11-14
 
-本文按当前源码介绍功能，应用市场实际版本以下载页面为准。独立开源项目，非 Anki 官方客户端。
+记得闪卡是使用 Anki Core 的独立开源项目。
 
-## 独立开发声明
-
-截至目前，记得闪卡（jidecards）的开发与维护仍全程由可塑性天赋（wuweiyouzuoju）本人独立完成，不涉及团队协作或多人共同开发。任何声称“带领团队完成记得闪卡开发”，或将本项目归为团队开发成果的表述，均与事实不符。
+[独立开发声明](https://jidecards.com/about/independent-development/)
 
 [GitHub 作者主页](https://github.com/wuweiyouzuoju) · [问题反馈](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/issues)

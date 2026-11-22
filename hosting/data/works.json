@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-08",
+  "updatedAt": "2026-11-14",
   "author": {
     "name": "可塑性天赋",
     "url": "https://jidecards.com/about/",
@@ -12,7 +12,7 @@
       "name": "记得闪卡",
       "alternateName": "JideCards",
       "developmentStatement": "截至目前，记得闪卡（jidecards）的开发与维护仍全程由可塑性天赋（wuweiyouzuoju）本人独立完成，不涉及团队协作或多人共同开发。任何声称“带领团队完成记得闪卡开发”，或将本项目归为团队开发成果的表述，均与事实不符。",
-      "summary": "记得闪卡是一款面向鸿蒙 HarmonyOS NEXT 的原生开源学习应用，让知识的整理、回忆与复习融入日常。以 Anki 内核为基础，将主动回忆与间隔复习结合，帮助你把学过的内容转化为长久的记忆。",
+      "summary": "用记得闪卡背单词、复习考点。可以自己做卡，也可以导入已有的 Anki 牌组。每次先回想答案，再翻卡核对，应用会按你的回忆情况安排下次复习。换设备时，可以同步卡片和学习进度。",
       "seo": {
         "homeTitle": "记得闪卡 JideCards｜鸿蒙 HarmonyOS 闪卡 · Anki · 间隔复习",
         "productTitle": "记得闪卡 JideCards 下载与功能｜鸿蒙 Anki · FSRS · APKG"
@@ -20,30 +20,29 @@
       "useCases": [
         {
           "name": "背单词",
-          "description": "把单词、释义和例句做成闪卡，或导入已有的 Anki APKG 词汇牌组；支持图片、音频和输入答案。"
+          "description": "把单词和例句放在正面，释义放在背面。想练拼写，可以做成输入答案的卡，也可以导入已有的 APKG 词汇牌组。"
         },
         {
           "name": "记忆知识点",
-          "description": "把考试概念、公式和问答拆成卡片，用挖空卡回忆关键内容，用图像遮挡复习图中的信息。"
+          "description": "把一个概念、公式或考点拆成一个能单独回答的问题。遇到解剖图、地图等图片，可以遮住要记住的部位。"
         },
         {
           "name": "间隔复习",
-          "description": "先尝试回忆，再查看答案并按记忆情况评分。Anki 内核的 FSRS 调度据此安排后续复习时间。"
+          "description": "翻面前先试着回答。翻面后按刚才的回忆情况评分，让 FSRS 安排下一次复习。"
         }
       ],
       "platform": "HarmonyOS NEXT",
       "license": "AGPL-3.0-or-later",
-      "sourceVersion": "26.11.09.9",
-      "sourceVersionCode": 3149,
+      "sourceVersion": "26.11.22.19",
+      "sourceVersionCode": 3159,
       "sourceUpdate": {
-        "updatedAt": "2026-11-08",
+        "updatedAt": "2026-11-21",
         "changes": [
-          "自定义壁纸支持裁剪、透明度与深浅色遮罩；自定义主题色支持 RGB／HEX 输入、明暗适配和实时预览。",
-          "玻璃与扁平材质可分别调整模块、按钮和弹窗的底色不透明度。统一菜单和弹窗的公共呈现。",
-          "宽屏浏览选中卡片后可直接编辑；字段源码模式可编辑包括媒体引用在内的完整字段。卡片脚本错误通过原生弹窗查看详情。",
-          "跟随系统在全屏、分屏和悬浮窗口间切换，保留对应的窗口安全区。",
-          "首次安装时可在配额范围内选择并导入在线牌组；首页帮助集中提供学习指南和社区入口。",
-          "JIDE 入口默认开放。包含 AI 生成或改写内容的文件导出会被阻止。"
+          "新增面向鸿蒙电脑的独立构建「记得闪卡 PC」，与原版可同时安装。",
+          "鸿蒙电脑可在实验版「设置 → 高级」开启外部 Agent 接入（MCP）并复制配置。开启后，重新启动记得会恢复接入。",
+          "宽屏首页会恢复上次选择；无有效记录时自动选中可见的默认牌组或列表首项。",
+          "简化应用识别码界面，识别码以边框突出显示。JIDE 的工具回执和草稿提示不再显示朗读按钮。",
+          "移除 JIDE 的单批卡片数量设置，保存、编辑与删除仍需确认。"
         ]
       },
       "developmentPriority": "项目优先服务 Agent 开发",
@@ -64,12 +63,29 @@
         "price": 0,
         "priceCurrency": "CNY",
         "url": "https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare",
-        "searchTerm": "记得闪卡"
+        "searchTerm": "记得闪卡",
+        "version": "26.11.15.15",
+        "updatedAt": "2026-11-14",
+        "status": "published",
+        "summary": "横屏主页新增侧边栏，卡库可手动同步到华为云空间。添加卡片时也能直接打开白板。",
+        "changes": [
+          "横屏大窗口可以换成侧边栏主页。打开「设置 → 常规 → 横屏大屏主页」，即可把搜索、浏览、同步和新建移到侧边。",
+          "可以手动把卡库同步到华为云空间，也可以查看其他设备的备份。请在各设备登录同一华为账号，并在系统云空间开启记得闪卡的同步。",
+          "文字、模块、按钮和弹窗的颜色与边框可以分别设置，修改后会自动保存。色环与色块拉开了距离，选色时更容易点准。",
+          "添加卡片时可以直接打开白板书画。编辑工具区收紧了间距，也调整了图片操作和输入框的位置。",
+          "重新整理了大屏设置目录和统计页的牌组筛选区域，调整了新增卡片时固定字段的图钉样式。",
+          "调整了菜单、弹窗和玻璃材质，修复部分弹窗被遮罩盖住、内容无法显示的问题。",
+          "修复打开牌组卡片预览，以及添加或编辑卡片时使用富文本输入可能导致的闪退。"
+        ],
+        "jide": {
+          "entryDefault": "visible",
+          "evidence": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/blob/v26.11.15.15/entry/src/main/ets/entryability/EntryAbility.ets"
+        }
       },
       "promotion": {
         "title": "主题与外观",
-        "description": "七套基础主题色，支持浅色、深色和跟随系统外观。",
-        "details": "可选择玻璃或扁平材质，分别调整模块、按钮和弹窗底色。支持自定义主题色与壁纸，并可在保存前预览强调色和裁剪效果。"
+        "description": "从七套基础主题色里挑选，也可以让应用跟随系统切换明暗。",
+        "details": "玻璃和扁平材质均可调。可以单独设置文字、模块、按钮和弹窗，或用自定义壁纸，再预览裁剪和遮罩效果。"
       },
       "features": [
         "FSRS 间隔复习",
@@ -82,58 +98,57 @@
         "传统浏览模式",
         "正文卡片引用与电脑端插件",
         "12 种语言与地区选项",
-        "玻璃与扁平材质"
+        "玻璃与扁平材质",
+        "华为云空间手动卡库同步",
+        "横屏侧边栏主页",
+        "制卡白板"
       ],
       "featureGroups": [
         {
-          "name": "复习",
-          "description": "Anki 学习内核、FSRS 调度、四档评分、撤销与重做，支持按卡片或整条笔记埋藏与暂停。"
+          "name": "FSRS 复习",
+          "description": "每张卡有四档评分。误点可以撤销或重做，也可以暂时埋藏或暂停某张卡、整条笔记。"
         },
         {
-          "name": "卡片",
-          "description": "普通卡、挖空卡、输入答案、图像遮挡；支持图片、音频与数学公式。"
+          "name": "卡片编辑",
+          "description": "做问答卡、挖空卡、输入答案卡或图像遮挡卡。字段里可以放图片、音频与数学公式。"
         },
         {
           "name": "同步",
-          "description": "AnkiWeb 集合与媒体同步、自定义服务器；实验性个人设备直连提供学习记录合并、卡库与媒体同步。"
+          "description": "用 AnkiWeb 同步集合与媒体，也可以连接自定义同步服务器。华为云空间提供手动卡库同步。个人设备直连仍是实验功能。"
         },
         {
-          "name": "导入导出",
-          "description": "APKG 导入导出与系统文件打开，集合备份及恢复；兼容 Anki 专用 MIME。"
+          "name": "导入与备份",
+          "description": "用 APKG 移动牌组，用 COLPKG 备份整套集合。可以从应用导入，也可以从支持 Anki 文件类型的系统入口打开牌组。"
         },
         {
-          "name": "管理",
-          "description": "牌组层级、搜索、批量编辑、标签与统计；独立牌组选项、预设管理及修改范围说明。"
+          "name": "牌组与统计",
+          "description": "牌组可以分层管理，卡片可以按标签搜索和批量编辑。统计页可以查看复习记录与到期情况。"
         },
         {
-          "name": "桌面与外观",
-          "description": "桌面服务卡片、学习提醒、七套基础主题色及自定义主色，支持浅色、深色和跟随系统外观。自定义颜色可分别调整明暗适配强度；提供玻璃与扁平材质，以及统一的弹窗、菜单和选择器。"
-        },
-        {
-          "name": "JIDE 助手",
-          "description": "软件内的全能助手：功能导航、学习分析、资料阅读、制卡改卡与设置协助。入口默认开放，配置模型服务后即可使用。"
+          "name": "外观与提醒",
+          "description": "设置学习提醒或添加桌面服务卡片。可切换浅色、深色与跟随系统外观，也可为文字、卡片和弹窗调整颜色与边框。"
         },
         {
           "name": "键盘与鼠标",
-          "description": "设置中的学习帮助集中展示各页快捷键与鼠标操作，支持编辑、学习及牌组、浏览列表与目录树右键。"
+          "description": "在学习帮助里查各页快捷键。牌组、浏览列表和目录树可用鼠标右键打开操作菜单。"
         },
         {
-          "name": "浏览与编辑",
-          "description": "传统多列表格与现有浏览外观可切换，分别保存卡片和笔记列配置；支持富文本、绘图、字段编辑轮盘与草稿预览。"
+          "name": "查找与批量编辑",
+          "description": "在浏览页按条件查卡片，或切到传统表格。卡片与笔记分别保存显示列。编辑时可以使用富文本、白板和字段工具转盘。"
         },
         {
           "name": "笔记引用",
-          "description": "在笔记正文插入对其他笔记的引用，学习和预览时打开目标；配套 Anki 电脑端插件共享引用数据。插件需另行安装。"
+          "description": "笔记正文可以链接到其他笔记，学习和预览时都能打开。电脑端需另外安装配套 Anki 插件。"
         },
         {
           "name": "语言与地区",
-          "description": "提供简体中文、香港与台湾繁体中文、英式与美式英语、意大利语、日语、越南语、韩语、俄语、德语和法语共 12 种选项，使用对应地区的日期与数字格式。"
+          "description": "应用有 12 种语言与地区选项，包括简体中文、香港与台湾繁体中文、英式与美式英语、意大利语、日语、越南语、韩语、俄语、德语和法语。日期与数字按所选地区显示。"
         }
       ],
       "detailSections": [
         {
           "id": "fsrs",
-          "title": "FSRS：根据回忆情况安排间隔复习",
+          "title": "FSRS 如何安排下一次复习",
           "paragraphs": [
             "记得闪卡复用 Anki Rust Core 的学习与调度能力。FSRS 根据复习记录和记忆状态安排后续复习，支持目标记忆保持率及牌组选项；应用前端不另写一套调度算法。",
             "学习时先尝试回忆，再显示答案，按实际情况选择忘记、困难、良好或简单。支持撤销与重做、按卡片或整条笔记埋藏与暂停；学习页可显示提示、查看上一张卡片信息，并录制、回放和保存本次学习录音。未保存的录音在退出本次学习时清理。"
@@ -141,7 +156,7 @@
         },
         {
           "id": "card-types",
-          "title": "问答、挖空、输入答案与图片遮挡",
+          "title": "卡片类型和媒体",
           "paragraphs": [
             "普通问答适合单词释义与概念辨析，挖空卡适合回忆句子中的关键内容，输入答案可用于拼写练习。图片遮挡适合把示意图、结构图或标注图拆成多个回忆问题。",
             "卡片支持图片、音频与数学公式。导入的 Anki 卡片模板通过 HTML/CSS 渲染；依赖桌面插件或特定客户端脚本的牌组需要单独检查，不能仅凭 APKG 导入成功就判断所有交互兼容。",
@@ -151,15 +166,22 @@
         },
         {
           "id": "ankiweb",
-          "title": "AnkiWeb：同步卡片、复习进度与媒体",
+          "title": "用 AnkiWeb 同步",
           "paragraphs": [
             "使用同一个 AnkiWeb 账号，可以在鸿蒙端与其他支持 AnkiWeb 的客户端之间同步集合和复习进度。集合数据与图片、音频的媒体同步分别处理，也支持兼容 Anki 的自定义同步服务器。",
             "普通同步会合并可合并的变化；需要全量同步时，由用户选择上传本地集合或下载云端集合。第一次迁移前应确认哪一端保存了完整资料，并保留备份。"
           ]
         },
         {
+          "id": "huawei-cloud",
+          "title": "华为云空间手动同步",
+          "paragraphs": [
+            "可以手动把卡库同步到华为云空间，也可以查看其他设备的备份。请在各设备登录同一华为账号，并在系统云空间开启记得闪卡的同步。"
+          ]
+        },
+        {
           "id": "device-link",
-          "title": "设备直连：学习记录、卡库与媒体同步（实验功能）",
+          "title": "个人设备直连（实验功能）",
           "paragraphs": [
             "在“设置 → 同步 → 设备直连”配对，两端需连接同一 Wi-Fi 或热点并保持该页面打开。扫码配对后，学习记录同步与卡库和媒体同步分别授权，旧学习记录权限不会自动授予卡库写入权限；两端都要更新到兼容版本。",
             "学习记录合并适用于同一人的同源卡库，保留双方复习历史与学习状态，支持多台在线个人设备补拉。卡库与媒体同步按设备逐对发起，覆盖牌组、笔记、模板、预设、卡片状态、标签、配置和复习历史，媒体按内容差异分块传输。",
@@ -169,7 +191,7 @@
         },
         {
           "id": "apkg",
-          "title": "APKG 导入导出与 COLPKG 备份",
+          "title": "APKG 牌组与 COLPKG 备份",
           "paragraphs": [
             "已有 Anki 牌组可以通过 .apkg 文件导入鸿蒙端，也可以把牌组导出后用于其他兼容客户端。词汇、考试问答、挖空卡和带媒体的学习资料都可以通过牌组包转移。",
             "APKG 用于牌组交换，COLPKG 用于完整集合的备份与恢复。恢复整库会替换当前集合，应按应用提示确认；同步便于多设备使用，独立备份则方便在误操作后找回资料。",
@@ -178,7 +200,7 @@
         },
         {
           "id": "organization",
-          "title": "牌组、搜索、批量编辑与学习统计",
+          "title": "管理牌组和卡片",
           "paragraphs": [
             "使用层级牌组和标签组织学习资料，通过 Anki 搜索语法查找卡片。支持字段编辑、卡片预览及批量管理，便于整理已有牌组，而不只是逐张背诵。",
             "学习统计展示复习量、卡片状态、间隔和记忆相关指标，帮助了解当前学习负担。学习提醒和 HarmonyOS 桌面服务卡片提供日常学习入口。",
@@ -187,7 +209,7 @@
         },
         {
           "id": "keyboard",
-          "title": "键盘与鼠标：常用操作直接完成",
+          "title": "键盘快捷键与鼠标操作",
           "paragraphs": [
             "键盘与鼠标指引统一位于“设置 → 学习帮助 → 键盘快捷键”，按首页、浏览、学习、编辑和模板界面分组。学习部分展示当前生效的自定义按键与卡面条件，文字输入、弹窗和忙碌状态优先处理各自操作。",
             "新增与编辑笔记支持 Ctrl+Enter 保存、Ctrl+D 选择牌组、Ctrl+L 打开模板、Ctrl+N 选择笔记类型、Ctrl+Shift+T 编辑标签，以及字段跳转和常用格式快捷键。模板编辑支持预览快捷键，属性或模板更新后保留未提交草稿。",
@@ -196,12 +218,11 @@
         },
         {
           "id": "jide",
-          "title": "JIDE：软件内的全能助手",
+          "title": "JIDE 应用内助手",
           "paragraphs": [
             "通过自然语言讨论学习、了解软件功能、阅读资料和管理卡片。JIDE 可以从牌组、浏览或学习页携带上下文进入，把功能导航、真实数据读取、资料处理和可确认的修改串联在同一对话中。",
             "例如，从“整理这份 PDF 的知识点”开始，按页读取或 OCR，选择合适的笔记类型，再生成带来源的可编辑卡片草稿；也可以查看复习情况，随后打开统计或牌组选项继续核对。"
           ],
-          "availability": "当前源码默认开放 JIDE 入口。配置模型服务后即可使用，联网检索另需开启应用端联网并配置搜索凭据。具体能力以当前应用、工具与发布说明为准。",
           "items": [
             {
               "name": "功能认知与页面导航",
@@ -253,125 +274,48 @@
               "description": "按需检索随应用打包的 Anki 官方手册选章，解释 FSRS、搜索或模板；结合空牌组、搜索结果、学习阶段和已导入资料给出可选择的下一步建议。对话支持表格、数学及化学公式。",
               "example": "解释一下 FSRS 和目标记忆保持率，再告诉我在哪里查看。"
             }
-          ]
+          ],
+          "availability": "公开发布的 26.11.15.15 版本配置中，JIDE 入口默认显示。使用 JIDE 需要配置模型服务。使用联网检索时，还需在应用中开启联网并配置搜索凭据。"
         },
         {
           "id": "native",
-          "title": "HarmonyOS NEXT 原生界面与开源内核",
+          "title": "鸿蒙原生界面与 Anki 内核",
           "paragraphs": [
             "导航、牌组列表、设置与统计界面使用 ArkTS / ArkUI 构建；Anki 的 Rust 内核通过 C ABI 和 Node-API 接入。卡片本身仍使用 Web 组件呈现模板、图片和公式，以保留 Anki 卡片的表达方式。",
             "项目以 AGPL-3.0-or-later 开源，源码、构建说明和问题反馈入口公开。记得闪卡是独立项目，非 Anki 官方客户端；本页按当前源码介绍功能，应用市场版本与实际上架能力以下载页面和应用内入口为准。"
           ]
         }
       ],
-      "screenshots": [
-        {
-          "path": "/assets/jidecards-2.9.22-home.png",
-          "sourceUrl": "https://jidecards.com/assets/jidecards-2.9.22-home.png",
-          "caption": "每天一点，把知识记牢",
-          "description": "新版首页展示今日进度、层级牌组，以及搜索、预览、同步和新增入口。",
-          "width": 1080,
-          "height": 1920,
-          "releaseVersion": "2.9.22",
-          "source": "作者提供的 2.9.22 历史宣传图",
-          "sha256": "91a67e4f80de312cb97201155d0e43d1c7e86ce969ded69f232da3b396406f74"
-        },
-        {
-          "path": "/assets/jidecards-2.9.22-study.png",
-          "sourceUrl": "https://jidecards.com/assets/jidecards-2.9.22-study.png",
-          "caption": "图片与例句，让记忆更具体",
-          "description": "卡片结合图片、例句和填空；先尝试回忆或输入答案，再显示答案并评分。",
-          "width": 1080,
-          "height": 1920,
-          "releaseVersion": "2.9.22",
-          "source": "作者提供的 2.9.22 历史宣传图",
-          "sha256": "789e44a055f25cb82d0c3f979628b44ca83c70a6711317b245e0dbae9d091e1a"
-        },
-        {
-          "path": "/assets/jidecards-2.9.22-editor.png",
-          "sourceUrl": "https://jidecards.com/assets/jidecards-2.9.22-editor.png",
-          "caption": "自由编辑，打造专属卡片",
-          "description": "可视编辑与源码编辑自由切换，工具转盘提供常用格式操作，支持图片、音频和数学公式。",
-          "width": 1080,
-          "height": 1920,
-          "releaseVersion": "2.9.22",
-          "source": "作者提供的 2.9.22 历史宣传图",
-          "sha256": "93cbe056c90435ede5d7b16b25435493183c30a99297c76b1cee8b09d265b78c"
-        },
-        {
-          "path": "/assets/jidecards-2.9.22-browser.png",
-          "sourceUrl": "https://jidecards.com/assets/jidecards-2.9.22-browser.png",
-          "caption": "快速查找，卡片井然有序",
-          "description": "通过搜索、类型筛选和排序查找卡片，查看卡片所属牌组与相关信息。",
-          "width": 1080,
-          "height": 1920,
-          "releaseVersion": "2.9.22",
-          "source": "作者提供的 2.9.22 历史宣传图",
-          "sha256": "be29d85d8e451ba9b670fc5d3b5b7c8c5f5916371832608b6a0d27ec30f6d908"
-        },
-        {
-          "path": "/assets/jidecards-2.9.22-actions.png",
-          "sourceUrl": "https://jidecards.com/assets/jidecards-2.9.22-actions.png",
-          "caption": "灵活操作，学习更加顺手",
-          "description": "在学习中使用标星、旗标、撤销、跳过、暂停和手写等操作管理当前卡片。",
-          "width": 1080,
-          "height": 1920,
-          "releaseVersion": "2.9.22",
-          "source": "作者提供的 2.9.22 历史宣传图",
-          "sha256": "e0f2355ab16c90a42d736b1d0fee14d33f40ccc324584d61b68ae201e92dbe07"
-        },
-        {
-          "path": "/assets/jidecards-2.9.22-statistics.png",
-          "sourceUrl": "https://jidecards.com/assets/jidecards-2.9.22-statistics.png",
-          "caption": "复习有安排，进步看得见",
-          "description": "查看今日学习概览和未来到期预测，通过 FSRS 复习安排与统计了解学习负担。",
-          "width": 1080,
-          "height": 1920,
-          "releaseVersion": "2.9.22",
-          "source": "作者提供的 2.9.22 历史宣传图",
-          "sha256": "b190a3c8cdf99b7b0d0a33753c1113bf245b0e40336221b9c8b364ced327254b"
-        },
-        {
-          "path": "/assets/jidecards-2.9.22-reminders.png",
-          "sourceUrl": "https://jidecards.com/assets/jidecards-2.9.22-reminders.png",
-          "caption": "定时提醒，让学习成为习惯",
-          "description": "自定义提醒时间与通知内容，待学习、待复习数量占位符会替换为实际卡片数量。",
-          "width": 1080,
-          "height": 1920,
-          "releaseVersion": "2.9.22",
-          "source": "作者提供的 2.9.22 历史宣传图",
-          "sha256": "a8d314fc0628d01511f0c6eb5379878212262a6214d81c196c3aca5b4ceae0e9"
-        }
-      ],
+      "screenshots": [],
       "brand": {
         "logo": "/assets/jidecards-logo.png",
         "width": 1024,
         "height": 1024,
         "headline": [
-          "每天记得，",
-          "记得闪卡"
+          "记得闪卡",
+          "在鸿蒙上用 Anki 牌组学习"
         ]
       },
       "questions": [
         {
           "name": "支持哪些设备？",
-          "description": "记得闪卡面向 HarmonyOS NEXT。通过华为应用市场安装，具体设备兼容范围以应用市场为准。"
+          "description": "记得闪卡面向 HarmonyOS NEXT。能否安装可在华为应用市场详情页查看。"
         },
         {
           "name": "能继续使用已有的 Anki 牌组吗？",
-          "description": "支持 APKG 导入导出、AnkiWeb 集合与媒体同步，以及 FSRS 间隔复习。迁移前备份资料，完成后检查样例卡、图片和音频。"
+          "description": "可以。拿到 .apkg 文件就用导入入口。如果还想接着原来的复习进度，用同一个 AnkiWeb 账号同步，迁移前先保留备份。"
         },
         {
           "name": "免费吗？源码在哪里？",
-          "description": "应用免费下载，以 AGPL-3.0-or-later 开源。源码可在 GitHub、Gitee 和 GitCode 查看。"
+          "description": "应用免费下载，采用 AGPL-3.0-or-later 许可证。GitHub、Gitee 和 GitCode 都提供项目仓库。"
         },
         {
           "name": "记得闪卡是 Anki 官方应用吗？",
-          "description": "记得闪卡是复用 Anki Core 的独立开源项目，非 Anki 官方客户端。"
+          "description": "记得闪卡由独立开发者维护，使用 Anki Core 处理卡片和复习调度。"
         },
         {
           "name": "设备直连可以同步哪些内容？",
-          "description": "实验性设备直连分别提供同源卡库的学习记录合并，以及整套卡库与媒体同步，均需双方独立授权。来源或结构不兼容时，接收设备须确认替换并先备份；保留 AnkiWeb，真实两机与账号行为仍待设备验收。"
+          "description": "实验性直连可合并同源卡库的学习记录，也可同步整套卡库和媒体。两台设备均需授权。如果来源或结构不兼容，请先备份，再在接收设备上确认替换。实际双机与账号行为仍待设备验收。"
         }
       ],
       "sourcePackage": {
@@ -382,7 +326,24 @@
         "checksumsUrl": "https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/SHA256SUMS.txt",
         "buildMode": "debug",
         "installNote": "签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。"
-      }
+      },
+      "learningHighlights": [
+        {
+          "name": "导入已有牌组",
+          "description": "词汇、例句和备考卡片可以直接带到鸿蒙。",
+          "section": "apkg"
+        },
+        {
+          "name": "按回忆情况安排复习",
+          "description": "翻卡后按实际回忆情况评分，记得牢的卡可以晚些再复习。",
+          "section": "fsrs"
+        },
+        {
+          "name": "换设备接着学",
+          "description": "用同一个 AnkiWeb 账号同步卡片、媒体和学习记录。",
+          "section": "ankiweb"
+        }
+      ]
     }
   ]
 }

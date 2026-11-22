@@ -3,23 +3,19 @@ import { esc } from './layout.mjs';
 
 export function renderFeeds(content) {
   const { data, work, guide, origin, repositories } = content;
-  const releaseNotes = work.sourceUpdate.changes.map((change, index) => `${index + 1}. ${change}`).join('\n');
-  const facts = `- 当前源码版本：${work.sourceVersion}（构建编号 ${work.sourceVersionCode}）
-- 华为应用市场版本以下载页面为准。
+  const market = work.marketplace;
+  const releaseNotes = market.changes.map((change, index) => `${index + 1}. ${change}`).join('\n');
+  const facts = `- 华为应用市场正式版：${market.version}（已上架）
 - 平台：${work.platform}
 - 许可证：${work.license}
 - 作者：[${data.author.name}](${data.author.url})
 - 下载：[华为应用市场](${work.marketplace.url})
-- 签名 HAP 开发包：[${work.sourcePackage.fileName}](${work.sourcePackage.downloadUrl}) · [SHA-256 校验](${work.sourcePackage.checksumsUrl}) · [构建说明](${work.sourcePackage.releaseUrl})
-- 开发包安装：${work.sourcePackage.installNote}
 - 源码：${repositories.map(item => `[${item.name}](${item.url})`).join(' · ')}
 - 更新日期：${data.updatedAt}
 
-本文按当前源码介绍功能，应用市场实际版本以下载页面为准。独立开源项目，非 Anki 官方客户端。
+记得闪卡是使用 Anki Core 的独立开源项目。
 
-## 独立开发声明
-
-${work.developmentStatement}`;
+[独立开发声明](${origin}/about/independent-development/)`;
   const detailed = work.detailSections.map(section => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}${section.availability ? `\n\n${section.availability}` : ''}${section.items ? `\n\n${section.items.map(item => `- ${item.name}：${item.description}${item.example ? ` 示例：“${item.example}”` : ''}`).join('\n')}` : ''}`).join('\n\n');
   const media = work.screenshots.map(item => `### ${item.caption}\n\n${item.description}\n\n![${item.caption}](${origin}${item.path})\n\n历史宣传图版本：${item.releaseVersion}。${item.source}。`).join('\n\n');
   const table = item => `| ${item.headers.join(' | ')} |\n| ${item.headers.map(() => '---').join(' | ')} |\n${item.rows.map(row => `| ${row.join(' | ')} |`).join('\n')}`;
@@ -36,16 +32,16 @@ ${guide.sections.map(section => `## ${section.title}\n\n${(section.paragraphs ??
 
 ${guide.references.map(item => `- [${item.title}](${item.url})`).join('\n')}
 `;
-  const releaseText = `# 记得闪卡 ${work.sourceVersion} 源码更新说明\n\n原文：${origin}/releases/\n更新日期：${work.sourceUpdate.updatedAt}。\n\n${releaseNotes}\n\n${facts}\n`;
+  const releaseText = `# 记得闪卡 ${market.version} 更新说明\n\n原文：${origin}/releases/\n更新日期：${market.updatedAt}。\n\n${market.summary}\n\n${releaseNotes}\n\n${facts}\n`;
   const developersText = `# 记得闪卡开发文档
 
 原文：${origin}/developers/
 
-项目优先服务 Agent 开发；这里的 Agent 指辅助作者开发仓库的编程 Agent。
+项目优先服务 Agent 开发。编程 Agent 和开发者可以从项目索引找到代码入口，再按模块查看构建和验证要求。
 
 ${facts}
 
-## 责任与构建入口
+当前仓库版本：${work.sourceVersion}（构建编号 ${work.sourceVersionCode}）。\n\n[签名 HAP 开发包](${work.sourcePackage.downloadUrl}) · [SHA-256 校验](${work.sourcePackage.checksumsUrl}) · [构建记录](${work.sourcePackage.releaseUrl})。\n\n${work.sourcePackage.installNote}\n\n## 责任与构建入口
 
 - [开发约定](${work.repository}/blob/main/AGENTS.md)
 - [项目索引](${work.repository}/blob/main/PROJECT_CONTEXT.md)
@@ -59,6 +55,8 @@ ${facts}
 
 ${work.detailSections.find(item => item.id === 'jide').availability}
 
+[该版本入口配置](${market.jide.evidence})
+
 ## 机器可读入口
 
 正文在构建时输出完整 HTML，功能、版本、平台、更新说明和能力边界由同一套内容生成 Markdown 与 JSON。
@@ -70,14 +68,21 @@ ${work.detailSections.find(item => item.id === 'jide').availability}
 - [网站地图](${origin}/sitemap.xml)
 - [版本更新订阅](${origin}/releases.xml)
 `;
-  const productText = `# 记得闪卡 JideCards\n\n原文：${work.url}\n\n${work.summary}\n\n${facts}\n\n## 学习用途\n\n${work.useCases.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n## 功能概览\n\n${work.featureGroups.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n${detailed}\n\n## ${work.promotion.title}\n\n${work.promotion.description} ${work.promotion.details}\n\n## 历史界面示例\n\n${media}\n\n## 常见问题\n\n${work.questions.map(item => `### ${item.name}\n\n${item.description}`).join('\n\n')}\n\n## ${work.sourceVersion} 源码更新说明\n\n${releaseNotes}\n`;
-  const homeText = `# 记得闪卡 JideCards\n\n${work.brand.headline.join('')}\n\n${work.summary}\n\n${facts}\n\n## 学习与资料\n\n${work.useCases.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n${work.featureGroups.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n## ${work.promotion.title}\n\n${work.promotion.description} ${work.promotion.details}\n\n## ${work.sourceVersion} 源码更新说明\n\n${releaseNotes}\n\n[完整功能](${work.url}) · [使用指南](${origin}${guide.pathname}) · [开发文档](${origin}/developers/)\n`;
+  const highlights = work.learningHighlights.map(item => `- [${item.name}](${work.url}technical/#${item.section}) — ${item.description}`).join('\n');
+  const questionText = items => items.map(item => `### ${item.name}\n\n${item.description}`).join('\n\n');
+  const publicQuestions = questionText(work.questions.slice(0, 3));
+  const technicalText = `# 进阶功能与兼容性\n\n原文：${work.url}technical/\n\n${detailed}\n\n[JIDE 入口配置](${market.jide.evidence})\n\n## ${work.promotion.title}\n\n${work.promotion.description} ${work.promotion.details}\n\n## 进阶问答\n\n${questionText(work.questions.slice(3))}\n`;
+  const statementText = `# 独立开发声明\n\n原文：${origin}/about/independent-development/\n\n${work.developmentStatement}\n`;
+  const productText = `# 记得闪卡 JideCards\n\n原文：${work.url}\n\n${work.summary}\n\n${facts}\n\n## 学习场景\n\n${work.useCases.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n## 功能概览\n\n${highlights}\n\n## 应用截图\n\n${media}\n\n## 常见问题\n\n${publicQuestions}\n\n[进阶功能与兼容性](${work.url}technical/) · [${market.version} 更新说明](${origin}/releases/)\n`;
+  const homeText = `# 记得闪卡 JideCards\n\n${work.brand.headline[1]}\n\n${work.summary}\n\n[华为应用市场免费下载](${market.url}) · ${market.version} 已上架\n\n## 从制卡到复习\n\n${highlights}\n\n## 常见问题\n\n${publicQuestions}\n\n[功能与截图](${work.url}) · [使用指南](${origin}${guide.pathname}) · [更新说明](${origin}/releases/)\n`;
   const aboutText = `# 关于记得闪卡\n\n${data.author.name}，记得闪卡独立开发者。\n\n${facts}\n\n[GitHub 作者主页](${data.author.github}) · [问题反馈](${work.repository}/issues)\n`;
   const pages = [
     { path: '/', title: '记得闪卡 JideCards', description: work.summary, markdown: '/content/home.md' },
     { path: '/works/jidecards/', title: '记得闪卡功能与下载', description: work.summary, markdown: '/content/product.md' },
+    { path: '/works/jidecards/technical/', title: '进阶功能与兼容性', description: '同步方式、备份格式、卡片模板、快捷键和 JIDE 的使用条件。', markdown: '/content/technical.md' },
+    { path: '/about/independent-development/', title: '独立开发声明', description: '记得闪卡项目的开发和维护归属说明。', markdown: '/content/independent-development.md' },
     { path: guide.pathname, title: guide.title, description: guide.description, markdown: '/content/harmonyos-anki-guide.md', updatedAt: guide.updatedAt },
-    { path: '/releases/', title: `${work.sourceVersion} 源码更新说明`, description: '当前版本的完整编号更新说明。', markdown: '/content/releases.md' },
+    { path: '/releases/', title: `${market.version} 更新说明`, description: market.summary, markdown: '/content/releases.md' },
     { path: '/developers/', title: '开发文档', description: '源码、模块责任、构建与验证入口。', markdown: '/content/developers.md' },
     { path: '/about/', title: '关于项目与作者', description: `${data.author.name}，记得闪卡独立开发者。`, markdown: '/content/about.md' }
   ].map(item => ({ ...item, url: `${origin}${item.path}`, markdownUrl: `${origin}${item.markdown}`, updatedAt: item.updatedAt ?? data.updatedAt }));
@@ -105,15 +110,16 @@ ${pages.map(item => `- [${item.title}](${item.markdownUrl}): ${item.description}
 ${work.promotion.title}：${work.promotion.description} ${work.promotion.details}
 `;
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${pages.map(item => `  <url><loc>${esc(item.url)}</loc><lastmod>${item.updatedAt}</lastmod></url>`).join('\n')}\n</urlset>\n`;
-  const updated = `${work.sourceUpdate.updatedAt}T00:00:00+08:00`;
+  const updated = `${market.updatedAt}T00:00:00+08:00`;
   const atom = `<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>记得闪卡版本更新</title><id>${origin}/releases.xml</id><link href="${origin}/releases.xml" rel="self"/><link href="${origin}/releases/"/><updated>${updated}</updated><author><name>${esc(data.author.name)}</name></author><entry><title>记得闪卡 ${esc(work.sourceVersion)} 源码更新</title><id>${origin}/releases/#release-${work.sourceVersion.replaceAll('.', '-')}</id><link href="${origin}/releases/#release-${work.sourceVersion.replaceAll('.', '-')}"/><updated>${updated}</updated><content type="text">${esc(releaseNotes)}</content></entry></feed>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>记得闪卡版本更新</title><id>${origin}/releases.xml</id><link href="${origin}/releases.xml" rel="self"/><link href="${origin}/releases/"/><updated>${updated}</updated><author><name>${esc(data.author.name)}</name></author><entry><title>记得闪卡 ${esc(market.version)} 更新</title><id>${origin}/releases/#release-${market.version.replaceAll('.', '-')}</id><link href="${origin}/releases/#release-${market.version.replaceAll('.', '-')}"/><updated>${updated}</updated><content type="text">${esc(releaseNotes)}</content></entry></feed>
 `;
   return {
-    'llms.txt': llms, 'llms-full.txt': `${llms}\n${productText}\n${guideText}\n${developersText}\n${releaseText}\n`,
+    'llms.txt': llms, 'llms-full.txt': `${llms}\n${productText}\n${technicalText}\n${guideText}\n${developersText}\n${releaseText}\n${aboutText}\n${statementText}\n`,
+    'content/technical.md': technicalText, 'content/independent-development.md': statementText,
     'content/home.md': homeText, 'content/product.md': productText, 'content/harmonyos-anki-guide.md': guideText,
     'content/releases.md': releaseText, 'content/developers.md': developersText, 'content/about.md': aboutText,
-    'data/site-index.json': `${JSON.stringify({ schemaVersion: 1, updatedAt: data.updatedAt, origin, sourceVersion: work.sourceVersion, sourceVersionCode: work.sourceVersionCode, contentLanguage: 'zh-CN', product: `${origin}/data/works.json`, llms: `${origin}/llms.txt`, fullText: `${origin}/llms-full.txt`, releaseFeed: `${origin}/releases.xml`, pages }, null, 2)}\n`,
+    'data/site-index.json': `${JSON.stringify({ schemaVersion: 1, updatedAt: data.updatedAt, origin, sourceVersion: work.sourceVersion, sourceVersionCode: work.sourceVersionCode, marketplace: { version: market.version, status: market.status, url: market.url }, contentLanguage: 'zh-CN', product: `${origin}/data/works.json`, llms: `${origin}/llms.txt`, fullText: `${origin}/llms-full.txt`, releaseFeed: `${origin}/releases.xml`, pages }, null, 2)}\n`,
     'sitemap.xml': sitemap, 'releases.xml': atom, 'robots.txt': `User-agent: *\nAllow: /\n\nSitemap: ${origin}/sitemap.xml\n`
   };
 }

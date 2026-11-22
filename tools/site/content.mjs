@@ -12,13 +12,20 @@ export async function loadContent(root) {
   const work = data.works[0];
   work.sourceVersion = app.versionName;
   work.sourceVersionCode = app.versionCode;
+  const market = work.marketplace;
+  const jide = work.detailSections.find(section => section.id === 'jide');
+  const jideDefaults = { visible: '默认显示', hidden: '默认隐藏' };
+  const entryDefault = jideDefaults[market.jide?.entryDefault];
+  if (!entryDefault || !market.jide.evidence.includes(`/blob/v${market.version}/`)) {
+    throw new Error('JIDE availability must cite a source for the listed marketplace release.');
+  }
+  jide.availability = `公开发布的 ${market.version} 版本配置中，JIDE 入口${entryDefault}。使用 JIDE 需要配置模型服务。使用联网检索时，还需在应用中开启联网并配置搜索凭据。`;
   const packageVersion = work.sourcePackage?.tag?.match(/^v(\d+\.\d+\.\d+(?:\.\d+)?)$/)?.[1];
   // 已发布下载包有独立事实来源；源码升版不能编造尚未发布的下载链接。
   if (!packageVersion || work.sourcePackage.fileName !== `jidecards-v${packageVersion}-signed.hap`) {
     throw new Error('Published HAP filename must match its own release tag.');
   }
-  // 不维护市场版本号；源码版本读取应用配置，截图保留各自的历史版本。
-  if (!work.screenshots.length) throw new Error('Current author-supplied product media is required.');
+  // 没有当前截图时允许空目录，不回退到历史宣传图。
   for (const item of work.screenshots) {
     if (!item.releaseVersion || !item.path.includes(`-${item.releaseVersion}-`)) throw new Error(`Product media version does not match its provenance: ${item.path}`);
     const bytes = await readFile(path.join(hosting, item.path));

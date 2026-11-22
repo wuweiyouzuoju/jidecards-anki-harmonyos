@@ -1,55 +1,29 @@
 # 记得闪卡 JideCards
 
-每天记得，记得闪卡
+在鸿蒙上用 Anki 牌组学习
 
-记得闪卡是一款面向鸿蒙 HarmonyOS NEXT 的原生开源学习应用，让知识的整理、回忆与复习融入日常。以 Anki 内核为基础，将主动回忆与间隔复习结合，帮助你把学过的内容转化为长久的记忆。
+用记得闪卡背单词、复习考点。可以自己做卡，也可以导入已有的 Anki 牌组。每次先回想答案，再翻卡核对，应用会按你的回忆情况安排下次复习。换设备时，可以同步卡片和学习进度。
 
-- 当前源码版本：26.11.09.9（构建编号 3149）
-- 华为应用市场版本以下载页面为准。
-- 平台：HarmonyOS NEXT
-- 许可证：AGPL-3.0-or-later
-- 作者：[可塑性天赋](https://jidecards.com/about/)
-- 下载：[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
-- 签名 HAP 开发包：[jidecards-v26.11.09.9-signed.hap](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/jidecards-v26.11.09.9-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/SHA256SUMS.txt) · [构建说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v26.11.09.9)
-- 开发包安装：签名开发包，安装受包内签名与设备授权限制；普通用户建议从华为应用市场安装。
-- 源码：[GitHub](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [Gitee](https://gitee.com/wuweiyouzuoju/jidecards-anki-harmonyos) · [GitCode](https://gitcode.com/wuweiyouzuoju/jidecards-anki-harmonyos)
-- 更新日期：2026-11-08
+[华为应用市场免费下载](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare) · 26.11.15.15 已上架
 
-本文按当前源码介绍功能，应用市场实际版本以下载页面为准。独立开源项目，非 Anki 官方客户端。
+## 从制卡到复习
 
-## 独立开发声明
+- [导入已有牌组](https://jidecards.com/works/jidecards/technical/#apkg) — 词汇、例句和备考卡片可以直接带到鸿蒙。
+- [按回忆情况安排复习](https://jidecards.com/works/jidecards/technical/#fsrs) — 翻卡后按实际回忆情况评分，记得牢的卡可以晚些再复习。
+- [换设备接着学](https://jidecards.com/works/jidecards/technical/#ankiweb) — 用同一个 AnkiWeb 账号同步卡片、媒体和学习记录。
 
-截至目前，记得闪卡（jidecards）的开发与维护仍全程由可塑性天赋（wuweiyouzuoju）本人独立完成，不涉及团队协作或多人共同开发。任何声称“带领团队完成记得闪卡开发”，或将本项目归为团队开发成果的表述，均与事实不符。
+## 常见问题
 
-## 学习与资料
+### 支持哪些设备？
 
-- 背单词：把单词、释义和例句做成闪卡，或导入已有的 Anki APKG 词汇牌组；支持图片、音频和输入答案。
-- 记忆知识点：把考试概念、公式和问答拆成卡片，用挖空卡回忆关键内容，用图像遮挡复习图中的信息。
-- 间隔复习：先尝试回忆，再查看答案并按记忆情况评分。Anki 内核的 FSRS 调度据此安排后续复习时间。
+记得闪卡面向 HarmonyOS NEXT。能否安装可在华为应用市场详情页查看。
 
-- 复习：Anki 学习内核、FSRS 调度、四档评分、撤销与重做，支持按卡片或整条笔记埋藏与暂停。
-- 卡片：普通卡、挖空卡、输入答案、图像遮挡；支持图片、音频与数学公式。
-- 同步：AnkiWeb 集合与媒体同步、自定义服务器；实验性个人设备直连提供学习记录合并、卡库与媒体同步。
-- 导入导出：APKG 导入导出与系统文件打开，集合备份及恢复；兼容 Anki 专用 MIME。
-- 管理：牌组层级、搜索、批量编辑、标签与统计；独立牌组选项、预设管理及修改范围说明。
-- 桌面与外观：桌面服务卡片、学习提醒、七套基础主题色及自定义主色，支持浅色、深色和跟随系统外观。自定义颜色可分别调整明暗适配强度；提供玻璃与扁平材质，以及统一的弹窗、菜单和选择器。
-- JIDE 助手：软件内的全能助手：功能导航、学习分析、资料阅读、制卡改卡与设置协助。入口默认开放，配置模型服务后即可使用。
-- 键盘与鼠标：设置中的学习帮助集中展示各页快捷键与鼠标操作，支持编辑、学习及牌组、浏览列表与目录树右键。
-- 浏览与编辑：传统多列表格与现有浏览外观可切换，分别保存卡片和笔记列配置；支持富文本、绘图、字段编辑轮盘与草稿预览。
-- 笔记引用：在笔记正文插入对其他笔记的引用，学习和预览时打开目标；配套 Anki 电脑端插件共享引用数据。插件需另行安装。
-- 语言与地区：提供简体中文、香港与台湾繁体中文、英式与美式英语、意大利语、日语、越南语、韩语、俄语、德语和法语共 12 种选项，使用对应地区的日期与数字格式。
+### 能继续使用已有的 Anki 牌组吗？
 
-## 主题与外观
+可以。拿到 .apkg 文件就用导入入口。如果还想接着原来的复习进度，用同一个 AnkiWeb 账号同步，迁移前先保留备份。
 
-七套基础主题色，支持浅色、深色和跟随系统外观。 可选择玻璃或扁平材质，分别调整模块、按钮和弹窗底色。支持自定义主题色与壁纸，并可在保存前预览强调色和裁剪效果。
+### 免费吗？源码在哪里？
 
-## 26.11.09.9 源码更新说明
+应用免费下载，采用 AGPL-3.0-or-later 许可证。GitHub、Gitee 和 GitCode 都提供项目仓库。
 
-1. 自定义壁纸支持裁剪、透明度与深浅色遮罩；自定义主题色支持 RGB／HEX 输入、明暗适配和实时预览。
-2. 玻璃与扁平材质可分别调整模块、按钮和弹窗的底色不透明度。统一菜单和弹窗的公共呈现。
-3. 宽屏浏览选中卡片后可直接编辑；字段源码模式可编辑包括媒体引用在内的完整字段。卡片脚本错误通过原生弹窗查看详情。
-4. 跟随系统在全屏、分屏和悬浮窗口间切换，保留对应的窗口安全区。
-5. 首次安装时可在配额范围内选择并导入在线牌组；首页帮助集中提供学习指南和社区入口。
-6. JIDE 入口默认开放。包含 AI 生成或改写内容的文件导出会被阻止。
-
-[完整功能](https://jidecards.com/works/jidecards/) · [使用指南](https://jidecards.com/guides/harmonyos-anki/) · [开发文档](https://jidecards.com/developers/)
+[功能与截图](https://jidecards.com/works/jidecards/) · [使用指南](https://jidecards.com/guides/harmonyos-anki/) · [更新说明](https://jidecards.com/releases/)
