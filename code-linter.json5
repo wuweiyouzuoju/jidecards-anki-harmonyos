@@ -1,0 +1,54 @@
+{
+  // DevEco Code Linter 配置。运行：devecocli check lint entry/src/main/ets
+  // 结果与规则调整说明见 docs/quality/code-linter.md。路径相对工程根目录；
+  // DevEco 默认另行跳过 ohosTest、test、build、oh_modules、node_modules、.preview。
+  "files": ["**/*.ets", "**/*.ts"],
+  "ignore": [
+    // 由 tools/core-protocol.mjs 从锁定的官方协议描述生成；改动以生成器和 protocol:check 为准。
+    "entry/src/main/ets/proto/generated/**/*",
+    // 以下为 Node 工具、官网、桌面端、原生库与本地产物，不属于 ArkTS 应用源码。
+    "tools/**/*",
+    "hosting/**/*",
+    "desktop/**/*",
+    "native/**/*",
+    "server/**/*",
+    "third_party/**/*",
+    "target/**/*",
+    "work/**/*",
+    "output/**/*",
+    ".local/**/*",
+    "hvigor/**/*"
+  ],
+  "ruleSet": ["plugin:@performance/recommended", "plugin:@typescript-eslint/recommended"],
+  "rules": {
+    // 分析器不识别 `if (task !== null) await task` 的类型收窄和返回 Promise 的函数字段；
+    // 保留为 warn 以便发现真实问题（已修复 TTS 引擎同步 stop/shutdown 的多余 await）。
+    "@typescript-eslint/await-thenable": "warn"
+  },
+  "overrides": [
+    {
+      // SDK 26.0.0 的 arkPerfCheck 对 .ts 模块不解析 ES 标准库及跨文件值导出：
+      // String.split、Array.from 等被推断为 any（no-unsafe-*），
+      // 被 new 调用的类也被要求改成 import type（consistent-type-imports）。
+      // 真实的纯类型导入已改为 import type；类型安全由 ArkTS 严格编译与 architecture-boundaries 测试保证。
+      "files": ["entry/src/main/ets/**/*.ts"],
+      "rules": {
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-argument": "off",
+        "@typescript-eslint/no-unsafe-return": "off",
+        "@typescript-eslint/consistent-type-imports": "off",
+        "@typescript-eslint/await-thenable": "off"
+      }
+    },
+    {
+      // 领域枚举按名称引用生成协议枚举（如 SearchSearchNodeCardState.CARD_STATE_DUE），
+      // 保证协议数值单一来源；Anki 队列状态使用负数字面量（-1/-2/-3）。
+      "files": ["entry/src/main/ets/proto/messages/*.ts"],
+      "rules": {
+        "@typescript-eslint/prefer-literal-enum-member": "off"
+      }
+    }
+  ]
+}
