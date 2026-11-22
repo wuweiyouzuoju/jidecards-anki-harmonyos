@@ -16,7 +16,29 @@
       "updateDuration": 1,
       "defaultDimension": "2*4",
       "supportDimensions": ["2*4"],
-      "formConfigAbility": "ability://EntryAbility"
+      "formConfigAbility": "ability://EntryAbility",
+      "standby": {
+        "isSupported": false
+      }
+    },
+    {
+      "name": "today_review_card",
+      "displayName": "$string:today_review_widget_name",
+      "description": "$string:today_review_widget_description",
+      "src": "./ets/widget/pages/TodayReviewCard.ets",
+      "uiSyntax": "arkts",
+      "renderingMode": "fullColor",
+      "isDefault": false,
+      "updateEnabled": true,
+      "updateDuration": 1,
+      "defaultDimension": "2*2",
+      "supportDimensions": ["2*2"],
+      "supportDeviceTypes": ["phone"],
+      "standby": {
+        "isSupported": true,
+        "isAdapted": true,
+        "isPrivacySensitive": false
+      }
     }
   ]
 }

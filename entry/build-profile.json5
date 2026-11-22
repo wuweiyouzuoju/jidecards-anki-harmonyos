@@ -32,6 +32,11 @@
     },
     {
       name: 'default'
+    },
+    {
+      name: 'pc',
+      config: { deviceType: ['2in1'] },
+      source: { abilities: [{ name: 'EntryAbility', label: '$string:app_name_pc' }] },
     }
   ]
 }
