@@ -17,7 +17,7 @@ export function renderFeeds(content) {
 
 [独立开发声明](${origin}/about/independent-development/)`;
   const detailed = work.detailSections.map(section => `## ${section.title}\n\n${section.paragraphs.join('\n\n')}${section.availability ? `\n\n${section.availability}` : ''}${section.items ? `\n\n${section.items.map(item => `- ${item.name}：${item.description}${item.example ? ` 示例：“${item.example}”` : ''}`).join('\n')}` : ''}`).join('\n\n');
-  const media = work.screenshots.map(item => `### ${item.caption}\n\n${item.description}\n\n![${item.caption}](${origin}${item.path})\n\n历史宣传图版本：${item.releaseVersion}。${item.source}。`).join('\n\n');
+  const media = work.screenshots.map(item => `### ${item.caption}\n\n${item.description}\n\n![${item.caption}](${origin}${item.path})\n\n截图版本：${item.releaseVersion}。${item.source}。`).join('\n\n');
   const table = item => `| ${item.headers.join(' | ')} |\n| ${item.headers.map(() => '---').join(' | ')} |\n${item.rows.map(row => `| ${row.join(' | ')} |`).join('\n')}`;
   const guideText = `# ${guide.title}
 
@@ -69,12 +69,14 @@ ${work.detailSections.find(item => item.id === 'jide').availability}
 - [版本更新订阅](${origin}/releases.xml)
 `;
   const highlights = work.learningHighlights.map(item => `- [${item.name}](${work.url}technical/#${item.section}) — ${item.description}`).join('\n');
+  const groups = work.featureGroups.map(item => `- ${item.name}：${item.description}`).join('\n');
+  const jide = work.detailSections.find(item => item.id === 'jide');
   const questionText = items => items.map(item => `### ${item.name}\n\n${item.description}`).join('\n\n');
   const publicQuestions = questionText(work.questions.slice(0, 3));
   const technicalText = `# 进阶功能与兼容性\n\n原文：${work.url}technical/\n\n${detailed}\n\n[JIDE 入口配置](${market.jide.evidence})\n\n## ${work.promotion.title}\n\n${work.promotion.description} ${work.promotion.details}\n\n## 进阶问答\n\n${questionText(work.questions.slice(3))}\n`;
   const statementText = `# 独立开发声明\n\n原文：${origin}/about/independent-development/\n\n${work.developmentStatement}\n`;
-  const productText = `# 记得闪卡 JideCards\n\n原文：${work.url}\n\n${work.summary}\n\n${facts}\n\n## 学习场景\n\n${work.useCases.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n## 功能概览\n\n${highlights}\n\n## 应用截图\n\n${media}\n\n## 常见问题\n\n${publicQuestions}\n\n[进阶功能与兼容性](${work.url}technical/) · [${market.version} 更新说明](${origin}/releases/)\n`;
-  const homeText = `# 记得闪卡 JideCards\n\n${work.brand.headline[1]}\n\n${work.summary}\n\n[华为应用市场免费下载](${market.url}) · ${market.version} 已上架\n\n## 从制卡到复习\n\n${highlights}\n\n## 常见问题\n\n${publicQuestions}\n\n[功能与截图](${work.url}) · [使用指南](${origin}${guide.pathname}) · [更新说明](${origin}/releases/)\n`;
+  const productText = `# 记得闪卡 JideCards\n\n原文：${work.url}\n\n${work.summary}\n\n${facts}\n\n## 学习场景\n\n${work.useCases.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n## 功能概览\n\n${highlights}\n\n## 全部功能\n\n${groups}\n\n## 应用截图\n\n${media}\n\n## 常见问题\n\n${publicQuestions}\n\n[进阶功能与兼容性](${work.url}technical/) · [${market.version} 更新说明](${origin}/releases/)\n`;
+  const homeText = `# 记得闪卡 JideCards\n\n${work.brand.headline[1]}\n\n${work.summary}\n\n[华为应用市场免费下载](${market.url}) · ${market.version} 已上架\n\n## 三步开始\n\n${highlights}\n\n## 可以用来学什么\n\n${work.useCases.map(item => `- ${item.name}：${item.description}`).join('\n')}\n\n## 功能一览\n\n${groups}\n\n## ${jide.title}\n\n${jide.paragraphs[0]}\n\n${jide.availability}\n\n## 鸿蒙原生界面，Anki 内核\n\n${work.detailSections.find(item => item.id === 'native').paragraphs[0]}\n\n## ${work.promotion.title}\n\n${work.promotion.description}\n\n## 应用界面\n\n${work.screenshots.map(item => `- [${item.caption}](${origin}${item.path})：${item.description}`).join('\n')}\n\n## ${market.version} 更新\n\n${market.summary}\n\n## 常见问题\n\n${publicQuestions}\n\n[功能与截图](${work.url}) · [使用指南](${origin}${guide.pathname}) · [更新说明](${origin}/releases/)\n`;
   const aboutText = `# 关于记得闪卡\n\n${data.author.name}，记得闪卡独立开发者。\n\n${facts}\n\n[GitHub 作者主页](${data.author.github}) · [问题反馈](${work.repository}/issues)\n`;
   const pages = [
     { path: '/', title: '记得闪卡 JideCards', description: work.summary, markdown: '/content/home.md' },
@@ -100,7 +102,7 @@ ${pages.map(item => `- [${item.title}](${item.markdownUrl}): ${item.description}
 
 - [llms-full.txt](${origin}/llms-full.txt): 产品能力、状态边界、版本说明、宣传图文字说明和完整使用指南。
 - [页面与内容 JSON](${origin}/data/site-index.json): 每页 HTML、Markdown 链接和更新日期。
-- [产品 JSON](${origin}/data/works.json): 平台、版本、功能、源码、作者和历史宣传图。
+- [产品 JSON](${origin}/data/works.json): 平台、版本、功能、源码、作者和应用截图。
 - [使用指南 JSON](${origin}/data/harmonyos-anki-guide.json): 指南原始正文、操作步骤、表格与参考资料。
 - [网站地图](${origin}/sitemap.xml): 所有可索引页面。
 - [版本更新订阅](${origin}/releases.xml): 版本说明 Atom 订阅。

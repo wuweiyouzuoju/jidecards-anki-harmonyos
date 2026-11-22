@@ -18,7 +18,7 @@
     {
       "path": "/",
       "title": "记得闪卡 JideCards",
-      "description": "用记得闪卡背单词、复习考点。可以自己做卡，也可以导入已有的 Anki 牌组。每次先回想答案，再翻卡核对，应用会按你的回忆情况安排下次复习。换设备时，可以同步卡片和学习进度。",
+      "description": "记得闪卡是面向 HarmonyOS NEXT 的开源闪卡应用，兼容 Anki 牌组，适配鸿蒙手机、平板和电脑。可以自己做卡，也可以导入已有的 APKG 牌组。每次先回想答案，再翻卡评分，FSRS 按你的回忆情况安排下次复习。换设备时，用 AnkiWeb 同步卡片和学习进度。",
       "markdown": "/content/home.md",
       "url": "https://jidecards.com/",
       "markdownUrl": "https://jidecards.com/content/home.md",
@@ -27,7 +27,7 @@
     {
       "path": "/works/jidecards/",
       "title": "记得闪卡功能与下载",
-      "description": "用记得闪卡背单词、复习考点。可以自己做卡，也可以导入已有的 Anki 牌组。每次先回想答案，再翻卡核对，应用会按你的回忆情况安排下次复习。换设备时，可以同步卡片和学习进度。",
+      "description": "记得闪卡是面向 HarmonyOS NEXT 的开源闪卡应用，兼容 Anki 牌组，适配鸿蒙手机、平板和电脑。可以自己做卡，也可以导入已有的 APKG 牌组。每次先回想答案，再翻卡评分，FSRS 按你的回忆情况安排下次复习。换设备时，用 AnkiWeb 同步卡片和学习进度。",
       "markdown": "/content/product.md",
       "url": "https://jidecards.com/works/jidecards/",
       "markdownUrl": "https://jidecards.com/content/product.md",

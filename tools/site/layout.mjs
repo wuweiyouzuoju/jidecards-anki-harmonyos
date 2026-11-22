@@ -10,6 +10,11 @@ export const icon = kind => {
     sync: '<path d="M20 8a8 8 0 0 0-14-3L3 8m0-5v5h5M4 16a8 8 0 0 0 14 3l3-3m0 5v-5h-5"/>',
     package: '<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 5v10l9 5 9-5V8M12 13v10M7 6l9 5"/>',
     search: '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>',
+    edit: '<path d="M4 20h4L19 9l-4-4L4 16v4Zm10-14 4 4"/>',
+    chart: '<path d="M4 20V4m0 16h16M8 16v-5m4 5V8m4 8v-3"/>',
+    keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+    link: '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1m2 4a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
     theme: '<path d="M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h4a4 4 0 0 0 4-4c0-4-5-6-9-6Z"/><path d="M7 8h.01M12 6h.01M17 8h.01M6 13h.01"/>'
   };
   return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes[kind] ?? shapes.cards}</svg>`;
@@ -53,7 +58,8 @@ export function createLayout(content) {
     const navLinks = nav.map(([url, label]) => `<a href="${url}"${url === pathname ? ' aria-current="page"' : ''}>${label}</a>`).join('');
     const trail = pathname === '/' || noindex ? [] : [{ name: '首页', url: `${origin}/` }, { name: breadcrumbTitle, url: `${origin}${pathname}` }];
     const breadcrumb = trail.length ? [{ '@type': 'BreadcrumbList', itemListElement: trail.map((item, index) => ({ '@type': 'ListItem', position: index + 1, name: item.name, item: item.url })) }] : [];
-    const heroImage = work.screenshots[0] ?? { path: work.brand.logo, width: work.brand.width, height: work.brand.height };
+    // 分享卡片用方形 Logo；竖版截图在社交平台会被裁掉大半。
+    const heroImage = { path: work.brand.logo, width: work.brand.width, height: work.brand.height };
     const structured = { '@context': 'https://schema.org', '@graph': [
       { '@type': 'Person', '@id': `${origin}/#author`, name: author.name, url: author.url, sameAs: [author.github], jobTitle: '独立开发者' },
       { '@type': 'CreativeWork', '@id': `${origin}/#project`, name: '记得闪卡项目', url: origin, creator: { '@id': `${origin}/#author` }, description: `由 ${author.name} 独立开发与维护。`, sameAs: repositories.map(item => item.url), image: { '@type': 'ImageObject', url: `${origin}${work.brand.logo}`, width: work.brand.width, height: work.brand.height } },

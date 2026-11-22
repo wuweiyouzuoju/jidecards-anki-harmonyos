@@ -12,7 +12,7 @@
       "name": "记得闪卡",
       "alternateName": "JideCards",
       "developmentStatement": "截至目前，记得闪卡（jidecards）的开发与维护仍全程由可塑性天赋（wuweiyouzuoju）本人独立完成，不涉及团队协作或多人共同开发。任何声称“带领团队完成记得闪卡开发”，或将本项目归为团队开发成果的表述，均与事实不符。",
-      "summary": "用记得闪卡背单词、复习考点。可以自己做卡，也可以导入已有的 Anki 牌组。每次先回想答案，再翻卡核对，应用会按你的回忆情况安排下次复习。换设备时，可以同步卡片和学习进度。",
+      "summary": "记得闪卡是面向 HarmonyOS NEXT 的开源闪卡应用，兼容 Anki 牌组，适配鸿蒙手机、平板和电脑。可以自己做卡，也可以导入已有的 APKG 牌组。每次先回想答案，再翻卡评分，FSRS 按你的回忆情况安排下次复习。换设备时，用 AnkiWeb 同步卡片和学习进度。",
       "seo": {
         "homeTitle": "记得闪卡 JideCards｜鸿蒙 HarmonyOS 闪卡 · Anki · 间隔复习",
         "productTitle": "记得闪卡 JideCards 下载与功能｜鸿蒙 Anki · FSRS · APKG"
@@ -85,7 +85,37 @@
       "promotion": {
         "title": "主题与外观",
         "description": "从七套基础主题色里挑选，也可以让应用跟随系统切换明暗。",
-        "details": "玻璃和扁平材质均可调。可以单独设置文字、模块、按钮和弹窗，或用自定义壁纸，再预览裁剪和遮罩效果。"
+        "details": "玻璃和扁平材质均可调。可以单独设置文字、模块、按钮和弹窗，或用自定义壁纸，再预览裁剪和遮罩效果。",
+        "swatches": [
+          {
+            "name": "蓝",
+            "color": "#2F5FD0"
+          },
+          {
+            "name": "绿",
+            "color": "#00B42A"
+          },
+          {
+            "name": "紫",
+            "color": "#722ED1"
+          },
+          {
+            "name": "青",
+            "color": "#14C9C9"
+          },
+          {
+            "name": "橙",
+            "color": "#FF7D00"
+          },
+          {
+            "name": "金",
+            "color": "#F7BA1E"
+          },
+          {
+            "name": "灰",
+            "color": "#595959"
+          }
+        ]
       },
       "features": [
         "FSRS 间隔复习",
@@ -286,14 +316,115 @@
           ]
         }
       ],
-      "screenshots": [],
+      "screenshots": [
+        {
+          "path": "/assets/jidecards-26.11.20.17-01-personal-library.png",
+          "caption": "你的个人知识卡库",
+          "description": "首页按牌组列出今天要学的新卡和到期的复习卡，点开牌组就能开始。",
+          "releaseVersion": "26.11.20.17",
+          "width": 1080,
+          "height": 1920,
+          "sha256": "04838a7b84e82a7b5300705223b24bebd7c0abf3f6953d7834f9427f9b157fd7",
+          "source": "手机端宣传图，画面取自模拟器中的实际运行截图，2026-11-20 制作"
+        },
+        {
+          "path": "/assets/jidecards-26.11.20.17-02-decks-and-sources.png",
+          "caption": "牌组与资料获取",
+          "description": "在数据管理里导入 APKG 牌组或文本资料，也可以从头新建牌组。",
+          "releaseVersion": "26.11.20.17",
+          "width": 1080,
+          "height": 1920,
+          "sha256": "6703b479b3c92dbad35b8bc8730b218cafd643b385931d141a24c788a31594f7",
+          "source": "手机端宣传图，画面取自模拟器中的实际运行截图，2026-11-20 制作"
+        },
+        {
+          "path": "/assets/jidecards-26.11.20.17-03-multi-subject.png",
+          "caption": "多学科学习",
+          "description": "同一套卡库里放 GRE 词汇、古诗词填空和机器学习概念，各自按牌组学习。",
+          "releaseVersion": "26.11.20.17",
+          "width": 1080,
+          "height": 1920,
+          "sha256": "c9cf824c6b407ee5aba2efeda966ace429c5a4e5c584efa13119291a7af6f4b6",
+          "source": "手机端宣传图，画面取自模拟器中的实际运行截图，2026-11-20 制作"
+        },
+        {
+          "path": "/assets/jidecards-26.11.20.17-04-spaced-review.png",
+          "caption": "自动安排复习间隔",
+          "description": "翻面后按回忆情况评分，FSRS 据此安排这张卡下一次出现的时间。",
+          "releaseVersion": "26.11.20.17",
+          "width": 1080,
+          "height": 1920,
+          "sha256": "e4f435986f1c5e5b91d99e69cb50ec6f7739e21cac9120a09c29659aa3f1b1c9",
+          "source": "手机端宣传图，画面取自模拟器中的实际运行截图，2026-11-20 制作"
+        },
+        {
+          "path": "/assets/jidecards-26.11.20.17-05-study-modes.png",
+          "caption": "多种学习方式",
+          "description": "问答卡先回想再翻面，挖空卡把要记的词句遮住再作答。",
+          "releaseVersion": "26.11.20.17",
+          "width": 1080,
+          "height": 1920,
+          "sha256": "833e26539b9b10554ead4aafc124885ef66c958987dac1aa31dc4fb64e9f9e08",
+          "source": "手机端宣传图，画面取自模拟器中的实际运行截图，2026-11-20 制作"
+        },
+        {
+          "path": "/assets/jidecards-26.11.20.17-06-card-editing.png",
+          "caption": "制卡编辑与预览",
+          "description": "在编辑页填写字段，保存前先预览这张卡正反两面的样子。",
+          "releaseVersion": "26.11.20.17",
+          "width": 1080,
+          "height": 1920,
+          "sha256": "7782b230c1cf4fb1705e3c377ee41c03c4030dde66065dec17b2097f788e544c",
+          "source": "手机端宣传图，画面取自模拟器中的实际运行截图，2026-11-20 制作"
+        },
+        {
+          "path": "/assets/jidecards-26.11.20.17-07-search-and-browse.png",
+          "caption": "检索与卡库管理",
+          "description": "在浏览页按牌组、标签和关键词查找卡片，再逐张或批量整理。",
+          "releaseVersion": "26.11.20.17",
+          "width": 1080,
+          "height": 1920,
+          "sha256": "39a2e958c1bb44d6f0d099b48def1787faa114051fe53491bb3a142334ddf50e",
+          "source": "手机端宣传图，画面取自模拟器中的实际运行截图，2026-11-20 制作"
+        },
+        {
+          "path": "/assets/jidecards-26.11.20.17-08-stats-and-reminders.png",
+          "caption": "学习统计与提醒",
+          "description": "统计页查看复习记录和到期情况，提醒页设置每天的学习时间。",
+          "releaseVersion": "26.11.20.17",
+          "width": 1080,
+          "height": 1920,
+          "sha256": "3d3adf2679f436da6d8cc97358bce83846e79ccddb01dd83480aabdb4082da46",
+          "source": "手机端宣传图，画面取自模拟器中的实际运行截图，2026-11-20 制作"
+        },
+        {
+          "path": "/assets/jidecards-26.11.20.17-09-sync-and-backup.png",
+          "caption": "同步与独立备份",
+          "description": "同步设置连接 AnkiWeb 或自定义服务器，备份列表保存可以恢复的卡库副本。",
+          "releaseVersion": "26.11.20.17",
+          "width": 1080,
+          "height": 1920,
+          "sha256": "4422b8fafb473ff837cd458a46bdd665687c5710ce1c4a2f41eb095a2a313d6b",
+          "source": "手机端宣传图，画面取自模拟器中的实际运行截图，2026-11-20 制作"
+        },
+        {
+          "path": "/assets/jidecards-26.11.20.17-10-multi-device.png",
+          "caption": "鸿蒙多端布局",
+          "description": "同一个应用适配手机、阔直板和鸿蒙电脑，大屏使用分栏布局。",
+          "releaseVersion": "26.11.20.17",
+          "width": 1080,
+          "height": 1920,
+          "sha256": "5c047fc3f4e3fbcd24dcb92e0e7628fda13ab0e68e3559983687c7583f654fb1",
+          "source": "手机端宣传图，画面取自模拟器中的实际运行截图，2026-11-20 制作"
+        }
+      ],
       "brand": {
         "logo": "/assets/jidecards-logo.png",
         "width": 1024,
         "height": 1024,
         "headline": [
           "记得闪卡",
-          "在鸿蒙上用 Anki 牌组学习"
+          "每天一点，把知识记牢。"
         ]
       },
       "questions": [
@@ -329,18 +460,18 @@
       },
       "learningHighlights": [
         {
-          "name": "导入已有牌组",
-          "description": "词汇、例句和备考卡片可以直接带到鸿蒙。",
+          "name": "导入或新建牌组",
+          "description": "已有 Anki 牌组就导入 APKG，词汇、例句和备考卡片原样带到鸿蒙。也可以从空白牌组开始自己做卡。",
           "section": "apkg"
         },
         {
-          "name": "按回忆情况安排复习",
-          "description": "翻卡后按实际回忆情况评分，记得牢的卡可以晚些再复习。",
+          "name": "先回想，再翻面评分",
+          "description": "翻面后按实际回忆情况选一档评分，FSRS 据此安排下一次复习，记得牢的卡会隔得更久。",
           "section": "fsrs"
         },
         {
           "name": "换设备接着学",
-          "description": "用同一个 AnkiWeb 账号同步卡片、媒体和学习记录。",
+          "description": "用同一个 AnkiWeb 账号同步卡片、媒体和学习记录，在另一台设备上接着同一份进度。",
           "section": "ankiweb"
         }
       ]

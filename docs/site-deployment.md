@@ -6,7 +6,7 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 
 ## 内容与构建
 
-产品、作者、SEO、功能、宣传词和图片元数据统一维护在 `hosting/data/works.json`。指南事实来源是 `hosting/data/harmonyos-anki-guide.json`。官网正式版本、上架状态和公开更新说明统一取自 `works[0].marketplace`，以作者确认的上架信息填写。JIDE 默认入口状态与对应版本证据记录在 `marketplace.jide`，由构建器生成进阶页、开发页及机器可读资料的同一条说明。源码版本仍独立读取 `AppScope/app.json5`，用于开发页与 SoftwareSourceCode。SoftwareApplication、产品页、Markdown、JSON 和 Atom 从正式版数据生成。2.9.22 宣传图保留独立的历史版本标注和 SHA-256 校验，不要求截图版本等于当前市场版本，不把旧图片改标为当前截图。
+产品、作者、SEO、功能、宣传词和图片元数据统一维护在 `hosting/data/works.json`。指南事实来源是 `hosting/data/harmonyos-anki-guide.json`。官网正式版本、上架状态和公开更新说明统一取自 `works[0].marketplace`，以作者确认的上架信息填写。JIDE 默认入口状态与对应版本证据记录在 `marketplace.jide`，由构建器生成进阶页、开发页及机器可读资料的同一条说明。源码版本仍独立读取 `AppScope/app.json5`，用于开发页与 SoftwareSourceCode。SoftwareApplication、产品页、Markdown、JSON 和 Atom 从正式版数据生成。截图保留独立的版本标注和 SHA-256 校验，不要求截图版本等于当前市场版本，不把旧图片改标为当前截图。
 
 `tools/build-site.mjs` 只负责构建编排。修改入口按责任划分：
 
@@ -28,13 +28,14 @@ Cloudflare Worker：`wispy-glade-db0d`。静态目录：`hosting/`。主域名�
 ## 官网视觉与布局
 
 - 站点使用浅紫底、白色阅读区、深紫正文和紫色行动按钮。颜色、圆角、页边距、段间距与最大内容宽度在 `hosting/styles.css` 的 `:root` 维护。主要操作用实心按钮，文档跳转用文字链接。
-- 首页按下载、核心用途、截图、正式版更新、迁移和答疑排列。用真实应用 Logo 和可操作的词汇卡做主视觉，截图注明拍摄版本。
+- 首页按下载、三步开始、应用界面、学习场景、功能一览、JIDE、原生界面与内核、主题外观、迁移、正式版更新、答疑和源码排列。主视觉是第一张手机截图和可操作的词汇卡，其余截图在横向滚动区，注明截图版本。标题口号与 README 一致，文案取自 `works.json`。
+- 紫色是品牌主色；评分、学习场景和架构三层用绿、蓝、橙区分。字号按 1000px、640px、370px 三档断点切换，不随视口宽度缩放。
 - 功能与指南页共用目录布局，宽屏将导航放在正文左侧，窄屏放到正文之前。更新页将说明与安装入口并排，窄屏按正文、安装的顺序排列。长表格在自己的容器内横向滚动。
 - 页面只使用一个一级标题，目录链接直达既有章节。菜单、翻卡和问答使用原生展开控件。修改共享样式时检查手机与桌面、键盘焦点和关闭 JavaScript 的导航。
 
 ## 图片与 Logo
 
-历史截图、2.9.22 宣传图及官网副本已按作者要求删除。`screenshots` 当前为空，生成器允许没有截图，并使用应用 Logo 作为分享图。后续仅接入当前版本实际运行截图，记录版本、宽高、来源与 SHA-256；缺图时不回退到旧图。
+历史截图、2.9.22 宣传图及官网副本已按作者要求删除。`screenshots` 现为 26.11.20.17 手机端宣传图十张，原样复制自 `docs/assets/promo/phone/`，记录版本、宽高、来源与 SHA-256；界面改版时整套更换，不单张替换。生成器仍允许没有截图，缺图时不回退到旧图。分享图固定使用方形应用 Logo，竖版截图在社交平台会被裁切。
 
 Logo 原图由生成器从 `AppScope/resources/base/media/app_icon.png` 原样复制。页面先内嵌已有图标：导航与页脚用 32 像素 PNG，主体用 180 像素 Apple 图标，正文首次绘制无需等待 1024 像素原图。宣传图先使用同尺寸内嵌 SVG 占位；图片脚本等待两次 animation frame，确保正文先绘制一次，再用 IntersectionObserver 在图片距离视口 200 像素时赋予原图地址，配合原生 lazy 与低优先级下载。预留真实宽高避免下载后布局跳动；下载失败恢复内嵌预览。不支持观察器的浏览器在首次绘制后交给原生 lazy。
 

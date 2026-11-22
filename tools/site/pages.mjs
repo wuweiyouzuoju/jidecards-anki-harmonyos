@@ -19,44 +19,79 @@ export function renderPages(content, layout) {
   const link = (url, label) => `<a class="text-link" href="${esc(url)}">${esc(label)} <span aria-hidden="true">→</span></a>`;
   const faq = items => `<div class="faq">${items.map(item => `<details><summary>${esc(item.name)}</summary><p>${esc(item.description)}</p></details>`).join('')}</div>`;
   const featureKinds = ['package', 'review', 'sync'];
+  const groupKinds = ['review', 'edit', 'sync', 'package', 'chart', 'theme', 'keyboard', 'search', 'link', 'globe'];
   const technicalPath = '/works/jidecards/technical/';
   const highlights = work.learningHighlights.map((item, index) => `<article class="feature-card"><span class="feature-icon">${icon(featureKinds[index])}</span><h3>${link(technicalPath + '#' + item.section, item.name)}</h3><p>${esc(item.description)}</p></article>`).join('');
+  const steps = `<ol class="step-list">${work.learningHighlights.map((item, index) => `<li><span class="step-number" aria-hidden="true">${index + 1}</span><h3>${esc(item.name)}</h3><p>${esc(item.description)}</p>${link(technicalPath + '#' + item.section, '了解细节')}</li>`).join('')}</ol>`;
+  const groups = `<div class="capability-grid">${work.featureGroups.map((item, index) => `<article class="capability"><span class="feature-icon">${icon(groupKinds[index])}</span><div><h3>${esc(item.name)}</h3><p>${esc(item.description)}</p></div></article>`).join('')}</div>`;
+  const cases = `<div class="case-grid">${work.useCases.map(item => `<article><h3>${esc(item.name)}</h3><p>${esc(item.description)}</p></article>`).join('')}</div>`;
+  const swatches = `<ul class="swatches" aria-label="基础主题色">${(work.promotion.swatches ?? []).map(item => `<li><span style="background:${esc(item.color)}" aria-hidden="true"></span>${esc(item.name)}</li>`).join('')}</ul>`;
+  const shots = work.screenshots;
+  const shotMeta = shots.length ? `截图版本 ${esc(shots[0].releaseVersion)}` : '当前版本截图待补充';
+  const ratings = ['忘记', '困难', '良好', '简单'];
   const publicQuestions = work.questions.slice(0, 3);
+  const native = work.detailSections.find(section => section.id === 'native');
+  // 三层说明与 README 的架构描述一致；细节以进阶页的 native 章节为准。
+  const stack = [
+    ['ArkTS / ArkUI', '导航、牌组列表、设置和统计界面'],
+    ['C ABI · Node-API', '把界面的请求交给内核，再把结果带回界面'],
+    ['Anki Rust Core', '集合、模板渲染、复习调度和同步']
+  ];
+  const stackList = `<ol class="stack-list">${stack.map(([name, role]) => `<li><strong>${esc(name)}</strong><span>${esc(role)}</span></li>`).join('')}</ol>`;
   const home = page({
     title: work.seo.homeTitle, description: work.summary, pathname: '/', markdown: '/content/home.md',
     className: 'home',
     body: `<section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="release-dot"></span> HarmonyOS NEXT</p>
+        <p class="eyebrow"><span class="release-dot"></span> ${esc(work.platform)} · 免费 · 开源</p>
         <h1 id="hero-title">${esc(work.brand.headline[0])}<span>${esc(work.brand.headline[1])}</span></h1>
         <p class="hero-description">${esc(work.summary)}</p>
         ${download}
         <a class="text-link" href="${guide.pathname}">已有 Anki 牌组？查看迁移步骤 <span aria-hidden="true">→</span></a>
       </div>
-      <div class="hero-identity">
-        <div class="hero-orbit" aria-hidden="true"></div><span class="hero-stack" aria-hidden="true"></span>
-        ${logo('hero-logo', 220, '记得闪卡应用 Logo')}
+      <div class="hero-visual">
+        ${shots.length ? figure(shots[0]) : ''}
         <details class="sample-card">
-          <summary><span class="sample-label">试翻一张词汇卡</span><strong lang="en">recall</strong><span class="sample-action"><span class="sample-open">翻看释义</span><span class="sample-close">收起释义</span></span></summary>
-          <p>回想，回忆起</p>
+          <summary>${logo('hero-logo', 56, '记得闪卡应用 Logo')}<span class="sample-label">试翻一张词汇卡</span><strong lang="en">recall</strong><span class="sample-action"><span class="sample-open">翻看释义</span><span class="sample-close">收起释义</span></span></summary>
+          <div class="sample-answer"><p>回想，回忆起</p><ul class="rating-row" aria-label="翻面后的四档评分">${ratings.map(name => `<li>${name}</li>`).join('')}</ul></div>
         </details>
       </div>
     </section>
-    <section class="home-section" id="features"><div class="section-heading"><h2>从制卡到复习</h2><a class="text-link" href="/works/jidecards/">查看完整功能 <span aria-hidden="true">→</span></a></div>
-      <div class="feature-grid">${highlights}</div>
+    <ul class="fact-strip" aria-label="基本信息">
+      <li><strong>免费</strong><span>${esc(market.name)}下载</span></li>
+      <li><strong>${esc(work.license)}</strong><span>源码公开</span></li>
+      <li><strong>12 种</strong><span>语言与地区</span></li>
+      <li><strong>APKG · AnkiWeb</strong><span>沿用已有牌组和进度</span></li>
+    </ul>
+    <section class="home-section" id="features"><div class="section-heading"><h2>三步开始</h2><a class="text-link" href="/works/jidecards/">查看完整功能 <span aria-hidden="true">→</span></a></div>
+      ${steps}
     </section>
-    <section class="home-section gallery-panel" id="learning"><div class="section-heading"><div><h2>应用界面</h2><p class="meta">${work.screenshots.length ? esc(work.screenshots[0].releaseVersion) : '当前版本截图待补充'}</p></div><a class="text-link" href="/works/jidecards/#screenshots">查看全部截图 <span aria-hidden="true">→</span></a></div>
-      <div class="preview-grid">${work.screenshots.slice(0, 3).map(figure).join('\n')}</div>
+    <section class="home-section band" id="learning"><div class="section-heading"><div><h2>应用界面</h2><p class="meta">${shotMeta}</p></div><a class="text-link" href="/works/jidecards/#screenshots">查看全部截图 <span aria-hidden="true">→</span></a></div>
+      <div class="poster-rail" role="region" aria-label="应用界面截图，可横向滚动" tabindex="0">${shots.slice(1).map(figure).join('\n')}</div>
     </section>
-    <section class="launch-band" id="source-update" aria-labelledby="launch-title">
-      <div><h2 id="launch-title">${esc(market.version)} 更新</h2><p>${esc(market.summary)}</p></div>
-      <a class="text-link" href="/releases/">查看更新说明 <span aria-hidden="true">→</span></a>
+    <section class="home-section" id="use-cases"><div class="section-heading"><h2>可以用来学什么</h2></div>
+      ${cases}
     </section>
+    <section class="home-section" id="capabilities"><div class="section-heading"><h2>功能一览</h2><a class="text-link" href="${technicalPath}">进阶功能与兼容性 <span aria-hidden="true">→</span></a></div>
+      ${groups}
+    </section>
+    <section class="home-section assistant" id="jide"><div><p class="eyebrow">应用内助手</p><h2>${esc(jide.title)}</h2><p>${esc(jide.paragraphs[0])}</p><a class="text-link" href="${technicalPath}#jide">查看 JIDE 的能力与使用条件 <span aria-hidden="true">→</span></a></div>
+      <p class="note">${esc(jide.availability)}</p>
+    </section>
+    <section class="home-section" id="native"><div class="section-heading"><h2>鸿蒙原生界面，Anki 内核</h2><a class="text-link" href="${technicalPath}#native">了解实现方式 <span aria-hidden="true">→</span></a></div>
+      <p class="section-lede">${esc(native.paragraphs[0])}</p>
+      ${stackList}
+    </section>
+    <section class="home-section appearance-strip" id="appearance"><div><h2>${esc(work.promotion.title)}</h2><p>${esc(work.promotion.description)}</p>${swatches}</div><a class="text-link" href="/works/jidecards/#appearance">查看外观选项 <span aria-hidden="true">→</span></a></section>
     <section class="migration-section home-section"><div><h2>把 Anki 牌组带到鸿蒙</h2><p>只迁移牌组，导入 APKG。要接着原来的进度复习，先备份卡库，再用同一个 AnkiWeb 账号同步。</p><a class="text-link" href="${guide.pathname}">查看迁移步骤 <span aria-hidden="true">→</span></a></div>
       <dl class="migration-options"><div><dt>APKG 牌组</dt><dd>导入后打开几张卡，检查图片、音频和模板。</dd></div><div><dt>AnkiWeb 同步</dt><dd>确认学习记录和媒体都已下载，再继续复习。</dd></div></dl>
     </section>
-    <section class="block-layout" id="questions"><h2>常见问题</h2>${faq(publicQuestions)}</section>
-    <section class="appearance-strip" id="appearance"><span class="theme-swatch" aria-hidden="true"></span><div><h2>${esc(work.promotion.title)}</h2><p>${esc(work.promotion.description)}</p></div><a href="/works/jidecards/#appearance">查看外观选项 <span aria-hidden="true">→</span></a></section>
+    <section class="launch-band home-section" id="source-update" aria-labelledby="launch-title">
+      <div><p class="eyebrow">正式版更新</p><h2 id="launch-title">${esc(market.version)} 更新</h2><p>${esc(market.summary)}</p></div>
+      <a class="button secondary" href="/releases/">查看更新说明</a>
+    </section>
+    <section class="home-section block-layout" id="questions"><h2>常见问题</h2>${faq(publicQuestions)}</section>
+    <section class="home-section open-source" id="open-source"><div><h2>源码公开</h2><p>记得闪卡以 ${esc(work.license)} 许可证发布，可以阅读源码、自行构建，或提交问题和修改。</p></div><div class="repository-links">${repoLinks}<a href="/developers/">开发文档</a><a href="/about/">关于作者</a></div></section>
     `
   });
 
@@ -67,13 +102,14 @@ export function renderPages(content, layout) {
     body: `<div class="product-intro"><div>${pageHeader('功能与下载', work.summary)}<div id="download">${download}</div></div>
       <div class="product-brand">${logo('product-logo', 120, '记得闪卡应用 Logo')}</div></div>
     <div class="document-layout"><aside>${contents('功能目录', [
-      ['#learning', '学习场景'], ['#features', '功能概览'], ['#technical', '进阶功能'],
+      ['#learning', '学习场景'], ['#features', '功能概览'], ['#capabilities', '全部功能'], ['#technical', '进阶功能'],
       ['#appearance', work.promotion.title], ['#screenshots', '应用截图'], ['#source-update', '版本更新'], ['#questions', '常见问题']
     ])}</aside><div class="page-sections">
       <section id="learning"><h2>用闪卡背单词、复习知识点</h2>${featureList(work.useCases)}</section>
       <section id="features"><h2>功能概览</h2><div class="feature-grid">${highlights}</div></section>
+      <section id="capabilities"><h2>全部功能</h2>${groups}</section>
       <section id="appearance"><h2>${esc(work.promotion.title)}</h2><p>${esc(work.promotion.description)}</p>${link(technicalPath + '#appearance', '查看外观设置')}</section>
-      <section id="screenshots"><h2>应用截图</h2><p class="meta">${work.screenshots.length ? esc(work.screenshots[0].releaseVersion) : '当前版本截图待补充'}。当前界面以安装的版本为准。</p><div class="media-grid">${work.screenshots.length ? work.screenshots.map(figure).join('') : ''}</div></section>
+      <section id="screenshots"><h2>应用截图</h2><p class="meta">${shotMeta}，手机端。当前界面以安装的版本为准。${sourceLink('docs/assets/promo/README.md', '平板与电脑端宣传图')}</p><div class="media-grid">${work.screenshots.length ? work.screenshots.map(figure).join('') : ''}</div></section>
       <section id="source-update" class="launch-band"><div><h2>${esc(market.version)} 更新说明</h2><p>${esc(market.summary)}</p></div>${link('/releases/', '完整更新说明')}</section>
       <section id="technical"><h2>进阶功能与兼容性</h2><p>查看备份与同步条件、卡片模板、键盘快捷键和 JIDE 的使用条件。</p>
         <ul class="technical-links">${work.detailSections.map(section => `<li id="${esc(section.id)}">${link(technicalPath + '#' + section.id, section.title)}</li>`).join('')}</ul>
