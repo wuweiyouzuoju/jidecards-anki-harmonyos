@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor, appearanceTextColor } from '../../utils/AppearanceElements';
 import { 按下态按钮 } from './按下态按钮';
 import { FormRowLayout } from '../../utils/FormRowLayout';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -6,6 +7,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 /** 与状态或标题对应的辅助操作靠右；整表提交与危险确认仍使用原操作区。 */
 @Component
 export struct LabeledActionRow {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop label: ResourceStr = '';
   @Prop actionLabel: ResourceStr = '';
   @Prop actionIcon: Resource | undefined = undefined;
@@ -21,9 +23,9 @@ export struct LabeledActionRow {
 
   build() {
     Row({ space: FormRowLayout.gap }) {
-      Text(this.label).fontSize(this.compactLabel ? 应用尺寸.字号_正文_小 : 应用尺寸.字号_正文).fontColor(this.textColor)
+      Text(this.label).fontSize(this.compactLabel ? 应用尺寸.字号_正文_小 : 应用尺寸.字号_正文).fontColor(appearanceTextColor(this.appearanceElements, this.textColor))
         .textAlign(TextAlign.Start).layoutWeight(1).constraintSize({ minWidth: 0 })
-      按下态按钮({ 文案: this.actionLabel, 图标: this.actionIcon, 字色: this.tint, 是否启用: this.isInteractive,
+      按下态按钮({ 文案: this.actionLabel, 图标: this.actionIcon, 字色: appearanceTextColor(this.appearanceElements, this.tint), 是否启用: this.isInteractive,
         singleLine: true, 点击回调: (): void => { this.activate(); } })
         .constraintSize(FormRowLayout.trailingConstraint).flexShrink(0)
     }.width('100%').constraintSize({ minHeight: FormRowLayout.controlHeight }).alignItems(VerticalAlign.Center)

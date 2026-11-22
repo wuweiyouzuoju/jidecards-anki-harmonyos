@@ -9,6 +9,7 @@ export interface ActionMenuListItem extends SharedActionMenuListItem {}
 /** 完整菜单列表、分隔行、实时可用性及迟到点击守卫由公共基础统一执行。 */
 @Component
 export struct ActionMenuList {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private material: string = 'flat';
   @StorageProp('themeMode') private mode: string = 'system';
   @StorageProp('systemDarkMode') private systemDark: boolean = false;
@@ -18,7 +19,7 @@ export struct ActionMenuList {
   @Prop labelAlignment: TextAlign = TextAlign.Center;
   onSelect: (id: string) => void = (_id: string): void => {};
   build() {
-    SharedActionMenuList({ theme: productMenuTheme(this.material, this.mode, this.systemDark, true, undefined, this.accent, this.getUIContext()),
+    SharedActionMenuList({ theme: productMenuTheme(this.material, this.mode, this.systemDark, true, undefined, this.accent, this.getUIContext(), this.appearanceElements),
       items: this.items, labelAlignment: this.labelAlignment, slideScope: this.slideScope, menuRouter: menuSlideSession,
       readPressScale: (): number => currentMotionProfile().pressScale, onTrigger: (area: Area): void => { rememberPopupTrigger(area); }, onSelect: this.onSelect })
   }

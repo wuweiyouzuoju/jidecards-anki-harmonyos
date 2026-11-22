@@ -5,6 +5,7 @@ import { ImageSurfaceStyle } from '../../utils/ImageSurfaceStyle';
 /** 字段与管理弹层共用缩略图；文件缺失和解码失败有明确反馈。 */
 @Component
 export struct NoteImagePreview {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('reset') source: string = '';
   @State private failed: boolean = false;
 
@@ -20,6 +21,6 @@ export struct NoteImagePreview {
           .accessibilityText($r('app.string.add_note_image_preview'))
           .onError((): void => { this.failed = true; })
       }
-    }.width('100%').attributeModifier(new ImageSurfaceStyle())
+    }.width('100%').attributeModifier(new ImageSurfaceStyle( this.appearanceElements))
   }
 }

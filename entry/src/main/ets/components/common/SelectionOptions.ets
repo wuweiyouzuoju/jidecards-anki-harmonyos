@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { ActionIcon } from './ActionIcon';
 import { ActionMenuListItem } from './ActionMenuList';
 import { PressFeedback } from '../../utils/PressFeedback';
@@ -8,6 +9,7 @@ import { 颜色键 } from '../../model/颜色主题';
 /** 枚举选择共用行：图文成组居中，当前项只改变文字，不绘制勾号、圆点或选中底色。 */
 @Component
 export struct SelectionOptions {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @Prop items: ActionMenuListItem[] = [];
   @Prop horizontal: boolean = false;
@@ -23,12 +25,12 @@ export struct SelectionOptions {
       Button() {
         Row({ space: 10 }) {
           if (item.icon !== undefined) {
-            ActionIcon({ source: item.icon, glyphSize: 20, tint: item.iconTint ?? $r('app.color.text_secondary'),
+            ActionIcon({ source: item.icon, glyphSize: 20, tint: item.iconTint ?? appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')),
               semanticStrokeColor: item.iconTint }).flexShrink(0)
           }
           Text(item.label).fontSize(SelectStyle.controlFont.size)
             .fontWeight(item.selected ? FontWeight.Medium : FontWeight.Normal)
-            .fontColor(item.selected ? this.actionColor : $r('app.color.text_primary'))
+            .fontColor(item.selected ? this.actionColor : appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             .textAlign(TextAlign.Center).flexShrink(1)
         }.width('100%').justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Center)
       }.type(ButtonType.Normal).width(this.horizontal ? '50%' : '100%').constraintSize({ minHeight: 44 })

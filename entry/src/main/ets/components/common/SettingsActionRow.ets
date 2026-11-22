@@ -1,5 +1,6 @@
-import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { disclosureAnimation } from '../../utils/AppMotion';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -10,7 +11,10 @@ import { HelpLabel } from './HelpLabel';
 /** 目录、维护和关于入口共用几何；水平边距和分隔线归宿主。 */
 @Component
 export struct SettingsActionRow {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop title: ResourceStr = '';
+  @Prop spacious: boolean = false;
+  @Prop densityScale: number = 1;
   @Prop hint: ResourceStr = '';
   @Prop icon: ResourceStr | undefined = undefined;
   @Prop trailingIcon: ResourceStr | undefined = undefined;
@@ -37,33 +41,34 @@ export struct SettingsActionRow {
   @Builder
   private defaultHint(): void {
     if (this.hint !== '') {
-      Text(this.hint).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%').textAlign(TextAlign.Start)
+      Text(this.hint).fontSize(this.spacious ? 16 * this.densityScale : 应用尺寸.字号_正文_小)
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%').textAlign(TextAlign.Start)
     }
   }
 
   build() {
-    Row({ space: 应用尺寸.间距_12 }) {
+    Row({ space: this.spacious ? 12 * this.densityScale : 应用尺寸.间距_12 }) {
       if (this.icon !== undefined) { ActionIcon({ source: this.icon }).flexShrink(0) }
-      Column({ space: 应用尺寸.间距_4 }) {
+      Column({ space: this.spacious ? 4 * this.densityScale : 应用尺寸.间距_4 }) {
         if (this.showHelp) {
           HelpLabel({ title: this.title, onHelp: this.onHelp })
         } else {
-          Text(this.title).fontSize(应用尺寸.字号_按钮)
-            .fontColor($r('app.color.text_primary')).width('100%').textAlign(TextAlign.Start)
+          Text(this.title).fontSize(this.spacious ? 20 * this.densityScale : 应用尺寸.字号_按钮)
+            .fontWeight(this.spacious ? FontWeight.Medium : FontWeight.Normal)
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%').textAlign(TextAlign.Start)
         }
         this.hintContent()
       }.alignItems(HorizontalAlign.Start).layoutWeight(1)
       if (this.trailingIcon === undefined && this.showDisclosure) {
-        DisclosureChevron({ tint: $r('app.color.text_secondary') })
+        DisclosureChevron({ tint: appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')) })
           .rotate({ angle: this.disclosureAngle(), centerX: '50%', centerY: '50%' })
           .animation(disclosureAnimation())
       } else if (this.trailingIcon !== undefined) {
         ActionIcon({ source: this.trailingIcon, glyphSize: 24 })
       }
-    }.width('100%').constraintSize({ minHeight: this.hint === '' ? 48 : 58 })
-    .padding({ top: this.hint === '' ? 0 : 应用尺寸.间距_8,
-      bottom: this.hint === '' ? 0 : 应用尺寸.间距_8 })
+    }.width('100%').constraintSize({ minHeight: this.spacious ? 88 * this.densityScale : (this.hint === '' ? 48 : 58) })
+    .padding({ top: this.hint === '' ? 0 : (this.spacious ? 8 * this.densityScale : 应用尺寸.间距_8),
+      bottom: this.hint === '' ? 0 : (this.spacious ? 8 * this.densityScale : 应用尺寸.间距_8) })
     .attributeModifier(new PressFeedback(1, 0.4, true)).enabled(this.isInteractive)
     .onAreaChange((_old: Area, area: Area): void => { this.triggerArea = area; })
     .onClick((): void => { this.activate(); })

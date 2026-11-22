@@ -1,5 +1,6 @@
-import { SeriesVisual } from '../../utils/SeriesVisual';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { SeriesVisual } from '../../utils/SeriesVisual';
 import { NativeDialogHost, NativeDialogDismiss, NativeDialogPresentation } from './NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -7,10 +8,9 @@ import { 颜色键 } from '../../model/颜色主题';
 import { ComponentContent } from '@kit.ArkUI';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { FieldEditResult, wrapFieldSelection, nextClozeNumber, NoteFieldEditingOptions,
-  NOTE_FIELD_EDITING_SUPPORT, noteFieldExpansionTool, noteEditorTool, noteFieldModeTool,
-  noteEditorFormatOptions, NoteEditorFormatOption, noteFieldShortcut } from '../../model/NoteFieldEditing';
-import { 按下态按钮 } from './按下态按钮';
-import { NoteFieldLayout } from './NoteFieldLayout';
+  NOTE_FIELD_EDITING_SUPPORT, noteFieldExpansionTool, noteEditorTool,
+  noteEditorFormatOptions, NoteEditorFormatOption, noteFieldShortcut, noteFieldModeTitleKey } from '../../model/NoteFieldEditing';
+import { NoteFieldModeButton } from './NoteFieldModeButton';
 import { IconActionButton } from './IconActionButton';
 import { NoteTextRun, parseNoteRichText, parseNoteVisualText, serializeNoteRichText, selectionHasFormat, richResultIsBold,
   noteFontSizeValue, noteFontSizeId, noteRichFontSize, noteRichCaretFontSize, setNoteRichFontSize,
@@ -31,6 +31,7 @@ import { showToastSafely, resourceText, namedResourceText } from '../../utils/Ui
 import { 字段帮助对话框 } from '../字段帮助面板';
 import { keyboardEventChord } from '../../utils/KeyboardKeyAdapter';
 import { KeyboardPressSession } from '../../model/KeyboardInput';
+import { AppLog } from '../../model/AppLog';
 export type { NoteFieldEditingOptions } from '../../model/NoteFieldEditing';
 export { noteFieldMediaTool } from '../../model/NoteFieldEditing';
 
@@ -58,6 +59,8 @@ interface NoteEditorOptionSelection {
 /** 三个笔记入口共用；可视编辑仅接管可保真理解的文字 HTML，复杂内容保留源码。 */
 @Component
 export struct NoteFieldEditor {
+  @StorageProp(颜色键.动作主色) private modeAccent: string = '#2F5FD0';
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('editor_wheel_on_entry') private wheelOnEntry: boolean = true;
   @StorageProp('editor_wheel_on_keyboard') private wheelOnKeyboard: boolean = true;
   @StorageProp('windowKeyboardTopVp') @Watch('keyboardVisibilityChanged') private wheelKeyboardTop: number = 0;
@@ -67,7 +70,6 @@ export struct NoteFieldEditor {
   @StorageProp('surface_material') private fieldMaterial: string = 'flat';
   @StorageProp('themeMode') private fieldMode: string = 'system';
   @StorageProp('systemDarkMode') private fieldSystemDark: boolean = false;
-  @StorageProp(颜色键.动作主色) private fieldAccent: string = '#2F5FD0';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('receiveValue') value: string = '';
   @Prop fieldName: string = '';
@@ -107,6 +109,7 @@ export struct NoteFieldEditor {
   private applying: boolean = false;
   private lastSnapshot: string = '';
   private selectionVersion: number = 0;
+  private richChangeVersion: number = 0;
   private readonly expandedDialog: NativeDialogHost = new NativeDialogHost();
   private expansionTimer: number = -1;
   private readonly hintDialog: NativeDialogHost = new NativeDialogHost();
@@ -124,13 +127,22 @@ export struct NoteFieldEditor {
   @Prop @Watch('focusRequested') focusRequest: number = 0;
   private focusHandled: number = 0;
   private inputLaidOut: boolean = false;
+  @Prop deferWheelUntilInputReady: boolean = false;
+  private wheelRequestedBeforeLayout: boolean = false;
+  private wheelOpening: number = -1;
   private focusRequested(): void {
     if (!this.inputLaidOut || this.focusRequest === this.focusHandled || this.disabled || !this.foreground) return;
     this.focusHandled = this.focusRequest; this.wheelSession.activate(this.inputKey); this.focusInput(this.sourceMode);
   }
   private inputReady(): void {
     const firstLayout: boolean = !this.inputLaidOut;
+    if (firstLayout) AppLog.info('NoteFieldEditor', '[BrowserPerf] input laid out');
     this.inputLaidOut = true; this.focusRequested();
+    if (firstLayout && this.deferWheelUntilInputReady && this.wheelRequestedBeforeLayout) {
+      this.wheelRequestedBeforeLayout = false;
+      // 先提交输入首帧，再创建浮动轮盘，避免其整组按钮阻塞新笔记显示。
+      this.wheelOpening = setTimeout((): void => { this.wheelOpening = -1; this.showWheel(); }, 0);
+    }
     if (firstLayout && this.expanded) this.focusInput(this.sourceMode);
   }
   private fieldFocused: boolean = false;
@@ -151,7 +163,7 @@ export struct NoteFieldEditor {
         if (this.fieldFocused && this.wheelKeyboardTop > 0 ? this.wheelOnKeyboard : this.wheelOnEntry) this.showWheel();
         else this.hideWheel(true);
       } else { this.hideWheel(true); this.closeFormat(); }
-    });
+    }, (): void => { this.updateWheel(); });
   }
   aboutToDisappear(): void {
     clearTimeout(this.expansionTimer); this.expandedDialog.dispose();
@@ -198,7 +210,7 @@ export struct NoteFieldEditor {
   private style(format: number, fontSize: string = this.typingFontSize, heading: string = this.typingHeading, reference: boolean = false): RichEditorTextStyle {
     return { fontSize: noteFontSizeValue(fontSize, this.editingFontSize()) * (fontSize === '' ? noteHeadingScale(heading) : 1),
       fontFamily: this.fieldConfig?.fontName || undefined,
-      fontColor: (format & FORMAT_HIGHLIGHT) !== 0 ? '#202020' : $r('app.color.text_primary'),
+      fontColor: (format & FORMAT_HIGHLIGHT) !== 0 ? '#202020' : appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')),
       fontWeight: (format & FORMAT_BOLD) !== 0 ? FontWeight.Bold : FontWeight.Normal,
       fontStyle: (format & FORMAT_ITALIC) !== 0 ? FontStyle.Italic : FontStyle.Normal,
       fontFeature: '"sups" 0, "subs" 0',
@@ -209,8 +221,10 @@ export struct NoteFieldEditor {
 
   private referenceThemeChanged(): void {
     if (!this.ready || this.disposed || this.sourceMode) return;
+    const runs = this.nativeRichRuns();
+    if (runs === null) return;
     let offset: number = 0;
-    for (const run of this.nativeRichRuns()) {
+    for (const run of runs) {
       if (run.url?.startsWith(NOTE_REFERENCE_PREFIX)) {
         this.richController.updateSpanStyle({ start: offset, end: offset + run.text.length,
           textStyle: { textBackgroundStyle: this.style(run.format, '', '', true).textBackgroundStyle } });
@@ -226,6 +240,7 @@ export struct NoteFieldEditor {
   }
 
   private loadRich(runs: NoteTextRun[]): void {
+    this.richChangeVersion++;
     this.applying = true;
     try {
       this.richController.deleteSpans();
@@ -241,24 +256,39 @@ export struct NoteFieldEditor {
     } finally { this.applying = false; }
   }
 
-  private nativeRichRuns(): NoteTextRun[] {
+  private nativeRichRuns(): NoteTextRun[] | null {
+    // 原生控制器可能在输入法回调中暂时无法提供片段。空数组表示实际清空。
+    let spans: (RichEditorTextSpanResult | RichEditorImageSpanResult)[];
+    try {
+      spans = this.richController.getSpans();
+    } catch (error) {
+      AppLog.warn('NoteFieldEditor', '[NoteFieldEditor] getSpans failed');
+      return null;
+    }
+    if (!Array.isArray(spans)) return null;
     const runs: NoteTextRun[] = [];
-    for (const span of this.richController.getSpans()) {
+    for (let index: number = 0; index < spans.length; index++) {
+      const span = spans[index];
       const text = span as RichEditorTextSpanResult;
-      const style: RichEditorTextStyleResult = text.textStyle;
-      let format: number = richResultIsBold(style.fontWeight) ? FORMAT_BOLD : 0;
-      if (style.fontStyle === FontStyle.Italic) format |= FORMAT_ITALIC;
-      if (style.decoration.type === TextDecorationType.Underline) format |= FORMAT_UNDERLINE;
-      const background: ResourceColor | undefined = style.textBackgroundStyle?.color;
+      // getSpans 同时返回图片、符号和文字。输入法候选态的文字也可能缺少部分样式。
+      if (typeof text?.value !== 'string' || text.symbolSpanStyle !== undefined) continue;
+      const style: RichEditorTextStyleResult | undefined = text.textStyle;
+      let format: number = richResultIsBold(style?.fontWeight ?? 0) ? FORMAT_BOLD : 0;
+      if (style?.fontStyle === FontStyle.Italic) format |= FORMAT_ITALIC;
+      if (style?.decoration?.type === TextDecorationType.Underline) format |= FORMAT_UNDERLINE;
+      const background: ResourceColor | undefined = style?.textBackgroundStyle?.color;
       if ((typeof background === 'string' && background.toUpperCase().endsWith('FFF176')) ||
         (typeof background === 'number' && (background & 0xFFFFFF) === 0xFFF176)) format |= FORMAT_HIGHLIGHT;
-      const feature: string = style.fontFeature ?? '';
-      if (feature.indexOf('"sups" 1') >= 0) format |= FORMAT_SUPERSCRIPT;
-      if (feature.indexOf('"subs" 1') >= 0) format |= FORMAT_SUBSCRIPT;
-      const run: NoteTextRun = { text: text.value.slice(text.offsetInSpan[0], text.offsetInSpan[1]), format: format };
+      const feature: string | undefined = style?.fontFeature;
+      if (typeof feature === 'string') {
+        if (feature.includes('"sups" 1')) format |= FORMAT_SUPERSCRIPT;
+        if (feature.includes('"subs" 1')) format |= FORMAT_SUBSCRIPT;
+      }
+      const run: NoteTextRun = { text: text.value.slice(text.offsetInSpan?.[0] ?? 0, text.offsetInSpan?.[1] ?? text.value.length),
+        format: format };
       const url: ResourceStr | undefined = text.urlStyle?.url;
       if (typeof url === 'string' && url !== '') run.url = url;
-      const size: string = noteFontSizeId(style.fontSize, this.editingFontSize());
+      const size: string = noteFontSizeId(style?.fontSize ?? 0, this.editingFontSize());
       if (size !== '') run.fontSize = size;
       runs.push(run);
     }
@@ -266,7 +296,8 @@ export struct NoteFieldEditor {
   }
 
   private richRuns(): NoteTextRun[] {
-    return preserveNoteRichStyles(this.nativeRichRuns(), this.richStyleRuns);
+    const runs = this.nativeRichRuns();
+    return runs === null ? this.richStyleRuns : preserveNoteRichStyles(runs, this.richStyleRuns);
   }
 
   private replaceRichParagraphs(runs: NoteTextRun[], start: number, end: number): void {
@@ -291,9 +322,19 @@ export struct NoteFieldEditor {
   }
 
   /** 原生输入/粘贴/删除给出变更前后 UTF-16 范围；选区外的字号语义不变。 */
-  private richChanged(before: TextRange, after: TextRange): void {
+  private richChanged(before: TextRange, after: TextRange, retry: boolean = true): void {
     if (this.applying || !this.ready || this.disposed || this.disabled || this.sourceMode) return;
-    const inserted: NoteTextRun[] = sliceNoteRichText(this.nativeRichRuns(), after.start ?? 0, after.end ?? 0);
+    const version: number = ++this.richChangeVersion;
+    const nativeRuns = this.nativeRichRuns();
+    if (nativeRuns === null) {
+      if (retry) {
+        setTimeout((): void => {
+          if (version === this.richChangeVersion) this.richChanged(before, after, false);
+        }, 16);
+      }
+      return;
+    }
+    const inserted: NoteTextRun[] = sliceNoteRichText(nativeRuns, after.start ?? 0, after.end ?? 0);
     const headings: boolean = this.typingHeading !== '' || this.richStyleRuns.some((run: NoteTextRun): boolean => run.heading !== undefined);
     for (const run of inserted) {
       if (run.fontSize === undefined && this.typingFontSize === 'medium') run.fontSize = 'medium';
@@ -302,23 +343,27 @@ export struct NoteFieldEditor {
     this.replaceRichStyles(before.start ?? 0, before.end ?? 0, inserted);
     this.closeOptions();
     if (headings) {
-      const runs: NoteTextRun[] = normalizeNoteRichHeadings(this.richRuns());
+      const runs: NoteTextRun[] = normalizeNoteRichHeadings(preserveNoteRichStyles(nativeRuns, this.richStyleRuns));
       const caret: number = after.end ?? 0;
       this.typingHeading = noteRichCaretHeading(runs, caret);
       this.typingFontSize = noteRichCaretFontSize(runs, caret);
       this.replaceRichParagraphs(runs, caret, caret);
-    } else this.publishRich();
+    } else this.publishRich(nativeRuns);
     this.updateWheel();
   }
 
-  private publishRich(): void {
-    if (this.applying || !this.ready || this.disposed || this.disabled || this.sourceMode) return;
-    const runs: NoteTextRun[] = this.richRuns();
+  private publishRich(nativeRuns: NoteTextRun[] | null = null): boolean {
+    if (this.applying || !this.ready || this.disposed || this.disabled || this.sourceMode) return false;
+    const snapshot = nativeRuns ?? this.nativeRichRuns();
+    if (snapshot === null) return false;
+    const runs: NoteTextRun[] = preserveNoteRichStyles(snapshot, this.richStyleRuns);
     this.richStyleRuns = runs;
     const html: string = serializeNoteRichText(runs);
-    if (html === this.lastSnapshot) return;
-    this.lastSnapshot = html;
-    this.value = html; this.onChange(html);
+    if (html !== this.lastSnapshot) {
+      this.lastSnapshot = html;
+      this.value = html; this.onChange(html);
+    }
+    return true;
   }
 
   private placeholderText(_locale: string = this.uiLanguage): string {
@@ -327,19 +372,20 @@ export struct NoteFieldEditor {
   }
 
   private richSelectionChanged(range: RichEditorRange): void {
-    if (this.disposed || this.applying) return;
+    if (!this.ready || this.sourceMode || this.disposed || this.applying) return;
     const changed: boolean = this.selectionStart !== (range.start ?? 0) || this.selectionEnd !== (range.end ?? range.start ?? 0);
     if (changed) this.closeOptions();
     this.selectionStart = range.start ?? 0; this.selectionEnd = range.end ?? this.selectionStart;
     // 输入时的选区通知可能早于 onDidChange，等待字号片段随文字范围更新后再继承。
-    if (changed && this.selectionStart === this.selectionEnd &&
-      this.nativeRichRuns().map((run: NoteTextRun): string => run.text).join('') ===
+    const runs = changed && this.selectionStart === this.selectionEnd ? this.nativeRichRuns() : null;
+    if (runs !== null &&
+      runs.map((run: NoteTextRun): string => run.text).join('') ===
       this.richStyleRuns.map((run: NoteTextRun): string => run.text).join('')) {
       this.typingFontSize = noteRichCaretFontSize(this.richStyleRuns, this.selectionStart);
       this.typingHeading = noteRichCaretHeading(this.richStyleRuns, this.selectionStart);
       if (this.typingHeading !== '') this.typingFormat |= FORMAT_BOLD;
     }
-    if (this.ready) this.richController.setTypingStyle(this.style(this.typingFormat));
+    this.richController.setTypingStyle(this.style(this.typingFormat));
     this.updateWheel();
   }
 
@@ -382,7 +428,7 @@ export struct NoteFieldEditor {
       if (flag === FORMAT_UNDERLINE) patch.decoration = { type: enabled ? TextDecorationType.Underline : TextDecorationType.None };
       if (flag === FORMAT_HIGHLIGHT) {
         patch.textBackgroundStyle = { color: enabled ? '#FFF176' : Color.Transparent };
-        patch.fontColor = enabled ? '#202020' : $r('app.color.text_primary');
+        patch.fontColor = enabled ? '#202020' : appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'));
       }
       this.applySelectionStyle(patch);
     } else {
@@ -454,7 +500,10 @@ export struct NoteFieldEditor {
   private switchMode(_locale: string = this.uiLanguage, restoreFocus: boolean = true): void {
     if (this.disabled || this.disposed) return;
     this.closeOptions();
-    if (!this.sourceMode) { this.publishRich(); this.sourceMode = true; this.ready = false; }
+    if (!this.sourceMode) {
+      if (this.ready && !this.publishRich()) return;
+      this.sourceMode = true; this.ready = false;
+    }
     else {
       if (parseNoteVisualText(this.value) === null) {
         showToastSafely(this.getUIContext(), { message: resourceText(this.getUIContext(), $r('app.string.note_editor_complex_html')) });
@@ -873,10 +922,13 @@ export struct NoteFieldEditor {
   }
   private wheelParams(): NoteEditorWheelParams {
     const version: number = this.optionSelection?.version ?? -1;
-    return new NoteEditorWheelParams(this.wheelState(), (id: string): void => { this.executeWheel(id); }, this.wheelVisible,
+    const params: NoteEditorWheelParams = new NoteEditorWheelParams(this.wheelState(), (id: string): void => { this.executeWheel(id); }, this.wheelVisible,
       this.lastWheelTool, (id: string): void => { if (!this.disposed) this.lastWheelTool = id; },
       (): void => { this.resetWheelFormats(); }, (id: string): void => { this.executeWheel(id, true); },
       (id: string): void => { this.selectFormatOption(id, version); }, (): void => { this.closeOptions(); });
+    params.pageOpacity = this.wheelSession.opacity;
+    params.pageOffset = this.wheelSession.offset;
+    return params;
   }
   private resetWheelFormats(): void {
     if (this.disposed || this.disabled || !this.foreground || !this.wheelActive || !this.wheelVisible) return;
@@ -904,6 +956,9 @@ export struct NoteFieldEditor {
   }
   private fieldBlur(): void { this.fieldFocused = false; this.keyboardSession.reset(); }
   private showWheel(): void {
+    if (this.deferWheelUntilInputReady && !this.inputLaidOut && !this.disposed) {
+      this.wheelRequestedBeforeLayout = true; return;
+    }
     if (!this.wheelActive || this.disposed || this.disabled || !this.foreground || this.hintDialog.current() !== null ||
       this.linkDialog.current() !== null || this.referenceDialog.current() !== null || this.formatDialog.current() !== null) return;
     if (this.wheelRemoval >= 0) { clearTimeout(this.wheelRemoval); this.wheelRemoval = -1; }
@@ -915,6 +970,8 @@ export struct NoteFieldEditor {
   }
   private updateWheel(): void { this.wheelContent?.update(this.wheelParams()); }
   private hideWheel(immediate: boolean = false): void {
+    this.wheelRequestedBeforeLayout = false;
+    if (this.wheelOpening >= 0) { clearTimeout(this.wheelOpening); this.wheelOpening = -1; }
     this.closeOptions();
     this.wheelVisible = false;
     if (this.wheelRemoval >= 0) { clearTimeout(this.wheelRemoval); this.wheelRemoval = -1; }
@@ -986,17 +1043,6 @@ export struct NoteFieldEditor {
   }
 
   @Builder
-  private fieldContent() {
-    按下态按钮({ 文案: $r('app.string.' + noteFieldModeTool('visual').titleKey),
-      字号: 应用尺寸.字号_正文_小, 是否启用: !this.disabled, selectable: true, selected: !this.sourceMode, fillWidth: true,
-      点击回调: (): void => { this.requestMode(false); } })
-    按下态按钮({ 文案: $r('app.string.' + noteFieldModeTool('source_edit').titleKey),
-      字号: 应用尺寸.字号_正文_小, 是否启用: !this.disabled, selectable: true, selected: this.sourceMode, fillWidth: true,
-      点击回调: (): void => { this.requestMode(true); } })
-    this.inputContent()
-  }
-
-  @Builder
   private inputContent() {
     Column() {
       Column() {
@@ -1008,10 +1054,9 @@ export struct NoteFieldEditor {
           .fontFamily(this.fieldConfig?.fontName || 'HarmonyOS Sans')
           .direction(this.fieldConfig?.rtl === true ? Direction.Rtl : Direction.Ltr)
           .textAlign(TextAlign.Start)
-          .fontColor($r('app.color.text_primary')).placeholderColor($r('app.color.text_tertiary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).placeholderColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
           .backgroundColor(Color.Transparent)
-          .border(SurfaceBorder.materialOptions(this.fieldMaterial, SeriesVisual.isDark(this.fieldMode, this.fieldSystemDark)))
-          .borderRadius(应用尺寸.圆角_面板).padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10,
+          .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10,
             top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 }).enabled(!this.disabled)
           .defaultFocus(this.sourceToolFocus)
           .onFocus((): void => { this.fieldFocus(); }).onBlur((): void => { this.fieldBlur(); })
@@ -1022,21 +1067,21 @@ export struct NoteFieldEditor {
         RichEditor({ controller: this.richController })
           .id(this.inputKey + '-visual')
           .direction(this.fieldConfig?.rtl === true ? Direction.Rtl : Direction.Ltr)
-          .width('100%').height(this.expanded ? '100%' : noteEditorHeight(false)).placeholder(this.placeholderText(), { fontColor: $r('app.color.text_tertiary') })
+          .width('100%').height(this.expanded ? '100%' : noteEditorHeight(false)).placeholder(this.placeholderText(), { fontColor: appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')) })
           .backgroundColor(Color.Transparent)
-          .border(SurfaceBorder.materialOptions(this.fieldMaterial, SeriesVisual.isDark(this.fieldMode, this.fieldSystemDark)))
-          .borderRadius(应用尺寸.圆角_面板).padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10,
+          .padding({ left: 应用尺寸.间距_10, right: 应用尺寸.间距_10,
             top: 应用尺寸.间距_10, bottom: 应用尺寸.间距_10 }).enabled(!this.disabled)
           .defaultFocus(this.sourceToolFocus)
           .onFocus((): void => { this.fieldFocus(); }).onBlur((): void => { this.fieldBlur(); })
           .onTouch((event: TouchEvent): void => { if (this.fieldFocused && this.wheelOnKeyboard && event.type === TouchType.Down) this.showWheel(); })
           .onReady((): void => { this.richReady(); this.inputReady(); })
           .onSelectionChange((range: RichEditorRange): void => { this.richSelectionChanged(range); })
-          .onWillChange((change: RichEditorChangeValue): boolean => change.replacedImageSpans.length === 0 && change.replacedSymbolSpans.length === 0)
+          .onWillChange((change: RichEditorChangeValue): boolean => (change.replacedImageSpans?.length ?? 0) === 0 && (change.replacedSymbolSpans?.length ?? 0) === 0)
           .onDidChange((before: TextRange, after: TextRange): void => { this.richChanged(before, after); })
       }
       }.width('100%').height(this.expanded ? undefined : noteEditorHeight(false)).layoutWeight(this.expanded ? 1 : 0)
-        .attributeModifier(SeriesVisual.insetSurface(this.fieldMaterial, SeriesVisual.isDark(this.fieldMode, this.fieldSystemDark), this.fieldAccent, '', 应用尺寸.圆角_面板))
+        .border(SurfaceBorder.materialOptions(this.fieldMaterial, SeriesVisual.isDark(this.fieldMode, this.fieldSystemDark), this.appearanceElements))
+        .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         .clip(true)
       // 操作行放在输入框边界外，不缩短或覆盖正文视口。
       Row() {
@@ -1055,7 +1100,7 @@ export struct NoteFieldEditor {
     }.width('100%').height(this.expanded ? '100%' : undefined)
     if (this.sourceMode && !this.expanded) {
       Text($r('app.string.note_editor_source_hint'))
-        .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+        .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     }
   }
 
@@ -1071,14 +1116,16 @@ export struct NoteFieldEditor {
     if (this.expanded) {
       // 弹窗编辑同一草稿；页内保留原高度，其他字段不跟随展开。
       Column().width('100%').height(noteEditorHeight(false))
-    } else if (this.modeControlInHeader) {
-      Column({ space: 应用尺寸.间距_5 }) { this.inputContent() }.width('100%')
-        .onKeyPreIme((event: KeyEvent): boolean => this.handleFieldShortcut(event))
     } else {
-    NoteFieldLayout({ wideMinWidth: NOTE_FIELD_EDITING_SUPPORT.modeControlWideMinWidth,
-      railWidth: NOTE_FIELD_EDITING_SUPPORT.modeControlRailWidth,
-      content: (): void => { this.fieldContent(); } })
-      .width('100%').onKeyPreIme((event: KeyEvent): boolean => this.handleFieldShortcut(event))
+      Column({ space: 应用尺寸.间距_5 }) {
+        if (!this.modeControlInHeader) {
+          Row() {
+            NoteFieldModeButton({ label: $r('app.string.' + noteFieldModeTitleKey(this.sourceMode)), accent: this.modeAccent, isInteractive: !this.disabled,
+              controlId: this.inputKey + '-mode', onToggle: (): void => { this.requestMode(!this.sourceMode); } })
+          }.width('100%').justifyContent(FlexAlign.End)
+        }
+        this.inputContent()
+      }.width('100%').onKeyPreIme((event: KeyEvent): boolean => this.handleFieldShortcut(event))
     }
   }
 }

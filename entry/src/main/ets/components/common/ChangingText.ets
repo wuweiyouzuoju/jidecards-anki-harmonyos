@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceTextColor } from '../../utils/AppearanceElements';
 import { currentMotionProfile, motionAnimation } from '../../utils/AppMotion';
 
 /** 只过渡变化的短文字；快速更新合并到下次短过渡，当前过渡不中断。 */
 @Component
 export struct ChangingText {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('changed') value: string = '';
   @Prop textSize: number = 14;
   @Prop tint: ResourceColor = $r('app.color.text_secondary');
@@ -34,10 +36,10 @@ export struct ChangingText {
   build() {
     Stack({ alignContent: this.alignment === TextAlign.End ? Alignment.End :
       this.alignment === TextAlign.Start ? Alignment.Start : Alignment.Center }) {
-      Text(this.previous).fontSize(this.textSize).fontColor(this.tint).opacity(1 - this.progress)
+      Text(this.previous).fontSize(this.textSize).fontColor(appearanceTextColor(this.appearanceElements, this.tint)).opacity(1 - this.progress)
         .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(this.alignment)
         .translate({ y: -currentMotionProfile().textOffset * this.progress }).accessibilityLevel('no')
-      Text(this.current).fontSize(this.textSize).fontColor(this.tint).opacity(this.progress)
+      Text(this.current).fontSize(this.textSize).fontColor(appearanceTextColor(this.appearanceElements, this.tint)).opacity(this.progress)
         .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).textAlign(this.alignment)
         .translate({ y: currentMotionProfile().textOffset * (1 - this.progress) })
     }

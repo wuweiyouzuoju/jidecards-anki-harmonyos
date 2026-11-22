@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { IconActionButton } from './IconActionButton';
 import { TagPicker } from './TagPicker';
 import { TagSelectionChange } from '../../model/NoteTags';
@@ -11,6 +12,7 @@ import { ExpansionReveal } from '../../utils/ExpansionReveal';
 /** 新增、编辑及遮罩笔记共用；输入和标签选择均回写宿主草稿，保存仍归宿主。 */
 @Component
 export struct NoteTagsField {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('syncText') text: string = '';
   @State private tags: string[] = [];
   @State private input: string = '';
@@ -72,7 +74,7 @@ export struct NoteTagsField {
         Flex({ wrap: FlexWrap.Wrap }) {
           ForEach(this.tags, (tag: string) => {
             Row({ space: 应用尺寸.间距_4 }) {
-              Text(tag).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_primary')).flexShrink(1)
+              Text(tag).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).flexShrink(1)
               IconActionButton({ source: $r('app.media.ic_common_close'), label: $r('app.string.note_visual_remove'),
                 controlSize: 28, controlGlyphSize: 12, isInteractive: this.isInteractive,
                 onAction: (): void => { this.removeTag(tag); } })
@@ -84,7 +86,7 @@ export struct NoteTagsField {
       }
       Row({ space: 应用尺寸.间距_8 }) {
       TextInput({ text: this.input, placeholder: $r('app.string.add_note_tags_placeholder') })
-        .id(this.inputId).attributeModifier(new FormInputStyle()).enabled(this.isInteractive)
+        .id(this.inputId).attributeModifier(new FormInputStyle( undefined, this.appearanceElements)).enabled(this.isInteractive)
         .onAreaChange((): void => { this.laidOut = true; this.focusRequested(); })
         .layoutWeight(1).onChange((value: string): void => { this.changeInput(value); })
         .onSubmit((): void => { this.commitInput(); })

@@ -16,6 +16,3 @@ export function selectionPopupAngle(trigger: SelectionRect, popup: SelectionRect
   if (popup.left + popup.width <= trigger.left + 1) return 180;
   return popup.top + popup.height / 2 >= trigger.top + trigger.height / 2 ? 90 : -90;
 }
-export function selectionClosedAngle(openAngle: number): number {
-  return openAngle === 0 || openAngle === 180 ? 90 : 0;
-}

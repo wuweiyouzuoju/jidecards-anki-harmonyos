@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceElementRadius } from '../../utils/AppearanceElements';
 import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../../model/SurfaceMaterial';
 import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { SeriesVisual } from '../../utils/SeriesVisual';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { PressFeedback } from '../../utils/PressFeedback';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { localizedResourceText } from '../../utils/UiFeedback';
@@ -12,6 +14,7 @@ import { hasActionStatus } from '../../model/InteractionFeedback';
 /** 主操作按钮统一几何与反馈；宿主决定可用状态、忙碌文案及业务动作。 */
 @Component
 export struct PrimaryActionButton {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('themeMode') private materialTheme: string = 'system';
   @StorageProp('systemDarkMode') private materialSystemDark: boolean = false;
   @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
@@ -38,6 +41,16 @@ export struct PrimaryActionButton {
 
   private resolvedTint(): ResourceColor { return this.tint ?? this.primaryBackground; }
 
+  private actionSurface(): SharedSurface {
+    return SeriesVisual.control(this.glassSurface ? 'glass' : 'flat', SeriesVisual.isDark(this.materialTheme, this.materialSystemDark),
+        this.glassAccent, 应用尺寸.圆角_行动按钮, true, this.resolvedTint(), buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial), this.appearanceElements);
+  }
+
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     Button() {
       Row({ space: 8 }) {
@@ -51,10 +64,9 @@ export struct PrimaryActionButton {
       .padding({ left: 16, right: 16, top: 8, bottom: 8 })
       .fontSize(应用尺寸.字号_按钮)
       .fontColor(this.foreground)
-      .attributeModifier(SeriesVisual.control('glass', SeriesVisual.isDark(this.materialTheme, this.materialSystemDark),
-        this.glassAccent, 应用尺寸.圆角_行动按钮, this.glassSurface, this.resolvedTint()))
-      .backgroundColor(SeriesVisual.buttonFill(this.resolvedTint(), buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial)))
-      .borderRadius(应用尺寸.圆角_行动按钮)
+      .attributeModifier(this.actionSurface())
+      .background(this.renderGlassBackground(this.actionSurface()))
+      .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_行动按钮))
       .shadow(SeriesVisual.shadow(this.glassSurface ? 'glass' : this.surfaceMaterial, SeriesVisual.isDark(this.materialTheme, this.materialSystemDark)))
       .enabled(this.isInteractive)
       .opacity(this.isInteractive ? 1 : 0.6)

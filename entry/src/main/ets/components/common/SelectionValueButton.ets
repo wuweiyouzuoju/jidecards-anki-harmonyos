@@ -1,6 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { disclosureAnimation } from '../../utils/AppMotion';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { SelectStyle } from '../../utils/SelectStyle';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { localizedResourceText } from '../../utils/UiFeedback';
@@ -9,29 +10,35 @@ import { DisclosureChevron } from './DisclosureChevron';
 /** 目录和设置枚举共用无外框的当前值入口；选项窗口与提交仍归原选择器。 */
 @Component
 export struct SelectionValueButton {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private language: string = 'zh-Hans';
   @Prop value: string = '';
   @Prop label: ResourceStr = '';
   @Prop disclosureAngle: number = 90;
+  @Prop anchorAtChevron: boolean = false;
   @Prop controlWidth: Length = 'auto';
   @Prop controlMaxWidth: Length = '100%';
   @Prop valueMaxLines: number = 2;
   @Prop isInteractive: boolean = true;
+  onChevronArea: (area: Area) => void = (_area: Area): void => {};
   onAction: () => void = (): void => {};
   private triggerArea: Area | undefined = undefined;
+  private chevronArea: Area | undefined = undefined;
 
   private activate(): void { if (this.isInteractive) {
-      if (this.triggerArea !== undefined) rememberPopupTrigger(this.triggerArea);
+      const area: Area | undefined = this.anchorAtChevron ? this.chevronArea : this.triggerArea;
+      if (area !== undefined) rememberPopupTrigger(area, this.anchorAtChevron ? 0 : 16);
       this.onAction();
     } }
   build() {
     Button() {
       Row({ space: SelectStyle.controlSpace }) {
         Text(this.value).fontSize(SelectStyle.controlFont.size).fontWeight(SelectStyle.controlFont.weight)
-          .fontColor($r('app.color.text_primary')).maxLines(this.valueMaxLines).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).maxLines(this.valueMaxLines).textOverflow({ overflow: TextOverflow.Ellipsis })
           .constraintSize({ minWidth: 0 }).flexShrink(1)
         DisclosureChevron().rotate({ angle: this.disclosureAngle, centerX: '50%', centerY: '50%' })
           .animation(disclosureAnimation()).flexShrink(0)
+          .onAreaChange((_old: Area, area: Area): void => { this.chevronArea = area; this.onChevronArea(area); })
       }.width('100%').justifyContent(FlexAlign.End).alignItems(VerticalAlign.Center)
     }.type(ButtonType.Normal).width(this.controlWidth).flexShrink(0)
       .height(this.valueMaxLines > 1 ? 'auto' : SelectStyle.controlHeightFor(this.getUIContext()))

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DialogFrame } from './DialogFrame';
 import { DialogHeader } from './DialogHeader';
 import { FormInputStyle } from '../../utils/FormInputStyle';
@@ -8,6 +9,7 @@ import { localizedResourceText } from '../../utils/UiFeedback';
 
 @CustomDialog
 export struct NoteLinkDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   controller?: CustomDialogController;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   selectedText: string = '';
@@ -34,20 +36,20 @@ export struct NoteLinkDialog {
   private content() {
     Column({ space: 应用尺寸.间距_8 }) {
       Text($r('app.string.note_editor_link_url')).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       TextInput({ text: this.url,
         placeholder: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.note_editor_link_url_hint')) })
-        .attributeModifier(new FormInputStyle())
+        .attributeModifier(new FormInputStyle( undefined, this.appearanceElements))
         .onChange((value: string): void => { this.url = value; })
       if (this.selectedText === '') {
         Text($r('app.string.note_editor_link_text')).fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         TextInput({ text: this.label,
           placeholder: localizedResourceText(this.getUIContext(), this.uiLanguage, $r('app.string.note_editor_link_text_hint')) })
-          .attributeModifier(new FormInputStyle())
+          .attributeModifier(new FormInputStyle( undefined, this.appearanceElements))
           .onChange((value: string): void => { this.label = value; })
       } else {
-        Text(this.selectedText).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        Text(this.selectedText).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       }
     }.width('100%')
   }

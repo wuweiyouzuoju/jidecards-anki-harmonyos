@@ -1,5 +1,6 @@
-import { 颜色键 } from '../../model/颜色主题';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor, appearanceTextColor } from '../../utils/AppearanceElements';
+import { 颜色键 } from '../../model/颜色主题';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { HelpLabel } from './HelpLabel';
 import { ActionIcon } from './ActionIcon';
@@ -8,6 +9,7 @@ import { localizedResourceText } from '../../utils/UiFeedback';
 /** 标题和说明共享剩余宽度，开关保留独立槽位；长说明自然换行，不挤入开关。 */
 @Component
 export struct SettingsToggleRow {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop title: ResourceStr = '';
@@ -36,19 +38,19 @@ export struct SettingsToggleRow {
       Column({ space: 应用尺寸.间距_4 }) {
         if (this.showHelp) {
           HelpLabel({ title: this.title, textSize: 应用尺寸.字号_按钮,
-            textColor: this.textColor,
+            textColor: appearanceTextColor(this.appearanceElements, this.textColor),
             isHelpEnabled: this.isHelpEnabled, onHelp: this.onHelp })
         } else {
           Text(this.title)
             .fontSize(应用尺寸.字号_按钮)
-            .fontColor(this.textColor)
+            .fontColor(appearanceTextColor(this.appearanceElements, this.textColor))
             .width('100%')
             .textAlign(TextAlign.Start)
         }
         if (this.hint !== '') {
           Text(this.hint)
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor(this.hintColor)
+            .fontColor(appearanceTextColor(this.appearanceElements, this.hintColor))
             .width('100%')
             .textAlign(TextAlign.Start)
         }

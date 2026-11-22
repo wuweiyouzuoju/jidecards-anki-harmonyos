@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { 按下态按钮 } from './按下态按钮';
 
 // ========================================================
@@ -27,6 +28,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 统一空态 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop 图标: Resource | undefined = undefined;
   @Prop 标题: ResourceStr;
   @Prop 副标题: ResourceStr = '';
@@ -40,12 +42,12 @@ export struct 统一空态 {
       }
       Text(this.标题)
         .fontSize(应用尺寸.字号_标题)
-        .fontColor($r('app.color.text_primary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .fontWeight(FontWeight.Medium)
       if (this.副标题 !== '') {
         Text(this.副标题)
           .fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .textAlign(TextAlign.Center)
       }
       if (this.动作文案 !== '') {

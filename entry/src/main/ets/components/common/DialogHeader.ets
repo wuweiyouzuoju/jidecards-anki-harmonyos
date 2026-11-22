@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { HelpLabel } from './HelpLabel';
 import { IconActionButton } from './IconActionButton';
@@ -10,6 +11,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 /** 固定标题操作栏：图标位于标题两侧，可见文字操作在标题下方；业务校验由调用方传入。 */
 @Component
 export struct DialogHeader {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop title: ResourceStr = '';
   @Prop highlightLabel: ResourceStr = '';
   @Prop highlightColors: string[] = [];
@@ -52,14 +54,14 @@ export struct DialogHeader {
         Row() {
           Row() {
             if (this.showClose && !this.showCloseLabel) {
-              IconActionButton({ toolbarStyle: true, source: this.closeIcon, label: this.closeLabel,
+              IconActionButton({ pageWheelEligible: this.isPageToolbar, toolbarStyle: true, source: this.closeIcon, label: this.closeLabel,
                 isInteractive: this.closeEnabled, onAction: this.onClose })
             }
           }.width(应用尺寸.按钮高度).justifyContent(FlexAlign.Start)
           Blank().layoutWeight(1)
           Row() {
             if (this.showAction && this.actionUsesIcon()) {
-              IconActionButton({ toolbarStyle: true, source: this.actionIcon || $r('app.media.' + DIALOG_ACTION_PRESENTATION.confirmIconKey),
+              IconActionButton({ pageWheelEligible: this.isPageToolbar, toolbarStyle: true, source: this.actionIcon || $r('app.media.' + DIALOG_ACTION_PRESENTATION.confirmIconKey),
                 label: this.actionLabel, isInteractive: this.actionEnabled, onAction: this.onAction })
             }
           }.width(应用尺寸.按钮高度).justifyContent(FlexAlign.End)
@@ -78,7 +80,7 @@ export struct DialogHeader {
         // 需要文字解释的操作独占一行，避免挤在标题两侧而截断。
         Row({ space: 8 }) {
           if (this.showClose && this.showCloseLabel) {
-            按下态按钮({ 文案: this.closeLabel, 字色: $r('app.color.text_secondary'),
+            按下态按钮({ 文案: this.closeLabel, 字色: appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')),
               是否启用: this.closeEnabled, singleLine: false, fillWidth: true, autoHeight: true, 点击回调: this.onClose })
               .layoutWeight(1)
           }
@@ -93,6 +95,6 @@ export struct DialogHeader {
     .width('100%')
     .constraintSize({ minHeight: this.isPageToolbar ? 应用尺寸.按钮高度 : 48 })
     .padding({ bottom: this.isPageToolbar ? 0 : 8 })
-    .border(SurfaceBorder.options({ bottom: this.showDivider ? 0.5 : 0 }))
+    .border(SurfaceBorder.options({ bottom: this.showDivider ? 0.5 : 0 }, undefined, this.appearanceElements))
   }
 }

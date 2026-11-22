@@ -30,9 +30,8 @@
 
 菜单安全边界由通用纯布局模型 [WindowSafeLayout.ts](../../model/WindowSafeLayout.ts) 计算，EntryAbility 发布系统栏、摄像头挖孔和导航条的实际边缘并集。AnchoredMenu 将顶部位置与滚动高度限制在这个区域内，横屏同时留出侧边挖孔；首页的更多和新建同样复用公共 AnchoredMenu，无尖角。各页面顶栏与菜单锚点的 pageToolbarTop/pageToolbarHeight/pageContentTop 同时消费安全上缘；普通系统栏保留光学校准，额外挖孔从实际边缘加一份分组间距起算。它只处理矩形、尺寸与边界，不依赖业务或平台 IO。DialogFrame 将搜索和表单弹窗居中于实际安全矩形，并按安全高度限制正文滚动；键盘缩小后的内部视口固定从外壳顶部开始，再在该视口内居中卡片，避免父级再次居中后裁切正文底部。遮罩保留覆盖整个窗口。
 
-模式区和输入栏的首帧位置由 [NoteFieldLayout.ets](NoteFieldLayout.ets) 在原生测量／放置阶段按实际字段约束决定，保留同一子树且不经宽度状态回调；回归为 `note-field-layout.test.mjs`。长字段展开、链接与源码选区动作统一在 `NoteFieldEditor.ets`，复用 `NoteLinkDialog.ets` 的公共弹窗；旋转与握姿布局由 [NoteEditorWheel.ets](../editor/NoteEditorWheel.ets) 拥有，纯几何与工具状态在 [NoteEditorWheel.ts](../../model/NoteEditorWheel.ts)。添加/编辑/Agent 页面 Provide 同一表单会话 `NoteEditorWheelSession`，字段 Consume 后默认首字段、点选切换、失焦保留；工具保持原窗口侧边浮动轮盘，图标下方带两行名称，字段下方不另加工具区；页面隐藏会暂停会话。HTML 选区规则在 [NoteHtmlTools.ts](../../model/NoteHtmlTools.ts)，富文本往返在 [NoteRichText.ts](../../model/NoteRichText.ts)。回归：`note-html-tools.test.mjs`、`note-rich-editor.test.mjs`；[格式与设备边界](../../../../../../docs/development/browser-stats.md#基础字段编辑与草稿保护)。
+字段标题和独立富文本输入共用 [NoteFieldModeButton.ets](NoteFieldModeButton.ets)，回归为 `note-field-layout.test.mjs`。长字段展开、链接与源码选区动作统一在 `NoteFieldEditor.ets`，复用 `NoteLinkDialog.ets` 的公共弹窗；旋转与握姿布局由 [NoteEditorWheel.ets](../editor/NoteEditorWheel.ets) 拥有，纯几何与工具状态在 [NoteEditorWheel.ts](../../model/NoteEditorWheel.ts)。添加/编辑/Agent 页面 Provide 同一表单会话 `NoteEditorWheelSession`，字段 Consume 后默认首字段、点选切换、失焦保留；工具保持原窗口侧边浮动轮盘，图标下方带两行名称，字段下方不另加工具区；页面隐藏会暂停会话。HTML 选区规则在 [NoteHtmlTools.ts](../../model/NoteHtmlTools.ts)，富文本往返在 [NoteRichText.ts](../../model/NoteRichText.ts)。回归：`note-html-tools.test.mjs`、`note-rich-editor.test.mjs`；[格式与设备边界](../../../../../../docs/development/browser-stats.md#基础字段编辑与草稿保护)。
 
-`NoteFieldLayout` 只接收宿主传入的 `wideMinWidth`、`railWidth` 与正文，不依赖笔记编辑业务模型；`NoteFieldEditor` 从同一 `NOTE_FIELD_EDITING_SUPPORT` 传入断点和宽度，JIDE 与实际布局继续使用同一配置。`note-field-layout` 执行真实宿主参数绑定后核对首帧与连续宽度变化，不能在测试内另写一份默认断点。
 
 字段外观配置由 [NoteFieldEditing.ts](../../model/NoteFieldEditing.ts) 的纯类型提供；Core 解码和宿主传递配置，公共组件不直接依赖 protobuf。NoteFieldEditor 消费 RTL、已安装字体/字号、描述和默认 HTML 源码；NoteFieldCard 消费初始折叠。图片遮罩标题/补充字段复用卡片并关闭普通媒体入口；图像与遮罩保持专用输入。
 
@@ -66,7 +65,7 @@
 | 数据管理与完整备份操作行 | [DataActionRow.ets](../settings/DataActionRow.ets)：数据分组和备份页共用标题、说明、箭头及可增长行高，水平边距归外层 | `import-flow-contract.test.mjs`；业务流程由 `import-options-runtime.test.mjs` 验证 |
 | 内置笔记类型与字段的本地化显示 | [NoteTypeText.ets](../../utils/NoteTypeText.ets) / [NoteTypePresentation.ts](../../model/NoteTypePresentation.ts)；字段标题与提示统一由 NoteFieldCard 调用，保留原始名称与模板引用 | `note-type-i18n.test.mjs`；边界见 [浏览与编辑](../../../../../../docs/development/browser-stats.md#内置名称的统一显示) |
 | 新增/编辑顶栏与字段卡片 | [NoteEditorHeader.ets](NoteEditorHeader.ets)、[NoteFieldCard.ets](../editor/NoteFieldCard.ets)；独立 EditNotePage 和新增页共享，草稿归宿主；新增页隐藏顶栏单次保存，底栏组合既有按钮；固定开关只由新增宿主传入 Core sticky 与回调，已有编辑默认隐藏；卡片内部16vp，宿主用 `页面分组间距` 提供宽12vp/窄8vp卡片外间距 | `editor-page.test.mjs`、`note-continuation.test.mjs`、`ui-shell-contract.test.mjs`；[连续制卡](../../../../../../docs/development/browser-stats.md#手工连续制卡) |
-| 笔记 HTML 字段与选区工具 | [NoteFieldEditor.ets](NoteFieldEditor.ets)；拥有 HTML、光标／选区与独立多选格式开关，每框提供可视编辑／源码编辑：宽字段右侧竖排且上按钮顶边、下按钮底边贴齐输入栏，窄字段顶部横排，断点与侧栏宽度由 NoteFieldEditing 的共同声明持有；输入框右下角提供展开按钮。当前字段拥有默认展开的 [边缘半圆菜单](../editor/NoteEditorWheel.ets)，六项常用工具在内圈，外圈在简洁版和实验版均显示；圆形按钮内放图标和两行名称。点击字号在外围再展开一圈七档选项，高亮实际光标/选区字号，混合字号不误选，再次点击或折叠收起。字号的源码读取与替换由 [NoteHtmlTools.ts](../../model/NoteHtmlTools.ts) 拥有，字段持有选区快照和代次，轮盘只渲染与回调。滑动保留多选、点击执行；折叠保留格式，再次展开仅清空格式选择，已有内容不变。一次性动作反馈100ms，字号圈打开期间入口持续亮；隐藏、折叠、销毁取消反馈及字号选项。动态高亮直接读取当前字段，防止复用条目缓存旧状态。草稿与媒体归父层，新增、浏览／学习及 Agent 草稿共用 | note-html-tools、note-rich-editor、note-editor-wheel、ai-agent-app-structure；原生多选、图标、圆环几何与中文输入须设备验收 |
+| 笔记 HTML 字段与选区工具 | [NoteFieldEditor.ets](NoteFieldEditor.ets)；拥有 HTML、光标／选区与独立多选格式开关，可视与源码共用一个紧凑模式按钮，字段卡片放在标题行，独立编辑器放在输入栏上方右侧；输入框右下角提供展开按钮。当前字段拥有默认展开的 [边缘半圆菜单](../editor/NoteEditorWheel.ets)，六项常用工具在内圈，外圈在简洁版和实验版均显示；圆形按钮内放图标和两行名称。点击字号在外围再展开一圈七档选项，高亮实际光标/选区字号，混合字号不误选，再次点击或折叠收起。字号的源码读取与替换由 [NoteHtmlTools.ts](../../model/NoteHtmlTools.ts) 拥有，字段持有选区快照和代次，轮盘只渲染与回调。滑动保留多选、点击执行；折叠保留格式，再次展开仅清空格式选择，已有内容不变。一次性动作反馈100ms，字号圈打开期间入口持续亮；隐藏、折叠、销毁取消反馈及字号选项。动态高亮直接读取当前字段，防止复用条目缓存旧状态。草稿与媒体归父层，新增、浏览／学习及 Agent 草稿共用 | note-html-tools、note-rich-editor、note-editor-wheel、ai-agent-app-structure；原生多选、图标、圆环几何与中文输入须设备验收 |
 | 未保存笔记/模板预览 | [NoteDraftPreview.ets](NoteDraftPreview.ets)；会话拥有冻结输入与读取代次，平台适配器拥有临时媒体，复用 CardWebView/HTML/数学/媒体及音频会话；宿主拥有关闭后保留的草稿 | `note-draft-preview*.test.mjs`、真实 Core `note_draft_preview.rs`；[范围与设备验收](../../../../../../docs/development/browser-stats.md#未保存笔记草稿预览2026-10-02) |
 | ⓘ 帮助/信息按钮及标题位置 | [HelpButton.ets](HelpButton.ets) 固定图标、点击区、朗读及事件隔离；[HelpLabel.ets](HelpLabel.ets) 让说明紧随标题；仅卡片信息独立动作保留行尾 | `ui-help-entry.test.mjs` 全 ArkTS 扫描、禁用回调、几何与帮助生命周期回归；规范见 [应用内帮助](../../../../../../docs/development/in-app-help.md) |
 | 只读帮助弹窗 | [字段帮助面板.ets](../字段帮助面板.ets) 组合 DialogFrame / DialogHeader；字段帮助对话框适配原生弹窗，支持正文及富内容插槽 | `ui-help-entry.test.mjs`、`ui-dialog-layout.test.mjs`、`deck-option-dialog.test.mjs`；实际系统返回、手势与字体布局须设备验收 |
@@ -78,7 +77,7 @@
 | 牌组选项字段与预设操作行 | [DeckOptionRow.ets](../home/DeckOptionRow.ets)，字段编辑器由 DeckOptionField 管理；完整选项按共同目录内联分组，单项恢复默认复用按下态按钮 | `deck-option-dialog.test.mjs`、`deck-options-parity.test.mjs`，检查共享控件和简洁模式显隐 |
 | 按钮按压反馈 | [GlassSurface.ets](../../utils/GlassSurface.ets)、[PrimaryGlassSurface.ets](../../utils/PrimaryGlassSurface.ets)：原生多态色层、稳定底色/边框，不经触摸状态重建文字；普通按钮与操作行同用 [PressFeedback.ets](../../utils/PressFeedback.ets)，统一单次变淡反馈 | `ui-press-feedback.test.mjs` 全仓点击入口审计，以及 `theme-text.test.mjs`、`button-press-state-contract.test.mjs`、`motion-style-contract.test.mjs`；快点/取消/禁用须设备验收 |
 | 页面四段等距与菜单锚点 | [应用尺寸](../../utils/应用尺寸.ets) 的 `页面分组间距`、`pageToolbarTop`、`pageToolbarHeight`、`pageContentTop`；光学估计限制见 [间距验收](../../../../../../docs/UI_SPACING.md) | `ui-shell-contract.test.mjs`；真实状态栏字形须设备验收 |
-| 菜单承接层与定位 | [AnchoredMenu.ets](AnchoredMenu.ets)，通过 [MenuSurface.ets](MenuSurface.ets) 与 `menu_surface` 明暗资源统一扁平底色和圆角，普通菜单及带尖角菜单均不绘制阴影；边框委托 SurfaceBorder，深色弹窗与卡片底色区分。首页、学习页、牌组预览、牌组长按/色条菜单及浏览多选共用；宿主传入最终窗口锚点，公共 Scroll 按实际可用高度限高，超长内容自动滚动。首页更多/新建直接复用无尖角 AnchoredMenu：`contentLeft`/`contentMaxWidth` 传入已包含安全区和页面间距的实测窗口边界，避免横向重复间距；可传 `cornerRadius` 与统计卡统一，其他宿主保留原默认值。原生手写 Popup 同样使用 `menu_surface`，显式传 `MenuSurface.popupShadow()` 与 `backgroundBlurStyle: BlurStyle.NONE` 关闭系统投影和磨砂；预览范围弹窗关闭箭头 | `ui-select-layout.test.mjs`、`browser-batch-menu.test.mjs`、`ui-surface-border.test.mjs`；设备验收实际外观、短屏和大字体滚动 |
+| 菜单承接层与定位 | [AnchoredMenu.ets](AnchoredMenu.ets)，通过 [MenuSurface.ets](MenuSurface.ets) 与 `menu_surface` 明暗资源统一扁平底色和圆角，扁平菜单关闭投影；共享玻璃表面就绪后绘制统一柔和投影；边框委托 SurfaceBorder，深色弹窗与卡片底色区分。首页、学习页、牌组预览、牌组长按/色条菜单及浏览多选共用；宿主传入最终窗口锚点，公共 Scroll 按实际可用高度限高，超长内容自动滚动。首页更多/新建直接复用无尖角 AnchoredMenu：`contentLeft`/`contentMaxWidth` 传入已包含安全区和页面间距的实测窗口边界，避免横向重复间距；可传 `cornerRadius` 与统计卡统一，其他宿主保留原默认值。原生手写 Popup 同样使用 `menu_surface`，显式传 `MenuSurface.popupShadow()` 与 `backgroundBlurStyle: BlurStyle.NONE` 由原生宿主绘制共享玻璃投影并关闭系统磨砂；预览范围弹窗关闭箭头 | `ui-select-layout.test.mjs`、`browser-batch-menu.test.mjs`、`ui-surface-border.test.mjs`；设备验收实际外观、短屏和大字体滚动 |
 | 菜单树与左侧布局 | [ActionMenuTree.ts](ActionMenuTree.ts) 按稳定 ID 展开可见行，传播父级禁用状态，收起分组同时清除后代展开状态；[ActionMenuLayout.ts](ActionMenuLayout.ts) 根据实测行高计算触发行中心与左侧面板避让，右侧行距不变。[MenuBubble.ets](MenuBubble.ets) 与 AnchoredMenu 的主菜单轮廓复用 [GlassBubblePanel.ets](GlassBubblePanel.ets)：上下/左右尖角和圆角同属连续路径，坐标按当前密度转换为 px，仅绘制底色与公共描边，不叠加模糊投影。主菜单轮廓在 Scroll 外，使用实测可见高度，正文滚动不移动尖角 | `study-menu.test.mjs` 执行树、收起、禁用、延迟点击、避让和密度回归；`motion-style-contract.test.mjs` 验证动画 |
 | 原生容器、表单与分隔线轮廓 | [SurfaceBorder.ets](../../utils/SurfaceBorder.ets)：`options()` 共用1vp线宽和 `surface_border` 明暗资源；菜单、统计/摘要卡片、详情外框、设置分组、输入框、下拉框、字段卡片、普通弹窗及 GlassSurface / PrimaryGlassSurface 按钮使用同一入口，分隔线共用 `color()` 并保留原线宽。只设置线宽/颜色，保留调用方底色、圆角和按压反馈；选中/排序状态可传原状态色，浏览旗标通过每边宽度/颜色保留左侧色条和其余中性轮廓。ImageSurfaceStyle 复用参数但保留适合图片灰底的 border_image；卡面内填空保留既有语义 | `ui-surface-border.test.mjs` 执行公共参数、深色轮廓对比度与全仓旧轮廓散写扫描；表单/下拉框和按压行为分别由 `ui-shell-controls.test.mjs`、`ui-select-layout.test.mjs`、`theme-text.test.mjs` 验证 |
 | 学习/预览/浏览动作菜单 | [CardActionMenu.ets](CardActionMenu.ets) 使用紧凑主菜单加侧面板。学习打开菜单时自动同时展开标记与卡片操作两个侧边子菜单，浏览多选保留自动展开的标记侧面板；不把子菜单内容并入主菜单。浏览普通菜单的设置分组仍按需打开侧面板，预览使用无分组平面菜单。宿主拥有 `expandedIds`、`onToggleBranch` 和业务动作，可由 `onSelect` 按稳定 ID 分发，因此条目 `action` 可选；组件拥有实测行高、尖角锚点和滚动。默认对齐工具栏；上下文菜单传宿主局部 `anchor` 行矩形，由 [ActionMenuLayout.ts](ActionMenuLayout.ts) 对齐行中心、上下避让并限制整组边界；尖角朝向所选行边框，短屏按较大一侧限高，左侧不足时子面板向右展开。不能复用工具栏默认位置。牌组长按由 `HomeDeckRowMenu` 组合公共 DialogFrame / DialogHeader 与 AnchoredMenuItem 显示居中弹窗，几何和操作范围见[首页](../../../../../../docs/development/home.md#牌组上下文操作与-ankidroid-的对齐范围2026-10-15)。侧面板根分组默认互斥，学习通过 `toggleActionMenuBranch(..., false)` 独立切换并保留其他已展开分组；旗标复用 [FlagMenuChoices.ets](FlagMenuChoices.ets)，点击后朝主菜单方向覆盖，只显示原有颜色与清除选项，两个侧面板保持原内容、位置和展开状态。覆盖层尖角朝向实际触发行，并按实测行高对齐；覆盖层高度独立记录，不污染源行测量。`visibleActionMenuRows` 拒绝被覆盖主菜单行的迟到点击，宿主移除主菜单观察，保留侧面板并只发布实际颜色与清除选项。普通浏览菜单使用同一组件承载搜索、显示和其他设置分组，可传条目 `divider`，副标题通过 `selected` 复用公共选中底色；预览保留平面菜单。整组共用 AnchoredMenu 的外部点击与安全区；首次打开即预留完整分支定位宽度，主列、侧列固定槽位，各面板独立限高滚动，并列侧菜单共享高度预算，滚动偏移参与下一级锚点。根因及设备证据见[稳定菜单定位决策](../../../../../../docs/decisions/2026-10-31-stable-cascade-menu-geometry.md) | `study-menu.test.mjs`、`study-menu-actions.test.mjs`、`home-deck-menu.test.mjs`、`browser-batch-menu.test.mjs`、`browser-more-menu.test.mjs`、`ai-agent-app-structure.test.mjs`；禁止回退原生 bindMenu |
@@ -93,7 +92,7 @@
 | 笔记媒体预览与独立管理 | 通用图片灰框 [NoteImagePreview.ets](NoteImagePreview.ets)；功能目录的 [NoteFieldCard.ets](../editor/NoteFieldCard.ets)、[NoteMediaDialog.ets](../editor/NoteMediaDialog.ets) 和 [NoteVisualPreview.ets](../editor/NoteVisualPreview.ets) 组合图片/视频与原音频；NoteMediaSession 拥有弹层副本，完成后交宿主，取消不应用 | `note-media-management.test.mjs`、`note-video-media.test.mjs`；见 [媒体管理](../../../../../../docs/development/browser-stats.md#编辑媒体预览与独立管理2026-10-01) |
 | 普通弹窗外壳 | [DialogFrame.ets](DialogFrame.ets)：固定操作栏、限宽卡片，默认正文按内容收缩并限高滚动；卡片预览显式 `fillBody=true` 使用剩余高度并自己管理正文滚动；业务组件拥有草稿与忙碌状态 | `ui-dialog-layout.test.mjs`；插槽用箭头函数调用所属组件的 Builder，保留状态所有者 |
 | 原生弹窗窗口 | [NativeDialogHost.ets](NativeDialogHost.ets)：统一全窗口配置、当前动效、替换/关闭/销毁和旧关闭回调隔离；原生构建器保留为组件字段工厂 | `native-dialog-host.test.mjs`、`motion-style-surfaces.test.mjs`、真实同步编译产物检查；布局和系统事件另做设备验收 |
-| 磨砂弹窗遮罩 | [DialogBackdrop.ets](DialogBackdrop.ets)：订阅应用主题与系统深浅色、覆盖安全区；关闭策略由调用方决定 | `ui-dialog-layout.test.mjs` 全入口扫描；不要逐窗复制磨砂配置或依赖漏传的主题属性 |
+| 弹窗压暗遮罩 | [DialogBackdrop.ets](DialogBackdrop.ets)：订阅应用主题与系统深浅色、覆盖安全区；关闭策略由调用方决定 | `ui-dialog-layout.test.mjs` 全入口扫描；不要逐窗复制遮罩配置或依赖漏传的主题属性 |
 | 设置与表单开关行 | [SettingsToggleRow.ets](SettingsToggleRow.ets)：可选说明与 HelpLabel，标题/说明共享剩余宽度，右侧开关不压缩，间隔16vp；未指定tint时响应式跟随当前主题主色，显式tint保留语义覆盖；确认值、持久化和错误归宿主 | `ui-shell-controls.test.mjs` 执行禁用回调、扫描设置开关及公共几何；`npm test -- sync`、`study-haptics.test.mjs`、`fsrs-state.test.mjs` 验证业务；HAP/设备验证换行与主题 |
 
 笔记图片预览与遮罩画布共用 [ImageSurfaceStyle.ets](../../utils/ImageSurfaceStyle.ets) 的深浅灰底、边框、圆角与裁切；普通预览统一由 `NoteImagePreview` 提供，交互画布保留自己的 Image/Canvas。外观样式不拥有图片尺寸、内外边距或手势，避免改变遮罩命中。验证：`ui-shell-controls.test.mjs`；[设备验收边界](../../../../../../docs/development/study-media.md#图片遮罩)。
@@ -108,7 +107,7 @@
 
 原生窗口每次通过 `NativeDialogHost.open(fieldFactory, canDismiss)` 创建，组件出现时 `activate()`，退出时 `dispose()`。系统关闭先校验窗口代次，再询问业务是否允许；嵌套返回/媒体取消可自行处理并返回 false。无参数按钮回调用 `guard()` 绑定窗口身份；有参数提交在字段工厂中捕获 `captureCurrent()`，回调先检查身份再关闭或提交，避免旧内容改写下一次窗口。窗口自行关闭后的生命周期用 `release()` 释放引用。公共宿主不拥有业务草稿或持久化任务，不能把程序主动 `close()` 用作忽略忙碌/草稿规则的用户退出入口。
 
-纯读取的加载状态应与已接受写入的退出保护分开；关闭只让迟到读取失效。确认框冻结目标并只消费一次，执行前检查宿主仍存活；已接受的写入继续完成并通知数据刷新，UI 回调在宿主销毁后失效。逐文件检查、修复和实际验证范围见[弹窗逻辑检查](../../../../../../docs/development/dialog-audit-2026-10-09.md)。
+纯读取的加载状态应与已接受写入的退出保护分开；关闭只让迟到读取失效。确认框冻结目标并只消费一次，执行前检查宿主仍存活；已接受的写入继续完成并通知数据刷新，UI 回调在宿主销毁后失效。逐文件检查、修复和实际验证范围见[弹窗逻辑检查](../../../../../../docs/archive/development/dialog-audit-2026-10-09.md)。
 
 字段工厂中的 `return new CustomDialogController(...)` 在当前 SDK 会生成无参数的 `jsDialog.setController()`，内容不能依赖自动注入的 `controller`。所有内容的关闭意图经宿主回调执行 `NativeDialogHost.close()`；只调用 `release()` 会丢失仍显示的窗口引用。媒体的 `onRequestClose` 与消失通知 `onClosed` 分开，业务忙碌守卫仍在内容中；宿主以会话代次隔离旧 ready/apply/closed，消失通知与提交分别只消费一次。自动前进的二级返回继续返回主级，主级才请求关窗。扫描见 `native-dialog-host.test.mjs`，真实媒体编译产物执行入口见 [媒体编译检查](../../../../../../docs/development/verification.md#媒体管理编译产物检查)。
 
@@ -147,16 +146,16 @@
 
 编辑分组使用EditorSectionCard统一16vp内边距和卡片表面。SelectionValueButton是目录和设置枚举的唯一值入口，透明、无描边/阴影/模糊，保留原40vp控件高度、大字体高度适配、长值省略和完整无障碍名称；FormSelectRow继续拥有标签/帮助与右侧限宽。DirectorySelect和SurfaceSelect分别拥有原目录/枚举菜单，不把选择协议搬入视觉组件。
 
-枚举选择入口统一用[SurfaceSelect.ets](SurfaceSelect.ets)和[SelectionValueButton.ets](SelectionValueButton.ets)，选项行由[SelectionOptions.ets](SelectionOptions.ets)拥有（图文成组居中、主题色及字重、无勾号和选中底色）。需要独立二级窗口时内部使用SelectionDialog，窗口身份与业务提交仍归宿主；层级/搜索选择保留DirectorySelect。
+枚举选择入口统一用[SurfaceSelect.ets](SurfaceSelect.ets)和[SelectionValueButton.ets](SelectionValueButton.ets)，选项行由[SelectionOptions.ets](SelectionOptions.ets)拥有（图文成组居中、主题色及字重、无勾号和选中底色）。牌组色条选择由同窗口的 AnchoredMenu 承载，沿用父菜单正文玻璃采样源；业务提交仍归宿主。层级/搜索选择保留DirectorySelect。
 
 编辑字段分组外壳见[EditorSectionCard.ets](EditorSectionCard.ets)，帮助标题独立测量与图标热区摆放见[HelpTitleLayout.ets](HelpTitleLayout.ets)。
 
-弹窗材质统一由[PopupSurface.ets](PopupSurface.ets)与[PopupAppearance.ts](PopupAppearance.ts)提供：玻璃档本体不叠底色或渐变，扁平档沿用有限透明及背景磨砂；DialogFrame、MenuSurface、SurfaceSelect和带尖角GlassBubblePanel共同消费，白板原生Popup同样读取色层和模糊策略。DialogBackdrop负责页面背景默认磨砂/玻璃通透；不修改页面颜色和纹理。
+弹窗材质统一由[PopupSurface.ets](PopupSurface.ets)与[PopupAppearance.ts](PopupAppearance.ts)提供：玻璃档本体不叠底色或渐变，扁平档沿用有限透明；DialogFrame、MenuSurface、SurfaceSelect和带尖角GlassBubblePanel共同消费，白板原生Popup同样读取色层和模糊策略。DialogBackdrop只压暗页面，不模糊文字和纹理；玻璃模糊仅由面板内部的SharedGlassBackdrop拥有。
 
 搜索输入由SearchFieldSurface独占材质参数，LiveSearchField及浏览搜索栏复用；普通FormInputStyle不改变。编辑轮盘半圆/手柄由EditorWheelSurface独立绘制，选中态与几何保留。页面模块仍由SeriesVisual负责，玻璃档三者统一不叠装饰填充，扁平档保留各自底色。透明菜单布局宿主MenuSurface(false)必须清除全部绘制属性并早返回，避免学习更多两列菜单间的空白带反光。
 
 
-[GlassSource.ets](GlassSource.ets) 只包页面正文和真实底色，按可见性、材质与前后台预热并释放源；同一窗口由可见正文登记采样源，宽屏内嵌编辑器沿用完整浏览正文。弹窗和遮罩在源外。
+[GlassSource.ets](GlassSource.ets) 只包页面正文和真实底色，按可见性、材质与前后台预热并释放源；同一窗口由可见的整页正文登记默认采样源。宽屏内嵌编辑器沿用完整浏览正文，独立取样的局部正文使用 pageBackdrop=false，由所属菜单显式传入来源。弹窗和遮罩在源外。
 [GlassPanel.ets](GlassPanel.ets) 统一消费系列 SharedGlassBackdrop，拥有首次纹理准备、真实纹理就绪后唯一展开；融合准备失败由同一壳恢复常规材质；宿主提供宽度/限高，正文决定收缩高度。融合纹理的负向偏移由独立原生 Stack 持有，不能直接挂在 SharedGlassFusion 的 NodeContainer 根节点上（其渲染帧会覆盖定位，导致远处按钮唤出的表单底板下移）。玻璃位于零布局尺寸的绝对层，禁止纹理反向参与面板测量，防止边框尺寸反馈持续撑大。原生窗口本身不另做进入动画。
 [GlassBubblePanel.ets](GlassBubblePanel.ets) 与 [MenuBubble.ets](MenuBubble.ets) 共用宿主的M/L/Q/C轮廓作裁剪、描边和公共HAR光学距离场，覆盖四个箭头方向。覆盖、系统例外及实测入口见[弹窗玻璃接入](../../../../../../docs/development/dialog-glass.md)。
 
@@ -165,11 +164,12 @@
 选择值控件SelectionValueButton统一最多两行、超出省略；SurfaceSelect与DirectorySelect先给出实测内容宽度，原生按钮内部限宽，避免auto尺寸依赖导致当前值消失。公共投影统一见SeriesVisual.shadow，同层级表面不再散写不同半径和偏移。
 
 
-公共弹层动效：按钮点击通过PopupTrigger交接一次实测Area，800ms过期；按钮菜单使用真实按钮源做SharedGlassFusion；居中选择框按下文契约保留居中静态玻璃。SurfaceSelect与SelectionDialog显式传入按钮矩形，无点击源的程序弹窗仍走常规过渡。展开统一SurfaceTransition.popupEnterMs=200，正文在融合结束时显现，不随弹窗高度或距离延长。
+公共弹层动效：按钮点击通过PopupTrigger交接一次实测Area，800ms过期；按钮菜单使用真实按钮源做SharedGlassFusion；居中选择框按下文契约保留居中静态玻璃。SurfaceSelect 显式传入按钮矩形，无点击源的程序弹窗仍走常规过渡。展开统一SurfaceTransition.popupEnterMs=200，正文在融合结束时显现，不随弹窗高度或距离延长。
 
 - [AppearanceReveal.ets](AppearanceReveal.ets)：材质推荐和幻彩解锁共用结果动效，尊重前后台与减少动态效果。
 - [CapturedThemeBackground.ets](CapturedThemeBackground.ets)：全屏预览消费唯一根背景原始帧，不另起主题动画。
 - [NoteFieldExpandedDialog.ets](NoteFieldExpandedDialog.ets)：字段展开原生窗口，借DialogFrame承载原编辑器，不复制草稿。
+- [OutlinedValue.ets](OutlinedValue.ets)：只为只读值（兑换码、官方 AI 请求号等）加公共轮廓与外观圆角；标题、复制按钮和排版由调用方负责。
 
 
 居中选择框使用 DialogFrame，按钮旁菜单使用 AnchoredMenu。玻璃表面与内容共享一次淡入和轻微缩放，保持各自的定位和提交操作。
@@ -181,9 +181,35 @@
 ActionIcon只映射产品材质和状态语义，Image几何、填色/描边矩阵统一由SharedActionIcon拥有。玻璃默认outlineOnly；语义tint转为描边。确实表达状态的徽标显式preserveFill，普通菜单不得用该例外恢复装饰填色。
 
 
-玻璃材质下 DialogBackdrop.blurRadius 默认取PopupAppearance.DEFAULT_DIALOG_BACKDROP_BLUR（8）。玻璃材质的牌组详情更多与列表长按在宽窄屏均复用FOCUSED_DIALOG_BACKDROP_BLUR（64），保留原有阴影。backgroundEffect对遮罩后方场景做真实磨砂，保留原压暗色；菜单及预览作为上层兄弟节点保持清晰，宽窄布局共用规则，扁平模式关闭磨砂。tracksHierarchy=false用于纯菜单背景，避免改变后续二级表单尺寸；普通表单默认仍参与原尺寸层级。
+玻璃材质的模糊仅作用于弹窗、菜单等面板自身轮廓内的取样。DialogBackdrop不调用backgroundEffect/backdropBlur，玻璃与扁平下都只压暗背景，面板外文字和图案保持清晰。牌组详情更多与列表长按同样遵循，JIDE发布backdrop_blur_radius为0。tracksHierarchy=false仅用于纯菜单背景，不改变表单尺寸层级。
 
 
 2026-11-04：完整菜单与弹层呈现由系列HAR拥有。[GlassPanel.ets](GlassPanel.ets)、[GlassBubblePanel.ets](GlassBubblePanel.ets)、[AnchoredMenu.ets](AnchoredMenu.ets)、[MenuItem.ets](MenuItem.ets)、[ActionMenuList.ets](ActionMenuList.ets)及[PopupSurface.ets](PopupSurface.ets)保留产品契约并转交Shared同名实现。[MenuTheme.ets](../../utils/MenuTheme.ets)只解析当前UI偏好、资源和API能力；PopupTrigger与SurfaceMaterial是通用UI依赖，不是业务服务。菜单定位、安全区、有限滚动、准备/迟到回调、图文排列和动作ID重验都在基础实现中。产品保留AppInterface声明、动作回调、路由会话和采样源引用。共享契约见[完整菜单接入](../../../../../../docs/development/dialog-glass.md#唯一责任入口)。
 
 [ImageCropViewport.ets](ImageCropViewport.ets) 统一壁纸和牌组图片的裁剪视口，复用 ibest-ui 裁剪器。
+
+### 外观对象覆盖
+
+普通正文、次要文字、页面底色、轮廓及设计token圆角通过 `utils/AppearanceElements` 和 `appearance_elements_active` 显式响应；输入样式、SeriesVisual与MenuTheme连接同一来源。默认资源型文字prop在绘制时解析，不在字段初始化时缓存自定义值。不要把状态色、卡片模板、二维码或画布内容迁为普通文字/背景。`appearance-elements.test.mjs` 的扫描及直接渲染回归约束该边界。设置编辑器的固定预览与草稿保存见[外观说明](../../../../../../docs/development/appearance.md#自定义主色与壁纸)。
+
+普通数值滑杆由 `utils/SliderStyle` 统一选中轨道与滑块主题色；白板纸张透明度、字体缩放、材质参数、壁纸遮罩和高级适配共用此入口。数值/禁用/提交仍归各自宿主；未选中轨道保留中性默认色。`appearance-elements.test.mjs` 扫描全部原生Slider构造并执行实际样式，禁止漏接或重复selectedColor规则。
+
+容器modifier调用必须显式传appearance_elements_active。模块最终圆角/边线由appearanceElementRadius与appearanceModuleBorder声明，不能依赖文字重绘间接更新；模块线色与按钮/弹窗线色分别由moduleOutline/outline拥有。统一调节入口和分区记忆见外观领域文档。
+
+## 页面侧边栏
+
+[PageActionShell](./PageActionShell.ets) 为普通 NavDestination 透传内容并关闭 PageToolbarActionScope 迁移，原顶部返回、回退、更多及模式菜单照常显示。侧栏仅由主页及牌组详情拥有，其他页面不因主页布局设置而隐藏顶栏。
+
+设置的互斥模式是特殊入口：侧边栏同时呈现简洁版/实验版两图标和真实选中态；顶部按钮沿用原模式菜单。保存文字在侧边栏内以公共确认图标呈现，原标签与守卫保留。正文搜索、范围及内容模式选择器不被收集为顶部动作。
+
+侧边动作现采用compactActionGrid计算的方框紧排：40vp方键、4vp间隔、最多两列，按钮少时面板自动收缩；收起手柄占独立槽。编辑器的格式圆环保留原样。
+
+所有普通目的地页面统一只有一个侧边动作面板，不能再按按钮原来的顶栏左右位置拆成两个面板；简洁版/实验版只是同一面板里的两个独立按钮。
+
+侧边操作长按名称统一复用UiFeedback.showToastSafely的系统Toast，不自绘标题色文字、气泡面板或位置。长按仅展示名称，仍拦截松手补发的点击；编辑器原格式长按行为保持原入口。
+
+[ShapePaint](./ShapePaint.ets) 使用公共ShapeAttribute设置圆形填色与描边，沿用API 11接口，避开API 26新增Circle重载。小组件不支持attributeModifier，圆形指示点由等尺寸圆角Row渲染。
+
+IconActionButton 的 preserveIconFill 用于图钉等实心选中状态，透传 ActionIcon.preserveFill，确保玻璃材质下也能区分固定与未固定。
+
+DirectorySelect 的展开动效以 SelectionValueButton 中实测的箭头区域为起点，牌组名长度不改变起点；箭头复用 SurfaceSelect 的 selectionPopupAngle，按实际面板相对箭头的位置确定方向，关闭复位向右。其他 SelectionValueButton 默认继续使用整按钮锚点。

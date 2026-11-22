@@ -6,6 +6,7 @@ import { DialogFrame } from './DialogFrame';
 import { DialogHeader } from './DialogHeader';
 import { NoteEditorHeader } from './NoteEditorHeader';
 import { localizedNamedResourceText } from '../../utils/UiFeedback';
+import { AppLog } from '../../model/AppLog';
 
 /** 新增、编辑与模板样例共用 Core 预览；外壳切换不改变草稿或媒体责任。 */
 @Component
@@ -23,7 +24,7 @@ export struct NoteDraftPreview {
     (state: DraftPreviewState): void => { this.state = state; });
   aboutToAppear(): void { this.session.open(this.input).catch((): void => {}); }
   aboutToDisappear(): void {
-    this.session.dispose(this.releaseCard()).catch((error: Error): void => { console.warn(error.message); });
+    this.session.dispose(this.releaseCard()).catch((error: Error): void => { AppLog.warn('NoteDraftPreview', error.message); });
   }
   @Builder
   private header() {

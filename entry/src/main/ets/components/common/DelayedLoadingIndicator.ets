@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceTextColor } from '../../utils/AppearanceElements';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 
 /** 短暂加载不闪进度圈；慢请求保留反馈，卸载即取消延迟任务。 */
 @Component
 export struct DelayedLoadingIndicator {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop tint: ResourceColor = $r('app.color.text_secondary');
   @State private shown: boolean = false;
   private timer: number = -1;
@@ -20,6 +22,6 @@ export struct DelayedLoadingIndicator {
   build() {
     LoadingProgress()
       .width(应用尺寸.加载指示器尺寸).height(应用尺寸.加载指示器尺寸)
-      .color(this.tint).visibility(this.shown ? Visibility.Visible : Visibility.Hidden)
+      .color(appearanceTextColor(this.appearanceElements, this.tint)).visibility(this.shown ? Visibility.Visible : Visibility.Hidden)
   }
 }

@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { ShapePaint } from './ShapePaint';
+import { appearanceElementColor, appearanceTextColor } from '../../utils/AppearanceElements';
 import { BUTTON_OPACITY_KEY, MaterialOpacity, buttonOpacityPercent } from '../../model/SurfaceMaterial';
 import { SeriesVisual } from '../../utils/SeriesVisual';
 import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { darkMaterial } from '../../utils/GlassMaterial';
 import { PressFeedback } from '../../utils/PressFeedback';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { THEME_TEXT_COLORS_KEY } from '../../model/ThemeCatalog';
 import { ActionStatus } from './ActionStatus';
 import { hasActionStatus } from '../../model/InteractionFeedback';
@@ -45,6 +48,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 按下态按钮 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp(BUTTON_OPACITY_KEY) private buttonOpacity: MaterialOpacity | undefined = undefined;
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @Prop feedback: string = '';
@@ -85,16 +89,21 @@ export struct 按下态按钮 {
 
   private resolvedSelectionColor(): ResourceColor { return this.selectionColor ?? this.actionColor; }
   private labelColor(): ResourceColor {
-    return this.selectable && this.selected ? this.resolvedSelectionColor() : this.字色;
+    return this.selectable && this.selected ? this.resolvedSelectionColor() : appearanceTextColor(this.appearanceElements, this.字色);
   }
   private buttonBorder(): BorderOptions {
-    if (!this.compact && !this.selectable && this.surfaceMaterial === 'glass' && darkMaterial()) return SurfaceBorder.materialOptions('glass', true);
+    if (!this.compact && !this.selectable) return SurfaceBorder.controlOptions(this.surfaceMaterial, darkMaterial(), this.appearanceElements);
     return SurfaceBorder.options(this.compact ? 0 : this.selectable ? 2 : 应用尺寸.卡片边框,
-      this.selectable && this.selected ? this.resolvedSelectionColor() : SurfaceBorder.color());
+      this.selectable && this.selected ? this.resolvedSelectionColor() : SurfaceBorder.color(), this.appearanceElements);
   }
 
   private buttonOpacityPercent(): number {
     return buttonOpacityPercent(this.buttonOpacity, this.surfaceMaterial);
+  }
+
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
   }
 
   build() {
@@ -102,7 +111,7 @@ export struct 按下态按钮 {
       Row({ space: 应用尺寸.间距_8 }) {
         if (hasActionStatus(this.feedback)) { ActionStatus({ phase: this.feedback, tint: this.labelColor() }) }
         if (this.markerColor !== undefined) {
-          Circle().width(10).height(10).fill(this.markerColor)
+          Circle().width(10).height(10).attributeModifier(new ShapePaint(this.markerColor))
         }
         if (this.图标 !== undefined) {
           Image(this.图标).width(16).height(16)
@@ -144,7 +153,8 @@ export struct 按下态按钮 {
     .fontColor(this.labelColor())
     .backgroundColor(this.compact && this.selected ? SeriesVisual.buttonFill(`#1A${this.actionColor.slice(-6)}`, this.buttonOpacityPercent()) : Color.Transparent)
     .border(this.buttonBorder())
-    .attributeModifier(this.compact ? new PressFeedback(1, 0.4, true) : new GlassSurface(this.surfaceMaterial, this.glassColors, $r('app.color.surface_card'), this.buttonBorder(), true, this.buttonOpacityPercent()))
+    .attributeModifier(this.compact ? new PressFeedback(1, 0.4, true) : new GlassSurface(this.surfaceMaterial, this.glassColors, $r('app.color.surface_card'), this.buttonBorder(), true, this.buttonOpacityPercent(), this.appearanceElements, 应用尺寸.圆角_胶囊))
+    .background(this.renderGlassBackground(this.compact ? new SharedSurface() : (new GlassSurface(this.surfaceMaterial, this.glassColors, $r('app.color.surface_card'), this.buttonBorder(), true, this.buttonOpacityPercent(), this.appearanceElements, 应用尺寸.圆角_胶囊)).backgroundSurface()))
     .stateEffect(false)
     .borderRadius(this.compact ? 8 : 应用尺寸.圆角_胶囊)
     .enabled(this.是否启用)

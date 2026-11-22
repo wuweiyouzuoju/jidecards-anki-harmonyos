@@ -12,12 +12,13 @@ export struct DirectorySelectDialog {
   @Link rows: DirectoryRow[];
   @Link isInteractive: boolean;
   @Prop title: ResourceStr = '';
+  onPanelArea: (area: Area) => void = (_area: Area): void => {};
   onSelect: (id: string) => void = (_id: string): void => {};
   onClose: () => void = (): void => {};
   onViewChanged: (view: DirectoryView | null) => void = (_view: DirectoryView | null): void => {};
   @Builder
   private header() {
-    DialogHeader({ title: this.title, showAction: false, onClose: this.onClose })
+    DialogHeader({ title: this.title, showAction: false, closeLabel: $r('app.string.close'), onClose: this.onClose })
   }
   @Builder
   private content() {
@@ -25,7 +26,7 @@ export struct DirectorySelectDialog {
       onSelect: this.onSelect, onViewChanged: this.onViewChanged })
   }
   build() {
-    DialogFrame({ nativeHost: true, maximumWidth: 应用尺寸.dialogMaxWidth,
+    DialogFrame({ onPanelArea: this.onPanelArea, nativeHost: true, maximumWidth: 应用尺寸.dialogMaxWidth,
       header: () => { this.header(); }, content: () => { this.content(); }, onDismiss: this.onClose })
   }
 }

@@ -10,6 +10,7 @@ import { themeLabelGlyphs } from './ThemeText';
 /** 颜色、资源、主题字形和指针路由属于产品；菜单行绘制只有公共基础一个实现。 */
 @Component
 export struct AnchoredMenuItem {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop slideLayer: number = 0;
   @Prop label: ResourceStr = '';
   @Prop labelAlignment: TextAlign = TextAlign.Start;
@@ -46,7 +47,7 @@ export struct AnchoredMenuItem {
       icon: this.icon,
       iconTint: this.iconTint,
       destructive: this.destructive,
-      theme: productMenuTheme(this.material, this.mode, this.systemDark, true, undefined, this.accent, this.getUIContext()),
+      theme: productMenuTheme(this.material, this.mode, this.systemDark, true, undefined, this.accent, this.getUIContext(), this.appearanceElements),
       labelGlyphs: this.selected && this.selectionUsesAccent ? themeLabelGlyphs(this.label, this.accentColors, this.getUIContext(), this.uiLanguage) : [],
       disclosureMotion: disclosureAnimation(), readPressScale: (): number => currentMotionProfile().pressScale,
       slideScope: this.slideScope, menuRouter: menuSlideSession, onTrigger: (area: Area): void => { rememberPopupTrigger(area); },

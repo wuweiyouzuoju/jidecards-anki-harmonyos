@@ -1,5 +1,5 @@
-import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { rememberPopupTrigger } from '../../utils/PopupTrigger';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { resourceText } from '../../utils/UiFeedback';
 import { HelpLayout } from '../../utils/HelpLayout';

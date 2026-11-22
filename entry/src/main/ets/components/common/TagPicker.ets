@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { DirectoryView } from '../../model/DirectoryTree';
 import { 标签服务 } from '../../backend/标签服务';
 import { TagTreeNode } from '../../proto/messages/TagsMessages';
@@ -16,6 +17,7 @@ import { APP_INTERFACE_SURFACES, AppInterfaceControl } from '../../model/AppInte
 /** 选择只改变宿主草稿；加载失败保留原标签，卸载丢弃迟到读取。 */
 @Component
 export struct TagPicker {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('resetSelection') noteTags: string[][] = [];
   @Prop @Watch('publishInterface') isInteractive: boolean = true;
@@ -102,18 +104,18 @@ export struct TagPicker {
         isEnabled: this.isInteractive && !this.loading, maximumLength: undefined, debounceMs: 0,
         onChange: (value: string): void => { this.query = value; this.refresh(); } })
       if (this.loading) {
-        Text($r('app.string.tags_loading')).fontColor($r('app.color.text_secondary'))
+        Text($r('app.string.tags_loading')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       } else if (this.failed) {
         Text($r('app.string.tags_load_error')).fontColor($r('app.color.error_text'))
         AnchoredMenuItem({ label: $r('app.string.home_retry'), onSelect: (): void => { this.load(); } })
       } else {
         if (this.noteTags.length > 1) {
           Text($r('app.string.tags_mixed_hint')).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary')).width('100%')
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         }
         if (this.rows.length === 0) {
           Text($r('app.string.tags_no_matches')).fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         } else {
           Column() {
             TagTreeList({ rows: this.rows, query: this.query, listHeight: this.listHeight, isInteractive: this.isInteractive,
@@ -122,7 +124,7 @@ export struct TagPicker {
               onViewChanged: (view: DirectoryView | null): void => { appInterface.observeDirectory('tag_picker', view); } })
           }.width('100%').padding(应用尺寸.间距_5)
             .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-            .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+            .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
         }
         if (this.canAdd()) {
           AnchoredMenuItem({ label: $r('app.string.tags_add_named', newTagName(this.query)), available: this.isInteractive,

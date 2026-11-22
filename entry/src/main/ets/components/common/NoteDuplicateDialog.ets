@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DialogFrame } from './DialogFrame';
 import { DialogHeader } from './DialogHeader';
 import { 按下态按钮 } from './按下态按钮';
@@ -7,6 +8,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 /** 保存尚未发生；取消回到原草稿，查看重复项不消费确认。 */
 @Component
 export struct NoteDuplicateDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   onCancel: () => void = (): void => {};
   onContinue: () => void = (): void => {};
   onView: () => void = (): void => {};
@@ -19,7 +21,7 @@ export struct NoteDuplicateDialog {
   @Builder
   private content() {
     Text($r('app.string.add_note_duplicate_warning')).width('100%')
-      .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+      .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
     按下态按钮({ 文案: $r('app.string.add_note_duplicate_view'), 点击回调: (): void => { this.onView(); } })
   }
   build() {

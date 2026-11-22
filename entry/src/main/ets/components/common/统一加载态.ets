@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 
 // ========================================================
 // @块ID UI-COMMON-LOADING-001
@@ -23,13 +24,14 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 统一加载态 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop 文案: ResourceStr = $r('app.string.common_loading');
   @Prop 尺寸: number = 应用尺寸.加载指示器尺寸;
 
   build() {
     Column({ space: 应用尺寸.间距_8 }) {
-      LoadingProgress().width(this.尺寸).height(this.尺寸).color($r('app.color.text_secondary'))
-      Text(this.文案).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_secondary'))
+      LoadingProgress().width(this.尺寸).height(this.尺寸).color(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
+      Text(this.文案).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
     }
     .width('100%')
     .height('100%')

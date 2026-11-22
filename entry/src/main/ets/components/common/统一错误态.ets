@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { 按下态按钮 } from './按下态按钮';
 
 // ========================================================
@@ -25,6 +26,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 
 @Component
 export struct 统一错误态 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop 文案: ResourceStr;
   @Prop 重试文案: ResourceStr = $r('app.string.common_retry');
   onRetry: (() => void) | undefined = undefined;
@@ -34,10 +36,10 @@ export struct 统一错误态 {
   build() {
     Column({ space: 应用尺寸.间距_12 }) {
       SymbolGlyph($r('sys.symbol.exclamationmark_triangle'))
-        .fontSize(48).fontColor([$r('app.color.text_secondary')]).accessibilityLevel('no')
+        .fontSize(48).fontColor([appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))]).accessibilityLevel('no')
       Text(this.文案)
         .fontSize(应用尺寸.字号_正文)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .textAlign(TextAlign.Center)
       if (this.onRetry !== undefined) {
         按下态按钮({ 文案: this.重试文案, 点击回调: (): void => { this.retry(); } })

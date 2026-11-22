@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { invalidateSharedGlassSource } from 'jide_foundation';
 import { glassSourceVisibility, setGlassSourceFreeze } from '../../utils/GlassBackdrop';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 let nextSource: number = 0;
@@ -10,14 +11,20 @@ export struct GlassSource {
   @Prop @Watch('sync') previewWarm: boolean = false;
   @StorageProp('surface_material') @Watch('sync') private material: string = 'flat';
   @StorageProp(APP_FOREGROUND_KEY) @Watch('sync') private foreground: boolean = false;
+  @StorageProp('themeMode') @Watch('invalidateSource') private themeMode: string = 'system';
+  @StorageProp('systemDarkMode') @Watch('invalidateSource') private systemDark: boolean = false;
+  @StorageProp('colorTheme') @Watch('invalidateSource') private colorTheme: string = '';
+  private invalidateSource(): void { invalidateSharedGlassSource(this.getUIContext(), this.sourceId); }
   @Prop freezeDuringPanels: boolean = false;
+  @Prop pageBackdrop: boolean = true;
   @Prop sourceId: string = `jide-glass-source-${++nextSource}`;
   private visible: boolean = false;
   @BuilderParam content: () => void = this.empty;
   @Builder
   private empty(): void {}
   private sync(): void {
-    glassSourceVisibility(this.getUIContext(), this.sourceId, this.sourceEnabled && this.visible && this.foreground && (this.material === 'glass' || this.previewWarm), this.previewWarm);
+    glassSourceVisibility(this.getUIContext(), this.sourceId, this.sourceEnabled && this.visible && this.foreground,
+      this.previewWarm, this.pageBackdrop);
   }
   aboutToAppear(): void { setGlassSourceFreeze(this.sourceId, this.freezeDuringPanels); }
   aboutToDisappear(): void { this.visible = false; this.sync(); setGlassSourceFreeze(this.sourceId, false); }
@@ -25,6 +32,12 @@ export struct GlassSource {
     Stack() {
       this.content()
     }.width('100%').height('100%').id(this.sourceId)
+      .onAreaChange((old: Area, area: Area): void => {
+        if (old.width !== area.width || old.height !== area.height ||
+          old.globalPosition.x !== area.globalPosition.x || old.globalPosition.y !== area.globalPosition.y) {
+          invalidateSharedGlassSource(this.getUIContext(), this.sourceId);
+        }
+      })
       .onVisibleAreaChange([0, 1], (visible: boolean, ratio: number): void => {
         this.visible = visible && ratio > 0; this.sync();
       })

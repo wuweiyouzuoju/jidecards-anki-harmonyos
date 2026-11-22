@@ -1,12 +1,13 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { common } from '@kit.AbilityKit';
 import { picker } from '@kit.CoreFileKit';
 import { NoteFieldEditor } from './NoteFieldEditor';
 import { 按下态按钮 } from './按下态按钮';
 import { SettingsActionRow } from './SettingsActionRow';
 import { IconActionButton } from './IconActionButton';
-import { NoteFieldAudio, NoteAudioPart, NoteAudioStatus, NoteAudioAttachmentStatus, noteAudioParts, replaceNoteAudioPart, localNoteAudioPath } from '../../model/NoteAudioDraft';
+import { NOTE_AUDIO_GENERATE_TITLE, NOTE_AUDIO_IMPORT_TITLE, NOTE_AUDIO_PLAY_ICON, NoteFieldAudio, NoteAudioPart, NoteAudioStatus, NoteAudioAttachmentStatus, noteAudioParts, replaceNoteAudioPart, localNoteAudioPath } from '../../model/NoteAudioDraft';
 import { NoteAudioPreview } from '../../utils/NoteAudioPreview';
 import { stageNoteAudio } from '../../backend/NoteAudioImport';
 import { NoteAudioRecorder, discardNoteRecordings } from '../../utils/NoteAudioRecorder';
@@ -19,6 +20,7 @@ import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 /** 共用音频字段：原有 sound 引用按位置展示；附件仍由表单和写入边界持有。 */
 @Component
 export struct NoteAudioField {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('publishStatus') value: string = '';
   @Prop fieldName: string = '';
@@ -28,6 +30,8 @@ export struct NoteAudioField {
   @Prop @Watch('publishStatus') audios: NoteFieldAudio[] = [];
   @Prop mediaOnly: boolean = false;
   @Prop controlsVisible: boolean = true;
+  @Prop @Watch('publishStatus') speechVisible: boolean = false;
+  onOpenSpeech: () => void = (): void => {};
   @Prop captureOnly: boolean = false;
   @Prop @Watch('recordRequested') recordRequest: number = 0;
   private handledRecord: number = 0;
@@ -73,7 +77,7 @@ export struct NoteAudioField {
       if (item.reference === undefined) attachments.push(this.attachmentStatus(`pending-${item.id}`));
     });
     this.onStatus({ recording: this.recording, paused: this.paused, working: this.working,
-      disabled: this.disabled, seconds: this.seconds, hasError: this.errorMessage !== '', attachments: attachments });
+      disabled: this.disabled, speechEnabled: this.speechVisible && this.foreground, seconds: this.seconds, hasError: this.errorMessage !== '', attachments: attachments });
   }
 
   private attachmentStatus(id: string): NoteAudioAttachmentStatus {
@@ -199,9 +203,10 @@ export struct NoteAudioField {
 
   private backgroundChanged(): void {
     if (!this.foreground) {
-      this.preview.stop().catch((): void => {});
+        this.preview.stop().catch((): void => {});
       if (this.recording || this.capturePending) this.cancelRecording();
     }
+    this.publishStatus();
   }
 
   private async play(key: string, filename: string, uri: string = ''): Promise<void> {
@@ -238,13 +243,21 @@ export struct NoteAudioField {
     Stack({ alignContent: Alignment.TopEnd }) {
       Row({ space: 应用尺寸.间距_8 }) {
         Text(partIndex >= 0 ? this.partLabel(partIndex) : label)
-          .fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+          .fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1).constraintSize({ minWidth: 0 })
-        按下态按钮({ 文案: this.playingKey === key ? $r('app.string.note_audio_stop') : $r('app.string.note_audio_play'),
-          字色: this.buttonColor, singleLine: true, 是否启用: !this.disabled && !this.working,
-          点击回调: (): void => { this.play(key, partIndex >= 0 ? this.partFilename(partIndex) : filename,
-            partIndex >= 0 ? this.partUri(partIndex) : uri); } }).flexShrink(0)
+        if (this.playingKey === key) {
+          按下态按钮({ 文案: $r('app.string.note_audio_stop'), 字色: this.buttonColor,
+            singleLine: true, 是否启用: !this.disabled && !this.working,
+            点击回调: (): void => { this.play(key, partIndex >= 0 ? this.partFilename(partIndex) : filename,
+              partIndex >= 0 ? this.partUri(partIndex) : uri); } }).flexShrink(0)
+        } else {
+          IconActionButton({ source: $r('app.media.' + NOTE_AUDIO_PLAY_ICON), label: $r('app.string.note_audio_play'),
+            pageWheelEligible: false, toolbarStyle: true, squareSurface: true,
+            isInteractive: !this.disabled && !this.working,
+            onAction: (): void => { this.play(key, partIndex >= 0 ? this.partFilename(partIndex) : filename,
+              partIndex >= 0 ? this.partUri(partIndex) : uri); } }).flexShrink(0)
+        }
         if (this.replacementsVisible) {
           按下态按钮({ 文案: $r('app.string.note_media_replace'), singleLine: true,
             是否启用: !this.disabled && !this.working && !this.recording,
@@ -262,7 +275,7 @@ export struct NoteAudioField {
       }
     }.width('100%')
       .backgroundColor(insetMaterialFill($r('app.color.surface_sidebar')))
-      .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+      .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
   }
 
   @Builder
@@ -284,13 +297,19 @@ export struct NoteAudioField {
           isInteractive: !this.working, onAction: (): void => { this.cancelRecording(); } })
       } else {
         if (!this.captureOnly) {
-          SettingsActionRow({ title: $r('app.string.note_audio_add'),
+          SettingsActionRow({ title: $r('app.string.' + NOTE_AUDIO_IMPORT_TITLE),
             isInteractive: !this.disabled && !this.working, onAction: (): void => { this.pick(); } })
           Divider().strokeWidth(1).color(SurfaceBorder.color())
         }
         SettingsActionRow({ title: $r('app.string.note_audio_record'),
           trailingIcon: $r('app.media.ic_audio_record_on'),
           isInteractive: !this.disabled && !this.working, onAction: (): void => { this.record(); } })
+        if (this.speechVisible) {
+          Divider().strokeWidth(1).color(SurfaceBorder.color())
+          SettingsActionRow({ title: $r('app.string.' + NOTE_AUDIO_GENERATE_TITLE),
+            isInteractive: !this.disabled && !this.working && this.foreground,
+            onAction: (): void => { this.onOpenSpeech(); } })
+        }
       }
     }.width('100%')
   }

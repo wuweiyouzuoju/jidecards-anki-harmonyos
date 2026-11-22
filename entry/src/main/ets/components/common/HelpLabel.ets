@@ -1,5 +1,6 @@
-import { HelpTitleLayout } from './HelpTitleLayout';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor, appearanceTextColor } from '../../utils/AppearanceElements';
+import { HelpTitleLayout } from './HelpTitleLayout';
 import { HelpButton } from './HelpButton';
 import { ThemeHighlightedTextSpans, themeTextKey } from './ThemeText';
 import { HelpLayout } from '../../utils/HelpLayout';
@@ -9,6 +10,7 @@ import { 颜色键 } from '../../model/颜色主题';
 /** 标题决定布局；帮助绝对定位在文字旁，热区不挤偏标题或撑高标题行。 */
 @Component
 export struct HelpLabel {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(颜色键.动作主色) private actionColor: string = '#2F5FD0';
   @Prop title: ResourceStr = '';
@@ -31,7 +33,7 @@ export struct HelpLabel {
   @Builder
   private titleContent() {
         Text() { ForEach([themeTextKey(this.title, this.highlightColors, this.getUIContext(), this.uiLanguage, this.highlightLabel)], (_textKey: string) => { ThemeHighlightedTextSpans(this.title, this.highlightLabel, this.highlightColors, this.getUIContext()) }, (_textKey: string): string => _textKey) }
-          .fontSize(this.textSize).fontColor(this.textColor).fontWeight(this.textWeight)
+          .fontSize(this.textSize).fontColor(appearanceTextColor(this.appearanceElements, this.textColor)).fontWeight(this.textWeight)
           .textAlign(this.centered ? TextAlign.Center : TextAlign.Start)
           .maxLines(this.limitTitleLines ? 2 : undefined)
           .textOverflow({ overflow: this.limitTitleLines ? TextOverflow.Ellipsis : TextOverflow.Clip })

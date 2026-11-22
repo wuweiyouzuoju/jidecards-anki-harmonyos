@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { PAGE_TOOLBAR_SCOPE, PageToolbarActionScope } from '../../model/PageToolbarActions';
+import { appearanceElementColor, appearanceTextColor } from '../../utils/AppearanceElements';
 import { WINDOW_SAFE_TOP_KEY } from '../../model/WindowSafeLayout';
 import { 按下态按钮 } from './按下态按钮';
 import { IconActionButton } from './IconActionButton';
@@ -9,6 +11,8 @@ import { HelpLabel } from './HelpLabel';
 /** 新增和编辑共用顶栏，标题中心不受两侧文案长度影响。 */
 @Component
 export struct NoteEditorHeader {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
+  @Consume(PAGE_TOOLBAR_SCOPE) private pageToolbarScope: PageToolbarActionScope = new PageToolbarActionScope();
   @Prop title: ResourceStr = '';
   @Prop actionLabel: ResourceStr = '';
   @Prop actionIcon: ResourceStr = '';
@@ -32,11 +36,11 @@ export struct NoteEditorHeader {
         centered: true, showHelp: false }).layoutWeight(1)
       Row() {
         if (this.showAction) {
-          if (this.actionIcon !== '') {
-            IconActionButton({ toolbarStyle: true, source: this.actionIcon, label: this.actionLabel,
+          if (this.actionIcon !== '' || this.pageToolbarScope.enabled) {
+            IconActionButton({ toolbarStyle: true, source: this.actionIcon || $r('app.media.ic_common_confirm'), label: this.actionLabel,
               isInteractive: this.actionEnabled, onAction: this.onSave })
           } else {
-          按下态按钮({ 文案: this.actionLabel, 字色: this.accent,
+          按下态按钮({ 文案: this.actionLabel, 字色: appearanceTextColor(this.appearanceElements, this.accent),
             是否启用: this.actionEnabled, 点击回调: this.onSave })
           }
         }

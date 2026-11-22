@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SharedAnchoredMenu, SharedToolbarMenuBounds, GlassFusionRect } from 'jide_foundation';
-import { currentGlassSource, retainGlassPanel, releaseGlassPanel, sourceCaptureAllowed, GLASS_BACKGROUND_SOURCE } from '../../utils/GlassBackdrop';
+import { currentPopupGlassSource, retainGlassPanel, releaseGlassPanel, sourceCaptureAllowed, GLASS_BACKGROUND_SOURCE, glassBackgroundSource } from '../../utils/GlassBackdrop';
 import { takePopupTrigger } from '../../utils/PopupTrigger';
 import { productMenuTheme } from '../../utils/MenuTheme';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
@@ -10,11 +10,13 @@ import { DIALOG_OPACITY_KEY, MaterialOpacity } from '../../model/SurfaceMaterial
 import { MenuSlideScope, menuSlideSession } from '../../model/MenuSlideSession';
 import { ActionMenuBubble } from './ActionMenuLayout';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { WINDOW_KEYBOARD_TOP_KEY, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY, WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY } from '../../model/WindowSafeLayout';
+import { WINDOW_KEYBOARD_TOP_KEY, WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY, WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY, WINDOW_SIZE_KEY, WindowSizeVp, remainingHorizontalInset } from '../../model/WindowSafeLayout';
 
 /** 薄适配只映射产品状态，工具栏定位、滚动、点击关闭和面板由公共基础统一拥有。 */
 @Component
 export struct AnchoredMenu {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
+  @Prop fuseFromTrigger: boolean = true;
   @Prop closeRequest: number = 0;
   @Prop toolbarBounds: SharedToolbarMenuBounds | undefined = undefined;
   @Prop menuWidth: number = 应用尺寸.compactMenuWidth;
@@ -42,6 +44,9 @@ export struct AnchoredMenu {
   @StorageProp(WINDOW_SAFE_BOTTOM_KEY) private safeBottom: number = 0;
   @StorageProp(WINDOW_SAFE_LEFT_KEY) private safeLeft: number = 0;
   @StorageProp(WINDOW_SAFE_RIGHT_KEY) private safeRight: number = 0;
+  @StorageProp(WINDOW_SIZE_KEY) private windowSize: WindowSizeVp = { width: 0, height: 0 };
+  @State private viewportLeft: number = 0;
+  @State private viewportWidth: number = 0;
   @State private sourceId: string = '';
   private trigger: GlassFusionRect | undefined = undefined;
   private retained: boolean = false;
@@ -53,8 +58,11 @@ export struct AnchoredMenu {
   @Builder
   private empty(): void {}
   aboutToAppear(): void {
-    this.sourceId = this.refractionSource || currentGlassSource(this.getUIContext());
-    if (this.surfaceVisible) this.trigger = takePopupTrigger();
+    this.sourceId = this.refractionSource || currentPopupGlassSource(this.getUIContext());
+    if (this.surfaceVisible) {
+      const trigger: GlassFusionRect | undefined = takePopupTrigger();
+      if (this.fuseFromTrigger) this.trigger = trigger;
+    }
     if (this.surfaceVisible) { retainGlassPanel(this.sourceId); this.retained = true; }
   }
   aboutToDisappear(): void { if (this.retained) { releaseGlassPanel(this.sourceId); this.retained = false; } }
@@ -74,14 +82,18 @@ export struct AnchoredMenu {
       materialRole: this.materialRole,
       bubble: this.bubble,
       maxHeight: this.maxHeight,
-      refractionSource: this.sourceId, backgroundSource: GLASS_BACKGROUND_SOURCE, trigger: this.trigger,
-      theme: productMenuTheme(this.material, this.mode, this.systemDark, this.foreground, this.dialogOpacity, this.accent, this.getUIContext()),
+      refractionSource: this.sourceId, backgroundSource: glassBackgroundSource(this.sourceId), trigger: this.trigger,
+      theme: productMenuTheme(this.material, this.mode, this.systemDark, this.foreground, this.dialogOpacity, this.accent, this.getUIContext(), this.appearanceElements),
       captureAllowed: (initialFrame: boolean = false): boolean => sourceCaptureAllowed(this.sourceId, initialFrame), menuRouter: menuSlideSession, slideScope: this.slideScope,
-      safeTop: this.safeTop, safeBottom: this.safeBottom, safeLeft: this.safeLeft, safeRight: this.safeRight, keyboardTop: this.keyboardTop,
+      safeTop: this.safeTop, safeBottom: this.safeBottom, safeLeft: remainingHorizontalInset(this.safeLeft, this.viewportLeft),
+      safeRight: remainingHorizontalInset(this.safeRight, this.viewportWidth > 0 ? this.windowSize.width - this.viewportLeft - this.viewportWidth : 0), keyboardTop: this.keyboardTop,
       bottomGap: 应用尺寸.页面底部间距(this.narrow), pageInset: 应用尺寸.页面内边距_水平,
       enterScale: SurfaceTransition.glassScale(true, false), enterAnimation: SurfaceTransition.glassEnterAnimation(true, false),
       exitTransition: SurfaceTransition.glassExit(true, false, this.alignEnd ? '100%' : '0%', '0%'), flatTransition: SurfaceTransition.dialog(),
       onPanelArea: this.onPanelArea, onPrepared: this.onPrepared, onClose: this.onClose,
       content: (): void => { this.content(); } })
+      .onAreaChange((_old: Area, area: Area): void => {
+        this.viewportLeft = Number(area.globalPosition.x); this.viewportWidth = Number(area.width);
+      })
   }
 }

@@ -1,5 +1,7 @@
-import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { appearanceElementRadius, appearanceElementColor, appearanceModuleBorder, appearanceModuleRadius } from '../../utils/AppearanceElements';
+import { MODULE_OPACITY_KEY, MaterialOpacity, DEFAULT_MODULE_OPACITY } from '../../model/SurfaceMaterial';
 import { 按下态按钮 } from './按下态按钮';
 import { SeriesVisual } from '../../utils/SeriesVisual';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
@@ -9,6 +11,7 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 /** 宿主拥有结果、有效撤销步号及重试；提示条只提供就近的可见反馈。 */
 @Component
 export struct ResultNotice {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @StorageProp(MODULE_OPACITY_KEY) private moduleOpacity: MaterialOpacity = DEFAULT_MODULE_OPACITY;
   @StorageProp('themeMode') private materialMode: string = 'system';
@@ -32,18 +35,26 @@ export struct ResultNotice {
     }, this.duration);
   }
 
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
+  }
+
   build() {
     Row({ space: 应用尺寸.间距_8 }) {
-      Text(this.message).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_primary'))
+      Text(this.message).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
         .layoutWeight(1).maxLines(3)
       if (this.actionLabel !== '') {
         按下态按钮({ 文案: this.actionLabel, 是否启用: this.canAct,
           点击回调: (): void => { if (this.canAct) this.onAction(); } })
       }
     }.width('100%').padding(应用尺寸.间距_12)
-      .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options())
-      .borderRadius(应用尺寸.圆角_卡片)
-      .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.materialAccent, '', 应用尺寸.圆角_卡片, this.moduleOpacity))
+      .backgroundColor($r('app.color.surface_card')).border(SurfaceBorder.options( undefined, undefined, this.appearanceElements))
+      .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_卡片))
+      .attributeModifier(SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.materialAccent, '', 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements))
+      .background(this.renderGlassBackground(SeriesVisual.surfaceFor(this.surfaceMaterial, SeriesVisual.isDark(this.materialMode, this.materialSystemDark), this.materialAccent, '', 应用尺寸.圆角_卡片, this.moduleOpacity, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
       .transition(TransitionEffect.OPACITY.animation(motionAnimation(currentMotionProfile().menuEnterMs)))
   }
 }

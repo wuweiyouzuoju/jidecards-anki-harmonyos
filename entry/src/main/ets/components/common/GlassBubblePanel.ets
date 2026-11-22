@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SharedGlassBubblePanel, GlassFusionRect } from 'jide_foundation';
-import { currentGlassSource, retainGlassPanel, releaseGlassPanel, sourceCaptureAllowed, GLASS_BACKGROUND_SOURCE } from '../../utils/GlassBackdrop';
+import { currentPopupGlassSource, retainGlassPanel, releaseGlassPanel, sourceCaptureAllowed, GLASS_BACKGROUND_SOURCE, glassBackgroundSource } from '../../utils/GlassBackdrop';
 import { takePopupTrigger } from '../../utils/PopupTrigger';
 import { productMenuTheme } from '../../utils/MenuTheme';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
@@ -13,6 +13,8 @@ import { 应用尺寸 } from '../../utils/应用尺寸';
 /** 产品只连接真实采样源、偏好及生命周期；完整呈现统一由公共基础拥有。 */
 @Component
 export struct GlassBubblePanel {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
+  @Prop shadowVisible: boolean = true;
   @Prop source: string = '';
   @Prop showContourStroke: boolean = true;
   @Prop panelWidth: number = 应用尺寸.compactMenuWidth;
@@ -32,7 +34,7 @@ export struct GlassBubblePanel {
   @Builder
   private empty(): void {}
   aboutToAppear(): void {
-    this.sourceId = this.source || currentGlassSource(this.getUIContext());
+    this.sourceId = this.source || currentPopupGlassSource(this.getUIContext());
     this.trigger = takePopupTrigger();
     if (this.sourceId !== '') { retainGlassPanel(this.sourceId); this.retained = true; }
   }
@@ -40,10 +42,10 @@ export struct GlassBubblePanel {
     if (this.retained) { releaseGlassPanel(this.sourceId); this.retained = false; }
   }
   build() {
-    SharedGlassBubblePanel({ source: this.sourceId, backgroundSource: GLASS_BACKGROUND_SOURCE, trigger: this.trigger,
+    SharedGlassBubblePanel({ shadowVisible: this.shadowVisible, source: this.sourceId, backgroundSource: glassBackgroundSource(this.sourceId), trigger: this.trigger,
       showContourStroke: this.showContourStroke, panelWidth: this.panelWidth, pointerCenter: this.pointerCenter, pointerSide: this.pointerSide,
       theme: productMenuTheme(this.material, this.mode, this.systemDark, this.foreground,
-        this.dialogOpacity, this.accent, this.getUIContext()),
+        this.dialogOpacity, this.accent, this.getUIContext(), this.appearanceElements),
       captureAllowed: (initialFrame: boolean = false): boolean => sourceCaptureAllowed(this.sourceId, initialFrame),
       enterScale: SurfaceTransition.glassScale(true, false), enterAnimation: SurfaceTransition.glassEnterAnimation(true, false),
       exitTransitionFor: (x: string, y: string): TransitionEffect => SurfaceTransition.glassExit(true, false, x, y), flatTransition: SurfaceTransition.dialog(),

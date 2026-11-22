@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { currentGlassSource } from '../../utils/GlassBackdrop';
+import { currentPopupGlassSource } from '../../utils/GlassBackdrop';
 import { GlassPanel } from './GlassPanel';
 import { GlassBubblePanel } from './GlassBubblePanel';
 import { WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_BOTTOM_KEY, WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY,
@@ -39,7 +39,7 @@ export struct CardActionMenu {
   @State private menuSource: string = '';
   @State private primaryReady: boolean = false;
   aboutToAppear(): void {
-    this.menuSource = currentGlassSource(this.getUIContext());
+    this.menuSource = currentPopupGlassSource(this.getUIContext());
   }
   private readonly primaryScroller: Scroller = new Scroller();
   private readonly groupScrollers: Map<string, Scroller> = new Map<string, Scroller>();

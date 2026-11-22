@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface, SharedSurfaceBackground } from 'jide_foundation';
+import { ShapePaint } from './ShapePaint';
+import { appearanceElementColor, appearanceModuleRadius, appearanceModuleBorder } from '../../utils/AppearanceElements';
+import { parseElementStyle } from '../../model/AppearanceElements';
 import { APP_FOREGROUND_KEY } from '../../model/AppLifecycleState';
 import { THEME_MOTION_KEY, themeDefinition } from '../../model/ThemeCatalog';
 import { SeriesVisual } from '../../utils/SeriesVisual';
@@ -13,6 +17,7 @@ interface UnlockSpark {
 /** 复用原幻彩礼物动效：一次浮现与粒子散开，后台或关闭动画时落到静态结果。 */
 @Component
 export struct AppearanceReveal {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp(THEME_MOTION_KEY) @Watch('settleMotion') private motion: boolean = true;
   @StorageProp(APP_FOREGROUND_KEY) @Watch('settleMotion') private foreground: boolean = false;
   @State private revealed: boolean = false;
@@ -86,7 +91,7 @@ export struct AppearanceReveal {
           Row().width('18%').height(100).borderRadius(20).backgroundColor('#A481B6')
         }.width('94%').justifyContent(FlexAlign.Center).rotate({ angle: -15 })
       }
-      Circle().width(140).height(140).fill(Color.Transparent).stroke(this.colors[1]).strokeWidth(1)
+      Circle().width(140).height(140).attributeModifier(new ShapePaint(Color.Transparent, this.colors[1])).strokeWidth(1)
         .scale({ x: this.burst ? 1.35 : 0.65, y: this.burst ? 1.35 : 0.65 })
         .opacity(this.burst ? 0 : 0.4)
       ForEach(this.sparks, (spark: UnlockSpark) => {
@@ -104,12 +109,16 @@ export struct AppearanceReveal {
           .width(48).height(48).fill('#FFFFFF')
         } else {
           Column({ space: 10 }) {
-            Text(this.label).fontSize(20).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+            Text(this.label).fontSize(20).fontWeight(FontWeight.Medium).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
             Row().width('80%').height(6).backgroundColor(this.colors[0]).opacity(0.3).borderRadius(3)
             Row().width('55%').height(6).backgroundColor(this.colors[1]).opacity(0.16).borderRadius(3)
           }.alignItems(HorizontalAlign.Start).padding(20).width('76%')
-            .attributeModifier(SeriesVisual.surfaceFor('glass', SeriesVisual.isDark(this.themeMode, this.systemDark), this.colors[0]))
-            .backgroundEffect({ radius: 24, saturation: 1, brightness: 1, color: Color.Transparent })
+            .attributeModifier(SeriesVisual.surfaceFor('glass', SeriesVisual.isDark(this.themeMode, this.systemDark), this.colors[0], undefined, undefined, undefined, this.appearanceElements))
+            .background(this.renderGlassBackground(SeriesVisual.surfaceFor('glass', SeriesVisual.isDark(this.themeMode, this.systemDark), this.colors[0], undefined, undefined, undefined, this.appearanceElements)))
+      .border(appearanceModuleBorder(this.appearanceElements))
+      .borderRadius(appearanceModuleRadius(this.appearanceElements, SeriesVisual.cardRadius))
+
+            .backgroundEffect({ radius: 24 * parseElementStyle(this.appearanceElements).blur / 50, saturation: 1, brightness: 1, color: Color.Transparent })
             .borderRadius(20).clip(true)
         }
       }
@@ -120,6 +129,11 @@ export struct AppearanceReveal {
     }
     .width('100%').height(180).clip(true)
     .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
+  }
+
+  @Builder
+  private renderGlassBackground(surface: SharedSurface) {
+    SharedSurfaceBackground({ surface: surface })
   }
 
   build() {

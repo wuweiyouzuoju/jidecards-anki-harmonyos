@@ -1,5 +1,6 @@
-import { SurfaceSelect } from './SurfaceSelect';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
+import { SurfaceSelect } from './SurfaceSelect';
 import { SelectStyle } from '../../utils/SelectStyle';
 import { FormRowLayout } from '../../utils/FormRowLayout';
 import { 应用尺寸 } from '../../utils/应用尺寸';
@@ -9,6 +10,7 @@ import { HelpLabel } from './HelpLabel';
 /** 标签与帮助的统一选择行；默认公共枚举，层级选择可提供同样限宽的控件。 */
 @Component
 export struct FormSelectRow {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private surfaceMaterial: string = 'flat';
   @Prop label: ResourceStr = '';
   @Prop icon: ResourceStr | undefined = undefined;
@@ -47,7 +49,7 @@ export struct FormSelectRow {
           isActionEnabled: this.isLabelActionEnabled, onAction: this.onLabelAction })
           .layoutWeight(1).constraintSize({ minWidth: 0 })
       } else {
-        Text(this.label).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary'))
+        Text(this.label).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
           .textAlign(TextAlign.Start).layoutWeight(1).constraintSize({ minWidth: 0 })
       }
       if (this.showValuePreview) { this.valuePreview() }

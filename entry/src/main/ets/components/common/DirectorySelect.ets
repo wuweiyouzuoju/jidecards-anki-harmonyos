@@ -1,5 +1,6 @@
-import { SelectionValueButton } from './SelectionValueButton';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SelectionRect, selectionPopupAngle } from './SelectionMenuLayout';
+import { SelectionValueButton } from './SelectionValueButton';
 import { DirectoryRow, DirectoryView, directorySelectionAllowed } from '../../model/DirectoryTree';
 import { DirectorySelectDialog } from './DirectorySelectDialog';
 import { FormSelectRow } from './FormSelectRow';
@@ -21,6 +22,7 @@ export struct DirectorySelect {
   onHelp: () => void = (): void => {};
   @Prop @Watch('syncRows') rows: DirectoryRow[] = [];
   @Prop value: string = '';
+  @Prop fillWidth: boolean = true;
   @Prop @Watch('openRequested') openRequest: number = 0;
   private handledRequest: number = 0;
   private openRequested(): void {
@@ -35,12 +37,19 @@ export struct DirectorySelect {
   @State private dialogInteractive: boolean = true;
   private readonly dialog: NativeDialogHost = new NativeDialogHost();
   private alive: boolean = false;
+  @State private popupAngle: number = 0;
+  private chevronRect: SelectionRect = { left: 0, top: 0, width: 0, height: 0 };
+
   private version: number = 0;
   private readonly createDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
     const version: number = this.version;
     const presentation: NativeDialogPresentation = this.dialog.presentation();
     return new CustomDialogController({
-      builder: DirectorySelectDialog({ rows: this.dialogRows, isInteractive: this.dialogInteractive,
+      builder: DirectorySelectDialog({ onPanelArea: (area: Area): void => {
+        if (version !== this.version || !this.alive) return;
+        this.popupAngle = selectionPopupAngle(this.chevronRect, { left: Number(area.globalPosition.x),
+          top: Number(area.globalPosition.y), width: Number(area.width), height: Number(area.height) });
+      }, rows: this.dialogRows, isInteractive: this.dialogInteractive,
         title: this.showLabel ? this.label : this.title,
         onSelect: (id: string): void => { if (version === this.version) this.select(id); },
         onClose: this.dialog.guard((): void => { this.close(); }),
@@ -57,13 +66,13 @@ export struct DirectorySelect {
   private syncRows(): void { this.dialogRows = this.rows; this.dialogInteractive = this.isInteractive; }
   private open(): void {
     if (!this.alive || !this.isInteractive || this.rows.length === 0) return;
-    this.syncRows(); this.version++;
+    this.popupAngle = 0; this.syncRows(); this.version++;
     try { this.dialog.open(this.createDialog, (): boolean => {
-      this.version++; this.onViewChanged(null); return true;
+      this.popupAngle = 0; this.version++; this.onViewChanged(null); return true;
     }); }
     catch (error) { showToastSafely(this.getUIContext(), { message: $r('app.string.directory_open_error') }); }
   }
-  private close(): void { this.version++; this.dialog.close(); this.onViewChanged(null); }
+  private close(): void { this.popupAngle = 0; this.version++; this.dialog.close(); this.onViewChanged(null); }
   private select(id: string): void {
     if (!this.alive || this.dialog.current() === null || !directorySelectionAllowed(this.rows, id, this.isInteractive)) return;
     this.close(); this.onSelect(id);
@@ -79,7 +88,8 @@ export struct DirectorySelect {
   }
   @Builder
   private control(fill: boolean = false) {
-    SelectionValueButton({ value: this.value, label: this.label, controlWidth: fill ? '100%' : this.controlWidth(), valueMaxLines: 2,
+    SelectionValueButton({ value: this.value, label: this.label, anchorAtChevron: true, disclosureAngle: this.popupAngle,
+      onChevronArea: (area: Area): void => { this.chevronRect = { left: Number(area.globalPosition.x), top: Number(area.globalPosition.y), width: Number(area.width), height: Number(area.height) }; }, controlWidth: fill ? '100%' : this.controlWidth(), valueMaxLines: 2,
       controlMaxWidth: fill ? '100%' : this.labelActionIcon !== undefined ? '56%' : '70%',
       isInteractive: this.isInteractive && this.rows.length > 0, onAction: (): void => { this.open(); } })
   }
@@ -91,7 +101,7 @@ export struct DirectorySelect {
         isInteractive: this.isInteractive, useCustomControl: true,
         customControl: () => { this.control(); } })
     } else {
-      this.control(true)
+      this.control(this.fillWidth)
     }
   }
 }

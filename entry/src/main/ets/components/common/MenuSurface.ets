@@ -1,5 +1,6 @@
-import { PopupSurface } from './PopupSurface';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { sharedGlassShadow } from 'jide_foundation';
+import { PopupSurface } from './PopupSurface';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { currentMotionProfile, motionAnimation, materialPopupAnimation } from '../../utils/AppMotion';
@@ -9,8 +10,12 @@ export class MenuSurface implements AttributeModifier<CommonAttribute> {
   static readonly pointerSpan: number = 20;
   static readonly pointerDepth: number = 6;
 
-  /** 原生 Popup 的系统阴影须显式关闭，与自绘菜单共用同一入口。 */
-  static popupShadow(): ShadowOptions { return { radius: 0 }; }
+  /** 原生Popup拥有投影，内部玻璃关闭同一层投影，避免重复与宿主裁切。 */
+  static popupShadow(): ShadowOptions {
+    const mode: string = AppStorage.get<string>('themeMode') ?? 'system';
+    const dark: boolean = mode === 'dark' || (mode === 'system' && (AppStorage.get<boolean>('systemDarkMode') ?? false));
+    return sharedGlassShadow(dark, AppStorage.get<string>('surface_material') === 'glass');
+  }
 
   /** 缩放围绕触发边缘；原生 Popup 未指定锚点时保留系统居中语义。 */
   static popupTransition(centerX: number | string = '50%',

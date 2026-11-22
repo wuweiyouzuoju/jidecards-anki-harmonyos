@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { DirectoryRow, DirectoryView, DirectoryExpansion, directoryListHeight,
   directoryRowKey, directorySelectionAllowed, visibleDirectoryRows } from '../../model/DirectoryTree';
 import { DisclosureChevron } from './DisclosureChevron';
@@ -32,6 +33,7 @@ class DirectoryRowsDataSource implements IDataSource {
 /** 目录唯一渲染入口；不拥有领域选择、存储或写入。外壳内边距只在此贡献一次。 */
 @Component
 export struct DirectoryTree {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('surface_material') private material: string = 'flat';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @StorageProp(颜色键.动作主色) private accent: string = '#2F5FD0';
@@ -122,26 +124,26 @@ export struct DirectoryTree {
                 if (this.selectionMode === 'multiple' && row.selection === 2) {
                   Text('−').fontSize(应用尺寸.字号_正文).fontWeight(FontWeight.Bold)
                     .fontColor(this.accent).textAlign(TextAlign.Center).width(20).height(20)
-                    .border({ width: 2, color: this.accent }).borderRadius(应用尺寸.圆角_进度条)
+                    .border({ width: 2, color: this.accent }).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_进度条))
                     .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
                 } else if (this.selectionMode === 'multiple' && row.selection >= 0) {
                   Checkbox().shape(CheckBoxShape.ROUNDED_SQUARE).select(row.selection === 1).selectedColor(this.accent)
-                    .unselectedColor($r('app.color.text_secondary')).width(20).height(20).margin(0)
+                    .unselectedColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width(20).height(20).margin(0)
                     .enabled(this.isInteractive && row.selectable).focusable(false)
                     .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
                 }
                 Text(row.name).fontSize(SelectStyle.optionFont.size)
                   .fontWeight(this.selectionMode === 'single' && row.selection === 1 ?
                     SelectStyle.selectedOptionFont.weight : SelectStyle.optionFont.weight)
-                  .fontColor(this.selectionMode === 'single' && row.selection === 1 ? this.accent : $r('app.color.text_primary'))
+                  .fontColor(this.selectionMode === 'single' && row.selection === 1 ? this.accent : appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary')))
                   .layoutWeight(1).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
                 if (this.selectionMode === 'filter' && row.selectable) {
                   Text(row.selection === 1 ? $r('app.string.custom_study_tags_include') :
                     row.selection === 2 ? $r('app.string.custom_study_tags_exclude') : $r('app.string.custom_study_tags_any'))
-                    .fontSize(应用尺寸.字号_正文_小).fontColor(row.selection === 0 ? $r('app.color.text_secondary') : this.accent)
+                    .fontSize(应用尺寸.字号_正文_小).fontColor(row.selection === 0 ? appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')) : this.accent)
                 }
                 if (row.detail !== '') {
-                  Text(row.detail).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_tertiary'))
+                  Text(row.detail).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_tertiary', $r('app.color.text_tertiary')))
                 }
               }.width('100%').padding({ left: 应用尺寸.间距_12, right: 应用尺寸.间距_12 })
             }.layoutWeight(1).height(44)
@@ -165,11 +167,11 @@ export struct DirectoryTree {
           maximumLength: undefined, debounceMs: 0, onChange: (value: string): void => { this.searchText = value; this.refresh(); } })
       }
       if (this.visible.length === 0) {
-        Text(this.emptyLabel).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary'))
+        Text(this.emptyLabel).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       } else {
         Column() { this.list() }.width('100%').padding(this.framed ? 应用尺寸.间距_5 : 0)
           .backgroundColor(this.framed ? insetMaterialFill($r('app.color.surface_card'), this.material) : Color.Transparent)
-          .border(this.framed ? SurfaceBorder.options() : { width: 0 }).borderRadius(应用尺寸.圆角_面板)
+          .border(this.framed ? SurfaceBorder.options( undefined, undefined, this.appearanceElements) : { width: 0 }).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
       }
     }.width('100%').alignItems(HorizontalAlign.Start)
   }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { SharedGlassPanel, GlassFusionRect } from 'jide_foundation';
-import { currentGlassSource, retainGlassPanel, releaseGlassPanel, sourceCaptureAllowed, GLASS_BACKGROUND_SOURCE } from '../../utils/GlassBackdrop';
+import { currentPopupGlassSource, currentGlassSource, retainGlassPanel, releaseGlassPanel, sourceCaptureAllowed, GLASS_BACKGROUND_SOURCE, glassBackgroundSource } from '../../utils/GlassBackdrop';
 import { takePopupTrigger } from '../../utils/PopupTrigger';
 import { productMenuTheme } from '../../utils/MenuTheme';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
@@ -10,6 +10,8 @@ import { DIALOG_OPACITY_KEY, MaterialOpacity } from '../../model/SurfaceMaterial
 /** 产品只连接真实采样源、偏好及生命周期；完整呈现统一由公共基础拥有。 */
 @Component
 export struct GlassPanel {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
+  @Prop shadowVisible: boolean = true;
   @Prop source: string = '';
   @Prop materialOverride: string = '';
   @Prop opaque: boolean = false;
@@ -42,7 +44,7 @@ export struct GlassPanel {
   @Builder
   private empty(): void {}
   aboutToAppear(): void {
-    this.sourceId = this.source || currentGlassSource(this.getUIContext());
+    this.sourceId = this.source || (this.role === 'menu' ? currentPopupGlassSource(this.getUIContext()) : currentGlassSource(this.getUIContext()));
     if (this.surfaceVisible) this.trigger = takePopupTrigger();
     if (this.surfaceVisible && !this.opaque) { retainGlassPanel(this.sourceId, this.materialOverride === 'glass'); this.retained = true; }
   }
@@ -50,7 +52,7 @@ export struct GlassPanel {
     if (this.retained) { releaseGlassPanel(this.sourceId, this.materialOverride === 'glass'); this.retained = false; }
   }
   build() {
-    SharedGlassPanel({
+    SharedGlassPanel({ shadowVisible: this.shadowVisible,
       materialOverride: this.materialOverride,
       opaque: this.opaque,
       panelWidth: this.panelWidth,
@@ -68,14 +70,14 @@ export struct GlassPanel {
       geometryReady: this.geometryReady,
       fusionContentRevealMs: this.fusionContentRevealMs,
       animateExit: this.animateExit,
-      source: this.sourceId, backgroundSource: GLASS_BACKGROUND_SOURCE, trigger: this.trigger,
+      source: this.sourceId, backgroundSource: glassBackgroundSource(this.sourceId), trigger: this.trigger,
       theme: productMenuTheme(this.materialOverride || this.material, this.mode, this.systemDark, this.foreground,
-        this.dialogOpacity, this.accent, this.getUIContext()),
+        this.dialogOpacity, this.accent, this.getUIContext(), this.appearanceElements),
       captureAllowed: (initialFrame: boolean = false): boolean => sourceCaptureAllowed(this.sourceId, initialFrame),
       enterScale: SurfaceTransition.glassScale(this.menuMotion || this.role === 'menu', this.drawerMotion),
       enterOffset: SurfaceTransition.glassOffset(this.drawerMotion),
       enterAnimation: SurfaceTransition.glassEnterAnimation(this.menuMotion || this.role === 'menu', this.drawerMotion),
-      exitTransition: SurfaceTransition.glassExit(this.menuMotion || this.role === 'menu', this.drawerMotion, this.centerX, this.centerY),
+      exitTransition: this.role === 'menu' ? SurfaceTransition.glassExit(true, false, this.centerX, this.centerY) : TransitionEffect.IDENTITY,
       flatTransition: SurfaceTransition.dialog(),
       onPrepared: this.onPrepared, content: (): void => { this.content(); } })
   }
