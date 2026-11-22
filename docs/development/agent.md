@@ -9,6 +9,10 @@
 - 责任链：UI → 会话/Runner → 读取、导航排队与提案；成功回复收尾 → 首页 Navigation；用户确认 → DraftExecutor / ActionExecutor → Service 或受控存储。
 - 快速反馈：`npm test -- agent`；完整验收见 [验证说明](verification.md)。
 
+## 外部 Agent 本地接入
+
+鸿蒙 PC/2in1 的 JIDE 通用助手页可显式开启本机 MCP，外部客户端复用当前全部工具目录与真实注册表。卡库写入与辅助操作仍走应用内确认；即时主题/导航增加本机确认。入口、配置、会话生命周期、工单限制与验证边界见 [外部 Agent 本地 MCP](external-agent.md)。
+
 ## 卡库与应用操作接入（2026-10-11）
 
 新增操作以 `model/agent/AgentOperations.ts` 为唯一声明、严格参数及风险目录，进入 assistant/create/edit 三种模式；`AgentOperationTools` 注册并验证 Scope、批量数量和已发现目标。`CoreAgentOperations.ts` 适配现有 Core 服务，`AppAgentOperations.ets` 适配本机存储和原界面宿主；不新增任意 RPC、文件路径或凭证入口。
@@ -38,7 +42,7 @@
 
 ### 全软件操作覆盖复核（2026-10-11）
 
-当前 JIDE 已覆盖上表的主要卡库业务，但不能表述为“全部按钮都能代点”或“整个软件都能无人参与操作”。复核以 `agentFunctionTools(100, 'assistant')` 的实际工具、`APP_INTERFACE_SURFACES` / `SETTINGS_GROUPS` 的共同声明及领域执行入口对照；界面条目、工具数量和测试通过率均不能换算为全软件操作覆盖率。当前能力仍以这些声明和真实注册为准，不另维护一份完整工具清单。
+当前 JIDE 已覆盖上表的主要卡库业务，但不能表述为“全部按钮都能代点”或“整个软件都能无人参与操作”。复核以 `agentFunctionTools('assistant')` 的实际工具、`APP_INTERFACE_SURFACES` / `SETTINGS_GROUPS` 的共同声明及领域执行入口对照；界面条目、工具数量和测试通过率均不能换算为全软件操作覆盖率。当前能力仍以这些声明和真实注册为准，不另维护一份完整工具清单。
 
 | 范围 | 尚未接通或受限的操作 | 现有能力及责任入口 |
 | --- | --- | --- |
@@ -82,7 +86,9 @@
 
 普通对话顶栏右侧只保留“更多”，复用首页 `IconActionButton(ic_home_more)`、无尖角 `AnchoredMenu` 和 `ActionMenuList`，点击显示“设置”和历史；菜单项与设置页标题共用 `ai_agent_settings_page_title`，中英文分别显示“设置”/“Settings”，`AppInterface` 的界面认知沿用同一资源键。菜单使用 `ic_home_settings`、回转时钟 `ic_common_history` 的既有灰色填充图标，顶栏仍使用描边。历史页右侧仅为“＋”。长期记忆只从 JIDE 设置页进入，顶栏不再设独立记忆入口。`AgentMemoryPanel` 负责搜索、范围筛选、新增/编辑/删除、未保存退出和真实界面观察，返回管理列表、设置、原聊天或历史按层级处理，保留原聊天及输入。`AgentMemoryManager` 拥有读取代次和手动提交；复用页面已有 `AgentWorkspaceStore` 的队列、`applyAgentMemoryChange` 的旧快照校验及本机存储，不调用模型、不修改卡库。AI 记忆提案和手动入口读写同一份数据；保存失败保留编辑内容，过期修改被拒绝，退出后已接受的提交仍完成。范围显示真实牌组名称，牌组删除后需重新选择范围或删除记忆；页面上的范围选择器显式传 `surface_card`，复用公共白底（深色随主题），卡片内部的内嵌选择器仍沿用公共默认底色。`AppInterface` 同时声明入口顺序、管理界面和实际控件状态；界面观察不额外授予写入权限。
 
-JIDE 设置直接组合全局设置的 `components/settings/AIAgent设置分组.ets` 与其中的 `AgentWebSettingsSection`，查看/编辑模型服务、模型、API 密钥、自定义服务视觉能力、单批制卡上限和联网搜索设置，仍经原 `AgentSettingsStore` / `AgentSecretStore` 保存。长期记忆在设置正文顶部单独占一栏，与下方 AI 配置分组分开；复用 `设置分组卡片(showHeader: false)` 和 `SettingsActionRow`，标题由操作行提供，卡片间距归 `应用尺寸.页面分组间距`，窄版8vp、宽版12vp。设置表单在打开长期记忆期间保留挂载和草稿，隐藏时释放自己的界面观察，返回后恢复；顶栏返回和系统返回统一委托设置分组的忙碌/未保存退出守卫。保存成功回调刷新当前页面 Provider 配置，后续请求使用新值。表单读取使用严格模式，读取失败禁用模型配置提交，避免以默认值覆盖已有设置；迟到读取与销毁回调由原组件代次隔离。设置正文独占12vp水平边距和8/12vp密度顶部间距，卡片内部边距仍归既有设置卡片，导航安全区只在正文底部追加一次。
+JIDE 设置直接组合全局设置的 `components/settings/AIAgent设置分组.ets` 与其中的 `AgentWebSettingsSection`，查看/编辑模型服务、模型、API 密钥、自定义服务视觉能力和联网搜索设置，仍经原 `AgentSettingsStore` / `AgentSecretStore` 保存。长期记忆在设置正文顶部单独占一栏，与下方 AI 配置分组分开；复用 `设置分组卡片(showHeader: false)` 和 `SettingsActionRow`，标题由操作行提供，卡片间距归 `应用尺寸.页面分组间距`，窄版8vp、宽版12vp。设置表单在打开长期记忆期间保留挂载和草稿，隐藏时释放自己的界面观察，返回后恢复；顶栏返回和系统返回统一委托设置分组的忙碌/未保存退出守卫。保存成功回调刷新当前页面 Provider 配置，后续请求使用新值。表单读取使用严格模式，读取失败禁用模型配置提交，避免以默认值覆盖已有设置；迟到读取与销毁回调由原组件代次隔离。设置正文独占12vp水平边距和8/12vp密度顶部间距，卡片内部边距仍归既有设置卡片，导航安全区只在正文底部追加一次。
+
+AI 智能体表单共用一个“保存配置”按钮，提交当前模型和联网的修改。开启 DeepSeek 联网可使用同一次提交中的模型密钥，或读取已经保存的 DeepSeek 密钥。先校验整页再写入，只有两部分都完成才显示成功；某部分写入失败时保留仍未保存的草稿。退出守卫使用同一组件持有的草稿与已保存基线。另有独立的会话上限控件。行为回归见 `ai-agent-settings-contract.test.mjs` 和 `ai-agent-web-settings.test.mjs`。
 
 `agent_settings` 的配置名称/条件直接复用 `SettingsStructure.SETTINGS_GROUPS` 的 `ai` 分组，真实表单发布加载、忙碌、可用控件与非敏感当前值；密钥与自定义 URL 不进入观察。长期记忆父级为 `agent_settings`，不新增助手代操作权限。回归在 `ai-agent-settings-contract.test.mjs`、`ai-agent-web-settings.test.mjs` 和 `ai-agent-app-structure.test.mjs`，按 [分级验证](verification.md#按变更路径选择验证)检查相关测试及增量 HAP；设备外观、键盘和交互单独验收，既有记忆页的历史设备结论不覆盖新设置页面。
 
@@ -100,13 +106,21 @@ JIDE 设置直接组合全局设置的 `components/settings/AIAgent设置分组.
 
 `AgentRunner` 在每次模型请求前及无待确认提案的工具完成后发布检查点。Session 对检查点副本补齐尚未返回工具的中断结果，不改正在执行的协议；原始思考保持完整，已接受写入不会从历史重新授权或重放。页面冻结并排队保存历史，同时原子写入现有检查点文件；持久化失败停止本轮，不能伪装成应用工具失败继续执行。检查点只描述已到达的边界，崩溃发生在实际副作用与检查点之间时仍需核实实际状态。
 
-默认单轮额度由8次模型/16次工具提高到32次模型/96次工具。`AgentExecutionBudget` 为当前内置 DeepSeek 两个模型使用768000序列化字符和131072输出token；自定义及其他接口维持240000字符/32768输出token。`ProviderProtocol` 与 Runner 拷贝共用该请求预算，不把字符额度冒充模型token窗口，不改变图片、Scope、草稿确认或批次写入边界。服务端仍可根据模型真实窗口拒绝请求。DeepSeek公开模型参数见[官方模型列表](https://api-docs.deepseek.com/api/list-models)和[官方规格](https://api-docs.deepseek.com/quick_start/pricing/)；本轮未进行付费模型评测。
+JIDE 前台执行不再按模型请求或工具调用次数暂停。工具结果和计划按既有检查点保存；单个长任务接近上下文预算时，在已完成的工具批次边界整理旧记录，保留最新原始思考、工具配对和用户要求。`AgentExecutionBudget` 仍约束单次请求尺寸。流传输不设总时长上限，以连续五分钟无数据判断连接停滞；断流且缺失终态时保留检查点。鸿蒙挂起应用后，回到当前 JIDE 会话会尝试重连并接续；应用进程终止后可从会话历史手动继续。卡库写入仍通过已有草稿或确认流程。
+
+联网开关开启且模型与搜索服务均选择 DeepSeek Flash／DeepSeek 时，`ProviderProtocol` 声明原生深度搜索和链接读取；当用户提供网页且没有明确要求搜索时，只声明链接读取，使深度搜索不会接管链接读取。其他组合继续使用已选搜索服务和应用联网工具。`ResponsesEventNormalizer` 从服务端事件和终态收集可核对来源，并保留链接原样续接字段；明确要求搜索时，搜索开始事件不能作为完成证据。Flash 启用服务端内容审核。附件读取沿用现有文档和媒体流程。官方协议见 [DeepSeek Web Tools](https://api-docs.deepseek.com/guides/web_tools/) 与 [Responses API](https://api-docs.deepseek.com/guides/responses_api/)。
 
 回归见 `ai-agent-long-project.test.mjs`、`ai-agent-v2-runtime.test.mjs`、原上下文预算及界面认知回归：覆盖超旧轮次任务、批内中断结果配对、恢复计划、IO失败停止、手动/AI修改冲突、大量记忆的有界请求及未保存退出。主机与设备验证分别记录；编译不证明真机布局和真实模型执行质量。
 
 2026-10-08：`get_browser_preferences` 读取真实集合浏览偏好、最近搜索、Core 列目录与忽略重音值。`propose_update_browser_preferences` 只接受模式、排序、副标题和 Cards/Notes 各自有序显示列的局部修改；未知配置键、无效列、当前模式不支持的排序被拒绝。确认卡显示前后值，`AgentActionExecutor` 与手动菜单共用 `BrowserPreferencesStore`，执行前核对旧快照，保存后读回。忽略重音由手动搜索选项和独立 propose_set_ignore_accents 提案共用保存入口；浏览偏好不修改笔记或调度。`AppInterface` 同步声明全选、清空、所选预览/导出/评分、列配置、搜索选项、快捷键、并排编辑和查找替换目标，各实际拥有者发布忙碌、作用范围与选项。界面观察不授予任意点击能力，实际修改仍走已注册领域入口。行为与确认回归见 `ai-agent-maintenance`、`browser-desktop-ui`。
 
-2026-10-07：`get_filtered_deck` 读取已发现筛选牌组的真实 Core 配置；`propose_update_filtered_deck` 仅准备搜索条件、数量/顺序、重新调度和预览延迟白名单修改。`FilteredDeckCommands` 是 UI/JIDE 的共同入口；确认卡显示前后值，执行前核对旧 protobuf 配置，保留未知字段与 v1 延迟，接受写入后独立于页面生命周期完成。搜索条件、数量上限、排序方式各自成行，不显示原始配置 JSON；未变值只显示一次，两组搜索以序号区分，移除项显示未设置。`FilteredDeckOptions` 的排序值/名称同时供手动表单和 JIDE 使用。普通牌组被拒绝，过期提案不提交，更新后重建并返回实际配置/计数。`get_advanced_settings` / `propose_update_collection_preferences` 同时读写隐藏音频按钮和翻面中断偏好。导入结果、音频设置和筛选菜单发布真实界面状态，不仅更新提示词。回归见 `filtered-deck-commands`，设备与 Core 证据见[本轮验收](ankidroid-high-priority-2026-10-07.md)。
+2026-10-07：`get_filtered_deck` 读取已发现筛选牌组的真实 Core 配置；`propose_update_filtered_deck` 仅准备搜索条件、数量/顺序、重新调度和预览延迟白名单修改。`FilteredDeckCommands` 是 UI/JIDE 的共同入口；确认卡显示前后值，执行前核对旧 protobuf 配置，保留未知字段与 v1 延迟，接受写入后独立于页面生命周期完成。搜索条件、数量上限、排序方式各自成行，不显示原始配置 JSON；未变值只显示一次，两组搜索以序号区分，移除项显示未设置。`FilteredDeckOptions` 的排序值/名称同时供手动表单和 JIDE 使用。普通牌组被拒绝，过期提案不提交，更新后重建并返回实际配置/计数。`get_advanced_settings` / `propose_update_collection_preferences` 同时读写隐藏音频按钮和翻面中断偏好。导入结果、音频设置和筛选菜单发布真实界面状态，不仅更新提示词。回归见 `filtered-deck-commands`，设备与 Core 证据见[本轮验收](../archive/development/ankidroid-high-priority-2026-10-07.md)。
+
+### DeepSeek 语音和 OCR
+
+当前模型服务为 DeepSeek 且本机存有非空模型密钥时，JIDE 输入区提供「DeepSeek 语音输入」。其他服务、空密钥或配置读取失败时隐藏此入口，保存模型配置后立即重算，界面与 JIDE 观察共用同一可用状态。录制单声道 16 kHz PCM WAV，最多 120 秒。转写结果追加到可编辑输入框，发送由用户执行。录音权限、空白识别、密钥被拒绝、余额、音频格式、服务繁忙和超时分别反馈；不会将服务原始响应或密钥显示在界面。只有含模型正文的完整回复才提供手动「DeepSeek 朗读」，工具回执和应用生成的草稿提示不会显示朗读入口，通过 DeepSeek WAV 接口合成，经应用播放器播放，结束或停止后清理缓存。离页取消待处理语音请求。
+
+用户在当前请求明确指定「DeepSeek OCR」时，已提交的 PDF 或图片可走云端逐页识别。每次只发送所读页面的 JPEG，结果保留 OCR 方法和截断状态；普通 OCR 使用鸿蒙本机能力。密钥复用安全存储，语音控件和忙碌状态接入 JIDE 观察。接口与计费见 [识别语音](https://api-docs.deepseek.com/guides/asr/)、[朗读](https://api-docs.deepseek.com/guides/tts/) 和 [OCR](https://api-docs.deepseek.com/guides/ocr/)。
 
 ### JIDE 专用高级能力（2026-10-04）
 
@@ -117,7 +131,7 @@ JIDE 设置直接组合全局设置的 `components/settings/AIAgent设置分组.
 | `get_advanced_settings` | collection 读取真实 Core FSRS 高级偏好和历史备份策略；study 读取本机学习操作配置，不读取凭证 |
 | `propose_update_collection_preferences` | 修改负担均衡、带步骤的短期调度、每日/每周/每月备份保留数与最小间隔，单位为数量/分钟。共用 `ReviewPreferencesStore` 队列，确认时检查旧值，仅修改白名单 wire 字段，保留未知字段；不主动重排卡片 |
 | `propose_update_study_controls` | 常亮、旧手势模式、实验版完整手势和键盘完整绑定。gestureConfig 支持四向滑动、双击、四区/九宫格、2/3/4 指与摇动，按卡面绑定同一学习动作目录，未绑定无操作；仅实验版可编辑和生效，简洁版保留已有配置，读工具返回 gestureInputs/gestureActions、gestureEditable/effectiveGestureConfig，确认预览展示布局、手势、卡面与动作。与“设置→复习→学习快捷键”共用校验和保存队列；keyboard 支持任意可识别物理键、精确 Ctrl/Shift/Alt、多个绑定及题目/答案面，空 bindings 禁用；旧 keys 兼容默认覆盖。评分只在答案面，系统返回不可重绑；读取同时返回 effectiveKeyboard 与共同动作目录，确认预览含卡面和组合键 |
-| `propose_export_subset` | 已发现的精确 notes/cards ID 子集导出 APKG/文本，最多1000项；notes 包含兄弟卡，cards 由 Core 决定相关笔记。确认时复查卡片/笔记及关联内容，Core 导出结束后释放集合再打开保存选择器，取消不会报告已保存 |
+| `propose_export_subset` | 已发现的精确 notes/cards ID 子集导出 APKG/文本；notes 包含兄弟卡，cards 由 Core 决定相关笔记。确认时复查卡片/笔记及关联内容，Core 导出结束后释放集合再打开保存选择器，取消不会报告已保存 |
 | `propose_duplicate_note` | 已发现笔记复制为新增草稿，保留字段、标签和媒体引用；确认时检查来源和类型未变，Core 分配新身份，不复制调度/日志 |
 | `propose_update_notetype_fields` | 修改 sticky、rtl、font、size、description、plainText、collapsed、excludeFromSearch 及排序字段；保留名称、顺序、身份和未知属性，展示跨牌组完整影响数量，高风险双重确认，不改变结构 |
 | `propose_restore_notetype` | 调用真实 Core 标准恢复，先展示当前/目标字段与模板，明确额外字段内容及模板卡片可能删除。完整影响范围和类型 JSON 在确认时复查，受批量上限约束；禁止 normal/cloze 互换，恢复后校验标准结构、模板定义与 CSS |
@@ -262,7 +276,7 @@ JIDE 页发布当前模式、历史/对话分区、发送/停止、文件解析�
 - `AgentToolCatalog.ts` 在制卡、改卡两种模式都声明 `propose_update_card_style` 和 `propose_update_note_type_templates`；页面始终调用 `HighRiskAgentTools.register(registry, mode)`。删除、变更类型等其他高风险工具仍只在改卡注册。工具声明和实际 Registry 执行由 `ai-agent-style-runtime.test.mjs` 联合验证。
 - 简单外观走 `AgentCardStyle.ts`：背景、文字和深色颜色只接受 `#RRGGBB`，字号、行距、对齐有明确边界。补丁只替换应用自己的样式块，保留外部 CSS、脚本、模板及类型元数据；重复修改保留上次未提及的属性。新建类型的 `propose_create_note_type.style` 复用同一实现。内部元素自带颜色/背景仍可能覆盖继承值，不承诺改写任意导入模板的所有元素。
 - 原模板工具兼容原参数，`templateJson`/`css` 改为至少提交一个，省略部分保留原值，显式空 CSS 表示清空。模板数组须非空且包含有效名称、正反面与原始 ord（新模板可用 null）；不能把 `[]` 当“保持模板”的占位符。
-- `AgentNotetypeImpact.ets` 用锁定 Core 支持的 `mid:<id>` 搜索一次笔记、一次卡片，计算跨牌组的完整影响；不按名称通配、不逐笔记发 RPC。纯 CSS 更新是一次共享类型写入，不受逐卡 batchLimit/1000 张上限约束；真正模板变更仍保留原上限。两者均是高风险草稿，保留原确认协议，不能自动保存。
+- `AgentNotetypeImpact.ets` 用锁定 Core 支持的 `mid:<id>` 搜索一次笔记、一次卡片，计算跨牌组的完整影响；不按名称通配、不逐笔记发 RPC。纯 CSS 更新是一次共享类型写入。模板变更仍计算完整影响范围，应用不按卡片数量拒绝草稿。两者均是高风险草稿，保留原确认协议，不能自动保存。
 - `AgentDraftExecutor` 在准备及执行时同时核对原类型 JSON 与完整受影响 ID 集合；卡片新增/删除或模板变化均使确认失效。写入后回读 CSS，未验证保存结果不报告成功。读回失败时可能已经写入，不能声称已回滚。
 - `AgentStylePreview.ets` 为新建类型和外观草稿提供同一配色/排版示意；实际模板内部样式仍保留，示意不是整张卡的渲染截图。历史的纯 CSS 草稿没有结构化示意，仍显示原有差异信息。
 - 高风险提案只在成功生成后登记 draftId；失败可用同一 ID 重试，成功 ID 不可重复。共享类型操作的执行重试保留原完整影响范围。Registry 只把共享模板草稿 ID、摘要、类型 ID 和数量返回模型，完整受影响 ID 集合仍在应用草稿中。Runner 区分 `failureStage=arguments/execution`，保留真实参数字段、后端 message/nativeStatus/kind/context，诊断文本统一脱敏；执行失败不再统一要求模型重写参数。空 receivedKeys 不能被解释为未收到调用，缩短 CSS 不能解决集合/范围/后端异常。
@@ -286,7 +300,7 @@ JIDE 无公式正文与表格单元格在 `AgentMarkdownText` 的统一 Text 入
 
 澄清选项由 `AgentClarificationCard.ets` 统一呈现：原生 Radio、标题和说明组成整行点击区，固定2vp边框与20vp标记，选中不改变几何；推荐不等于默认选中，仍需显式继续。选项内边距10vp由行拥有，行间距10vp由问题容器拥有；长文本自然换行。继续复用 `PrimaryActionButton`，状态和提交仍由页面负责。Agent 补充说明和消息输入共用 `FormTextAreaStyle`；制卡字段和普通改字段草稿直接复用 `NoteFieldEditor`，保留粗体、荧光、字号、标题和换行的可视编辑、源码回退及 HTML 序列化，不另建富文本解析或写入入口。已保存/忙碌卡片和非 pending 变更不可编辑。输入内部四边10vp，消息输入高度仍等于右侧两个按钮及其8vp间隔。回归入口 `ai-agent-form-controls.test.mjs`；键盘与安全区仍由页面 RESIZE 和导航条高度处理。
 
-输入区导入/发送在各自Stack内调用同一个 `composerLabelWidth`，用 `AppInterface.agentComposerLabelKeys` 的导入、解析、发送、取消全部本地化文案测量最大宽度；透明测量文字不进入无障碍朗读，语言切换按语言重建。实际文字独立居中；发送状态用12vp图标、14vp槽绝对定位到已有16vp左内边距，不参加横向排版，idle不绘制。两按钮保留44vp高度、16vp水平内边距和8vp竖向间距，并贡献相同1vp边框；发送使用透明边框保留实底外观。输入区10vp横向间隔及页面安全区仍归原宿主；中英、解析/请求/取消及结果切换不挤动输入框。标签、显隐、可用状态和JIDE观察仍共用原声明，不新增动作或权限。几何/标签覆盖回归见 `ui-action-status-layout.test.mjs`；键盘、大字体、窄/宽屏最终渲染须设备验收。
+JIDE 共用输入区的文本区占满上方，底行使用既有 `IconActionButton` 的圆形材质表面，由 `SeriesVisual` 与 `SurfaceBorder` 提供玻璃和扁平样式的轮廓。左侧加号导入文件，右侧麦克风和上传箭头分别负责录音与发送。录音中用项目已有带声波的麦克风，解析/转写显示简短状态，生成中发送按钮切换为停止。原生 TextArea 保持 48–112vp 内容区间，面板提供8vp内边距，页面负责外边距和底部安全区。键盘避让使用页面的 RESIZE，图标、无障碍标签、可用状态和 JIDE 观察由 `AppInterface` 登记。
 
 2026-10-10：公共UI回归、状态布局专项、文档/依赖边界及增量签名HAP通过，构建新增警告为0。手机模拟器覆盖安装后，导入/发送按钮外缘均为 `[1055,1279]`、宽224px，两行文字均为 `[1114,1220]`、水平中心1167px；输入为空/有文字时一致。安装前后UID、首次安装时间和debug签名类型一致；测试输入已清除并返回首页。宽屏模拟器只验收覆盖安装及首页启动，未进入其未启用的JIDE。模拟器未成功调出软键盘，真实请求中的状态图标、设备中英切换/大字体、宽屏聊天及真机未验收；状态分支与图标/内边距几何由专项主机回归覆盖，不能描述为设备全状态通过。截图和布局证据保存于忽略的 `.local/send-button-fix-20261010/`。
 
@@ -304,8 +318,8 @@ JIDE 无公式正文与表格单元格在 `AgentMarkdownText` 的统一 Text 入
 - JIDE 普通对话、制卡和改卡共用 `web_search` / `read_webpage` 两个本机只读工具，由 `AgentWebTools.ets` 注册到既有 Registry，不新增循环或卡库权限。`AgentWeb.ts` 负责参数边界、URL/跳转校验、正文分页和来源解析；设备适配使用 RCP，其他搜索配置 GET 读取网页，POST 调用豆包或 DeepSeek，关闭自动跳转、逐跳验证、解析地址排除内网/保留地址并将校验地址传给 DNS 规则、30 秒请求超时、流式响应最多 2 MiB，并在结束或失败时释放 Session。网页仅提取 HTML/纯文本，不运行脚本、登录或加载页面资源；复用 `AgentDocumentText`，不是浏览器或完整正文识别器。正文默认 12000、最多 24000 字符，`nextOffset=-1` 表示读完；续读重新请求网页，因此动态页面内容可能变化。没有任意网页图片/音频下载工具；已有 `search_images` 返回 Wikimedia 候选，并由 `AgentDraftExecutor` 在草稿确认后下载、校验及写入媒体库。
 - 新配置的搜索服务默认 DeepSeek，保留已显式保存的豆包搜索 Custom 版和 Brave 选择；目录和购买地址在 `AgentSearchProvider.ts`。豆包固定 POST `https://open.feedcoopapi.com/search_api/web_search`，仅发送 Query、SearchType=web、Count、NeedUrl 和 text 格式；凭据仅放 Authorization，解析 Result.WebResults，优先 Summary、回退 Snippet。契约核对火山引擎[官方 API 实现](https://github.com/volcengine/mcp-server/blob/main/server/mcp_server_askecho_search_infinity/src/mcp_server_askecho_search_infinity/api/api_key_auth.py)与[请求结构](https://github.com/volcengine/mcp-server/blob/main/server/mcp_server_askecho_search_infinity/src/mcp_server_askecho_search_infinity/model.py)。三个服务均返回标题、HTTPS URL 和限长摘要，不自动读取全部结果；查询统一限制1至100字符。错误响应不能计为成功检索，零结果仍表示真实执行。豆包和 Brave 配置的网页读取在设备直接请求；DeepSeek 配置的网页读取调用独立 Fetch 接口，会按其官方规则计费，不是 Search 次数。
 - 联网开关在 `AgentSettingsStore` 的独立键保存，默认关闭；搜索服务独立保存，缺省 DeepSeek。先打开界面开关，才显示服务选择和密钥输入；此时仅打开配置，保存后才生效。DeepSeek 复用模型设置中已保存的密钥，搜索表单不提供重复输入、不覆盖或清除模型密钥；其他服务仍使用独立搜索密钥。缺少所选服务凭据拦截保存，存储入口启用时检查所选服务的已保存密钥，运行时读取开关也检查凭据；旧版本开启但没有对应密钥的配置视为关闭，不影响本地生成。搜索密钥在 Asset Store 的独立 `web.doubao` / `web.brave` 别名保存，既有模型与 Brave 密钥保持原别名，不自动互用。设置复用公共 `SettingsToggleRow` / `SelectStyle` / `FormInputStyle` / `PrimaryActionButton` / `按下态按钮`，不把密钥写入偏好、提示词、历史或工具输出。服务选择独占公共 FormSelectRow，额度说明与购买按钮使用独立 LabeledActionRow；DeepSeek 隐藏重复密钥输入。行间距仍由 FormRowLayout.rowGap 唯一提供，公共控件拥有内部几何，原设置容器与安全区保持既有边距。豆包按钮打开[官方控制台](https://console.volcengine.com/search-infinity/web-search)，提醒订阅和按量密钥独立；系统浏览器打开失败时复制购买网址，复制也失败则显示网址。关闭时保留密钥；切换服务仅读取相应凭据，迟到结果失效。配置及真实组件非渲染行为回归见 `ai-agent-web-settings.test.mjs`。
-- 每轮读取当前开关；用户明确要求不联网时移除两个联网声明，保留其他本地能力。工具执行前再次检查开关，偏好/密钥存储失败保留错误。声明本机联网工具时 Runner 保持 Provider 搜索 `off`，自定义模型也能使用；真实成功工具输出才记录执行及来源，正文中的链接不能替代工具证据。空搜索结果算实际执行，不算存在来源；网络失败不算已搜索。既有来源展示、时间线、预算和取消协议共用。
-- JIDE 配置使用应用端开关和服务选择，不恢复旧 Provider 三档搜索界面或读取其历史偏好。Provider 的内置搜索协议保留兼容，主页面固定关闭该路径以避免重复检索；它不代表应用端联网关闭。错误提示分别说明应用开关、检索未完成或来源缺失，不再建议通过切换 DeepSeek/OpenAI 修复本机工具。DeepSeek 使用原始 JSON Search/Fetch 接口，通过现有本机工具执行；Brave 国内直连稳定性尚未验收，未接入 SearXNG。
+- 每轮读取当前开关；明确要求不联网时关闭应用及 Provider 联网能力。应用端工具执行前再次检查开关。成功的搜索或链接读取才足以证明执行，来源取实际工具结果与服务端事件中的网页，正文链接不作为证据。
+- JIDE 配置使用应用端开关和服务选择。DeepSeek Flash 配合 DeepSeek 搜索时使用原生 Responses 联网；其他组合沿用应用端 Search/Fetch、豆包或 Brave。服务端搜索和 Fetch 按 DeepSeek 规则计费。
 - 回归入口 `ai-agent-web.test.mjs` 与 `ai-agent-runner-contract.test.mjs` 覆盖豆包 POST / Brave GET、搜索密钥隔离、底层无密钥读取、参数/URL/跳转、文本分页、响应大小、HTTP/内容类型失败、取消和迟到响应、各模式声明、关闭联网后的本地能力、真实 Registry/RCP 适配及自定义 Provider 接续。平台网络 IO 用主机替身，实际设备网络连通性、服务账户额度、网站反爬/脚本页面及设置外观由用户真机验收；本轮不操作真机。
 - 2026-10-01 本机联网验收：Agent 领域 355 项、全库 1829 项测试通过；联网代码已完成 clean 签名 HAP 构建，警告门禁 accepted=268、unexpected=0。实现供应用所有受支持设备共用，不检查特定设备 ID 或机型。未使用用户搜索密钥发起付费检索，未操作真机；API 服务连通性和实际外观不由主机替身测试证明。安全存储回归见 `ai-agent-web-storage.test.mjs`，保留既有模型别名，并验证搜索密钥独立替换/清除及存储失败可观察。
 - 2026-10-01 豆包接入及默认关闭复验：`npm run verify` 完成原生、沙箱、RPC 和 clean 签名 HAP，警告门禁 accepted=268、unexpected=0；最后的 `npm run verify -- repo` 全库1863项通过。覆盖先打开配置再填密钥保存、服务独立密钥、豆包默认、真实工具 POST 接线、服务选择旁购买地址及打开失败复制回退。未使用真实 API 密钥检索，未购买套餐，未操作真机；宽窄屏、开关/选择框观察更新、浏览器跳转及实际网络由用户验收。
@@ -328,7 +342,7 @@ JIDE 无公式正文与表格单元格在 `AgentMarkdownText` 的统一 Text 入
 - `AgentProviderContext.ts` 负责草稿语义视图；`truncateProviderText` 必须包括截断标记在内遵守额度，字段/操作丢失须标记 truncated。`buildProviderDraftStateContext` 对大量草稿改用真实身份、状态、数量和执行结果，明确正文已省略，避免完整草稿复制进系统指令后占满请求。页面不再按80项/正文字符预裁剪历史或当前材料，发送预算由下面的整包预检统一拥有。
 - `AgentCardBatch.ts` 在第一处等待前复制整批选中字段和目标；每张卡仍经页面适配器调用 `AgentDraftExecutor.prepare/executeOrdinary`。单卡失败不中断整批，已保存卡不再创建；操作占用直到整批完成，成功才通知同步。
 - 页面通过会话 ID 和消息 ID 回写状态，不能依赖异步开始时的数组索引。离页后执行器继续已接受写入，禁止访问旧 UI 或读取下一张卡的可变字段；错误文案在开始保存前固定。
-- `AgentFileImport.ts` 的 `mergeAgentImportedFiles` 统一限制10个文件、160000正文字符；持久资料只提交描述，PDF 按页读取不占这个正文额度。迟到文件解析不得进入另一个会话。
+- `AgentFileImport.ts` 的 `mergeAgentImportedFiles` 保留待提交附件10个的交互限制；160000字符预算仅适用于旧内联正文，持久资料只提交描述，不与旧正文争用额度。迟到文件解析不得进入另一个会话。
 - 历史列表每次打开/关闭都更新读取代次；恢复历史、新建会话和手动选择类型使旧能力响应失效。笔记类型请求还独立去重，迟到失败不能清空新选择。离页后的文件解析及历史删除只完成已接受的存储操作，不回写旧 UI；回归见 `platform-warning-boundaries`。
 - `agent-page-models.test.mjs` 直接测试业务规则；`agent-page-lifecycle.test.mjs` 仅保留页面与真实模型的接线验证，覆盖离页、消息替换、整批输入与确认执行器路径。
 
@@ -348,7 +362,7 @@ JIDE 无公式正文与表格单元格在 `AgentMarkdownText` 的统一 Text 入
 
 每次用户发送、澄清/确认后接续或检查点恢复，`AgentRunner` 建立新的 `AgentToolDiscovery`，初始只发送已可用的 `discover_tools`、`get_app_structure`、`request_clarification`。普通聊天可直接回答；业务操作先按简短中英文功能关键词查找，或按准确 `names` 加载工具。搜索只消费原声明的名称和说明，支持 `nextOffset` 分页；每次最多加载6个结果，返回简短名称/说明，完整 schema、示例和规则从下一次模型请求的工具声明取得，不复制到工具结果中。查不到时可换关键词或从软件结构目录取得准确名称，不能凭空猜参数。
 
-同一次执行最多保留12个非核心定义，按实际加载/使用更新最近顺序，超出时移出最久未用定义；核心发现入口始终保留。移出/下一轮重置只影响定义窗口，原对话、读取覆盖、任务计划、草稿、确认账本及执行结果保持原所有权。历史工具名不自动加载，检查点恢复不重放历史调用。业务工具必须在本次请求中已声明，同批发现不能提前执行它；被过滤的联网、模式或平台能力无法通过名称重新开启。发现计入原模型/工具预算与审计，不算联网或业务执行证据，也不取得任何写入许可。
+同一次执行最多保留12个非核心定义，按实际加载/使用更新最近顺序，超出时移出最久未用定义；核心发现入口始终保留。移出/下一轮重置只影响定义窗口，原对话、读取覆盖、任务计划、草稿、确认账本及执行结果保持原所有权。历史工具名不自动加载，检查点恢复不重放历史调用。业务工具必须在本次请求中已声明，同批发现不能提前执行它；被过滤的联网、模式或平台能力无法通过名称重新开启。发现计入工具审计，不算联网或业务执行证据，也不取得任何写入许可。
 
 `get_app_structure.tools`、导航能力和推荐仍表示过滤后的可用目录；其工具名未必在当前定义窗口内，调用前需要发现。能力指纹按完整目录计算，不因加载窗口改变而抖动；Runner 的“本轮可用工具”只列当前实际声明。新增领域工具只维护原声明、处理器和权限边界，不维护第二份发现清单。
 
@@ -406,14 +420,26 @@ JIDE 优先用已有官方资料解释 Anki 概念、学习、FSRS、搜索和�
 
 验证：`ai-agent-anki-help.test.mjs` 检查真实资源完整性、中文/英文查询、分段续读、取消、损坏失败和真实 ResourceManager/Registry 适配；`ai-agent-v2-runtime.test.mjs` 执行真实 Runner/Session 的搜索→读取→回复，以及恢复后读取新版 revision。新平台接口需增量 HAP；模型是否主动选择合适章节、真机读取与中文解释质量需另做验收。
 
+## 单次请求与异常恢复
+
+默认 `AgentTurnLimits` 不限制整项任务的模型轮次和工具调用次数。`AgentExecutionBudget` 仅决定本机单次序列化保护/压缩阈值（已知 DeepSeek 768000字符，其他配置240000字符），不是服务端token窗口或累计任务额度。页面不再默认发送自定32768/131072输出token上限；显式调用者仍可传合法 `maxOutputTokens`。API自己的上下文、输出与速率限制仍生效，不能声称无限单次请求。官方付费网关未收到显式输出预算时仍按32768 token作单次预占；不是任务总额度，余额与结算规则不因客户端改动被绕过。
+
+`response.incomplete` 原因为 `max_output_tokens` 时，Runner保存完整可用终态输出并发起后续轮次；官方网关也保留该终态、按真实usage结算并以原请求ID幂等回放，不再把它丢成整次失败。内容过滤/其他失败不作为token续接。无输出的短暂网络/429/5xx沿既有有限重试；已经收到输出的断流不盲目重复付费请求，可见文本以明确标注的部分参考数据写入检查点，不回放未完成工具参数。Session在失败/取消时保存paused状态；恢复保留已完成工具结果、检索进度与本地资料，执行结果未知的写操作仍要求核查，不自动重复写卡。检查点IO失败明确报错，不能假装已安全恢复。原子文件写入不等于保证所有设备断电场景，未验证部分须单独记录。
+
+直接回归：`ai-agent-documents` 验证超过4MiB全文的本地分段、注册工具读到末页、编码跨块/回退和失败清理；`ai-agent-v2-runtime` 验证超出单次输出后的续接、断流检查点/恢复及未知写入防重放；`server/official-ai/test_service.py` 验证token截断终态幂等结算与其他失败处理。真实提供商、进程强杀和设备文件选择器需独立验收。
+
+本轮验证（2026-11-21）：`npm test -- agent` 793项全部通过；官方网关 `uv run --with "cryptography>=46,<49" python -m unittest discover -s server/official-ai -p "test_*.py"` 33项通过；架构与文档门禁通过，`devecocli build --modules entry` 增量签名HAP通过。修正了旧页面测试提取遗漏现有平台判断和锁死回调排版的假设，未修改该平台功能。未覆盖安装设备、部署网关或执行真机强杀/真实提供商长任务验收，构建与平台替身测试不能代替这些结果。
+
 ## 文件资料与按页制卡
 
 输入区上方的文件状态卡片共用左右12vp内边距，成功、不支持和解析失败状态使用同一布局；右侧“移除”保留紧凑行内操作，卡片负责与边框的距离，输入区外层负责页面和底部安全区留白。
 
-JIDE 的文件入口沿用 `AgentFileImportService.ets`，支持格式以 `AgentFileImport.ts` 为准：PDF、DOCX、PPTX、XLSX、OpenDocument、电子书、文本、图片和视频。Word 等已有解析器继续负责转文本，不承诺保留原版式。图片/文档单文件最大20MiB，视频最大64MiB，单批最多10个文件；文本/压缩文档仍保留原有大小和截断提示。新 PDF 资料按需逐页读取，不使用旧一次性提取的120页/30页 OCR 上限。
+JIDE 的文件入口沿用 `AgentFileImportService.ets`，支持格式以 `AgentFileImport.ts` 为准：APKG、PDF、DOCX、PPTX、XLSX、OpenDocument、电子书、文本、图片和视频。Word 等已有解析器继续负责转文本，不承诺保留原版式。本地文件不再因20MiB/64MiB固定原件大小拒绝，原件使用文件描述符异步复制并按实际剩余磁盘预检；PDF 按需读页，文本与 APKG 提取结果通过 `AgentTextPaging.ets` 以64KiB块流式解码、按最多12000字符写入独立文本页，不再只保留前4MiB。Office/电子书逐成员或章节写页，不按累计160000字符停止提取。清单只保留页数和存储标识；旧内嵌 textPages 清单仍可恢复。待提交附件仍最多10个；压缩格式仍保留2000成员和单个XML/HTML 6MiB的解析器资源保护，超限是明确失败，不冒充完整内容。DeepSeek Files API 原文件上传是独立协议，当前导入仍走本地解析。新 PDF 资料按需逐页读取，不使用旧一次性提取的120页/30页 OCR 上限。
+
+- APKG 由 `AgentFileImportService.parseAnkiPackage` 使用锁定 Anki Core 在独立临时集合导入，再提取笔记字段、标签、牌组和类型文本，读取完成/失败后关闭独立 backend 并清理缓存。此处显式 `new 后端会话()` 是用户集合单例规则的隔离例外，不能改用 `获取实例()`。移除原包20MiB及ZIP展开声明48MiB固定门槛，改按真实剩余磁盘预检；此估算不等于嵌套 Zstandard 的完整展开预算，空间不足和IO失败仍真实报告。提取全文流式写入会话资料分段，提交后沿用按页/偏移读取、恢复和删除。只读资料不向用户卡库导入，不执行模板，不向用户导出文件；不提供包内图片/音频和复习记录读取。空包和损坏包显示具体失败。模型从附件上下文收到同一能力边界，不将附件选择视作卡库写入授权。
 
 - `AgentDocumentStore.ets` 在选择器授权期复制原文件到 `filesDir/agent-documents/<conversationId>/<documentId>`。PDF 导入只验证文件和页数，不预先 OCR 全书。提交后的资料在恢复会话时仍可用，删除会话时删除所属资料；未提交的暂存资料不会被模型列出。
-- `AgentDocuments.ts` 提供 `list_documents`、`read_document_page`、`ocr_document_page`、`save_document_notes`，校验会话范围、页号、实际读取与取消代次。文本每次最多12000字符，返回 nextOffset/nextPage。原文、OCR 文本和 modelNotes 分开，笔记是模型解释，不作为原文或长期偏好。大任务受既有轮次预算控制，可继续读取；不能仅凭页数声称完整覆盖。
+- `AgentDocuments.ts` 提供模型可真实调用的 `list_documents`、`read_document_page`、`ocr_document_page`、`save_document_notes`，校验会话范围、页号、实际读取与取消代次。文本每次最多12000字符，返回 nextOffset/nextPage。原文、OCR 文本和 modelNotes 分开，笔记是模型解释，不作为原文或长期偏好。大任务受既有轮次预算控制，可继续读取；不能仅凭页数声称完整覆盖。
 - PDF 文字提取使用 API 12 的 `getGraphicsObjects()`；不调用 API 23 的 `getTextContent()`。渲染、图像编码和系统 OCR 均使用 API 21 可用接口，兼容 SDK 不提升。OCR 无需视觉模型；失败返回真实工具错误，原文件和既有缓存保留，模型可换读法。复杂布局的文字顺序和公式不保证无误。
 - 当前模型支持视觉时可 includeImage 读取单页；自定义提供商在设置中启用视觉支持，文字模型走 OCR。Responses 的 function_call_output 使用 input_text/input_image 数组，适用于兼容服务，不绑定 DeepSeek。切换文字模型时 Runner 去除历史图片。渲染最长边2400、缩放最多3倍、JPEG最多2MiB；Provider 限制8张/12MiB，常规上下文保留最近两张页面图片，最新视频批次可完整保留最多四帧。历史保存文件页指针，不写 base64，恢复后按工具重新读取。
 - `create_flashcards.cards[].sources` 接受实际读取的资料页；CardAgentTools 把经过转义的文件名和页码加入最后一个字段，用户可在既有草稿预览中编辑。原来的目标选择、草稿确认与卡库写入边界继续适用。
@@ -450,7 +476,7 @@ JIDE 与主页拖动排序共用 `DeckHierarchyCommands.ets` 和原本机牌组�
 
 `AgentDeckDeletionImpact.ets` 是只读影响计算的共同入口：从真实树收集子牌组 ID，使用 Core 的 did: 查询，不按牌组名称通配。普通牌组的影响包括借入筛选牌组的卡片（锁定 Core 的 storage/deck/cards_for_deck.sql）；删除筛选牌组将卡片归还，默认牌组由 Core 保留并重置。这些语义继续由既有牌组 Service/Core 执行，应用内 Agent 不实现自己的删除引擎。
 
-影响数量按多个根的全部卡片、笔记和子牌组去重，合计卡片数仍受配置批次限制及1000张硬上限。每个 delete_deck 操作保留 before 树快照及 after 影响 ID 快照；AgentDraftExecutor 在准备和执行前重新校验，卡片 ID/笔记 ID 或树变化使确认失效，包括数量相同但卡片换入的情况。已有 after 为空的历史草稿兼容原树校验。写入继续要求两份不同的确认令牌；一部分操作失败时，AgentDraftRetry 仅保留失败根及其完整子牌组/卡片/笔记影响，不重做成功删除。
+影响数量按多个根的全部卡片、笔记和子牌组去重。单批不按卡片数量限制。每个 delete_deck 操作保留 before 树快照及 after 影响 ID 快照；AgentDraftExecutor 在准备和执行前重新校验，卡片 ID/笔记 ID 或树变化使确认失效，包括数量相同但卡片换入的情况。已有 after 为空的历史草稿兼容原树校验。写入继续要求两份不同的确认令牌；一部分操作失败时，AgentDraftRetry 仅保留失败根及其完整子牌组/卡片/笔记影响，不重做成功删除。
 
 新草稿同时保存完整牌组路径，祖先改名也使确认失效。过程和确认预览显示完整名称，并区分普通删除、筛选牌组归还与默认牌组重置；内部影响快照用于校验，不作为“修改后内容”展示。预览文字支持系统长按复制。
 
@@ -488,6 +514,18 @@ JIDE 目标澄清的“选择”、目标弹窗的“新建笔记类型”、主
 
 AI新建/改写笔记以及模板写入接入公共来源记录；JIDE子集与整库导出和手动导出共用阻断入口，不能换格式或换入口绕过。`get_app_structure`的`aiContentExport`直接返回共同声明，包括旧内容不补标边界。实现和验证见[AI内容导出限制](import-data.md#ai-内容导出限制2026-11-07)。来源记录先持久化再写内容；失败时不报告未标记内容保存成功。
 
-JIDE 对简洁版和实验版默认开放，启动即显示会话、制卡、改卡和 AI 设置入口。首次调用模型仍使用用户在 AI 设置中保存的服务配置。
+JIDE 对简洁版和实验版默认隐藏；实验版设置的开发者调试入口可在本机解锁，已保存的解锁状态在下次启动恢复。ReleaseFeatures 拥有偏好和统一开关，界面与 JIDE 认知共用 agent 状态；开发者密钥仅控制本机显隐，不是实名核验或服务端授权。首次调用模型仍使用用户在 AI 设置中保存的服务配置。
 
 JIDE 制卡和改卡草稿复用普通编辑器的 NoteFieldCard。字段展示、折叠和源码切换由公共组件管理，草稿仍由 JIDE 保存和确认，附件添加保留在原草稿流程。
+
+### 系统应用接续认知
+
+`get_app_structure.continuation` 复用 `ContinuationSession.CONTINUATION_SUPPORT`，并从其真实拥有者读取 `available/pending`，能力指纹同时覆盖该声明。系统接续支持与数据前提见[学习与媒体](study-media.md#harmonyos-多设备应用接续)。JIDE 不发起系统接续，不读接续载荷中的拼写输入，不把系统接续当作卡库同步或新增写入工具。
+
+## 官方 AI 与华为登录
+
+官方服务、所有 AI 入口的华为登录要求、实际 Token 结算与 IAP 边界见[官方 AI 决策](../decisions/2026-11-20-official-ai.md)；服务器配置和可执行验证见[官方 AI 服务](../../server/official-ai/README.md)。原自带 Key 和自定义接口保留，官方购买与正式消费按服务端配置开放。
+
+### 官方AI额度配置
+
+未配置AI提供商时默认官方服务；显式保存过的自带Key提供商仍保留。选择官方服务立即持久化提供商并刷新会话，不写入隐藏的个人Key/联网草稿，官方模式不显示保存配置，JIDE也不发布ai_save；自带Key模式继续使用原保存流程。AI智能体配置选择官方服务后，由components/settings/AIAgent设置分组.ets直接组合OfficialAISettings.ets，不再跳转独立额度页。可用额度与已用额度固定左右两列，分别读取generationBalance与usedCredits；每列仅“数字＋点”包圆角细边框，标题留在框外；两列数字与单位统一主文字色、数字Bold字重，数字在14–44vp内自适应缩小，保持两列。已用额度旁的帮助说明DeepSeek API实际输入、缓存和输出Token换算点数、按登录账号分账，恢复购买收于该说明弹窗。充值份数、总点数、价格与购买按钮放在同卡片的圆角细边框区域，玻璃模式沿用透明填充；账号登录由未登录时的主按钮提供。聊天设置与应用设置共用。会话变化走reloadOfficialSession，支付忙碌走officialBusy；official_ai是内嵌界面观察表面，现有数量、余额、已用点数和购买观察能力不变，不是AppNavigation目的地。服务器与真实沙盒验收见[官方AI决策](../decisions/2026-11-20-official-ai.md)。
