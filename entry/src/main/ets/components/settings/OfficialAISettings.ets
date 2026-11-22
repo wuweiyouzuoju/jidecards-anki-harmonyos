@@ -105,17 +105,22 @@ export struct OfficialAISettings {
     const token: string = await this.service.token();
     if (this.disposed) return;
     this.signedIn = token !== '';
-    if (!this.signedIn) { this.notice = this.text($r('app.string.official_ai_login_required')); return; }
+    if (!this.signedIn) {
+      this.wallet = null;
+      this.product = null;
+      this.notice = this.text($r('app.string.official_ai_login_required'));
+      return;
+    }
     const wallet: OfficialWallet = await this.service.wallet();
     if (this.disposed) return;
-    this.wallet = wallet;
     await this.detectEnvironment();
     if (this.disposed) return;
     if (wallet.environment !== (this.sandbox ? 'SANDBOX' : 'NORMAL')) {
       // 旧普通会话仍可用于 AI；支付需要用户重新授权当前沙盒环境。
-      this.signedIn = false; this.wallet = null;
+      this.signedIn = false; this.wallet = null; this.product = null;
       throw new Error('login_required');
     }
+    this.wallet = wallet;
     if (wallet.products.length > 0) {
       const products: iap.Product[] = await iap.queryProducts(this.context(), { productType: iap.ProductType.CONSUMABLE,
         productIds: wallet.products.map((entry): string => entry.id) });

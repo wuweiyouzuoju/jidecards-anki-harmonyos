@@ -33,7 +33,11 @@ for (const sessionEnvironment of ['NORMAL', 'SANDBOX']) {
     const page = new Page();
     const wallet = { environment: sessionEnvironment, products: [{ id: 'pack' }] };
     Object.assign(page, { service: { token: async () => 'session', wallet: async () => wallet }, disposed: false,
-      sandbox: true, detectEnvironment: async () => {}, context: () => ({}), text: x => x });
+      sandbox: true, wallet: null, context: () => ({}), text: x => x,
+      detectEnvironment: async () => {
+        await Promise.resolve();
+        assert.equal(page.wallet, null);
+      } });
     if (sessionEnvironment === 'NORMAL') {
       await assert.rejects(page.update(), /login_required/);
       assert.equal(page.signedIn, false); assert.equal(page.wallet, null); assert.equal(queries, 0);
