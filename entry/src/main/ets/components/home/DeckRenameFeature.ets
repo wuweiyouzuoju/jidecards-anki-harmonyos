@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GLASS_HOME_SOURCE } from '../../utils/GlassBackdrop';
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DeckHierarchyCommands } from '../../backend/DeckHierarchyCommands';
 import { 牌组服务 } from '../../backend/牌组服务';
 import { appInterface } from '../../backend/AppInterfaceService';
@@ -20,6 +22,7 @@ import { interfaceItemText } from '../../utils/AppInterfaceText';
 /** 草稿与预览归面板；确认后的写入归公共命令，离页不取消已接受的 Core 操作。 */
 @Component
 export struct DeckRenameFeature {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @Prop deckId: number = 0;
   @Prop localDisplayName: string = '';
@@ -127,20 +130,20 @@ export struct DeckRenameFeature {
 
   @Builder
   private content() {
-    Text($r('app.string.deck_rename_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+    Text($r('app.string.deck_rename_hint')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     Text(interfaceItemText(this.getUIContext(), 'deck_rename', 'name', this.uiLanguage))
-      .fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
-    TextInput({ text: this.name }).attributeModifier(new FormInputStyle()).maxLength(200)
+      .fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
+    TextInput({ text: this.name }).attributeModifier(new FormInputStyle( undefined, this.appearanceElements)).maxLength(200)
       .enabled(!this.loading && !this.saving && this.tree !== null)
       .onChange((value: string): void => { this.changeName(value); })
     if (this.localDisplayName !== '') {
       Text($r('app.string.deck_rename_alias_hint', this.localDisplayName)).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     }
     if (this.loading) { 统一加载态().height(应用尺寸.加载指示器尺寸 + 应用尺寸.按钮高度) }
     if (this.plan !== null) {
       ForEach(this.plan.changes, (change: DeckPathChange) => {
-        Text(`${change.before} → ${change.after}`).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+        Text(`${change.before} → ${change.after}`).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       }, (change: DeckPathChange): string => String(change.id))
     }
     if (this.errorCode !== '') {
@@ -151,7 +154,7 @@ export struct DeckRenameFeature {
   }
 
   build() {
-    DialogFrame({ maximumWidth: 应用尺寸.dialogMaxWidth, canDismiss: !this.saving,
+    DialogFrame({ refractionSource: GLASS_HOME_SOURCE, maximumWidth: 应用尺寸.dialogMaxWidth, canDismiss: !this.saving,
       header: () => { this.header(); }, content: () => { this.content(); },
       onDismiss: (): void => { this.handleBackRequest(); } })
   }

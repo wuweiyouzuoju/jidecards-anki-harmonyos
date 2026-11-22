@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { PressFeedback } from '../../utils/PressFeedback';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { DisclosureChevron } from '../common/DisclosureChevron';
@@ -6,6 +7,7 @@ import { DisclosureChevron } from '../common/DisclosureChevron';
 /** 牌组选项中的字段与分类共用入口外观；打开编辑器或分类由调用方决定。 */
 @Component
 export struct DeckOptionRow {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop title: ResourceStr = '';
   @Prop summary: ResourceStr = '';
   @Prop error: string = '';
@@ -20,12 +22,12 @@ export struct DeckOptionRow {
   build() {
     Column({ space: 4 }) {
       Row({ space: 12 }) {
-        Text(this.title).fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
+        Text(this.title).fontSize(15).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).layoutWeight(1)
         if (this.summary !== '') {
-          Text(this.summary).fontSize(14).fontColor($r('app.color.text_secondary'))
+          Text(this.summary).fontSize(14).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
             .constraintSize({ maxWidth: '38%' }).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
         }
-        DisclosureChevron({ tint: $r('app.color.text_secondary') }).rotate({ angle: this.isExpanded ? 90 : 0 })
+        DisclosureChevron({ tint: appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')) }).rotate({ angle: this.isExpanded ? 90 : 0 })
       }
       .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 10, right: 10, top: 6, bottom: 6 })
       .attributeModifier(new PressFeedback())

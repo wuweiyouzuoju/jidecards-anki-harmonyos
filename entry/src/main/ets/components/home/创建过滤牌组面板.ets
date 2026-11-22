@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GLASS_HOME_SOURCE } from '../../utils/GlassBackdrop';
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DialogFrame } from '../common/DialogFrame';
 import { SurfaceBorder } from '../../utils/SurfaceBorder';
 import { FormInputStyle } from '../../utils/FormInputStyle';
@@ -44,6 +46,7 @@ import type { FilteredDeckOrderChoice } from '../../model/FilteredDeckOptions';
 
 @Component
 export struct 创建过滤牌组面板 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -153,10 +156,10 @@ export struct 创建过滤牌组面板 {
       Column({ space: 应用尺寸.间距_5 }) {
         Text($r('app.string.filtered_deck_search_label'))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
         TextInput({ placeholder: $r('app.string.filtered_deck_search_placeholder'), text: this.搜索串 })
-          .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
+          .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距, this.appearanceElements))
           .enabled(!this.处理中)
           .onChange((value: string) => { this.搜索串 = value; })
       }
@@ -166,10 +169,10 @@ export struct 创建过滤牌组面板 {
       Column({ space: 应用尺寸.间距_5 }) {
         Text($r('app.string.filtered_deck_limit_label'))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
         TextInput({ text: this.数量上限 })
-          .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
+          .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距, this.appearanceElements))
           .type(InputType.Number)
           .enabled(!this.处理中)
           .onChange((value: string) => { this.数量上限 = value; })
@@ -201,7 +204,7 @@ export struct 创建过滤牌组面板 {
   }
 
   build() {
-    DialogFrame({ header: () => { this.panelHeader(); }, content: () => { this.panelContent(); },
+    DialogFrame({ refractionSource: GLASS_HOME_SOURCE, header: () => { this.panelHeader(); }, content: () => { this.panelContent(); },
       canDismiss: !this.处理中, onDismiss: (): void => { this.handleBackRequest(); } })
   }
 }

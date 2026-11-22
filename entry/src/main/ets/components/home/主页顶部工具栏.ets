@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { WALLPAPER_KEY } from '../../model/AppearanceCustomization';
 import { pageMaterialFill } from '../../utils/GlassMaterial';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { WINDOW_SAFE_TOP_KEY } from '../../model/WindowSafeLayout';
 import { PAGE_COMPACT_LAYOUT_KEY } from '../../model/AppLayoutState';
 

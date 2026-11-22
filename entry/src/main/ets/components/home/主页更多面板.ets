@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { LEADERBOARD_HIDDEN_KEY } from '../../model/LeaderboardVisibility';
 import { AppInterfaceItem, AppInterfaceControl, visibleInterfaceItems } from '../../model/AppInterface';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { namedResourceText } from '../../utils/UiFeedback';
@@ -12,14 +13,15 @@ export struct 主页更多面板 {
   slideScope: MenuSlideScope = new MenuSlideScope();
   @Prop @Watch('publishInterface') historyAvailable: boolean = true;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
+  @StorageProp(LEADERBOARD_HIDDEN_KEY) @Watch('publishInterface') private leaderboardHidden: boolean = false;
+  onLeaderboard: () => void = (): void => {};
   设置回调: () => void = (): void => {};
   onHistory: () => void = (): void => {};
   统计回调: () => void = (): void => {};
   提醒回调: () => void = (): void => {};
-  onSoftwareHelp: () => void = (): void => {};
 
   private menuItems(): AppInterfaceItem[] {
-    return visibleInterfaceItems('home_more', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false });
+    return visibleInterfaceItems('home_more', { simple: false, agent: false, cloudDeck: false, themeHasTextures: false, leaderboardHidden: this.leaderboardHidden });
   }
 
   private menuEntries(_locale: string = this.uiLanguage): ActionMenuListItem[] {
@@ -33,9 +35,9 @@ export struct 主页更多面板 {
     switch (id) {
       case 'settings': return $r('app.media.ic_home_settings');
       case 'history': return $r('app.media.ic_study_undo');
+      case 'leaderboard': return $r('app.media.ic_home_leaderboard');
       case 'stats': return $r('app.media.ic_home_stats');
       case 'reminders': return $r('app.media.ic_home_reminders');
-      case 'software_help': return $r('app.media.ic_study_guide');
       default: return undefined;
     }
   }
@@ -46,8 +48,8 @@ export struct 主页更多面板 {
       case 'settings': this.设置回调(); break;
       case 'history': this.onHistory(); break;
       case 'stats': this.统计回调(); break;
+      case 'leaderboard': if (!this.leaderboardHidden) this.onLeaderboard(); break;
       case 'reminders': this.提醒回调(); break;
-      case 'software_help': this.onSoftwareHelp(); break;
     }
   }
 
@@ -55,7 +57,7 @@ export struct 主页更多面板 {
     const items: AppInterfaceItem[] = this.menuItems();
     appInterface.observe({ surface: 'home_more', sectionId: '', selectedId: '',
       optionIds: items.map((item: AppInterfaceItem): string => item.id),
-      optionLabels: items.map((item: AppInterfaceItem): string => namedResourceText(this.getUIContext(), item.titleKey)), busy: false,
+      controlsComplete: true, optionLabels: items.map((item: AppInterfaceItem): string => namedResourceText(this.getUIContext(), item.titleKey)), busy: false,
       values: [{ id: 'presentation', value: 'button_anchored_popup' }, { id: 'label_alignment', value: 'center' }],
       items: items.map((item: AppInterfaceItem): AppInterfaceControl => ({ id: item.id, title: '', titleKey: item.titleKey,
         enabled: item.id !== 'history' || this.historyAvailable, selected: false })) });

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DeckOptionsFsrsState, FsrsPresetResult } from '../../model/home/DeckOptionsSession';
 import { FsrsWorkloadPoint } from '../../proto/messages/FsrsMessages';
 import { DeckOptionField, DeckOptionChoice } from './DeckOptionField';
@@ -14,6 +15,7 @@ import { namedResourceText } from '../../utils/UiFeedback';
 /** Actions return to the existing draft owner; this component only owns comparison controls. */
 @Component
 export struct FsrsTools {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('publishInterface') state: DeckOptionsFsrsState = new DeckOptionsFsrsState();
   @Prop @Watch('publishInterface') busy: boolean = false;
@@ -96,27 +98,27 @@ export struct FsrsTools {
       }
       if (this.state.historyCount !== null) {
         Text($r('app.string.deck_fsrs_history_count', this.state.historyCount.included, this.state.historyCount.total))
-          .fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+          .fontSize(14).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         Text($r('app.string.deck_fsrs_evaluation_scope', this.state.evaluationSearch,
           this.state.evaluationDate || resourceText(this.getUIContext(), $r('app.string.deck_fsrs_all_history'))))
-          .fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+          .fontSize(14).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
       if (this.state.evaluation !== null) {
         Text($r('app.string.deck_fsrs_evaluation_result', this.state.evaluation.logLoss.toFixed(4), this.state.evaluation.rmseBins.toFixed(4)))
-          .fontSize(14).fontColor($r('app.color.text_primary')).width('100%')
-        Text($r('app.string.deck_fsrs_evaluation_help')).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+          .fontSize(14).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
+        Text($r('app.string.deck_fsrs_evaluation_help')).fontSize(14).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
       ForEach(this.state.results, (result: FsrsPresetResult) => {
         Text(this.resultText(result)).fontSize(14).width('100%')
           .fontColor(result.error !== '' || result.healthCheckPassed === false
-            ? $r('app.color.error_text') : $r('app.color.text_secondary'))
+            ? $r('app.color.error_text') : appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
       }, (result: FsrsPresetResult): string => String(result.id) + ':' + String(result.fsrsItems) + ':' + result.error + ':' + String(result.healthCheckPassed))
       if (this.state.results.some((result: FsrsPresetResult): boolean => result.error !== '')) {
         DeckOptionRow({ title: $r('app.string.deck_fsrs_retry_failed'), busy: this.busy,
           onOpen: (): void => { this.onOptimize(this.state.allPresets, true); } })
       }
       if (this.state.batchDraft) {
-        Text($r('app.string.deck_fsrs_batch_scope')).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+        Text($r('app.string.deck_fsrs_batch_scope')).fontSize(14).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       }
       DeckOptionField({ title: $r('app.string.deck_fsrs_days'), value: this.daysText,
         help: $r('app.string.deck_fsrs_simulation_help'), busy: this.busy,
@@ -129,12 +131,12 @@ export struct FsrsTools {
       }
       if (this.state.workload !== null) {
         Text($r('app.string.deck_fsrs_workload_title', this.state.workloadDays))
-          .fontSize(15).fontColor($r('app.color.text_primary')).width('100%')
+          .fontSize(15).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
         DeckOptionField({ title: $r('app.string.deck_fsrs_compare_retention'), value: this.selectedRetention,
           choices: this.choices(), help: $r('app.string.deck_fsrs_simulation_help'), busy: this.busy,
           onChange: (value: string): void => { this.selectedRetention = value; } })
         ForEach(this.comparisonPoints(), (point: FsrsWorkloadPoint) => {
-          Text(this.pointText(point)).fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+          Text(this.pointText(point)).fontSize(14).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
         }, (point: FsrsWorkloadPoint): string => String(point.retention) + ':' + String(point.costSeconds) + ':' + String(point.memorized) + ':' + String(point.reviewCount))
         DeckOptionRow({ title: $r('app.string.deck_fsrs_use_retention'), busy: this.busy,
           onOpen: (): void => { this.onRetention(String(Number(this.selectedRetention) / 100)); } })

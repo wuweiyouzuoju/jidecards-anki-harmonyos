@@ -1,9 +1,13 @@
-import { glassPopupTriggerRect } from 'jide_foundation';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { compactLandscapeScale } from '../../model/AppLayoutState';
+import { WINDOW_SIZE_KEY, WindowSizeVp } from '../../model/WindowSafeLayout';
+import { ShapePaint } from '../common/ShapePaint';
+import { glassPopupTriggerRect } from 'jide_foundation';
 import { GlassFusionRect } from 'jide_foundation';
 import { IconActionButton } from '../common/IconActionButton';
 import { 应用尺寸 } from '../../utils/应用尺寸';
-import { homeHeaderGeometry, HomeHeaderGeometry, HomeActionAnchor } from '../../model/HomeHeaderLayout';
+import { homeHeaderGeometry, homeSummaryCardCount, HomeHeaderGeometry, HomeActionAnchor } from '../../model/HomeHeaderLayout';
+import { DESKTOP_HOME_LAYOUT_KEY } from '../../model/DeckListAppearance';
 import { 主页摘要分页 } from './主页摘要分页';
 import { 主页快照, 空主页快照 } from '../../model/主页模型';
 import { 桌面卡片数据 } from '../../model/桌面卡片数据存储';
@@ -13,6 +17,12 @@ import { homeSyncIndicator, homeSyncLabelKey } from '../../model/HomeSyncStatusC
 /** 只拥有首行几何和按钮锚点；菜单状态与业务操作归首页。 */
 @Component
 export struct HomeSummaryHeader {
+  @StorageProp(DESKTOP_HOME_LAYOUT_KEY) private desktopHome: boolean = false;
+  @StorageProp(WINDOW_SIZE_KEY) private densityWindow: WindowSizeVp = { width: 0, height: 0 };
+  private densityScale(): number {
+    return compactLandscapeScale(this.densityWindow.width, this.densityWindow.height);
+  }
+
   @StorageProp(PAGE_COMPACT_LAYOUT_KEY) @Watch('layoutChanged') private narrowDeckLayout: boolean = false;
   @Prop @Watch('layoutChanged') showSummary: boolean = true;
   @Prop actionsVisible: boolean = true;
@@ -40,8 +50,8 @@ export struct HomeSummaryHeader {
 
   private geometry(): HomeHeaderGeometry {
     const context: UIContext = this.getUIContext();
-    return homeHeaderGeometry(this.contentWidth, 应用尺寸.页面分组间距(this.narrowDeckLayout), this.showSummary,
-      应用尺寸.按钮高度, context.px2vp(context.fp2px(1)));
+    return homeHeaderGeometry(this.contentWidth, 应用尺寸.页面分组间距(this.narrowDeckLayout) * this.densityScale(), this.showSummary,
+      应用尺寸.按钮高度 * this.densityScale(), context.px2vp(context.fp2px(1)), this.densityScale());
   }
   private closeMenus(): void { this.onMenusClose(); }
   private layoutChanged(): void {
@@ -51,9 +61,11 @@ export struct HomeSummaryHeader {
 
   private updateAnchor(area: Area): void {
     const next: number = Number(area.width);
+    this.contentWidth = next;
+    if (!this.actionsVisible) return;
     const anchor: HomeActionAnchor = { left: Number(area.globalPosition.x), width: next,
-      top: Number(area.globalPosition.y) + homeHeaderGeometry(next, 应用尺寸.页面分组间距(this.narrowDeckLayout),
-        this.showSummary, 应用尺寸.按钮高度).controlHeight + 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) };
+      top: Number(area.globalPosition.y) + homeHeaderGeometry(next, 应用尺寸.页面分组间距(this.narrowDeckLayout) * this.densityScale(),
+        this.showSummary, 应用尺寸.按钮高度 * this.densityScale()).controlHeight + 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) * this.densityScale() };
     if (Math.abs(anchor.left - this.menuAnchor.left) > 0.1 || Math.abs(anchor.top - this.menuAnchor.top) > 0.1 ||
       Math.abs(anchor.width - this.menuAnchor.width) > 0.1) {
       this.closeMenus(); this.contentWidth = next; this.menuAnchor = anchor; this.onMenuAnchor(anchor);
@@ -61,10 +73,24 @@ export struct HomeSummaryHeader {
   }
 
   @Builder
-  private summaryCard() {
+  private summaryCard(slot: number) {
     主页摘要分页({ 主页快照数据: this.homeSnapshot, 图表快照: this.graphsSnapshot,
-      cardHeight: this.geometry().summaryHeight, compactCard: this.geometry().compactCard })
-      .width(this.geometry().summaryWidth).height(this.geometry().summaryHeight).flexShrink(0)
+      rememberSlot: this.desktopHome ? slot : -1,
+      cardHeight: this.geometry().summaryHeight, compactCard: this.summaryCardWidth() < 260, compactLandscape: this.densityScale() < 1 })
+      .width(this.summaryCardWidth()).height(this.geometry().summaryHeight).flexShrink(0)
+  }
+
+  private summaryGap(): number {
+    return 应用尺寸.页面分组间距(this.narrowDeckLayout) * this.densityScale();
+  }
+
+  private summaryCount(): number {
+    return homeSummaryCardCount(this.desktopHome, this.contentWidth, this.summaryGap());
+  }
+
+  private summaryCardWidth(): number {
+    const width: number = this.geometry().summaryWidth;
+    return this.summaryCount() === 2 ? (width - this.summaryGap()) / 2 : width;
   }
 
   @Builder
@@ -112,15 +138,14 @@ export struct HomeSummaryHeader {
       Stack({ alignContent: Alignment.TopEnd }) {
         IconActionButton({ toolbarStyle: true, source: $r('app.media.ic_home_sync'), label: this.syncLabel(),
           controlSize: this.geometry().controlHeight, controlWidth: this.geometry().controlWidth, controlGlyphSize: this.geometry().controlGlyphSize,
-          feedback: this.syncIndicator === 'syncing' ? 'busy' : this.syncIndicator === 'done' ? 'success' :
-            this.syncIndicator === 'failure' ? 'failure' : 'idle', onAction: this.onSync })
+          onAction: this.onSync })
         if (homeSyncIndicator(this.syncAccountState, this.syncIndicator) === 'attention') {
           Text('!').fontSize(14).fontWeight(FontWeight.Bold)
             .fontColor(Color.White).backgroundColor($r('app.color.error_text'))
             .width(16).height(16).textAlign(TextAlign.Center).borderRadius(8)
             .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
         } else if (homeSyncIndicator(this.syncAccountState, this.syncIndicator) === 'pending') {
-          Circle().width(8).height(8).fill($r('app.color.warning_text'))
+          Circle().width(8).height(8).attributeModifier(new ShapePaint($r('app.color.warning_text')))
             .hitTestBehavior(HitTestMode.None).accessibilityLevel('no')
         }
       }.width(this.geometry().controlWidth).height(this.geometry().controlHeight)
@@ -152,14 +177,19 @@ export struct HomeSummaryHeader {
   }
 
   build() {
-    Column({ space: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) }) {
+    Column({ space: 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) * this.densityScale() }) {
       if (this.contentWidth <= 0) {
         // 保留可测量的首行；宽度就绪后一次性展示，避免零宽图标和溢出按钮。
         Blank().height((this.showSummary ? this.geometry().summaryHeight : 0) +
-          (this.actionsVisible ? this.geometry().actionsHeight + 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) : 0))
+          (this.actionsVisible ? this.geometry().actionsHeight + 应用尺寸.页面内容顶部间距(this.narrowDeckLayout) * this.densityScale() : 0))
       } else {
         if (this.actionsVisible) { this.actions() }
-        if (this.showSummary) { this.summaryCard() }
+        if (this.showSummary) {
+          Row({ space: this.summaryGap() }) {
+            this.summaryCard(0)
+            if (this.summaryCount() === 2) { this.summaryCard(1) }
+          }.width('100%')
+        }
       }
     }.width('100%').flexShrink(0)
       .onAreaChange((_old: Area, area: Area): void => { this.updateAnchor(area); })

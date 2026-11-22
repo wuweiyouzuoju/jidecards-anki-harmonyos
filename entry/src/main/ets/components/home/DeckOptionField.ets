@@ -1,5 +1,6 @@
-import { insetMaterialFill } from '../../utils/GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
+import { insetMaterialFill } from '../../utils/GlassMaterial';
 import { DialogFrame } from '../common/DialogFrame';
 import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
@@ -19,6 +20,7 @@ export interface DeckOptionChoice {
 /** 单项弹窗只持有本地草稿，确认并通过调用方校验后才更新牌组选项表单。 */
 @CustomDialog
 export struct DeckOptionEditor {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   controller?: CustomDialogController;
   title: ResourceStr = '';
   help: ResourceStr = '';
@@ -63,22 +65,22 @@ export struct DeckOptionEditor {
           TextArea({ text: this.draft })
             .width('100%').height(200).fontSize(应用尺寸.字号_正文)
             .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-            .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+            .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
             .onChange((value: string): void => { this.draft = value; this.error = ''; })
         } else {
           TextInput({ text: this.draft })
             .width('100%').height(应用尺寸.按钮高度).fontSize(应用尺寸.字号_正文)
             .backgroundColor(insetMaterialFill($r('app.color.surface_card')))
-            .border(SurfaceBorder.options()).borderRadius(应用尺寸.圆角_面板)
+            .border(SurfaceBorder.options( undefined, undefined, this.appearanceElements)).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
             .onChange((value: string): void => { this.draft = value; this.error = ''; })
         }
       } else {
         ForEach(this.choices, (choice: DeckOptionChoice) => {
           Row({ space: 12 }) {
-            Text(choice.label).fontSize(15).fontColor($r('app.color.text_primary')).layoutWeight(1)
+            Text(choice.label).fontSize(15).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).layoutWeight(1)
           }
           .width('100%').constraintSize({ minHeight: 48 }).padding({ left: 8, right: 8 })
-          .backgroundColor(this.draft === choice.value ? insetMaterialFill($r('app.color.surface_page')) : Color.Transparent)
+          .backgroundColor(this.draft === choice.value ? insetMaterialFill(appearanceElementColor(this.appearanceElements, 'surface_page', $r('app.color.surface_page'))) : Color.Transparent)
           .borderRadius(10)
           .attributeModifier(new PressFeedback())
           .onClick((): void => { this.draft = choice.value; this.error = ''; })
@@ -99,6 +101,7 @@ export struct DeckOptionEditor {
 /** 与设置页相同的入口行：名称、当前值、右箭头；整行可点击。 */
 @Component
 export struct DeckOptionField {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop title: ResourceStr = '';
   @Prop help: ResourceStr = '';
   @Prop @Watch('syncValue') value: string = '';

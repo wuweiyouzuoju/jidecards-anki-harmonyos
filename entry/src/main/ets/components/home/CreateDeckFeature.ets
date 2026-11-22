@@ -21,7 +21,7 @@ export struct CreateDeckFeature {
 
   aboutToDisappear(): void { this.disposed = true; }
 
-  private async create(name: string, _locale: string = this.uiLanguage): Promise<void> {
+  private async createDeck(name: string, _locale: string = this.uiLanguage): Promise<void> {
     if (this.busy || this.disposed) return;
     this.busy = true;
     this.error = '';
@@ -49,6 +49,6 @@ export struct CreateDeckFeature {
     创建牌组面板({ isDark: this.isDark, busy: this.busy, errorMessage: this.error,
       parentOptions: this.decks, initialParentId: this.parentId,
       onCancel: (): void => { if (!this.busy) this.onClose(); },
-      onConfirm: (name: string): void => { this.create(name); } })
+      onConfirm: (name: string): void => { this.createDeck(name); } })
   }
 }

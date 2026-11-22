@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GLASS_HOME_SOURCE } from '../../utils/GlassBackdrop';
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
 import { GlassPanel } from '../common/GlassPanel';
 import { SurfaceTransition } from '../../utils/SurfaceTransition';
 import { FormInputStyle } from '../../utils/FormInputStyle';
@@ -35,6 +37,7 @@ interface 预设选项 {
 
 @Component
 export struct 自定义学习对话框 {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @State private surfaceWidth: string = '88%';
   @State private surfaceMaximumWidth: number = 480;
   @StorageProp('系统语言') private uiLanguage: string = 'zh-Hans';
@@ -301,7 +304,7 @@ export struct 自定义学习对话框 {
         color: this.选中预设 === 预设.字段号 ?
           设置面板色板_取(this.isDark).主色 : Color.Transparent
       })
-      .borderRadius(应用尺寸.圆角_面板)
+      .borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
       .enabled(!this.处理中 && !this.加载默认值中 && this.默认值 !== null)
       .attributeModifier(new PressFeedback())
       .onClick(() => { this.切换预设(预设.字段号); })
@@ -314,21 +317,21 @@ export struct 自定义学习对话框 {
     Column({ space: 应用尺寸.间距_8 }) {
       Text(this.当前预设().说明资源)
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .width('100%')
       if (isCustomStudyLimit(this.选中预设)) {
         Text(this.availableCount(this.选中预设 === 自定义学习预设.新卡上限增量))
           .fontSize(应用尺寸.字号_正文_小)
-          .fontColor($r('app.color.text_secondary'))
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           .width('100%')
       }
       Text(this.选中预设 === 自定义学习预设.按状态或标签 ? $r('app.string.custom_study_cards_label') :
         (this.当前预设().是天数 ? $r('app.string.custom_study_days_label') : $r('app.string.custom_study_value_label')))
         .fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .width('100%')
       TextInput({ text: this.输入值 })
-        .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距))
+        .attributeModifier(new FormInputStyle(应用尺寸.卡片内边距, this.appearanceElements))
         .type(isCustomStudyLimit(this.选中预设) ? InputType.Normal : InputType.Number)
         .inputFilter(isCustomStudyLimit(this.选中预设) ? '^-?[0-9]*$' : '^[0-9]*$')
         .enabled(!this.处理中 && !this.加载默认值中 && this.默认值 !== null)
@@ -347,7 +350,7 @@ export struct 自定义学习对话框 {
         if (this.默认值 !== null && this.默认值.tags.length > 0) {
           Text($r('app.string.custom_study_tags_hint'))
             .fontSize(应用尺寸.字号_正文_小)
-            .fontColor($r('app.color.text_secondary'))
+            .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
           DirectoryTree({ rows: this.tagRows(), selectionMode: 'filter', revealSelection: false,
             isInteractive: !this.处理中 && !this.加载默认值中,
             onSelect: (name: string): void => { this.cycleTag(name); },
@@ -365,7 +368,7 @@ export struct 自定义学习对话框 {
           } })
         .onClick((event: ClickEvent): void => { this.handleBackRequest(); })
         .transition(SurfaceTransition.backdrop())
-      GlassPanel({ radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: '88%' }) {
+      GlassPanel({ source: GLASS_HOME_SOURCE, radius: 应用尺寸.圆角_卡片, panelWidth: this.surfaceWidth, maximumWidth: this.surfaceMaximumWidth, maximumHeight: '88%' }) {
 Column({ space: 应用尺寸.间距_16 }) {
         DialogHeader({
           title: $r('app.string.custom_study_title'),
@@ -379,7 +382,7 @@ Column({ space: 应用尺寸.间距_16 }) {
           Column({ space: 应用尺寸.间距_12 }) {
             if (this.deckName !== '') {
               Text(this.deckName).fontSize(应用尺寸.字号_正文_小)
-                .fontColor($r('app.color.text_secondary')).width('100%')
+                .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
             }
             Column({ space: 应用尺寸.间距_5 }) {
               ForEach(this.预设列表, (预设: 预设选项) => { this.预设行(预设) },

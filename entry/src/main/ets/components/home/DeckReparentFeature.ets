@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { GLASS_HOME_SOURCE } from '../../utils/GlassBackdrop';
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DeckHierarchyCommands } from '../../backend/DeckHierarchyCommands';
 import { 牌组服务 } from '../../backend/牌组服务';
 import { appInterface } from '../../backend/AppInterfaceService';
@@ -19,6 +21,7 @@ import { interfaceItemText } from '../../utils/AppInterfaceText';
 /** 拥有选择与预览；写入接受后由公共命令完成，离页只停止界面回写。 */
 @Component
 export struct DeckReparentFeature {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @Prop deckId: number = 0;
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
@@ -153,7 +156,7 @@ export struct DeckReparentFeature {
 
   @Builder
   private content() {
-    Text($r('app.string.deck_move_hint')).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+    Text($r('app.string.deck_move_hint')).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
     DirectorySelect({ label: $r('app.string.deck_move_parent'), rows: this.parentRows(),
       value: this.options()[Math.max(0, this.candidateIds().indexOf(this.parentId))].value as string,
       isInteractive: !this.loading && !this.saving && this.tree !== null,
@@ -165,7 +168,7 @@ export struct DeckReparentFeature {
     if (this.plan !== null) {
       ForEach(this.plan.changes, (change: DeckPathChange) => {
         Text(`${change.before} → ${change.after}`).fontSize(应用尺寸.字号_正文)
-          .fontColor($r('app.color.text_primary')).width('100%')
+          .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
       }, (change: DeckPathChange): string => String(change.id))
     }
     if (this.errorCode !== '') {
@@ -176,7 +179,7 @@ export struct DeckReparentFeature {
   }
 
   build() {
-    DialogFrame({ maximumWidth: 应用尺寸.dialogMaxWidth, canDismiss: !this.saving,
+    DialogFrame({ refractionSource: GLASS_HOME_SOURCE, maximumWidth: 应用尺寸.dialogMaxWidth, canDismiss: !this.saving,
       header: () => { this.header(); }, content: () => { this.content(); },
       onDismiss: (): void => { this.handleBackRequest(); } })
   }

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementRadius, appearanceElementColor } from '../../utils/AppearanceElements';
 import { DialogFrame } from '../common/DialogFrame';
+import { GLASS_HOME_SOURCE } from '../../utils/GlassBackdrop';
 import { DialogSearchHeader } from '../common/DialogSearchHeader';
 import { 统一加载态 } from '../common/统一加载态';
 import { 按下态按钮 } from '../common/按下态按钮';
@@ -12,6 +14,7 @@ import { appInterface } from '../../backend/AppInterfaceService';
 /** 输入即筛选，不改主页列表；选择交给原牌组入口，沿用其展开祖先与详情行为。 */
 @Component
 export struct HomeDeckSearchDialog {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @Prop @Watch('publishInterface') decks: 牌组汇总[] = [];
   @Prop @Watch('publishInterface') hiddenIds: Set<string> = new Set<string>();
   @Prop @Watch('publishInterface') loadState: 主页加载状态 = 'loading';
@@ -57,21 +60,21 @@ export struct HomeDeckSearchDialog {
       Text($r('app.string.home_load_error')).fontColor($r('app.color.error_text'))
       按下态按钮({ 文案: $r('app.string.common_retry'), 点击回调: this.onRetry })
     } else if (this.results().length === 0) {
-      Text($r('app.string.home_search_empty')).fontColor($r('app.color.text_secondary'))
+      Text($r('app.string.home_search_empty')).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary')))
         .fontSize(应用尺寸.字号_正文).width('100%').padding(应用尺寸.间距_16)
     } else {
       Text($r('app.string.home_search_count', this.results().length)).fontSize(应用尺寸.字号_正文_小)
-        .fontColor($r('app.color.text_secondary')).width('100%')
+        .fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
       ForEach(this.results(), (deck: 牌组汇总) => {
         Button() {
           Column({ space: 应用尺寸.间距_4 }) {
-            Text(牌组显示名(deck)).fontSize(应用尺寸.字号_正文).fontColor($r('app.color.text_primary')).width('100%')
+            Text(牌组显示名(deck)).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
             if (deck.fullName !== 牌组显示名(deck)) {
-              Text(deck.fullName).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.text_secondary')).width('100%')
+              Text(deck.fullName).fontSize(应用尺寸.字号_正文_小).fontColor(appearanceElementColor(this.appearanceElements, 'text_secondary', $r('app.color.text_secondary'))).width('100%')
             }
           }.width('100%').alignItems(HorizontalAlign.Start).padding(应用尺寸.间距_12)
         }.width('100%').type(ButtonType.Normal).backgroundColor(Color.Transparent)
-          .constraintSize({ minHeight: 应用尺寸.按钮高度 }).borderRadius(应用尺寸.圆角_面板)
+          .constraintSize({ minHeight: 应用尺寸.按钮高度 }).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_面板))
           .attributeModifier(new PressFeedback()).stateEffect(false)
           .onClick((): void => { this.select(deck.id); })
       }, (deck: 牌组汇总): string => deck.id)
@@ -79,6 +82,7 @@ export struct HomeDeckSearchDialog {
   }
 
   build() {
-    DialogFrame({ header: () => { this.header(); }, content: () => { this.content(); }, onDismiss: this.onClose })
+    DialogFrame({ refractionSource: GLASS_HOME_SOURCE,
+      header: () => { this.header(); }, content: () => { this.content(); }, onDismiss: this.onClose })
   }
 }

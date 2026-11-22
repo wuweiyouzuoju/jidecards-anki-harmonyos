@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SeriesVisual } from '../../utils/SeriesVisual';
 
 // ========================================================
 // @块ID UI-HOME-LIST-001
@@ -41,7 +42,7 @@ import { LengthMetrics } from '@kit.ArkUI';
 import { SURFACE_MATERIAL_KEY } from '../../model/SurfaceMaterial';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { 牌组列表项 } from '../牌组列表项';
-import { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY, isDoubleColumnDeckListStyle,
+import { DECK_LIST_NARROW_KEY, DECK_LIST_STYLE_KEY, deckListColumnCount,
   deckListOverflows, groupDeckListRows, groupedDeckListOverflows, DeckListGroup } from '../../model/DeckListAppearance';
 import { 统一加载态 } from '../common/统一加载态';
 import { 统一空态 } from '../common/统一空态';
@@ -119,6 +120,14 @@ export struct 主页牌组列表 {
   private viewportHeight: number = 0;
   @State private contentOverflows: boolean = false;
 
+  private shadowInset(): number {
+    return this.surfaceMaterial === 'glass' ? 应用尺寸.页面分组间距(this.narrow) / 2 : 0;
+  }
+
+  private shadowEndInset(): number {
+    return SeriesVisual.scrollShadowEndInset(this.surfaceMaterial, this.shadowInset());
+  }
+
   private edgeFadeEnabled(): boolean {
     return this.surfaceMaterial === 'glass' && this.加载状态 === 'ready' && this.contentOverflows;
   }
@@ -145,16 +154,17 @@ export struct 主页牌组列表 {
     const context: UIContext = this.getUIContext();
     const rowHeight: number = 应用尺寸.deckRowHeight(this.narrow) * Math.max(1, context.px2vp(context.fp2px(1)));
     const gap: number = 应用尺寸.页面分组间距(this.narrow);
-    const overflow: boolean = this.columnCount() === 2 ? groupedDeckListOverflows(
-      this.groupSource.groupCounts(), rowHeight, gap, this.viewportHeight) : deckListOverflows(
-        this.牌组数据源.totalCount(), rowHeight, gap, this.viewportHeight);
+    const columns: number = this.columnCount();
+    const overflow: boolean = columns > 1 ? groupedDeckListOverflows(
+      this.groupSource.groupCounts(), rowHeight, gap, this.viewportHeight - this.shadowInset() - this.shadowEndInset(), columns) : deckListOverflows(
+        this.牌组数据源.totalCount(), rowHeight, gap, this.viewportHeight - this.shadowInset() - this.shadowEndInset());
     this.contentOverflows = this.加载状态 === 'ready' && overflow;
     this.onOverflowChange(this.contentOverflows);
   }
 
   private columnCount(): number {
     // 排序需要每个牌组的原始索引，临时恢复单列；退出后仍保留所选样式。
-    return isDoubleColumnDeckListStyle(this.style) && !this.排序模式中 && this.加载状态 === 'ready' ? 2 : 1;
+    return deckListColumnCount(this.style, !this.排序模式中 && this.加载状态 === 'ready');
   }
 
   aboutToAppear(): void {
@@ -193,7 +203,7 @@ export struct 主页牌组列表 {
     LazyForEach(this.牌组数据源, (deck: 牌组汇总) => {
       ListItem() {
         this.deckItem(deck)
-      }
+      }.padding({ left: this.shadowInset(), right: this.shadowInset() })
     }, (deck: 牌组汇总): string => this.deckKey(deck) + (sortingEnabled ? '_sort' : '_view'))
     .onMove(sortingEnabled ? (from: number, to: number): void => {
       this.moveDeck(from, to);
@@ -201,7 +211,7 @@ export struct 主页牌组列表 {
   }
 
   @Builder
-  private doubleDeckRows() {
+  private groupedDeckRows() {
     WaterFlow({ scroller: this.牌组列表滚动器 }) {
       LazyForEach(this.groupSource, (group: HomeDeckGroup) => {
         FlowItem() {
@@ -209,15 +219,17 @@ export struct 主页牌组列表 {
             ForEach(group.decks, (deck: 牌组汇总) => {
               this.deckItem(deck)
             }, (deck: 牌组汇总): string => this.deckKey(deck))
-          }.width('100%').alignItems(HorizontalAlign.Start)
+          }.width('100%').padding({ left: this.shadowInset(), right: this.shadowInset() }).alignItems(HorizontalAlign.Start)
         }.width('100%').id('home-deck-group-' + group.rootId)
       }, (group: HomeDeckGroup): string => group.rootId + ':' +
         group.decks.map((deck: 牌组汇总): string => this.deckKey(deck)).join('|'))
     }
-    .columnsTemplate('1fr 1fr')
-    .columnsGap(应用尺寸.页面分组间距(this.narrow))
+    .columnsTemplate(this.columnCount() === 3 ? '1fr 1fr 1fr' : '1fr 1fr')
+    .columnsGap(应用尺寸.页面分组间距(this.narrow) - 2 * this.shadowInset())
     .rowsGap(应用尺寸.页面分组间距(this.narrow))
     .width('100%').layoutWeight(1)
+    .padding({ top: this.shadowInset(), bottom: this.shadowEndInset() })
+    .clipContent(ContentClipMode.BOUNDARY)
     .id('home-deck-list-ready')
     .enabled(!this.reorderBusy)
     .scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring)
@@ -235,7 +247,7 @@ export struct 主页牌组列表 {
     牌组列表项({
 
       deck: deck,
-      hideStudyCounts: isDoubleColumnDeckListStyle(this.style),
+      hideStudyCounts: deckListColumnCount(this.style) > 1,
       selected: deck.id === this.选中的牌组ID,
       reorderMode: this.排序模式中,
       onSelect: (deckId: string): void => {
@@ -258,8 +270,8 @@ export struct 主页牌组列表 {
       // 排序模式的退出/完成入口在顶部工具栏（主页顶部工具栏 排序模式分支），此处不再渲染操作行。
       // 指示器等待刷新 Promise 落定，成功、失败或跳过都收起。
       Refresh({ refreshing: $$this.刷新指示器开关 }) {
-        if (this.columnCount() === 2) {
-          this.doubleDeckRows()
+        if (this.columnCount() > 1) {
+          this.groupedDeckRows()
         } else {
         List({ scroller: this.牌组列表滚动器, space: 应用尺寸.页面分组间距(this.narrow) }) {
           // LazyForEach 的 onMove 在创建时注册；单列进入/退出排序也必须换分支重建。
@@ -315,6 +327,7 @@ export struct 主页牌组列表 {
         }
         .width('100%')
         .enabled(!this.reorderBusy)
+        .contentStartOffset(this.shadowInset()).contentEndOffset(this.shadowEndInset())
         .id(this.加载状态 === 'ready' || this.加载状态 === 'empty' ? 'home-deck-list-ready' : 'home-deck-list-loading')
         .layoutWeight(1)
         .scrollBar(BarState.Auto)
@@ -328,6 +341,9 @@ export struct 主页牌组列表 {
         })
         }
       }
+      // 列表视口向公共页面留白扩展；子项的投影留白不再缩窄卡片。
+      .width('calc(100% + ' + (2 * this.shadowInset()) + 'vp)')
+      .margin({ left: -this.shadowInset(), right: -this.shadowInset(), top: -this.shadowInset() })
       .pullToRefresh(!this.排序模式中 && !this.reorderBusy)
       .onRefreshing(() => {
         this.refreshDecks().catch((error: Error): void => {

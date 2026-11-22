@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { SelectionDialog } from '../common/SelectionDialog';
-import { NativeDialogHost, NativeDialogFactory, NativeDialogDismiss, NativeDialogPresentation } from '../common/NativeDialogHost';
-import { showToastSafely } from '../../utils/UiFeedback';
-import { FOCUSED_DIALOG_BACKDROP_BLUR } from '../common/PopupAppearance';
+import { appearanceElementRadius } from '../../utils/AppearanceElements';
+import { SelectionOptions } from '../common/SelectionOptions';
 import { DialogBackdrop } from '../common/DialogBackdrop';
 import { AnchoredMenu } from '../common/AnchoredMenu';
 import { 牌组列表项 } from '../牌组列表项';
@@ -22,14 +20,17 @@ import { 简洁模式AppStorage键 } from '../../model/简洁模式存储';
 import { 应用尺寸 } from '../../utils/应用尺寸';
 import { CardActionMenu, CardActionMenuEntry } from '../common/CardActionMenu';
 import { ActionMenuAnchor, actionMenuHostAnchor } from '../common/ActionMenuLayout';
+import { HomeActionAnchor } from '../../model/HomeHeaderLayout';
 import { WindowPoint } from '../../model/WindowSafeLayout';
 
-/** 右键按指针定位，长按保留行预览，详情更多在窗口居中；动作和业务回调共用。 */
+/** 右键按指针定位，长按保留行预览，详情更多使用按钮锚点菜单；动作和业务回调共用。 */
 @Component
 export struct HomeDeckRowMenu {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @StorageProp(简洁模式AppStorage键) @Watch('publishInterface') private simple: boolean = true;
   @Prop centered: boolean = false;
+  @Prop toolbarBounds: HomeActionAnchor | undefined = undefined;
   @Prop refractionSource: string = '';
   @State private sourceId: string = '';
   @Prop deck: 牌组汇总 = 空牌组汇总;
@@ -71,24 +72,8 @@ export struct HomeDeckRowMenu {
     this.toneAnchor = { left: Number(area.globalPosition.x), top: Number(area.globalPosition.y),
       width: Number(area.width), height: Number(area.height) };
   }
-  @State private toneRows: ActionMenuListItem[] = [];
-  @State private toneInteractive: boolean = true;
-  private readonly toneDialog: NativeDialogHost = new NativeDialogHost();
-  private readonly createToneDialog: NativeDialogFactory = (dismiss: NativeDialogDismiss): CustomDialogController => {
-    const presentation: NativeDialogPresentation = this.toneDialog.presentation();
-    const isCurrent: () => boolean = this.toneDialog.captureCurrent();
-    const deckId: string = this.deckId;
-    return new CustomDialogController({
-      builder: SelectionDialog({ anchor: this.toneAnchor, items: this.toneRows, isInteractive: this.toneInteractive,
-        title: interfaceItemText(this.getUIContext(), 'deck_row_menu', 'tone', this.uiLanguage),
-        onSelect: (id: string): void => { if (isCurrent() && deckId === this.deckId) this.selectItem({ id: id, label: '' }); },
-        onClose: this.toneDialog.guard((): void => { this.closeTones(); }) }),
-      onWillDismiss: dismiss, autoCancel: presentation.autoCancel, customStyle: presentation.customStyle,
-      alignment: presentation.alignment, width: presentation.width, height: presentation.height,
-      keyboardAvoidMode: presentation.keyboardAvoidMode, maskColor: presentation.maskColor,
-      openAnimation: presentation.openAnimation, closeAnimation: presentation.closeAnimation
-    });
-  };
+  private toneSession: number = 0;
+  private toneDeckId: string = '';
   private mounted: boolean = false;
   onClose: () => void = (): void => {};
   onAction: (deckId: string, action: string) => void = (): void => {};
@@ -97,25 +82,26 @@ export struct HomeDeckRowMenu {
   aboutToAppear(): void {
     this.sourceId = this.refractionSource || currentGlassSource(this.getUIContext());
     this.mounted = true; this.previewHeight = Math.max(32, this.liftAnchor.height);
-    this.toneDialog.activate(); this.publishInterface();
+    this.publishInterface();
     this.previewReady = !this.usesGlass();
     if (!this.previewReady) this.previewTimer = setTimeout((): void => {
       this.previewFailed = true; this.previewReady = true; this.startLift();
     }, 250);
   }
   aboutToDisappear(): void {
-    this.mounted = false; clearTimeout(this.previewTimer); this.toneDialog.dispose();
+    this.mounted = false; clearTimeout(this.previewTimer);
     appInterface.leave('deck_row_menu'); appInterface.leave('deck_tones');
   }
 
   private handleBack(): void {
     if (this.busy || !this.mounted) return;
-    if (this.expandedIds.length > 0) this.closeTones();
-    else this.dismiss();
+    this.dismiss();
   }
 
   private dismiss(): void {
-    if (!this.busy && this.mounted) this.onClose();
+    if (this.busy || !this.mounted) return;
+    if (this.expandedIds.includes('tone')) this.closeTones(this.toneSession);
+    else this.onClose();
   }
 
   private toneItems(): ActionMenuListItem[] {
@@ -151,29 +137,30 @@ export struct HomeDeckRowMenu {
 
   private toggleBranch(item: ActionMenuListItem): void {
     if (this.busy || !this.mounted || item.id !== 'tone') return;
-    if (this.expandedIds.includes('tone')) { this.closeTones(); return; }
-    this.expandedIds = ['tone']; this.publishInterface();
-    try { this.toneDialog.open(this.createToneDialog, (): boolean => {
-      if (this.busy) return false;
-      this.expandedIds = []; return true;
-    }); } catch (error) {
-      this.expandedIds = [];
-      showToastSafely(this.getUIContext(), { message: $r('app.string.directory_open_error') });
-    }
+    if (this.expandedIds.includes('tone')) { this.closeTones(this.toneSession); return; }
+    if (this.toneAnchor === undefined) return;
+    this.toneSession++;
+    this.toneDeckId = this.deckId;
+    this.expandedIds = ['tone'];
   }
 
-  private closeTones(): void { this.toneDialog.close(); this.expandedIds = []; }
+  private closeTones(session: number): void {
+    if (!this.busy && this.mounted && session === this.toneSession) this.expandedIds = [];
+  }
+
+  private selectTone(id: string, session: number): void {
+    if (this.busy || !this.mounted || session !== this.toneSession || !this.expandedIds.includes('tone') ||
+      this.toneDeckId !== this.deckId) return;
+    const choice: DeckToneChoice | undefined = DECK_TONE_CHOICES.find((entry: DeckToneChoice): boolean => String(entry.tone) === id);
+    if (choice === undefined) return;
+    const deckId: string = this.deckId;
+    this.closeTones(session); this.onClose(); this.onToneChange(deckId, choice.tone);
+  }
 
   private selectItem(item: ActionMenuListItem): void {
     if (this.busy || !this.mounted) return;
     if (item.id === 'tone') { this.toggleBranch(item); return; }
-    if (this.expandedIds.includes('tone')) {
-      const choice: DeckToneChoice | undefined = DECK_TONE_CHOICES.find((entry: DeckToneChoice): boolean => String(entry.tone) === item.id);
-      if (choice !== undefined) {
-        const deckId: string = this.deckId;
-        this.closeTones(); this.onClose(); this.onToneChange(deckId, choice.tone); return;
-      }
-    }
+    if (this.expandedIds.includes('tone')) return;
     const current: AppInterfaceItem | undefined = deckRowMenuItems(this.simple, this.filtered)
       .find((entry: AppInterfaceItem): boolean => entry.id === item.id);
     if (current === undefined || current.id === 'tone') return;
@@ -183,7 +170,6 @@ export struct HomeDeckRowMenu {
 
   private publishInterface(): void {
     if (!this.mounted) return;
-    this.toneRows = this.toneItems(); this.toneInteractive = !this.busy;
     const items: AppInterfaceControl[] = deckRowMenuItems(this.simple, this.filtered).map((item: AppInterfaceItem): AppInterfaceControl => ({
       id: item.id, titleKey: item.titleKey,
       title: interfaceItemText(this.getUIContext(), 'deck_row_menu', item.id, this.uiLanguage),
@@ -196,8 +182,8 @@ export struct HomeDeckRowMenu {
       optionIds: items.map((item: AppInterfaceControl): string => item.id),
       optionLabels: items.map((item: AppInterfaceControl): string => item.title), items: items, controlsComplete: true,
       values: [{ id: 'filtered', value: String(this.filtered) }, { id: 'tone', value: String(this.tone) },
-        { id: 'presentation', value: this.centered ? 'centered_details_menu' : this.point === undefined ? 'lifted_deck_context_menu' : 'pointer_context_menu' },
-        { id: 'tone_presentation', value: 'secondary_dialog' },
+        { id: 'presentation', value: this.centered ? 'anchored_details_menu' : this.point === undefined ? 'lifted_deck_context_menu' : 'pointer_context_menu' },
+        { id: 'tone_presentation', value: 'submenu' },
         { id: 'backdrop_blur_radius', value: String(this.backdropBlurRadius()) },
         { id: 'triggers', value: 'long_press,right_click,details_more' }, { id: 'deck_name', value: this.deckName }] });
     if (this.expandedIds.includes('tone')) {
@@ -213,7 +199,7 @@ export struct HomeDeckRowMenu {
   }
 
   private backdropBlurRadius(): number {
-    return this.material === 'glass' && this.point === undefined ? FOCUSED_DIALOG_BACKDROP_BLUR : 0;
+    return 0;
   }
 
   private placement(): DeckMenuPlacement {
@@ -272,16 +258,35 @@ export struct HomeDeckRowMenu {
       .accessibilityLevel(this.expandedIds.includes('tone') ? 'no-hide-descendants' : 'auto')
   }
 
+  @Builder
+  private toneMenu(anchor: ActionMenuAnchor, session: number) {
+    // 与父菜单留在同一窗口，沿用打开菜单之前的正文采样。
+    AnchoredMenu({ refractionSource: this.sourceId, fuseFromTrigger: false, materialRole: 'menu',
+      menuWidth: anchor.width, contentLeft: anchor.left - this.hostLeft, contentMaxWidth: anchor.width,
+      topOffset: anchor.top - this.hostTop, alignEnd: false,
+      onClose: (): void => { this.closeTones(session); } }) {
+      SelectionOptions({ items: this.toneItems(), isInteractive: !this.busy,
+        onSelect: (id: string): void => { this.selectTone(id, session); } })
+    }
+  }
+
   build() {
     Stack() {
-      if (this.point !== undefined) {
+      if (this.centered) {
+        AnchoredMenu({ refractionSource: this.sourceId, toolbarBounds: this.toolbarBounds,
+          menuWidth: 应用尺寸.cardActionMenuWidth, alignEnd: true,
+          onPanelArea: (area: Area): void => { this.recordToneAnchor(area); },
+          onClose: (): void => { this.dismiss(); } }) {
+          this.dialogContent()
+        }
+      } else if (this.point !== undefined) {
         CardActionMenu({ onPrimaryArea: (area: Area): void => { this.recordToneAnchor(area); }, items: this.contextEntries(), anchor: this.contextAnchor(), expandedIds: this.expandedIds,
           menuWidth: 应用尺寸.cardActionMenuWidth,
           onToggleBranch: (item: CardActionMenuEntry): void => { this.toggleBranch({ id: item.id ?? '', label: item.value }); },
           onSelect: (item: CardActionMenuEntry): void => { item.action?.(); }, onClose: (): void => { this.dismiss(); } })
-          .hitTestBehavior(this.expandedIds.includes('tone') ? HitTestMode.None : HitTestMode.Default)
+          .accessibilityLevel(this.expandedIds.includes('tone') ? 'no-hide-descendants' : 'auto')
       } else {
-        DialogBackdrop({ blurRadius: this.backdropBlurRadius(), tracksHierarchy: false })
+        DialogBackdrop({ tracksHierarchy: false })
           .onClick((): void => { this.dismiss(); })
         AnchoredMenu({ onPanelArea: (area: Area): void => { this.recordToneAnchor(area); }, refractionSource: this.sourceId, materialRole: 'menu',
           menuWidth: this.panelWidth(), topOffset: this.menuTop(), alignEnd: false,
@@ -301,7 +306,7 @@ export struct HomeDeckRowMenu {
           牌组列表项({ deck: this.deck, selected: false, menuOpen: true })
             .onAreaChange((_old: Area, area: Area): void => { this.previewHeight = Number(area.height); })
         }
-          .width(this.previewWidth()).height(this.previewHeight).borderRadius(应用尺寸.圆角_牌组行).clip(true)
+          .width(this.previewWidth()).height(this.previewHeight).borderRadius(appearanceElementRadius(this.appearanceElements, 应用尺寸.圆角_牌组行)).clip(true)
           .position({ x: this.previewLeft(), y: this.previewTop() })
           .onAreaChange((_old: Area, area: Area): void => {
             this.previewRegion = { left: Number(area.globalPosition.x), top: Number(area.globalPosition.y),
@@ -310,6 +315,9 @@ export struct HomeDeckRowMenu {
           .shadow({ radius: 16, color: '#33000000', offsetX: 0, offsetY: 8 })
           .translate({ x: this.liftX, y: this.liftY }).opacity(this.liftOpacity)
           .hitTestBehavior(HitTestMode.None)
+      }
+      if (this.expandedIds.includes('tone') && this.toneAnchor !== undefined) {
+        this.toneMenu(this.toneAnchor, this.toneSession)
       }
     }.width('100%').height('100%').onClick((): void => { this.dismiss(); }).onAreaChange((_old: Area, area: Area): void => {
       this.hostLeft = Number(area.globalPosition.x); this.hostTop = Number(area.globalPosition.y);

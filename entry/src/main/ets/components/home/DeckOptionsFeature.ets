@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DeckOptionsSession, DeckOptionsSnapshot, DeckOptionsFsrsState } from '../../model/home/DeckOptionsSession';
 import { AnkiDeckOptions } from '../../backend/AnkiDeckOptions';
 import { 牌组配置表单 } from '../../model/牌组配置表单';
@@ -22,6 +23,7 @@ import { WINDOW_SAFE_TOP_KEY, WINDOW_SAFE_LEFT_KEY, WINDOW_SAFE_RIGHT_KEY } from
 /** 表单和提交状态随功能挂载，首页只持有打开目标与占用事实。 */
 @Component
 export struct DeckOptionsFeature {
+  @StorageProp('appearance_elements_active') private appearanceElements: string = '';
   @StorageProp('系统语言') @Watch('publishInterface') private uiLanguage: string = 'zh-Hans';
   @Prop @Watch('handleBackRequest') backRequest: number = 0;
 
@@ -219,7 +221,7 @@ export struct DeckOptionsFeature {
   @Builder
   private discardBody() {
     Text($r('app.string.deck_options_discard_message')).fontSize(应用尺寸.字号_按钮)
-      .fontColor($r('app.color.text_primary')).width('100%')
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
   }
 
   build() {
