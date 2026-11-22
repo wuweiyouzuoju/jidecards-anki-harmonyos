@@ -11,6 +11,7 @@
 | [编码规范](development/coding-standards.md) | 分层、命名、ArkTS 约束、资源、日志、注释、测试，以及每条规则的自动检查方式 |
 | [代码检查记录](quality/code-linter.md) | DevEco Code Linter 配置、检查范围、规则调整依据与当前结果 |
 | [验证与工具入口](development/verification.md) | 测试分级、HAP 警告门禁、协议检查、源码导出与设备验收 |
+| [鸿蒙真机验收](development/device-acceptance.md) | 设备、签名测试包、功能实测与缺陷复测证据 |
 | [长期决策](decisions/README.md) | 跨模块设计决策及其状态 |
 | [贡献指南](../CONTRIBUTING.md) | 开发环境、提交与验证要求 |
 
