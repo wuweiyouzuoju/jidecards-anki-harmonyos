@@ -19,6 +19,13 @@ test('home hidden IDs exclude deleted decks and duplicates without changing save
   assert.deepEqual(result.hiddenIds, ['1']);
   assert.deepEqual(state.hiddenIds, ['removed', '1', '1', 'old-collection']);
 });
+test('the default ID keeps a previously renamed Core name after a fresh load', async () => {
+  const { repository, state } = homeDataHarness();
+  state.deckName = '我的收集箱';
+  const { snapshot } = await repository.load('/collection', '默认牌组');
+  assert.equal(snapshot.decks[0].name, '我的收集箱');
+  assert.equal(snapshot.decks[0].fullName, '我的收集箱');
+});
 test('graph and widget persistence failures leave home deck loading available', async () => {
   const { repository, state } = homeDataHarness();
   state.failGraphs = true; let result = await repository.loadStatistics(await repository.load('/', 'Default'));

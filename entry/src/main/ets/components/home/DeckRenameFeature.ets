@@ -2,6 +2,7 @@
 import { GLASS_HOME_SOURCE } from '../../utils/GlassBackdrop';
 import { appearanceElementColor } from '../../utils/AppearanceElements';
 import { DeckHierarchyCommands } from '../../backend/DeckHierarchyCommands';
+import { HomeDeckCommands } from '../../backend/HomeDeckCommands';
 import { 牌组服务 } from '../../backend/牌组服务';
 import { appInterface } from '../../backend/AppInterfaceService';
 import { deckHierarchyEntries } from '../../model/DeckReparent';
@@ -35,10 +36,13 @@ export struct DeckRenameFeature {
   @State private name: string = '';
   @State private plan: DeckRenamePlan | null = null;
   @State private errorCode: string = '';
+  @State private savedWithAlias: string = '';
+  @State private aliasClearFailed: boolean = false;
   private tree: DeckTreeNode | null = null;
   private disposed: boolean = false;
   private generation: number = 0;
   private readonly commands: DeckHierarchyCommands = new DeckHierarchyCommands();
+  private readonly aliasCommands: HomeDeckCommands = new HomeDeckCommands();
 
   aboutToAppear(): void { this.load(true); }
   aboutToDisappear(): void { this.disposed = true; this.generation++; appInterface.leave('deck_rename'); }
@@ -46,16 +50,21 @@ export struct DeckRenameFeature {
 
   private publishInterface(): void {
     if (this.disposed) return;
-    const controls: AppInterfaceControl[] = [
+    const saved: boolean = this.savedWithAlias !== '';
+    const controls: AppInterfaceControl[] = saved ? [
+      { id: 'clear_alias', titleKey: 'deck_rename_clear_alias', title: '', enabled: !this.saving, selected: false },
+      { id: 'done', titleKey: 'done', title: '', enabled: !this.saving, selected: false }
+    ] : [
       { id: 'name', titleKey: 'deck_rename_name', title: '', enabled: !this.loading && !this.saving && this.tree !== null, selected: false },
       { id: 'confirm', titleKey: 'deck_rename_confirm', title: '', enabled: !this.loading && !this.saving && this.plan !== null, selected: false },
       { id: 'cancel', titleKey: 'cancel', title: '', enabled: !this.saving, selected: false }
     ];
     if (this.errorCode !== '') controls.push({ id: 'reload', titleKey: 'common_retry', title: '', enabled: !this.loading && !this.saving, selected: false });
-    appInterface.observe({ surface: 'deck_rename', sectionId: '', selectedId: String(this.deckId),
+    appInterface.observe({ surface: 'deck_rename', sectionId: saved ? 'saved_with_alias' : '', selectedId: String(this.deckId),
       optionIds: [], optionLabels: [], busy: this.loading || this.saving, controlsComplete: true, items: controls,
       values: [{ id: 'deck_id', value: String(this.deckId) }, { id: 'name', value: this.name },
-        { id: 'local_display_name', value: this.localDisplayName }, { id: 'affected_decks', value: String(this.plan?.changes.length ?? 0) }] });
+        { id: 'local_display_name', value: saved ? this.savedWithAlias : this.localDisplayName },
+        { id: 'affected_decks', value: String(this.plan?.changes.length ?? 0) }] });
   }
 
   private async load(resetName: boolean): Promise<void> {
@@ -90,7 +99,7 @@ export struct DeckRenameFeature {
   }
 
   private changeName(value: string): void {
-    if (this.loading || this.saving || this.disposed) return;
+    if (this.loading || this.saving || this.disposed || this.savedWithAlias !== '') return;
     this.name = value; this.updatePlan(); this.publishInterface();
   }
 
@@ -109,9 +118,10 @@ export struct DeckRenameFeature {
       AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
       if (this.disposed) return;
       this.plan = null;
-      try { await this.onSaved(); }
-      catch (error) { if (!this.disposed) showToastSafely(this.getUIContext(), { message: $r('app.string.deck_rename_refresh_failed') }); }
-      if (!this.disposed) this.onClose();
+      this.name = accepted.name;
+      if (this.localDisplayName !== accepted.name) this.savedWithAlias = this.localDisplayName;
+      await this.refreshSavedName(this.savedWithAlias === '');
+      if (!this.disposed && this.savedWithAlias === '') this.onClose();
     } catch (error) {
       if (!this.disposed) {
         this.plan = null; this.tree = null; this.errorCode = error instanceof Error ? error.message : 'deck_rename_failed';
@@ -121,9 +131,37 @@ export struct DeckRenameFeature {
     }
   }
 
+  private async refreshSavedName(showSuccess: boolean): Promise<void> {
+    try {
+      await this.onSaved();
+      if (showSuccess && !this.disposed) showToastSafely(this.getUIContext(), { message: $r('app.string.deck_rename_done') });
+    } catch (_error) {
+      if (!this.disposed) showToastSafely(this.getUIContext(), { message: $r('app.string.deck_rename_refresh_failed') });
+    }
+  }
+
+  private async clearSavedAlias(): Promise<void> {
+    if (this.saving || this.disposed || this.savedWithAlias === '') return;
+    this.saving = true; this.aliasClearFailed = false; this.onBusy(true); this.publishInterface();
+    try {
+      await this.aliasCommands.clearAlias(String(this.deckId), this.savedWithAlias);
+      AppStorage.setOrCreate<number>('需要刷新主页', Date.now());
+      if (this.disposed) return;
+      this.savedWithAlias = '';
+      await this.refreshSavedName(true);
+      if (!this.disposed) this.onClose();
+    } catch (_error) {
+      if (!this.disposed) this.aliasClearFailed = true;
+    } finally {
+      if (!this.disposed) { this.saving = false; this.onBusy(false); this.publishInterface(); }
+    }
+  }
+
   @Builder
   private header() {
     DialogHeader({ title: $r('app.string.deck_rename_title'), actionLabel: $r('app.string.deck_rename_confirm'),
+      showAction: this.savedWithAlias === '', closeLabel: this.savedWithAlias === '' ? $r('app.string.cancel') : $r('app.string.done'),
+      showCloseLabel: this.savedWithAlias !== '',
       actionEnabled: !this.loading && !this.saving && this.plan !== null, closeEnabled: !this.saving,
       onAction: (): void => { this.save(); }, onClose: (): void => { this.handleBackRequest(); } })
   }
@@ -144,7 +182,7 @@ export struct DeckRenameFeature {
     if (this.plan !== null) {
       ForEach(this.plan.changes, (change: DeckPathChange) => {
         Text(`${change.before} → ${change.after}`).fontSize(应用尺寸.字号_正文).fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
-      }, (change: DeckPathChange): string => String(change.id))
+      }, (change: DeckPathChange): string => JSON.stringify([change.id, change.before, change.after]))
     }
     if (this.errorCode !== '') {
       Text(this.errorText()).fontSize(应用尺寸.字号_正文_小).fontColor($r('app.color.error_text')).width('100%')
@@ -153,9 +191,30 @@ export struct DeckRenameFeature {
     }
   }
 
+  @Builder
+  private savedContent() {
+    Text($r('app.string.deck_rename_alias_saved', this.name, this.savedWithAlias))
+      .fontColor(appearanceElementColor(this.appearanceElements, 'text_primary', $r('app.color.text_primary'))).width('100%')
+    if (this.aliasClearFailed) {
+      Text($r('app.string.deck_customize_rename_failed')).fontSize(应用尺寸.字号_正文_小)
+        .fontColor($r('app.color.error_text')).width('100%')
+    }
+    按下态按钮({ 文案: $r('app.string.deck_rename_clear_alias'), 是否启用: !this.saving,
+      点击回调: (): void => { this.clearSavedAlias(); } })
+  }
+
+  @Builder
+  private dialogContent() {
+    if (this.savedWithAlias !== '') {
+      this.savedContent()
+    } else {
+      this.content()
+    }
+  }
+
   build() {
     DialogFrame({ refractionSource: GLASS_HOME_SOURCE, maximumWidth: 应用尺寸.dialogMaxWidth, canDismiss: !this.saving,
-      header: () => { this.header(); }, content: () => { this.content(); },
+      header: () => { this.header(); }, content: () => { this.dialogContent(); },
       onDismiss: (): void => { this.handleBackRequest(); } })
   }
 }

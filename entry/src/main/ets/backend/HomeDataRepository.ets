@@ -7,7 +7,7 @@ import { 统计服务 } from '../backend/统计服务';
 import { 构建主页快照 } from '../model/主页快照映射器';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import type { GraphsView } from '../proto/messages/StatsMessages';
-import { 牌组汇总, 牌组色调, 主页快照 } from '../model/主页模型';
+import { 牌组汇总, 牌组色调, 主页快照, isUnrenamedDefaultDeck } from '../model/主页模型';
 import { 加载牌组别名映射, 加载牌组色调映射, 加载牌组背景图映射 } from '../model/牌组元数据存储';
 import { 加载全部牌组顺序 } from '../model/牌组顺序存储';
 import { 加载已隐藏牌组ID列表 } from '../model/隐藏牌组存储';
@@ -60,7 +60,7 @@ export class HomeDataRepository {
       // 默认牌组（id=1）使用当前地区资源；用户自定义别名优先。
       const 默认牌组本地化名: string = defaultDeckName;
       for (const deck of snapshot.decks) {
-        if (deck.id === '1' && deck.displayName === '') {
+        if (isUnrenamedDefaultDeck(deck) && deck.displayName === '') {
           deck.name = 默认牌组本地化名;
         }
       }

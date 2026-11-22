@@ -90,14 +90,24 @@ test('production service sends RenameDeck to the locked Core ID with a full path
 
 function componentHarness() {
   const h=commandsHarness(),events=[],tracker=new AppInterfaceTracker();
+  const local = { name: '', writes: [], failure: null };
+  const HomeDeckCommands = loadPlatformModule('backend/HomeDeckCommands.ets', 'HomeDeckCommands', {
+    牌组服务: h.Decks,
+    保存牌组别名: async (id, value, expected) => {
+      local.writes.push([id, value, expected]);
+      if (local.failure) throw local.failure;
+      if (local.name !== expected) throw Error('setting_changed_since_proposal');
+      local.name = value;
+    }
+  });
   const Feature=loadComponentLogic('components/home/DeckRenameFeature.ets','DeckRenameFeature',{
     DeckHierarchyCommands:class {executeRename(plan){return h.commands.executeRename(plan);}},牌组服务:h.Decks,
-    deckHierarchyEntries,planDeckRename,appInterface:tracker,$r:key=>key,namedResourceText:(_ui,key)=>key,
-    AppStorage:{setOrCreate:()=>events.push('broadcast')},showToastSafely:()=>events.push('refresh-error')
+    HomeDeckCommands,deckHierarchyEntries,planDeckRename,appInterface:tracker,$r:key=>key,namedResourceText:(_ui,key)=>key,
+    AppStorage:{setOrCreate:()=>events.push('broadcast')},showToastSafely:(_ui,options)=>events.push(options.message)
   });
-  const feature=new Feature();feature.deckId=2;feature.localDisplayName='My alias';feature.getUIContext=()=>({});
+  const feature=new Feature();feature.deckId=2;feature.getUIContext=()=>({});
   feature.onBusy=busy=>events.push(busy?'busy':'idle');feature.onClose=()=>events.push('close');feature.onSaved=async()=>events.push('saved');
-  return {...h,feature,tracker,events};
+  return {...h,feature,tracker,events,local};
 }
 
 test('rename panel starts from Core name, previews children and blocks double submission, edits and back while saving',async()=>{
@@ -117,7 +127,7 @@ test('stale rename requires reload and confirmation; dispose never cancels an ac
   assert.equal(h.feature.tree,null);assert.equal(h.state.writes.length,0);
   await h.feature.load(false);assert.equal(h.feature.name,'New');assert.equal(h.feature.plan.changes[0].after,'Changed::New');
   h.feature.onSaved=async()=>{throw Error('refresh');};await h.feature.save();
-  assert.ok(h.events.includes('refresh-error'));assert.ok(h.events.includes('close'));assert.equal(h.feature.plan,null);
+  assert.ok(h.events.includes('app.string.deck_rename_refresh_failed'));assert.ok(h.events.includes('close'));assert.equal(h.feature.plan,null);
   const disposed=componentHarness();await disposed.feature.load(true);disposed.feature.changeName('New');
   disposed.state.gate=deferred();const pending=disposed.feature.save();await tick();disposed.feature.aboutToDisappear();
   disposed.state.gate.resolve();await pending;assert.equal(disposed.state.writes.length,1);
@@ -125,7 +135,7 @@ test('stale rename requires reload and confirmation; dispose never cancels an ac
 });
 
 test('JIDE reads shared rename labels, actual draft state and the real proposal capability in both languages',async()=>{
-  const h=componentHarness();await h.feature.load(true);h.feature.changeName('New');
+  const h=componentHarness();h.feature.localDisplayName='My alias';await h.feature.load(true);h.feature.changeName('New');
   for(const locale of ['base','en_US']) {
     const strings=new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`,import.meta.url),'utf8')).string.map(x=>[x.name,x.value]));
     const structure=buildAgentAppStructure({simple:false,agent:true,cloudDeck:false,themeHasTextures:false},'deck_rename','',
@@ -137,6 +147,46 @@ test('JIDE reads shared rename labels, actual draft state and the real proposal 
   }
   for(const surface of ['deck_row_menu'])assert.ok(APP_INTERFACE_SURFACES.find(x=>x.id===surface).items.some(x=>x.id==='rename'&&x.opens==='deck_rename'));
   assert.ok(APP_INTERFACE_SURFACES.find(x=>x.id==='deck_customize').instructionsKey);
+});
+
+test('successful rename exposes a separate guarded clear operation for a masking local alias', async () => {
+  const h = componentHarness();
+  h.feature.localDisplayName = h.local.name = 'My alias';
+  await h.feature.load(true);
+  h.feature.changeName('New');
+  await h.feature.save();
+  assert.equal(h.feature.name, 'New');
+  assert.equal(h.local.name, 'My alias');
+  assert.equal(h.events.includes('close'), false);
+  const observed = h.tracker.snapshot()[0];
+  assert.equal(observed.sectionId, 'saved_with_alias');
+  assert.deepEqual(observed.items.map(item => item.id), ['clear_alias', 'done']);
+  assert.ok(APP_INTERFACE_SURFACES.find(surface => surface.id === 'deck_rename').items.some(item => item.id === 'clear_alias'));
+
+  h.local.name = 'Changed elsewhere';
+  await h.feature.clearSavedAlias();
+  assert.equal(h.feature.aliasClearFailed, true);
+  assert.equal(h.local.name, 'Changed elsewhere');
+  assert.equal(h.events.includes('close'), false);
+  h.local.name = 'My alias';
+  await h.feature.clearSavedAlias();
+  assert.deepEqual(h.local.writes, [['2', '', 'My alias'], ['2', '', 'My alias']]);
+  assert.deepEqual(h.state.writes, [[2, 'English::New']]);
+  assert.equal(h.local.name, '');
+  assert.ok(h.events.includes('app.string.deck_rename_done'));
+  assert.ok(h.events.includes('close'));
+});
+
+test('finishing the success screen keeps the local alias unless the user clears it', async () => {
+  const h = componentHarness();
+  h.feature.localDisplayName = h.local.name = 'Personal label';
+  await h.feature.load(true);
+  h.feature.changeName('New');
+  await h.feature.save();
+  h.feature.handleBackRequest();
+  assert.deepEqual(h.local.writes, []);
+  assert.equal(h.local.name, 'Personal label');
+  assert.ok(h.events.includes('close'));
 });
 
 test('clearing a local display name writes only preferences and never calls Core rename',async()=>{

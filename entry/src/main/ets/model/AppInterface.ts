@@ -298,6 +298,8 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'deck_rename', titleKey: 'deck_rename_title', instructionsKey: 'deck_rename_hint', parent: 'deck_row_menu', items: [
     { id: 'name', titleKey: 'deck_rename_name' },
     { id: 'confirm', titleKey: 'deck_rename_confirm' },
+    { id: 'clear_alias', titleKey: 'deck_rename_clear_alias' },
+    { id: 'done', titleKey: 'done' },
     { id: 'cancel', titleKey: 'cancel' },
     { id: 'reload', titleKey: 'common_retry' }
   ] },

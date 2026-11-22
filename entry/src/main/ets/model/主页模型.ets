@@ -237,13 +237,18 @@ export function 待办数(牌组: 牌组汇总): number {
 interface DeckNameResources { getStringByNameSync(name: string): string; }
 interface DeckNameContext { resourceManager: DeckNameResources; }
 
-/** 显示别名优先；默认牌组从当前应用资源读取，后台真实名称不改写。 */
+/** Anki 新建集合会用当前 Core 语言为 ID 1 命名。改过名的牌组保留其真实路径。 */
+export function isUnrenamedDefaultDeck(牌组: 牌组汇总): boolean {
+  return 牌组.id === '1' && (牌组.fullName === 'Default' || 牌组.fullName === '系统默认');
+}
+
+/** 显示别名优先；出厂名称从当前应用资源读取。 */
 export function 牌组显示名(牌组: 牌组汇总, 语言: string = AppStorage.get<string>('系统语言') ?? 'zh-Hans'): string {
   if (牌组.displayName !== '') {
     return 牌组.displayName;
   }
   // 语言参数保留 UI 的响应式依赖；资源管理器持有当前应用语言。
-  if (牌组.id === '1') {
+  if (isUnrenamedDefaultDeck(牌组)) {
     const context: DeckNameContext | undefined = AppStorage.get<DeckNameContext>('abilityContext');
     if (context !== undefined) return context.resourceManager.getStringByNameSync('default_deck_name');
   }

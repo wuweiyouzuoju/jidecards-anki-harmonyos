@@ -49,9 +49,11 @@ HarmonyOS 6.1.0（API 23）二合一模拟器验证：别针在最大化键左�
 
 ## 牌组真实改名与本机显示名称
 
-长按牌组 → “牌组改名”，或牌组详情 → 更多 → “牌组改名”，进入 `components/home/DeckRenameFeature.ets`。输入从 Core 当前层名称初始化，只改这一层；移动父级仍用层级入口。`model/DeckRename.ts` 生成包含全部子牌组的完整路径预览，校验空名、层级分隔符、名称冲突和 NFC；`DeckHierarchyCommands.executeRename` 与移动/排序共用串行队列，冻结输入、提交前重读检查，再调用一次 Core `RenameDeck`（service 7 / method 18）。Core 同一事务更新后代路径并提供撤销/重做，牌组 ID、卡片归属和学习记录保持。成功请求同步并刷新首页；过期计划需要重载预览再确认，保存中阻止返回和重复提交，已接受写入不随面板销毁取消。
+长按牌组 → “牌组改名”，或点击牌组详情的标题，进入 `components/home/DeckRenameFeature.ets`。输入从 Core 当前层名称初始化，只改这一层；移动父级仍用层级入口。`model/DeckRename.ts` 生成包含全部子牌组的完整路径预览，校验空名、层级分隔符、名称冲突和 NFC；`DeckHierarchyCommands.executeRename` 与移动/排序共用串行队列，冻结输入、提交前重读检查，再调用一次 Core `RenameDeck`（service 7 / method 18）。Core 同一事务更新后代路径并提供撤销/重做，牌组 ID、卡片归属和学习记录保持。成功请求同步并刷新首页；过期计划需要重载预览再确认，保存中阻止返回和重复提交，已接受写入不随面板销毁取消。
 
-历史 `displayName` 继续作为按牌组 ID 存储的本机别名保留。旧定制入口明确命名“本机显示名称 / 背景”，留空删除别名并恢复 Core 名称；真实改名面板提示已有别名仍会显示。别名保存失败向表单传播，不误报成功。Core 新名称进入集合导出与同步，别名不参与。`AppInterface` 共用菜单、名称和说明；面板发布实际草稿、别名、影响数量与忙碌/确认状态，详情同时提供 `core_name` 和 `local_display_name`。JIDE 的实际提案与确认入口见[牌组层级操作](agent.md#牌组层级操作)。
+默认牌组仅在 ID 为 1 且 Core 仍保存出厂名称时显示当前语言的默认名称。主页快照保留 Core 完整路径，详情与本机搜索使用同一出厂名称判定。
+
+本机别名按牌组 ID 保存。改名成功且标题仍被别名覆盖时，原改名面板显示已保存的新名称和当前别名，并提供「清除别名并显示新名称」与「完成」。清除只写本机偏好，提交时核对所显示的别名，写入失败可留在面板重试。点完成保留别名。Core 新名称进入集合导出与同步。JIDE 从 `AppInterface` 读取改名草稿、已保存但保留别名的状态及可见操作；详情也提供 `core_name` 和 `local_display_name`。JIDE 的实际提案与确认入口见[牌组层级操作](agent.md#牌组层级操作)。
 
 弹窗复用 DialogFrame / DialogHeader / FormInputStyle，外壳独占外缘内边距、正文间隔与滚动限高；业务内容只加文字和路径预览。直接回归 `home-deck-rename.test.mjs`、`home-deck-features.test.mjs` 和 `ai-agent-v2-runtime.test.mjs`；真实 Core 回归 `native/rsharmony/tests/deck_rename.rs` 覆盖后代路径、稳定 ID、卡片/笔记/复习记录、一次撤销和重做、Unicode 与大小写改名。设备宽窄屏、大字体、主题、返回操作以及真实联网同步和模型规划须另做验收。
 

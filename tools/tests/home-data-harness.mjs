@@ -2,10 +2,15 @@
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { activeHiddenDeckIds } from '../../entry/src/main/ets/model/HiddenDecks.ts';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { loadPlatformModule, loadPlatformSource } from './platform-module-harness.mjs';
+import { 牌组色调 } from '../../entry/src/main/ets/model/DeckTone.ts';
+const homeModel = readFileSync(new URL('../../entry/src/main/ets/model/主页模型.ets', import.meta.url), 'utf8')
+  .replace(/^export \{[^\n]+\} from [^;]+;\r?$/gm, '');
+const isUnrenamedDefaultDeck = loadPlatformSource(homeModel, 'isUnrenamedDefaultDeck', { 牌组色调 });
 export function homeDataHarness() {
   const state = { days: 0, graph: { today: { answerCount: 9 } }, failGraphs: false, failSave: false,
-    tree: { children: [{ id: 1, newCount: 2, learnCount: 3, reviewCount: 4 }] }, hiddenIds: ['1'], calls: [], hours: 2, separate: true, saveWait: null };
+    tree: { children: [{ id: 1, newCount: 2, learnCount: 3, reviewCount: 4 }] }, deckName: 'Default',
+    hiddenIds: ['1'], calls: [], hours: 2, separate: true, saveWait: null };
   const dependencies = {
     hilog: { info() {}, error() {} }, 后端会话: { 获取实例: () => ({ 确保已打开: async () => state.calls.push('open') }) },
     牌组服务: class { async 获取牌组树() { state.calls.push('tree'); return state.tree; } },
@@ -16,9 +21,11 @@ export function homeDataHarness() {
     加载牌组色调映射: async () => new Map(), 加载牌组别名映射: async () => new Map(),
     加载全部牌组顺序: async () => new Map(), 加载牌组背景图映射: async () => new Map(), 加载已隐藏牌组ID列表: async () => state.hiddenIds,
     activeHiddenDeckIds,
+    isUnrenamedDefaultDeck,
     提取卡片数据: (graphs, pending, decks, hours, separate) => { state.calls.push(['widget', graphs, pending, decks, hours, separate]); return { 今日完成数: graphs.today.answerCount }; },
     保存卡片数据: async () => { state.calls.push('save'); if (state.failSave) throw new Error('disk'); await state.saveWait; },
-    构建主页快照: (tree, graphs) => ({ decks: [{ id: '1', name: 'Default', displayName: '' }], today: { completedCount: graphs?.today.answerCount ?? 0 }, memory: {} })
+    构建主页快照: (tree, graphs) => ({ decks: [{ id: '1', name: state.deckName, fullName: state.deckName, displayName: '' }],
+      today: { completedCount: graphs?.today.answerCount ?? 0 }, memory: {} })
   };
   Object.assign(dependencies, loadPlatformModule('backend/StatsWidgetPublisher.ets', '{ createStatsWidget, publishStatsWidget }', dependencies));
   const source = readFileSync(new URL('../../entry/src/main/ets/backend/HomeDataRepository.ets', import.meta.url), 'utf8')

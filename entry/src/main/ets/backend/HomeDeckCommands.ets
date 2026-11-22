@@ -14,6 +14,11 @@ export class HomeDeckCommands {
     return id;
   }
 
+  /** @throws {Error} 别名已变化或本机保存失败，交还改名面板。 */
+  async clearAlias(id: string, expected: string): Promise<void> {
+    await 保存牌组别名(id, '', expected);
+  }
+
   /** 别名先落盘，背景替换失败只报告该步骤，保留可重试的定制面板。
    * @throws {Error} 别名存储不可用或写入失败，由定制面板保留草稿并报告。
    */

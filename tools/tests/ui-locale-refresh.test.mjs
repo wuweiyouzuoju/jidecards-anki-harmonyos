@@ -181,18 +181,23 @@ test('cached statistics deck label refreshes without changing the selection or d
 
 test('default deck localization preserves actual user names and display overrides', () => {
   const source = read('model/主页模型.ets');
-  const start = source.indexOf('export function 牌组显示名(');
-  const code = source.slice(start, source.indexOf('\n}\n', start) + 2).replace('export ', '');
+  const start = source.indexOf('export function isUnrenamedDefaultDeck(');
+  const display = source.indexOf('export function 牌组显示名(');
+  const code = source.slice(start, source.indexOf('\n}\n', display) + 2).replaceAll('export ', '');
   let currentName='默认牌组';
   const displayName = new Function('AppStorage', stripTypeScriptTypes(code) + '; return 牌组显示名;')({
     get: () => ({resourceManager:{getStringByNameSync:key=>{assert.equal(key,'default_deck_name');return currentName;}}})
   });
-  const deck = { id: '1', displayName: '', name: 'Default' };
+  const deck = { id: '1', displayName: '', name: 'Default', fullName: 'Default' };
   assert.equal(displayName(deck, 'zh-Hans'), '默认牌组');
   currentName='Default';assert.equal(displayName(deck, 'en'), 'Default');
   for(const name of ['Mazzo predefinito','デフォルト','Bộ thẻ mặc định','預設牌組','標準stapel']){
     currentName=name;assert.equal(displayName(deck,'it-IT'),name);
   }
+  deck.name = '系统默认'; deck.fullName = '系统默认'; currentName = '默认牌组';
+  assert.equal(displayName(deck, 'zh-Hans'), '默认牌组');
+  deck.name = '我的收集箱'; deck.fullName = deck.name;
+  assert.equal(displayName(deck, 'zh-Hans'), '我的收集箱');
   deck.displayName = 'Custom'; assert.equal(displayName(deck, 'zh-Hans'), 'Custom');
   deck.id = '2'; deck.displayName = ''; deck.name = 'My deck';
   assert.equal(displayName(deck, 'en'), 'My deck');
