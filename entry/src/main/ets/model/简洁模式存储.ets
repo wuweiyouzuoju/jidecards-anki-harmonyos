@@ -53,7 +53,7 @@ export function initializeSimpleMode(): void {
       const store: preferences.Preferences = preferences.getPreferencesSync(context, { name: 存储名 });
       simple = store.getSync(简洁模式键, true) !== false;
     } catch (error) {
-      // 读取失败保留已知模式；全新会话使用原有简洁版默认值，设置页仍可重新读取。
+      // 读取失败保留已知模式；全新会话使用原有简洁版默认值，不在打开设置时重读覆盖实时值。
     }
   }
   AppStorage.setOrCreate<boolean>(简洁模式AppStorage键, simple);

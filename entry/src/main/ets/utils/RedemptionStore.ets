@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { restoreRemoteEntitlements } from '../backend/RemoteEntitlements';
 import { UNLOCKED_CONTENTS_KEY } from '../model/ThemeCatalog';
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
@@ -83,6 +84,7 @@ async function restore(): Promise<void> {
   savedTokens = verified;
   AppStorage.setOrCreate<boolean>(THEME_MOTION_KEY, store.getSync('motion', true) === true);
   AppStorage.setOrCreate<string[]>(UNLOCKED_CONTENTS_KEY, contents);
+  await restoreRemoteEntitlements(restored);
 }
 
 /** 初始化失败允许用户从设置重试，避免反复生成未落盘指纹。 */
@@ -119,6 +121,7 @@ export async function redeemContent(value: string): Promise<RedemptionResult> {
     savedTokens = merged;
     AppStorage.setOrCreate<string[]>(UNLOCKED_CONTENTS_KEY, savedTokens.map((entry: string): string =>
       parseRedemption(entry)!.contentId));
+    await restoreRemoteEntitlements(fingerprint);
     return 'success';
   } finally { mutationBusy = false; }
 }

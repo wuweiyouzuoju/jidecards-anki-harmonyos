@@ -19,6 +19,10 @@ export const STUDY_GESTURE_INPUTS: StudyGestureInput[] = [
   { id: 'three_finger', titleKey: 'study_gesture_three_finger' },
   { id: 'four_finger', titleKey: 'study_gesture_four_finger' },
   { id: 'shake', titleKey: 'study_gesture_shake' },
+  { id: 'point_top', titleKey: 'study_gesture_top', layout: 'points' },
+  { id: 'point_bottom', titleKey: 'study_gesture_bottom', layout: 'points' },
+  { id: 'point_left', titleKey: 'study_gesture_middle_left', layout: 'points' },
+  { id: 'point_right', titleKey: 'study_gesture_middle_right', layout: 'points' },
   { id: 'four_top_left', titleKey: 'study_gesture_top_left', layout: 'four' },
   { id: 'four_top_right', titleKey: 'study_gesture_top_right', layout: 'four' },
   { id: 'four_bottom_left', titleKey: 'study_gesture_bottom_left', layout: 'four' },
@@ -34,10 +38,26 @@ export const STUDY_GESTURE_INPUTS: StudyGestureInput[] = [
   { id: 'nine_bottom_right', titleKey: 'study_gesture_bottom_right', layout: 'nine' }
 ];
 export const STUDY_GESTURE_ACTIONS: StudyKeyboardAction[] = [
-  { id: 'none', titleKey: 'study_gesture_no_action' }, ...STUDY_KEYBOARD_ACTIONS
+  { id: 'none', titleKey: 'study_gesture_no_action' }, ...STUDY_KEYBOARD_ACTIONS,
+  { id: 'delete_note', titleKey: 'study_delete_note_title' },
+  { id: 'page_up', titleKey: 'study_action_page_up' },
+  { id: 'page_down', titleKey: 'study_action_page_down' },
+  { id: 'tag', titleKey: 'add_note_tags' },
+  { id: 'card_info', titleKey: 'browser_info_title' },
+  { id: 'reschedule_note', titleKey: 'browser_action_set_due' },
+  { id: 'user_action_1', titleKey: 'study_action_user_1' },
+  { id: 'user_action_2', titleKey: 'study_action_user_2' },
+  { id: 'user_action_3', titleKey: 'study_action_user_3' },
+  { id: 'user_action_4', titleKey: 'study_action_user_4' },
+  { id: 'user_action_5', titleKey: 'study_action_user_5' },
+  { id: 'user_action_6', titleKey: 'study_action_user_6' },
+  { id: 'user_action_7', titleKey: 'study_action_user_7' },
+  { id: 'user_action_8', titleKey: 'study_action_user_8' },
+  { id: 'user_action_9', titleKey: 'study_action_user_9' }
 ];
 export const STUDY_GESTURE_FIELDS: StudyGestureInput[] = [
   { id: 'close', titleKey: 'cancel' }, { id: 'save', titleKey: 'browser_detail_save' },
+  { id: 'help', titleKey: 'help_accessibility_description' },
   { id: 'enabled', titleKey: 'study_gesture_enabled' }, { id: 'layout', titleKey: 'study_gesture_layout' },
   { id: 'input', titleKey: 'study_gesture_input' }, { id: 'side', titleKey: 'study_keyboard_side' },
   { id: 'command', titleKey: 'study_keyboard_command' }, { id: 'add', titleKey: 'study_gesture_add' },
@@ -63,7 +83,7 @@ export function defaultStudyGestureConfig(): StudyGestureConfig {
 }
 export function validateStudyGestureConfig(value: StudyGestureConfig): StudyGestureConfig {
   if (value === null || typeof value !== 'object' || Object.keys(value).length !== 4 || value.version !== 1 ||
-    typeof value.enabled !== 'boolean' || !['four', 'nine'].includes(value.tapLayout) ||
+    typeof value.enabled !== 'boolean' || !['four', 'nine', 'points'].includes(value.tapLayout) ||
     !Array.isArray(value.bindings) || value.bindings.length > 64) throw new Error('invalid_study_gestures');
   const bindings: StudyGestureBinding[] = [];
   for (const item of value.bindings) {
@@ -79,19 +99,27 @@ export function validateStudyGestureConfig(value: StudyGestureConfig): StudyGest
 }
 export function studyGestureTapInput(layout: string, nx: number, ny: number): string {
   if (![nx, ny].every((value: number): boolean => Number.isFinite(value) && value >= 0 && value <= 1)) return '';
+  if (layout === 'points') {
+    const x: number = nx - 0.5, y: number = ny - 0.5;
+    return 'point_' + (Math.abs(x) > Math.abs(y) ? (x < 0 ? 'left' : 'right') : (y < 0 ? 'top' : 'bottom'));
+  }
   if (layout === 'four') return 'four_' + (ny < 0.5 ? 'top_' : 'bottom_') + (nx < 0.5 ? 'left' : 'right');
   if (layout !== 'nine') return '';
   const index: number = Math.min(2, Math.floor(ny * 3)) * 3 + Math.min(2, Math.floor(nx * 3));
   return 'nine_' + ['top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right'][index];
 }
-/** 没有绑定即无操作；评分不能绕过答案面，完整配置不继承隐藏的旧映射。 */
+/** AnkiDroid 评分命令：题面只翻答案，答案面才评分；非学习状态不执行。 */
+export function studyGestureAction(command: StudyInputCommand, phase: string): StudyInputCommand {
+  if (!['question', 'answer'].includes(phase)) return 'none';
+  if (['again', 'hard', 'good', 'easy'].includes(command) && phase === 'question') return 'flip';
+  return command === 'flip' && phase !== 'question' ? 'none' : command;
+}
+/** 未绑定不执行，显式卡面限制保留，完整配置不继承隐藏的旧映射。 */
 export function studyGestureCommand(config: StudyGestureConfig, input: string, phase: string): StudyInputCommand {
   if (!config.enabled || !['question', 'answer'].includes(phase)) return 'none';
   const item: StudyGestureBinding | undefined = config.bindings.find((binding: StudyGestureBinding): boolean =>
     binding.input === input && (binding.side === 'both' || binding.side === phase));
-  if (item === undefined || (item.command === 'flip' && phase !== 'question') ||
-    (['again', 'hard', 'good', 'easy'].includes(item.command) && phase !== 'answer')) return 'none';
-  return item.command;
+  return item === undefined ? 'none' : studyGestureAction(item.command, phase);
 }
 export function completeStudyGestures(config: StudyGestureConfig | undefined, simple: boolean): StudyGestureConfig | undefined {
   return !simple && config?.enabled ? config : undefined;
@@ -126,3 +154,6 @@ export class StudyShakeDetector {
     this.peaks = []; this.lastShake = now; return true;
   }
 }
+
+/** 官方白板工具由平台套件拥有，不声明不存在的可编程接口。 */
+export const STUDY_GESTURE_SUPPORT: string = 'AnkiDroid rating gestures flip on question and grade on answer; explicit face restrictions apply; points=diagonal directions, four=legacy quadrants, nine=grid; delete_note removes the note and all cards after confirmation, delete retains current-card scope; official handwriting tool shortcuts for eraser, clear and pen color are platform-limited';

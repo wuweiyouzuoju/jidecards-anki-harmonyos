@@ -12,6 +12,7 @@ export const APP_PAGE_ROUTES: AppPageRoute[] = [
   { surface: 'note_draft_preview', name: 'NoteDraftPreviewPage', titleKey: 'deck_preview' },
   { surface: 'deck_options', name: 'DeckOptionsPage', titleKey: 'deck_options_title' },
   { surface: 'stats', name: 'StatsPage', titleKey: 'stats_page_title' },
+  { surface: 'study_leaderboard', name: 'StudyLeaderboardPage', titleKey: 'leaderboard_title' },
   { surface: 'add_note', name: 'AddNotePage', titleKey: 'add_note_title' },
   { surface: 'agent', name: 'AiCardPage', titleKey: 'ai_agent_title' },
   { surface: 'reminders', name: 'ReminderPage', titleKey: 'reminder_list_title' },

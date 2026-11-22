@@ -2,8 +2,8 @@
 
 import { decideHomeSync } from './HomeSyncPolicy';
 import type { HomeActivityState } from './HomeActivityPolicy';
-import { AutoSyncScheduler } from './AutoSyncScheduler';
-import { SyncActivity } from './SyncSettings';
+import type { AutoSyncScheduler } from './AutoSyncScheduler';
+import type { SyncActivity } from './SyncSettings';
 import type { SyncAuth } from '../proto/messages/SyncMessages';
 
 export interface HomeSyncHost {

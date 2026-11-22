@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { ReviewPreferenceEdit } from '../proto/messages/PreferencesMessages';
-import { ReviewPreferences, decodeReviewPreferences, patchReviewPreferences,
-  validatePreferenceEdit } from '../proto/messages/PreferencesMessages';
-import { AutoSyncScheduler, autoSyncScheduler } from './AutoSyncScheduler';
-import { SyncActivity, syncActivity } from './SyncSettings';
+import { decodeReviewPreferences, patchReviewPreferences, validatePreferenceEdit } from '../proto/messages/PreferencesMessages';
+import type { ReviewPreferences } from '../proto/messages/PreferencesMessages';
+import { autoSyncScheduler } from './AutoSyncScheduler';
+import type { AutoSyncScheduler } from './AutoSyncScheduler';
+import { syncActivity } from './SyncSettings';
+import type { SyncActivity } from './SyncSettings';
 
 export interface ReviewPreferencesBackend {
   read(): Promise<Uint8Array>;

@@ -5,7 +5,7 @@ import { 配置服务 } from './配置服务';
 import type { BrowserSidebarBackend } from '../model/BrowserSidebar';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import type { TagTreeNode } from '../proto/messages/TagsMessages';
-import { ConfigKeyBool } from '../proto/messages/ConfigMessages';
+import type { ConfigKeyBool } from '../proto/messages/ConfigMessages';
 
 interface SavedSearchConfig { savedFilters?: object; }
 

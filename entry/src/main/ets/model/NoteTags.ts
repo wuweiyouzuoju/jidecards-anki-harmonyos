@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { DirectoryRow } from './DirectoryTree';
 import { directoryRow, visibleDirectoryRows } from './DirectoryTree';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { TagTreeNode } from '../proto/messages/TagsMessages';
 import type { EditableNote } from '../proto/messages/NoteMessages';
 import type { SearchNode } from '../proto/messages/SearchMessages';

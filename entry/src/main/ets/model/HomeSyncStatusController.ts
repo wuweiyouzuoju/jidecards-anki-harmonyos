@@ -90,13 +90,12 @@ function copyAuth(auth: SyncAuth | null): SyncAuth | null {
 /** 任务进度、冲突和排队提示优先于空闲状态。 */
 export function homeSyncIndicator(accountState: string, taskIndicator: string): string {
   if (taskIndicator !== 'hidden') return taskIndicator;
-  if (accountState === 'not_logged_in' || accountState === 'one_way') return 'attention';
+  if (accountState === 'one_way') return 'attention';
   return accountState === 'pending_changes' ? 'pending' : 'hidden';
 }
 
 export function homeSyncLabelKey(accountState: string, taskIndicator: string): string {
   if (taskIndicator !== 'hidden') return 'home_sync';
-  if (accountState === 'not_logged_in') return 'home_sync_not_logged_in';
   if (accountState === 'one_way') return 'home_sync_one_way';
   return accountState === 'pending_changes' ? 'home_sync_pending_changes' : 'home_sync';
 }

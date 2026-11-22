@@ -2,6 +2,7 @@
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { saveLocalPreference } from './LocalPreferenceWrite';
+import { AppLog } from '../model/AppLog';
 
 const PAPER_TRANSPARENCY_KEY: string = 'study_whiteboard_paper_transparency';
 const DEFAULT_PAPER_TRANSPARENCY: number = 80;
@@ -20,7 +21,7 @@ export function loadStudyPaperTransparency(): number {
     const value: preferences.ValueType = getStore().getSync(PAPER_TRANSPARENCY_KEY, DEFAULT_PAPER_TRANSPARENCY);
     if (typeof value === 'number' && Number.isFinite(value)) return Math.round(Math.max(0, Math.min(100, value)));
   } catch (error) {
-    console.warn('Study paper transparency could not be loaded');
+    AppLog.warn('StudyWhiteboard', 'Study paper transparency could not be loaded');
   }
   return DEFAULT_PAPER_TRANSPARENCY;
 }

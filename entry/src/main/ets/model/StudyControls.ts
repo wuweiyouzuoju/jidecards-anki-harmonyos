@@ -2,7 +2,7 @@
 import type { StudyInputCommand } from './StudyInputPolicy';
 import { defaultStudyKeyboard, normalizeStudyChord, validateStudyKeyboard, studyKeyboardCommand } from './StudyKeyboard';
 import type { StudyKeyboard, StudyKeyBinding } from './StudyKeyboard';
-import { validateStudyGestureConfig } from './StudyGestureConfig';
+import { validateStudyGestureConfig, studyGestureAction } from './StudyGestureConfig';
 import type { StudyGestureConfig } from './StudyGestureConfig';
 
 export const STUDY_CONTROLS_KEY: string = 'studyControls';
@@ -67,7 +67,5 @@ export function mappedStudyCommand(items: StudyCommandMapping[], input: string,
   if (mapping === undefined) return fallback;
   const command: StudyInputCommand = mapping.command;
   if (phase !== 'question' && phase !== 'answer') return 'none';
-  if (['again', 'hard', 'good', 'easy'].includes(command) && phase !== 'answer') return 'none';
-  if (command === 'flip' && phase !== 'question') return 'none';
-  return command;
+  return studyGestureAction(command, phase);
 }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { STUDY_KEYBOARD_ACTIONS, studyChordLabel } from './StudyKeyboard';
 import type { StudyKeyBinding } from './StudyKeyboard';
 import { NOTE_FIELD_SHORTCUTS } from './NoteFieldEditing';
@@ -5,7 +6,6 @@ import { BROWSER_SHORTCUTS } from './BrowserKeyboard';
 import type { BrowserShortcut } from './BrowserKeyboard';
 import { defaultStudyControls, effectiveStudyKeyboard, validateStudyControls } from './StudyControls';
 import type { StudyControls } from './StudyControls';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 /** 默认键位与页面指引共用；具体操作仍由原页面/会话执行。 */
 export const FIELD_SHORTCUTS = NOTE_FIELD_SHORTCUTS;
 export interface KeyboardShortcut { command: string; keys: string; titleKey: string; }

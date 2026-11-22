@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { MediaSnapshotRpc } from '../proto/generated/PrivateRpc';
 import { CoreRpc } from '../proto/generated/CoreRpc';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 // ========================================================
 // @块ID BACKEND-SVC-MEDIA-001
 // @名称 媒体服务边界

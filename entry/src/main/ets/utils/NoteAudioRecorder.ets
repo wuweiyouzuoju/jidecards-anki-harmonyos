@@ -12,7 +12,7 @@ export async function discardNoteRecordings(audios: NoteFieldAudio[]): Promise<v
     if (item.temporary && !new RegExp('[/\\\\]collection\\.media[/\\\\]').test(item.uri) &&
       new RegExp('/note-(?:recording|audio)-[0-9-]+\\.(?:m4a|mp3|aac|wav|ogg|flac)$').test(item.uri)) {
       try { await fs.unlink(item.uri); }
-      catch (error) { hilog.warn(0x0001, 'NoteAudio', 'Recording cleanup failed: %{public}s', `${error}`); }
+      catch (error) { hilog.warn(0x4342, 'NoteAudio', 'Recording cleanup failed: %{public}s', `${error}`); }
     }
   }
 }
@@ -33,7 +33,7 @@ export class NoteAudioRecorder {
   private reportFailure(error: Error): void {
     const code: number = (error as BusinessError).code;
     if (Number.isFinite(code)) this.errorCode = code;
-    hilog.error(0x0001, 'NoteAudio', 'Recording failed: stage=%{public}s code=%{public}d', this.stage, this.errorCode);
+    hilog.error(0x4342, 'NoteAudio', 'Recording failed: stage=%{public}s code=%{public}d', this.stage, this.errorCode);
   }
 
   /** @throws {Error} 权限拒绝/录制失败交给表单显示。 */
@@ -67,7 +67,7 @@ export class NoteAudioRecorder {
       this.stage = 'create';
       recorder = await media.createAVRecorder();
       recorder.on('stateChange', (state: media.AVRecorderState): void => {
-        hilog.info(0x0001, 'NoteAudio', 'Recorder state=%{public}s', state);
+        hilog.info(0x4342, 'NoteAudio', 'Recorder state=%{public}s', state);
       });
       recorder.on('error', (error: BusinessError): void => {
         if (generation === this.generation && !this.failed) {
@@ -182,6 +182,6 @@ export class NoteAudioRecorder {
   }
   private async remove(path: string): Promise<void> {
     try { await fs.unlink(path); }
-    catch (error) { hilog.warn(0x0001, 'NoteAudio', 'Recording cleanup failed: %{public}s', `${error}`); }
+    catch (error) { hilog.warn(0x4342, 'NoteAudio', 'Recording cleanup failed: %{public}s', `${error}`); }
   }
 }

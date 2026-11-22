@@ -1,5 +1,6 @@
-import { SeriesVisual } from './SeriesVisual';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { SharedSurface } from 'jide_foundation';
+import { SeriesVisual } from './SeriesVisual';
 import { darkMaterial } from './GlassMaterial';
 import { PressFeedback } from './PressFeedback';
 import { PrimaryGlassStyle } from '../model/ThemeCatalog';
@@ -13,11 +14,15 @@ export class PrimaryGlassSurface extends PressFeedback {
   private isDark: boolean;
   private opacityPercent: number;
 
-  constructor(material: string, style: PrimaryGlassStyle, actionColor: string = '#2F5FD0', isDark: boolean = darkMaterial(), opacity: number = 100) {
+  constructor(material: string, style: PrimaryGlassStyle, actionColor: string = '#2F5FD0', isDark: boolean = darkMaterial(), opacity: number = 100, appearance: string = '') {
     super();
     this.opacityPercent = opacity;
     this.material = material;
     this.style = style; this.actionColor = actionColor; this.isDark = isDark;
+  }
+
+  backgroundSurface(): SharedSurface {
+    return SeriesVisual.primaryAction(this.material, this.isDark, this.actionColor, 18, this.opacityPercent);
   }
 
   applyNormalAttribute(instance: CommonAttribute): void {

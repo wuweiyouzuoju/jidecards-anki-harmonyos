@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { remoteAnnouncementsEnabled } from './RemoteControl';
+import { 读取已接收公告 } from '../model/官方公告存储';
 import { http } from '@kit.NetworkKit';
 import { 官方公告地址, OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../model/官方公告配置';
 import {
@@ -28,6 +30,11 @@ export class 官方公告服务 {
     nowMs: number = Date.now()
   ): Promise<官方公告展示项 | null> {
     if (!OFFICIAL_ANNOUNCEMENTS_ENABLED || !HTTPS地址有效(this.manifestUrl)) return null;
+    if (this.manifestUrl === 官方公告地址) {
+      if (!remoteAnnouncementsEnabled()) return null;
+      const announcement = await 读取已接收公告();
+      return 解析可展示官方公告(JSON.stringify({ schemaVersion: 1, announcement }), currentVersion, nowMs, language);
+    }
     const startMs: number = Date.now();
     const client: http.HttpRequest = http.createHttp();
     const options: http.HttpRequestOptions = {

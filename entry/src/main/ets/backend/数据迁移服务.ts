@@ -8,9 +8,9 @@ import { CoreRpc } from '../proto/generated/CoreRpc';
 //   - 安全副本与回滚编排；文件 IO 委托 DataTransferFiles 的异步适配
 // 不持有 UI 状态；UI 通过 completion 回调或返回值感知进度与结果。
 // 错误键（如 transfer_confirmation_required）由 UI 层本地化，不在本边界翻译。
-import { common } from '@kit.AbilityKit';
+import type { common } from '@kit.AbilityKit';
 import { picker } from '@kit.CoreFileKit';
-import { ImportOperation } from '../model/ImportOperation';
+import type { ImportOperation } from '../model/ImportOperation';
 import { withImportProgress } from './ImportProgressService';
 import { checkReplacementSpace, prepareReplacementRecovery, markReplacementCommitted, recoverInterruptedReplacement, cleanupReplacementRecovery } from './TransferRecovery';
 import { 确保目录存在, 复制URI到沙箱, 按描述符复制文件, 静默删除 } from './DataTransferFiles';
@@ -234,7 +234,7 @@ export async function 执行牌组导入(暂存路径: string, options?: ImportA
 }
 /** Replaces personal data only after the presentation layer obtains its second confirmation. */
 /** @throws {Error} 文件读写或迁移失败，调用方必须停止操作并显示失败。 */
-export async function 替换集合(文件目录: string, 源URI: string, 是否已确认: boolean, 阶段回调?: (阶段: number) => void, operation: ImportOperation | null = null): Promise<void> {
+export async function 替换集合(文件目录: string, 源URI: string, 是否已确认: boolean, 阶段回调?: (阶段: number) => void, operation: ImportOperation | null = null, 验收?: () => Promise<void>): Promise<void> {
     if (!是否已确认) {
         throw new 数据迁移校验错误('transfer_confirmation_required');
     }
@@ -265,6 +265,7 @@ export async function 替换集合(文件目录: string, 源URI: string, 是否�
         operation?.progress('', 0, 0, false);
         await 会话.确保已打开(文件目录, true);
         closed = false;
+        await 验收?.();
         await markReplacementCommitted(文件目录);
         committed = true;
     }

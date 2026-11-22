@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { MenuSlideSession, menuSlideSession } from './MenuSlideSession';
+import { menuSlideSession } from './MenuSlideSession';
+import type { MenuSlideSession } from './MenuSlideSession';
 
 export interface MenuHoldClock {
   now(): number;

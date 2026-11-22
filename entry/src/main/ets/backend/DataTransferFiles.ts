@@ -2,7 +2,7 @@
 // 文件描述符与目录树 IO 的唯一适配；大文件复制不占用 UI 执行线程。
 import { BusinessError } from '@kit.BasicServicesKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
-import { ImportOperation } from '../model/ImportOperation';
+import type { ImportOperation } from '../model/ImportOperation';
 let transferFileId: number = 0;
 function nextTransferFileId(): number { return ++transferFileId; }
 

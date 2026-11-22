@@ -10,12 +10,15 @@ let publication: Promise<void> = Promise.resolve();
 /** 调用方在入队前确认请求代次及全库范围，页面不参与卡片存储协议。 */
 export function createStatsWidget(graphs: GraphsView, tree: DeckTreeNode,
   hours: number, separate: boolean): 桌面卡片数据 {
-  let due: number = 0;
+  let pendingStudy: number = 0;
+  let pendingReview: number = 0;
   if (tree === null || tree === undefined) throw new Error('widget_deck_tree_unavailable');
-  for (const child of tree.children) due += child.newCount + child.learnCount + child.reviewCount;
+  for (const child of tree.children) {
+    pendingStudy += child.newCount + child.learnCount;
+    pendingReview += child.reviewCount;
+  }
   const count: number = 平铺牌组树(tree).length;
-  const data: 桌面卡片数据 = 提取卡片数据(graphs, due, count, hours, separate);
-  return data;
+  return 提取卡片数据(graphs, pendingStudy + pendingReview, count, hours, separate, pendingReview);
 }
 
 export async function publishStatsWidget(data: 桌面卡片数据): Promise<void> {

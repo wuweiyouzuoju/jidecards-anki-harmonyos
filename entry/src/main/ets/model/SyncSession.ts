@@ -2,8 +2,8 @@
 import type { MediaSyncStatusResponse, SyncAuth, SyncCollectionResponse } from '../proto/messages/SyncMessages';
 import { 应用新端点, 分类同步错误, 判定集合同步走向, 提取新端点 } from './同步流程';
 import type { 集合同步结果走向 } from './同步流程';
-import { SyncActivity } from './SyncSettings';
-import { AutoSyncScheduler } from './AutoSyncScheduler';
+import type { SyncActivity } from './SyncSettings';
+import type { AutoSyncScheduler } from './AutoSyncScheduler';
 
 const 同步日志域: number = 0x4342;
 const 同步日志标签: string = 'jidecards';

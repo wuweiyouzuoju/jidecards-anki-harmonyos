@@ -272,6 +272,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
   private async 确保播放器(): Promise<media.AVPlayer> {
     if (this.播放器实例 === null) {
       记录信息('ensurePlayer: creating new AVPlayer');
+      if (!canIUse('SystemCapability.Multimedia.Media.Core')) throw new Error('media_unavailable');
       this.播放器实例 = await media.createAVPlayer();
       this.挂载监听器(this.播放器实例);
       记录信息('ensurePlayer: created, state=%{public}s', this.播放器实例.state);
@@ -310,7 +311,7 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
     播放器.on('audioInterrupt', (信息: audio.InterruptEvent): void => {
       记录信息('onAudioInterrupt: eventType=%{public}d forceType=%{public}d hintType=%{public}d',
         信息.eventType, 信息.forceType, 信息.hintType);
-      if (信息.hintType === audio.InterruptHint.INTERRUPT_HINT_RESUME && this.队列.length > 0
+      if (canIUse('SystemCapability.Multimedia.Audio.Core') && 信息.hintType === audio.InterruptHint.INTERRUPT_HINT_RESUME && this.队列.length > 0
         && this.播放器实例 !== null && this.播放器实例.state === 'paused') {
         this.播放器实例.play().then((): void => {
           记录信息('onAudioInterrupt: resumed playback');
@@ -523,7 +524,9 @@ export class 声音播放器 implements AudioQueuePlayer<string> {
     } else if (状态 === 'prepared' && !this.playRequested) {
       this.playRequested = true;
       try {
-        this.播放器实例.audioInterruptMode = audio.InterruptMode.SHARE_MODE;
+        if (canIUse('SystemCapability.Multimedia.Audio.Core')) {
+          this.播放器实例.audioInterruptMode = audio.InterruptMode.SHARE_MODE;
+        }
         记录信息('stateChange(prepared): audioInterruptMode=SHARE_MODE set');
       } catch (错误) {
         记录警告('stateChange(prepared): audioInterruptMode set failed %{public}s', 错误文本(错误 as object | undefined));

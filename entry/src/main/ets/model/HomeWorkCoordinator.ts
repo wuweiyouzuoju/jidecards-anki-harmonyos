@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { ExternalDeckOpenQueue } from './ExternalDeckOpen';
+import type { ExternalDeckOpenQueue } from './ExternalDeckOpen';
 import { canPresentHomePrompt } from './HomeActivityPolicy';
 import type { HomeActivityState } from './HomeActivityPolicy';
 

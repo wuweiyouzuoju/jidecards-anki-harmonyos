@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { isHomeDeckHidden } from './HiddenDecks';
+
 export interface HomeSearchDeck {
   id: string;
   name: string;
@@ -11,7 +13,7 @@ export interface HomeSearchDeck {
 export function searchHomeDecks<T extends HomeSearchDeck>(decks: T[], hiddenIds: Set<string>, query: string): T[] {
   const terms: string[] = query.normalize('NFC').trim().toLowerCase().split(/\s+/).filter((term: string): boolean => term.length > 0);
   return decks.filter((deck: T): boolean => {
-    if (hiddenIds.has(deck.id) || deck.ancestorIds.some((id: string): boolean => hiddenIds.has(id))) return false;
+    if (isHomeDeckHidden(deck.id, deck.ancestorIds, hiddenIds)) return false;
     const label: string = `${deck.fullName}\n${deck.name}\n${deck.displayName}`.normalize('NFC').toLowerCase();
     return terms.every((term: string): boolean => label.includes(term));
   });

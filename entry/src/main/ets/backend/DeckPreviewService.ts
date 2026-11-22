@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { DeckPreviewRpc } from '../proto/generated/PrivateRpc';
 import { 后端会话 } from './后端会话';
-import { DeckPreviewBackend, DeckPreviewScope } from '../model/DeckPreviewSession';
+import type { DeckPreviewBackend, DeckPreviewScope } from '../model/DeckPreviewSession';
 import { DECK_PREVIEW_SERVICE, encodeDeckPreviewRequest, decodeDeckPreviewIds } from '../proto/messages/DeckPreviewMessages';
 import { syncActivity } from '../model/SyncSettings';
 import { autoSyncScheduler } from '../model/AutoSyncScheduler';
+import { AppLog } from '../model/AppLog';
 /** 原生层隔离正式集合；本服务不选择牌组、不评分、不推进学习队列。 */
 export class DeckPreviewService implements DeckPreviewBackend {
     /** @throws {Error} 集合重开、快照或解析失败交给首页显示；失败仍释放本次占用。 */
@@ -24,7 +25,7 @@ export class DeckPreviewService implements DeckPreviewBackend {
             return decodeDeckPreviewIds(bytes);
         }
         catch (error) {
-            console.info(`DeckPreview: deck=${deckId} scope=${scope} stage=${stage} error=${error}`);
+            AppLog.info('DeckPreview', `DeckPreview: deck=${deckId} scope=${scope} stage=${stage} error=${error}`);
             throw error;
         }
         finally {

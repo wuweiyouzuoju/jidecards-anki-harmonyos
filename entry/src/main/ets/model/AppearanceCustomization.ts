@@ -39,7 +39,12 @@ export function rgbAccent(red: number, green: number, blue: number): string {
 
 export interface AppearanceCustomizationItem { id: string; titleKey: string; }
 export const APPEARANCE_CUSTOMIZATION_ITEMS: AppearanceCustomizationItem[] = [
+  { id: 'appearance_section', titleKey: 'appearance_section' },
   { id: 'custom_accent', titleKey: 'appearance_custom_color' },
+  { id: 'accent_advanced', titleKey: 'appearance_advanced' },
+  { id: 'accent_hue', titleKey: 'appearance_hue' },
+  { id: 'accent_saturation', titleKey: 'appearance_saturation' },
+  { id: 'accent_brightness', titleKey: 'appearance_brightness' },
   { id: 'accent_light_adaptation', titleKey: 'appearance_light_adaptation' },
   { id: 'accent_dark_adaptation', titleKey: 'appearance_dark_adaptation' },
   { id: 'apply_accent', titleKey: 'appearance_apply_color' },

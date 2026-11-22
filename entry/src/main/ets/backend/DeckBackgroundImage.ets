@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { fileIo } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
+import { AppLog } from '../model/AppLog';
 
 /** 解码器与文件由这里释放；返回的 PixelMap 所有权交给调用组件。
  * @throws {Error} 解码或清理失败交由组件报告，不留下未转移的图片。
@@ -25,6 +26,6 @@ export async function loadDeckBackground(path: string): Promise<PixelMap> {
 export function releaseDeckBackground(pixels: PixelMap | null): void {
   if (pixels === null) return;
   pixels.release().catch((error: Error): void => {
-    console.warn('[deck-background] PixelMap release failed: ' + error.message);
+    AppLog.warn('DeckBackground', '[deck-background] PixelMap release failed: ' + error.message);
   });
 }

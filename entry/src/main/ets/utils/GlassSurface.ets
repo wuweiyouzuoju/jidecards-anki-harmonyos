@@ -1,38 +1,39 @@
-import { SeriesVisual } from './SeriesVisual';
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { translucentGlassFill, usesGlassMaterial, darkMaterial } from './GlassMaterial';
+import { SharedSurface } from 'jide_foundation';
+import { SeriesVisual } from './SeriesVisual';
+import { usesGlassMaterial, darkMaterial } from './GlassMaterial';
 import { PressFeedback } from './PressFeedback';
 import { SurfaceBorder } from './SurfaceBorder';
 
-/** 玻璃表面不叠底色或渐变；按压反馈仍由公共反馈拥有。 */
+/** 按钮复用共享光学表面，按压与禁用继续由公共反馈拥有。 */
 export class GlassSurface extends PressFeedback {
-  private colors: string[];
-  private background: ResourceColor;
   private outline: BorderOptions | undefined;
 
   private material: string;
-  private stableAnchor: boolean;
   private buttonOpacity: number;
+  private radius: number;
 
   constructor(material: string, colors: string[], background: ResourceColor = $r('app.color.surface_card'),
-    outline: BorderOptions | undefined = undefined, stableAnchor: boolean = false, buttonOpacity: number = 100) {
+    outline: BorderOptions | undefined = undefined, stableAnchor: boolean = false, buttonOpacity: number = 100, appearance: string = '', radius: number = 18) {
     super(1, 0.4, stableAnchor);
-    this.stableAnchor = stableAnchor;
+    this.radius = radius;
     this.buttonOpacity = buttonOpacity;
     this.material = material;
-    this.colors = colors;
-    this.background = background;
     this.outline = outline;
+  }
+
+  backgroundSurface(): SharedSurface {
+    return SeriesVisual.control(this.material, darkMaterial(), '#2F5FD0', this.radius, true, undefined, this.buttonOpacity);
   }
 
   applyNormalAttribute(instance: CommonAttribute): void {
     super.applyNormalAttribute(instance);
-    this.applySurface(instance, false);
+    this.applySurface(instance);
   }
 
   applyPressedAttribute(instance: CommonAttribute): void {
     super.applyPressedAttribute(instance);
-    this.applySurface(instance, !this.stableAnchor);
+    this.applySurface(instance);
   }
 
   applyDisabledAttribute(instance: CommonAttribute): void {
@@ -40,20 +41,11 @@ export class GlassSurface extends PressFeedback {
     super.applyDisabledAttribute(instance);
   }
 
-  private applySurface(instance: CommonAttribute, pressed: boolean): void {
-    if (!usesGlassMaterial(this.material)) {
-      const fill: string = darkMaterial() ? '#000000' : '#FFFFFF';
-      instance.backgroundColor(this.buttonOpacity === 100 ? fill : SeriesVisual.buttonFill(fill, this.buttonOpacity)).backgroundBlurStyle(BlurStyle.NONE).backdropBlur(0)
-        .linearGradient({angle:0,colors:[[Color.Transparent,0],[Color.Transparent,1]]})
-        .shadow({radius:0,color:Color.Transparent,offsetX:0,offsetY:0}).border(SurfaceBorder.options());
-      return;
-    }
-
-
-    instance.backgroundColor(translucentGlassFill(this.background))
-      .backgroundBlurStyle(BlurStyle.NONE).backdropBlur(24)
-      .linearGradient({ angle: 110, colors: [[Color.Transparent, 0], [Color.Transparent, 1]] })
-      .shadow(SeriesVisual.shadow(this.material, darkMaterial()))
-      .border(this.outline ?? (darkMaterial() ? SurfaceBorder.materialOptions(this.material, true) : SurfaceBorder.options()));
+  private applySurface(instance: CommonAttribute): void {
+    const fill: ResourceColor | undefined = usesGlassMaterial(this.material) ? undefined :
+      darkMaterial() ? '#000000' : '#FFFFFF';
+    SeriesVisual.control(this.material, darkMaterial(), '#2F5FD0', this.radius, true,
+      fill, this.buttonOpacity).applyNormalAttribute(instance);
+    if (this.outline !== undefined) instance.border(this.outline);
   }
 }

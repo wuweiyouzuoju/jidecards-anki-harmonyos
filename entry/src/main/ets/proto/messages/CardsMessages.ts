@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 领域契约适配；协议事实由 generated/CoreMessages.ts 提供。
-import { 协议读取器 } from '../core/ProtoReader';
+import type { 协议读取器 } from '../core/ProtoReader';
 import { CardsCard, CardsCardId, CardsCardIds, CardsFsrsMemoryState, CardsRemoveCardsRequest, CardsSetDeckRequest, CardsSetFlagRequest, CardsUpdateCardsRequest } from '../generated/CoreMessages';
 import { decodeOpChanges, decodeOpChangesWithCount } from './CollectionMessages';
 export function encodeCardId(cid: number): Uint8Array {

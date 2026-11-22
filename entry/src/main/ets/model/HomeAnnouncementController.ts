@@ -38,6 +38,11 @@ export class HomeAnnouncementController {
     }, delay);
   }
 
+  requestFreshCheck(): void {
+    this.pause();
+    this.lastCheck = 0;
+  }
+
   pause(): void {
     this.timerGeneration++;
     if (this.timerId >= 0) this.timer.cancel(this.timerId);

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { elementRadius } from './AppearanceElements';
 import { themedGlassFill } from './GlassMaterial';
 import { SurfaceBorder } from './SurfaceBorder';
 import { 应用尺寸 } from './应用尺寸';
@@ -8,12 +9,13 @@ export class SearchFieldSurface implements AttributeModifier<TextInputAttribute>
   private material: string;
   private dark: boolean;
   private radius: number;
-  constructor(material: string, dark: boolean, radius: number = 应用尺寸.圆角_面板, accent: string = '') { this.accent = accent; this.material = material; this.dark = dark; this.radius = radius; }
+  private appearance: string;
+  constructor(material: string, dark: boolean, radius: number = 应用尺寸.圆角_面板, accent: string = '', appearance: string = '') { this.accent = accent; this.material = material; this.dark = dark; this.radius = radius; this.appearance = appearance; }
   applyNormalAttribute(instance: TextInputAttribute): void {
     const glass: boolean = this.material === 'glass';
     instance.backgroundBlurStyle(BlurStyle.NONE).backdropBlur(0)
       .backgroundColor(glass ? themedGlassFill(this.dark ? '#80121820' : '#66FFFFFF', this.dark, this.accent) : $r('app.color.surface_card'))
       .linearGradient({ angle: 135, colors: [['#00FFFFFF', 0], ['#00FFFFFF', 1]] });
-    instance.border(SurfaceBorder.materialOptions(this.material, this.dark)).borderRadius(this.radius);
+    instance.border(SurfaceBorder.materialOptions(this.material, this.dark, this.appearance)).borderRadius(elementRadius(this.radius));
   }
 }

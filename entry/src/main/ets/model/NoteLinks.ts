@@ -4,12 +4,12 @@ import { decodeNoteTextEntities } from './NoteRichText';
 export const NOTE_LINK_MARKER: string = '<!--jide-links:v1:';
 export const NOTE_LINK_SUPPORT = {
   version: 1, identity: 'Anki note GUID', storage: 'note field', field: '关联',
-  legacy: 'ml-mirror-row[data-guid]', navigation: 'read-only preview; retains study state',
+  legacy: 'ml-mirror-row[data-guid]', navigation: 'shared card preview; retains study state; draft reference previews are read-only',
   editing: 'outgoing links and global target aliases; incoming links derived locally',
   entryPoints: ['editor outer wheel reference card', 'new and existing note editor below tags', 'study more menu', 'card preview toolbar'],
   inlineReferences: 'selection or caret; local display text; saved atomically with note; no schema preparation required',
     inlineAppearance: 'current theme container background; no added underline',
-    search: 'shared live search field; 200ms debounce; input remains editable; selected reference text fixed below results',
+    search: 'shared live search field with 200ms debounce; management shows matches or an empty message directly under the field; tap a match to preview, or use its add-reference action; selection dialog fixes reference text below results',
   agentAccess: 'UI observation; user controls own edits'
 };
 export interface NoteLinkData { v: number; guid: string; targets: string[]; alias: string; }

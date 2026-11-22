@@ -5,8 +5,10 @@ import type { DeckConfigRequestOptions } from '../DeckConfigSave';
 import { applyFsrsParams, fsrsOptimizeInput, fsrsWorkloadInput } from '../FsrsOptions';
 import type { ComputeFsrsParamsInput, ComputeFsrsParamsOutput, SimulateFsrsInput,
   FsrsWorkloadOutput, EvaluateFsrsInput, EvaluateFsrsOutput, FsrsHistoryCount } from '../../proto/messages/FsrsMessages';
-import { AutoSyncScheduler, autoSyncScheduler } from '../AutoSyncScheduler';
-import { SyncActivity, syncActivity } from '../SyncSettings';
+import { autoSyncScheduler } from '../AutoSyncScheduler';
+import type { AutoSyncScheduler } from '../AutoSyncScheduler';
+import { syncActivity } from '../SyncSettings';
+import type { SyncActivity } from '../SyncSettings';
 import { DeckOptionsPresets } from '../DeckOptionsPresets';
 import type { DeckOptionsPresetEntry } from '../DeckOptionsPresets';
 

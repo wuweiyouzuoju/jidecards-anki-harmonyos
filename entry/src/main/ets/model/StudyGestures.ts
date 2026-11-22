@@ -30,9 +30,9 @@ export function resolveStudyGesture(action: string, state: StudyGestureState,
   if (state.blocked) return 'none';
   if (state.choice) return action === 'right' && state.phase === 'answer' ? 'continue' : 'none';
   if (state.gestures && action === 'double') return state.phase === 'question' ? 'flip' : 'none';
-  if (state.gestures && state.phase === 'answer') {
-    if (action === 'left') return 'good';
-    if (action === 'right') return 'hard';
+  if (state.gestures && ['question', 'answer'].includes(state.phase)) {
+    if (action === 'left') return state.phase === 'question' ? 'flip' : 'good';
+    if (action === 'right') return state.phase === 'question' ? 'flip' : 'hard';
   }
   if (action !== 'tap' || !state.tapZones || !Number.isFinite(nx) || !Number.isFinite(ny) ||
     nx < 0 || nx > 1 || ny < 0 || ny > 1) return 'none';

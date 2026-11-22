@@ -28,18 +28,13 @@ function errorText(error: object | undefined): string {
  */
 export class AudioFocusCoordinator {
   private static readonly INSTANCE: AudioFocusCoordinator = new AudioFocusCoordinator();
-  private readonly sessionManager: audio.AudioSessionManager = audio.getAudioManager().getSessionManager();
+  private sessionManager: audio.AudioSessionManager | null = null;
   private readonly owners: Set<Object> = new Set<Object>();
   private isActivated: boolean = false;
   private activationTask: Promise<void> | null = null;
   private deactivationTask: Promise<void> | null = null;
 
-  private constructor() {
-    this.sessionManager.on('audioSessionDeactivated', (event: audio.AudioSessionDeactivatedEvent): void => {
-      this.isActivated = false;
-      hilog.warn(DOMAIN, TAG, 'audioSessionDeactivated: reason=%{public}d', event.reason);
-    });
-  }
+  private constructor() {}
 
   static getInstance(): AudioFocusCoordinator {
     return AudioFocusCoordinator.INSTANCE;
@@ -57,7 +52,9 @@ export class AudioFocusCoordinator {
     if (this.activationTask === null) {
       this.activationTask = this.activateMixSession();
     }
-    await this.activationTask;
+    const task: Promise<void> = this.activationTask;
+    try { await task; }
+    finally { if (this.activationTask === task) this.activationTask = null; }
   }
 
   /** 在播放队列结束、停止或释放时调用；仍有另一播放方工作时保持会话。 */
@@ -75,14 +72,26 @@ export class AudioFocusCoordinator {
     if (this.deactivationTask === null) {
       this.deactivationTask = this.deactivateSession();
     }
-    await this.deactivationTask;
+    const task: Promise<void> = this.deactivationTask;
+    try { await task; }
+    finally { if (this.deactivationTask === task) this.deactivationTask = null; }
   }
 
   private async activateMixSession(): Promise<void> {
-    const strategy: audio.AudioSessionStrategy = {
-      concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_MIX_WITH_OTHERS
-    };
     try {
+      if (!canIUse('SystemCapability.Multimedia.Audio.Core')) return;
+      const strategy: audio.AudioSessionStrategy = {
+        concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_MIX_WITH_OTHERS
+      };
+      // 音频会话只影响混音策略，不应在打开无声卡片时初始化平台服务。
+      if (this.sessionManager === null) {
+        const manager: audio.AudioSessionManager = audio.getAudioManager().getSessionManager();
+        manager.on('audioSessionDeactivated', (event: audio.AudioSessionDeactivatedEvent): void => {
+          this.isActivated = false;
+          hilog.warn(DOMAIN, TAG, 'audioSessionDeactivated: reason=%{public}d', event.reason);
+        });
+        this.sessionManager = manager;
+      }
       await this.sessionManager.activateAudioSession(strategy);
       this.isActivated = true;
       hilog.info(DOMAIN, TAG, 'activateAudioSession: CONCURRENCY_MIX_WITH_OTHERS');
@@ -90,17 +99,16 @@ export class AudioFocusCoordinator {
       this.isActivated = false;
       hilog.error(DOMAIN, TAG, 'activateAudioSession failed: %{public}s', errorText(error as object | undefined));
     }
-    this.activationTask = null;
   }
 
   private async deactivateSession(): Promise<void> {
     try {
+      if (this.sessionManager === null) return;
       await this.sessionManager.deactivateAudioSession();
       this.isActivated = false;
       hilog.info(DOMAIN, TAG, 'deactivateAudioSession: success');
     } catch (error) {
       hilog.warn(DOMAIN, TAG, 'deactivateAudioSession failed: %{public}s', errorText(error as object | undefined));
     }
-    this.deactivationTask = null;
   }
 }

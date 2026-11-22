@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { fileIo as fs, statfs } from '@kit.CoreFileKit';
 import { 复制目录, 删除目录, 确保目录存在, 复制文件, 路径存在 } from './DataTransferFiles';
-import { ImportOperation } from '../model/ImportOperation';
+import type { ImportOperation } from '../model/ImportOperation';
 
 const RECOVERY_DIR: string = 'transfer-recovery';
 const COLLECTION_FILES: string[] = ['collection.anki2', 'collection.mdb'];

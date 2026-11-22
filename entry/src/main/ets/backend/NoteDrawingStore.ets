@@ -6,6 +6,7 @@ import { NoteDrawingDocument, DrawingFile, DRAWING_MAX_BYTES, emptyNoteDrawing, 
   drawingMetadata, embedDrawingMetadata, validDrawingFileName } from '../model/NoteDrawing';
 import { NoteFieldImage } from '../model/NoteImageDraft';
 import { UTF8编码, UTF8解码 } from '../proto/core/utf8';
+import { AppLog } from '../model/AppLog';
 
 const base64: util.Base64Helper = new util.Base64Helper();
 
@@ -131,7 +132,7 @@ async function removeDrawingPath(path: string, cacheDir: string, directory: bool
   const prefix: string = cacheDir + (directory ? '/note-drawing-work-' : '/note-drawing-image-');
   if (!path.startsWith(prefix) || path.slice(prefix.length).includes('/') || path.includes('..')) return;
   try { if (directory) await fs.rmdir(path); else await fs.unlink(path); }
-  catch (error) { console.warn(`Drawing cache cleanup failed: ${error}`); }
+  catch (error) { AppLog.warn('NoteDrawing', `Drawing cache cleanup failed: ${error}`); }
 }
 export async function disposeDrawingWorkspace(root: string, cacheDir: string): Promise<void> {
   await removeDrawingPath(root, cacheDir, true);
@@ -140,6 +141,6 @@ export async function discardNoteDrawingImages(images: NoteFieldImage[], cacheDi
   for (const item of images) {
     if (!item.uri.startsWith('file://')) continue;
     try { await removeDrawingPath(new fileUri.FileUri(item.uri).path, cacheDir, false); }
-    catch (error) { console.warn(`Drawing URI cleanup failed: ${error}`); }
+    catch (error) { AppLog.warn('NoteDrawing', `Drawing URI cleanup failed: ${error}`); }
   }
 }

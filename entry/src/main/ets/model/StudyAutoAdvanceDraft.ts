@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { StudyOptions, StudyAutoAdvanceSettings } from './StudyTiming';
+import { StudyAutoAdvanceSettings } from './StudyTiming';
+import type { StudyOptions } from './StudyTiming';
 
 export enum StudyAdvanceField { Main, QuestionTime, AnswerTime, QuestionAction, AnswerAction, FeedbackTime }
 

@@ -7,13 +7,14 @@ import { 笔记类型服务 } from './笔记类型服务';
 import { 搜索服务 } from './搜索服务';
 import { autoSyncScheduler } from '../model/AutoSyncScheduler';
 import { syncActivity } from '../model/SyncSettings';
-import { NoteLinkData, NoteLinkNode, NoteLinkTarget, NoteLinkView, NOTE_LINK_SUPPORT,
-  emptyNoteLinks, parseNoteLinks, noteLinkView, renderNoteLinkMirror, updateNoteLinkField,
-  sanitizeLinkAlias } from '../model/NoteLinks';
-import { EditableNote } from '../proto/messages/NoteMessages';
+import { NOTE_LINK_SUPPORT, linkPlain, emptyNoteLinks, parseNoteLinks, noteLinkView, renderNoteLinkMirror, updateNoteLinkField, sanitizeLinkAlias } from '../model/NoteLinks';
+import type { NoteLinkData, NoteLinkNode, NoteLinkTarget, NoteLinkView, NoteLinkRow } from '../model/NoteLinks';
+import { noteLinkGraph, NoteLinkGraph } from '../model/NoteLinkGraph';
+import type { EditableNote } from '../proto/messages/NoteMessages';
 import { prepareNoteReferenceFields, noteReferences, changeNoteReferences } from '../model/NoteReferences';
 
 export interface NoteLinksSnapshot { noteId: number; guid: string; metadata: string; view: NoteLinkView; }
+interface NoteLinksRead { snapshot: NoteLinksSnapshot; center?: NoteLinkTarget; }
 /** One owner serializes accepted edits. Lifecycle only invalidates reads, never accepted writes. */
 export class NoteLinksService {
   private notes: 笔记服务 = new 笔记服务();
@@ -51,7 +52,35 @@ export class NoteLinksService {
     try { await syncActivity.waitForCollection(); return (await this.resolve([guid]))[0]?.cardIds ?? []; }
     finally { autoSyncScheduler.endOperation(owner); }
   }
+  /** 编辑区徽标只计数，不重复读取笔记或解析目标标题/卡片。 */
+  async count(note: EditableNote, current: () => boolean): Promise<number | null> {
+    if (!current()) return null;
+    const owner: Object = {}; autoSyncScheduler.beginOperation(owner);
+    try {
+      await syncActivity.waitForCollection();
+      if (!current()) return null;
+      const nodes: NoteLinkNode[] = await this.graph();
+      if (!current()) return null;
+      if (!nodes.some((node: NoteLinkNode): boolean => node.guid === note.guid) &&
+        note.fields.some((field: string): boolean => field.includes('ml-mirror-row'))) throw new Error('note_links_migrate');
+      const view: NoteLinkView = noteLinkView(note.guid, nodes, []);
+      return view.outgoing.length + view.incoming.length;
+    } finally { autoSyncScheduler.endOperation(owner); }
+  }
+  async neighborhood(noteId: number): Promise<NoteLinkGraph> {
+    const result = await this.read(noteId, true);
+    const snapshot: NoteLinksSnapshot = result.snapshot;
+    const alias: string = parseNoteLinks(snapshot.metadata, snapshot.guid)?.alias ?? '';
+    const center: NoteLinkRow = { guid: snapshot.guid, noteId, alias,
+      label: linkPlain(alias) || result.center?.title || snapshot.guid, cardIds: result.center?.cardIds ?? [] };
+    return noteLinkGraph(center, snapshot.view);
+  }
+
   async load(noteId: number): Promise<NoteLinksSnapshot> {
+    return (await this.read(noteId, false)).snapshot;
+  }
+
+  private async read(noteId: number, includeCenter: boolean): Promise<NoteLinksRead> {
     const owner: Object = {}; autoSyncScheduler.beginOperation(owner);
     try {
       await syncActivity.waitForCollection();
@@ -62,9 +91,13 @@ export class NoteLinksService {
         throw new Error('note_links_migrate');
       }
       const preliminary: NoteLinkView = noteLinkView(note.guid, nodes, []);
-      const targets: NoteLinkTarget[] = await this.resolve(preliminary.outgoing.concat(preliminary.incoming)
-        .map((row): string => row.guid));
-      return { noteId: noteId, guid: note.guid, metadata: own?.metadata ?? '', view: noteLinkView(note.guid, nodes, targets) };
+      const guids: string[] = preliminary.outgoing.concat(preliminary.incoming).map((row): string => row.guid);
+      if (includeCenter) guids.push(note.guid);
+      const targets: NoteLinkTarget[] = await this.resolve(guids);
+      return {
+        snapshot: { noteId, guid: note.guid, metadata: own?.metadata ?? '', view: noteLinkView(note.guid, nodes, targets) },
+        center: includeCenter ? targets.find((target: NoteLinkTarget): boolean => target.guid === note.guid) : undefined
+      };
     } finally { autoSyncScheduler.endOperation(owner); }
   }
   async search(query: string, excludedGuid: string): Promise<NoteLinkTarget[]> {

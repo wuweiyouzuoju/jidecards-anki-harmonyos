@@ -14,10 +14,13 @@ export class SurfaceTransition {
   }
 
   /** 透明页面只淡入进入方，退出方立即隐藏，避免两套文字叠影。 */
-  static pageContent(forward: boolean, enabled: boolean = true): TransitionEffect {
+  static pageContent(forward: boolean, enabled: boolean = true, stableMaterial: boolean = false): TransitionEffect {
     if (!enabled) return TransitionEffect.IDENTITY;
+    // 材质不改变导航语义；玻璃与文字、编辑轮盘共用同一透明度进度。
+    const enter = TransitionEffect.opacity(0).combine(
+      TransitionEffect.translate({ x: navigationEnterOffset(forward) }));
     return TransitionEffect.asymmetric(
-      TransitionEffect.opacity(0).combine(TransitionEffect.translate({ x: navigationEnterOffset(forward) }))
+      enter
         .animation(SurfaceTransition.pageAnimation()),
       TransitionEffect.opacity(0).animation({ duration: 0 })
     );
@@ -29,7 +32,10 @@ export class SurfaceTransition {
   }
 
   static backdrop(): TransitionEffect {
-    return TransitionEffect.opacity(0).animation(SurfaceTransition.dialogExitAnimation());
+    return TransitionEffect.asymmetric(
+      TransitionEffect.opacity(0).animation({ duration: 取全屏转场时长(), curve: Curve.EaseOut }),
+      TransitionEffect.IDENTITY
+    );
   }
 
   /** 玻璃按宿主语义呈现；不借布局尺寸动画重测正文或重新采样。 */
@@ -63,7 +69,7 @@ export class SurfaceTransition {
   }
 
   static dialogExitAnimation(): AnimateParam {
-    return { duration: 取全屏转场时长(), curve: Curve.EaseOut };
+    return { duration: 0 };
   }
 
   static dialog(): TransitionEffect {
@@ -71,7 +77,7 @@ export class SurfaceTransition {
     return TransitionEffect.asymmetric(
       TransitionEffect.opacity(0).combine(TransitionEffect.scale({ x: scale, y: scale }))
         .animation(SurfaceTransition.dialogEnterAnimation()),
-      SurfaceTransition.backdrop()
+      TransitionEffect.IDENTITY
     );
   }
 }

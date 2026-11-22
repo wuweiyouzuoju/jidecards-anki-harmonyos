@@ -25,11 +25,16 @@ import { CoreRpc } from '../proto/generated/CoreRpc';
 // ========================================================
 import { 后端会话 } from './后端会话';
 import type { Deck, DeckTreeNode, 过滤牌组更新 } from '../proto/messages/DeckMessages';
-import { decodeDeck, decodeDeckTreeNode, decode过滤牌组更新, encodeDeck, encodeDeckIds, encodeDeckTreeRequest, encodeDeckId, encodeRenameDeckRequest, encodeReparentDecksRequest, encode过滤牌组更新 } from '../proto/messages/DeckMessages';
+import { decodeDeck, decodeDeckNames, decodeDeckTreeNode, decode过滤牌组更新, encodeDeck, encodeDeckIds, encodeDeckTreeRequest, encodeDeckId, encodeGetDeckNamesRequest, encodeRenameDeckRequest, encodeReparentDecksRequest, encode过滤牌组更新 } from '../proto/messages/DeckMessages';
 import { decodeOpChanges, decodeOpChangesWithCount, decodeOpChangesWithId } from '../proto/messages/CollectionMessages';
 import { decodeStringList } from '../proto/messages/SchedulerMessages';
 export class 牌组服务 {
     private readonly 会话: 后端会话 = 后端会话.获取实例();
+    async 获取完整牌组名称(): Promise<string[]> {
+        const 请求 = encodeGetDeckNamesRequest(false, true);
+        const 响应 = await new CoreRpc(this.会话).Decks_get_deck_names(请求);
+        return decodeDeckNames(响应).map((牌组): string => 牌组.name);
+    }
     /**
      * 拉取牌组树（DeckTree）。
      * 返回根节点占位（deckId=0、name=''），真实牌组在 children；

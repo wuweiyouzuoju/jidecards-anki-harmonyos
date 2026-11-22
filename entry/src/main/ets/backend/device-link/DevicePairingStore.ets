@@ -34,7 +34,7 @@ export class DevicePairingStore {
 
   /** @throws {Error} 偏好读取、首次身份保存或随机源失败。 */
   private async readCurrent(): Promise<DevicePairingState> {
-    const store = await preferences.getPreferences(this.context, { name: 'jidecards_device_link' });
+        const store = await preferences.getPreferences(this.context, { name: 'jidecards_device_link' });
     const saved = await store.get('pairings_v1', '');
     if (typeof saved !== 'string') throw new Error('device_link_storage_invalid');
     if (saved !== '') return parsePairingState(saved);

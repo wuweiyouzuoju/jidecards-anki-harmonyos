@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { JideDeckPreviewRequest, JideDeckPreviewResponse } from '../generated/CoreMessages';
 import { DeckPreviewRpc } from '../generated/PrivateRpc';
-import { DeckPreviewScope } from '../../model/DeckPreviewSession';
+import type { DeckPreviewScope } from '../../model/DeckPreviewSession';
 // Application-local service; locked Anki RPC IDs remain unchanged.
 export const DECK_PREVIEW_SERVICE: number = DeckPreviewRpc.SERVICE;
 export function encodeDeckPreviewRequest(deckId: string, scope: DeckPreviewScope): Uint8Array {

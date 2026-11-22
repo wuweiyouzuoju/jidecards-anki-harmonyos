@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { APPEARANCE_ELEMENT_ITEMS, APPEARANCE_ELEMENT_CONTROLS } from './AppearanceElements';
 import { OFFICIAL_HELP_LINKS } from './OfficialCommunity';
 import type { OfficialHelpLink } from './OfficialCommunity';
 import { APPEARANCE_CUSTOMIZATION_ITEMS } from './AppearanceCustomization';
@@ -22,19 +23,33 @@ export interface SettingsGroup {
   titleKey: string;
   fullOnly?: boolean;
   items: SettingsItem[];
+  desktopOnly?: boolean;
 }
 
 /** 分组顺序、标题和项名称共用；设置面板从此处选择实际渲染的卡片。 */
 export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'editor_wheel', sectionId: 'editor', titleKey: 'settings_editor_wheel', items: [
     { id: 'editor_wheel_on_entry', titleKey: 'editor_wheel_on_entry', settingId: 'editor_wheel_on_entry' },
-    { id: 'editor_wheel_on_keyboard', titleKey: 'editor_wheel_on_keyboard', settingId: 'editor_wheel_on_keyboard' }
+    { id: 'editor_wheel_on_keyboard', titleKey: 'editor_wheel_on_keyboard', settingId: 'editor_wheel_on_keyboard' },
+    { id: 'editor_wheel_grip', titleKey: 'editor_wheel_grip', settingId: 'editor_wheel_grip' }
+  ] },
+  { id: 'huawei_account', sectionId: 'general', titleKey: 'account_profile_title', items: [
+    { id: 'account_profile_login', titleKey: 'leaderboard_login', condition: 'signed_out' },
+    { id: 'account_profile_nickname', titleKey: 'account_profile_nickname', condition: 'signed_in', sensitive: true },
+    { id: 'account_profile_avatar', titleKey: 'account_profile_avatar', condition: 'signed_in' },
+    { id: 'account_profile_logout', titleKey: 'account_profile_logout', condition: 'signed_in' },
+    { id: 'account_profile_sync', titleKey: 'settings_directory_sync', opens: 'huawei_cloud' }
   ] },
   { id: 'general_display', sectionId: 'general', titleKey: 'settings_general_display', items: [
+    { id: 'home_layout', titleKey: 'home_layout_title', settingId: 'home_layout' },
     { id: 'language', titleKey: 'settings_language', settingId: 'language' },
     { id: 'home_today_summary', titleKey: 'settings_home_today_summary', settingId: 'home_today_summary' }
   ] },
+  { id: 'external_mcp', sectionId: 'advanced', titleKey: 'ai_agent_external_mcp', fullOnly: true, desktopOnly: true, items: [
+    { id: 'external_mcp_settings', titleKey: 'ai_agent_external_mcp', opens: 'external_mcp_settings' }
+  ] },
   { id: 'review_controls', sectionId: 'scheduler', titleKey: 'settings_controls_review', items: [
+    { id: 'study_two_buttons', titleKey: 'settings_study_two_buttons', settingId: 'study_two_buttons' },
     { id: 'study_haptics', titleKey: 'settings_study_haptics', settingId: 'study_haptics' },
     { id: 'study_quick_answer', titleKey: 'settings_quick_answer', settingId: 'study_quick_answer' },
     { id: 'study_keyboard', titleKey: 'study_keyboard_title', opens: 'study_keyboard' },
@@ -66,6 +81,12 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'sync_logout', titleKey: 'sync_logout', condition: 'logged_in' },
     { id: 'sync_custom_server', titleKey: 'sync_custom_server_entry' }
   ] },
+  { id: 'huawei_cloud', sectionId: 'sync', titleKey: 'huawei_cloud_title', items: [
+    { id: 'huawei_cloud_sync', titleKey: 'huawei_cloud_sync', iconKey: 'ic_sync_upload' },
+    { id: 'huawei_cloud_sources', titleKey: 'huawei_cloud_sources', iconKey: 'ic_sync_download' },
+    { id: 'huawei_cloud_settings', titleKey: 'huawei_cloud_settings' },
+    { id: 'huawei_cloud_restore', titleKey: 'huawei_cloud_restore', iconKey: 'ic_sync_download' }
+  ] },
   { id: 'device_link', sectionId: 'sync', titleKey: 'device_link_title', items: [
     { id: 'device_link_toggle', titleKey: 'device_link_title' },
     { id: 'device_link_help', titleKey: 'field_help_button' },
@@ -86,9 +107,13 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   { id: 'appearance', sectionId: 'appearance', titleKey: 'settings_appearance_display', items: [
     { id: 'theme_mode', titleKey: 'appearance_theme', settingId: 'theme_mode' },
     { id: 'color_theme', titleKey: 'appearance_color_theme', settingId: 'color_theme' },
+    { id: 'appearance_customize', titleKey: 'appearance_customize', opens: 'appearance_customization' },
     ...APPEARANCE_CUSTOMIZATION_ITEMS,
+    ...APPEARANCE_ELEMENT_ITEMS,
+    ...APPEARANCE_ELEMENT_CONTROLS,
     { id: 'theme_motion', titleKey: 'iridescent_motion', settingId: 'theme_motion', condition: 'theme_has_textures' },
     { id: 'surface_material', titleKey: 'surface_material', settingId: 'surface_material', opens: 'surface_material_settings' },
+    { id: 'glass_blur', titleKey: 'appearance_glass_blur', opens: 'surface_material_settings' },
     { id: 'module_opacity', titleKey: 'module_opacity', opens: 'surface_material_settings' },
     { id: 'button_opacity', titleKey: 'button_opacity', opens: 'surface_material_settings' },
     { id: 'dialog_opacity', titleKey: 'dialog_opacity', opens: 'surface_material_settings' },
@@ -136,26 +161,35 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'history_limit', titleKey: 'agent_history_limit' },
     { id: 'history_manage', titleKey: 'agent_history_manage', iconKey: 'ic_common_history', opens: 'agent_history_management' },
     { id: 'history_clear', titleKey: 'agent_history_clear', iconKey: 'ic_study_delete' },
+    { id: 'official_ai', titleKey: 'official_ai_wallet', condition: 'official_provider', opens: 'official_ai' },
     { id: 'ai_provider', titleKey: 'ai_agent_provider' },
     { id: 'ai_model', titleKey: 'ai_card_model', condition: 'builtin_provider' },
     { id: 'ai_custom_url', titleKey: 'ai_agent_custom_url_hint', condition: 'custom_provider' },
     { id: 'ai_custom_model', titleKey: 'ai_card_model_hint', condition: 'custom_provider' },
     { id: 'ai_vision', titleKey: 'ai_agent_custom_vision', condition: 'custom_provider' },
-    { id: 'ai_key', titleKey: 'ai_card_api_key', sensitive: true },
-    { id: 'ai_batch_limit', titleKey: 'ai_agent_batch_limit' },
-    { id: 'ai_save', titleKey: 'ai_card_save_config' },
+    { id: 'ai_key', titleKey: 'ai_card_api_key', sensitive: true, condition: 'self_key_provider' },
     { id: 'ai_web_enabled', titleKey: 'ai_web_enabled' },
     { id: 'ai_web_provider', titleKey: 'ai_web_provider', condition: 'web_enabled' },
     { id: 'ai_web_purchase', titleKey: 'ai_web_purchase', condition: 'web_enabled' },
     { id: 'ai_web_key', titleKey: 'ai_web_key_hint', condition: 'web_enabled', sensitive: true },
-    { id: 'ai_web_save', titleKey: 'ai_web_save' }
+    { id: 'ai_save', titleKey: 'ai_card_save_config', condition: 'self_key_provider' }
+  ] },
+  { id: 'leaderboard_settings', sectionId: 'advanced', titleKey: 'leaderboard_title', items: [
+    { id: 'leaderboard_show_home', titleKey: 'leaderboard_show_home' }
+  ] },
+  { id: 'advanced', sectionId: 'advanced', titleKey: 'settings_developer_debug_title', fullOnly: true, items: [
+    { id: 'developer_description', titleKey: 'settings_developer_debug_description' },
+    { id: 'developer_contact', titleKey: 'settings_developer_debug_qq_hint' },
+    { id: 'developer_key', titleKey: 'settings_developer_debug_key_placeholder', sensitive: true },
+    { id: 'developer_enable', titleKey: 'settings_developer_debug_enable' },
+    { id: 'developer_enabled', titleKey: 'settings_developer_debug_enabled' }
   ] },
   { id: 'redemption', sectionId: 'redemption', titleKey: 'settings_directory_redemption', items: [
     { id: 'installation_fingerprint', titleKey: 'redemption_fingerprint', sensitive: true },
     { id: 'fingerprint_copy', titleKey: 'redemption_copy' },
     { id: 'redemption', titleKey: 'redemption_entry' }
   ] },
-  { id: 'about', sectionId: 'about', titleKey: 'study_more', items: [
+  { id: 'about', sectionId: 'about', titleKey: 'settings_about_title', items: [
     { id: 'app_information', titleKey: 'app_about_title' },
     { id: 'feedback', titleKey: 'feedback_title' },
     { id: 'rate', titleKey: 'about_rate_title' },
@@ -164,11 +198,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   ] },
 ];
 
-export function visibleSettingsGroups(sectionId: string, simple: boolean, agent: boolean): SettingsGroup[] {
+export function visibleSettingsGroups(sectionId: string, simple: boolean, agent: boolean, desktop: boolean = false): SettingsGroup[] {
   const section = SETTINGS_ENTRIES.find((entry): boolean => entry.id === sectionId);
   if (section === undefined || !settingsEntryVisible(section, simple, agent)) return [];
   return SETTINGS_GROUPS.filter((group: SettingsGroup): boolean =>
-    group.sectionId === sectionId && !(group.fullOnly && simple));
+    group.sectionId === sectionId && !(group.fullOnly && simple) && (!group.desktopOnly || desktop));
 }
 
 /** 首页弹窗与设置目录共享同一组可点击项。 */

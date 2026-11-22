@@ -40,8 +40,11 @@
 // 维护模块级 Map<id, 回调>，注册/注销时写入/删除。
 // ========================================================
 
+import { navigationEnterOffset } from './AppMotion';
+
 /** NavDestination 注册的转场回调对：起点设置 + 终点设置。 */
 export interface 转场回调对 {
+  prepare?: () => Promise<void>;
   /** 起点回调：设置 opacity 起始值。isPush=true 是 push 操作；isExit=true 是退出方。 */
   起点: (isPush: boolean, isExit: boolean) => void;
   /** 终点回调：设置 opacity 终止值（通常为 1.0）。isPush=true 是 push 操作；isExit=true 是退出方。 */
@@ -65,8 +68,16 @@ export class CustomTransition {
 
   /** 注册 NavDestination 的转场回调。同一 id 重复注册时覆盖。 */
   注册NavParam(id: string, 起点: (isPush: boolean, isExit: boolean) => void,
-    终点: (isPush: boolean, isExit: boolean) => void): void {
-    this.回调表.set(id, { 起点, 终点 });
+    终点: (isPush: boolean, isExit: boolean) => void, prepare?: () => Promise<void>): void {
+    this.回调表.set(id, { 起点, 终点, prepare });
+  }
+
+  /** 共用页面入场位移与显隐时序，读取当前动效档位。 */
+  registerPage(id: string, update: (opacity: number, offset: number) => void, prepare?: () => Promise<void>): void {
+    this.注册NavParam(id,
+      (isPush: boolean, isExit: boolean): void => { update(isExit ? 1 : 0, isExit ? 0 : navigationEnterOffset(isPush)); },
+      (_isPush: boolean, isExit: boolean): void => { update(isExit ? 0 : 1, 0); },
+      prepare);
   }
 
   /** 取指定 id 的起点回调；不存在返回 null。 */
@@ -79,6 +90,10 @@ export class CustomTransition {
   取终点回调(id: string): ((isPush: boolean, isExit: boolean) => void) | null {
     const 回调对: 转场回调对 | undefined = this.回调表.get(id);
     return 回调对 ? 回调对.终点 : null;
+  }
+
+  preparation(id: string): (() => Promise<void>) | null {
+    return this.回调表.get(id)?.prepare ?? null;
   }
 
   /** 注销指定 id 的回调（NavDestination aboutToDisappear 时调用）。 */

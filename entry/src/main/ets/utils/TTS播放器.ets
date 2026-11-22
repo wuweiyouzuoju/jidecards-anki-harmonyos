@@ -203,7 +203,7 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
     await this.停止();
     if (this.引擎 !== null) {
       try {
-        await this.引擎.shutdown();
+        this.引擎.shutdown();
         记录信息('release: engine.shutdown() ok');
       } catch (错误) {
         记录警告('release: engine.shutdown() threw %{public}s', 错误文本(错误 as BusinessError | undefined));
@@ -229,7 +229,7 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
   private async 内部停止(): Promise<void> {
     if (this.引擎 !== null) {
       try {
-        await this.引擎.stop();
+        this.引擎.stop();
         记录信息('stopInternal: engine.stop() ok');
       } catch (错误) {
         记录警告('stopInternal: engine.stop() threw %{public}s', 错误文本(错误 as BusinessError | undefined));
@@ -327,7 +327,7 @@ export class TTS播放器 implements AudioQueuePlayer<TtsItem> {
     // 语言、person 或 voiceVersion 变了，重建引擎
     if (this.引擎 !== null) {
       try {
-        await this.引擎.shutdown();
+        this.引擎.shutdown();
         记录信息('ensureEngine: old engine.shutdown() ok (lang was %{public}s person was %{public}d voiceVersion was %{public}d)',
           this.引擎语言, this.引擎人物, this.引擎语音版本号);
       } catch (错误) {

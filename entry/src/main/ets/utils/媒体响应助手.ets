@@ -21,6 +21,7 @@
 // ========================================================
 
 import { fileIo as fs } from '@kit.CoreFileKit';
+import { AppLog } from '../model/AppLog';
 
 /**
  * 扩展名 → MIME 的查找表。
@@ -209,7 +210,7 @@ async function prepareMediaResponse(response: WebResourceResponse, request: WebR
     try {
       if (file !== null && !transferred) { await fs.close(file); }
     } catch (error) {
-      console.warn('Media response file cleanup failed');
+      AppLog.warn('MediaResponse', 'Media response file cleanup failed');
     } finally {
       response.setResponseIsReady(true);
     }

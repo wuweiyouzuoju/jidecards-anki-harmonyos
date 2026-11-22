@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { loadAppearanceElements } from './AppearanceElementStore';
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { fileIo } from '@kit.CoreFileKit';
@@ -6,16 +7,21 @@ import { image } from '@kit.ImageKit';
 import { CUSTOM_ACCENT_KEY, WALLPAPER_KEY, WALLPAPER_OPACITY_KEY, WALLPAPER_LIGHT_KEY, WALLPAPER_DARK_KEY,
   DEFAULT_CUSTOM_ACCENT, normalizedAccent, maskOpacity, ACCENT_LIGHT_ADAPTATION_KEY, ACCENT_DARK_ADAPTATION_KEY, adaptationStrength } from '../model/AppearanceCustomization';
 import { saveLocalPreference, readLocalPreference } from './LocalPreferenceWrite';
+import { AppLog } from '../model/AppLog';
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 function context(): common.UIAbilityContext {
   const value: common.UIAbilityContext | undefined = AppStorage.get<common.UIAbilityContext>('abilityContext');
   if (value === undefined) throw new Error('ability_context_unavailable');
   return value;
 }
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 function store(): preferences.Preferences {
   return preferences.getPreferencesSync(context(), { name: 'jidecards_settings' });
 }
 /** 首屏主题应用前恢复；失败交给启动偏好读取边界。 */
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 export async function loadAppearanceCustomization(): Promise<void> {
+  await loadAppearanceElements();
   const saved: preferences.Preferences = store();
   const accent: preferences.ValueType = await readLocalPreference(saved, CUSTOM_ACCENT_KEY, DEFAULT_CUSTOM_ACCENT);
   const lightAdaptation: preferences.ValueType = await readLocalPreference(saved, ACCENT_LIGHT_ADAPTATION_KEY, 100);
@@ -33,18 +39,22 @@ export async function loadAppearanceCustomization(): Promise<void> {
   AppStorage.setOrCreate<number>(WALLPAPER_LIGHT_KEY, maskOpacity(light as number));
   AppStorage.setOrCreate<number>(WALLPAPER_DARK_KEY, maskOpacity(dark as number));
 }
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 export async function saveCustomAccent(value: string): Promise<void> {
   await saveLocalPreference(store(), CUSTOM_ACCENT_KEY, normalizedAccent(value), DEFAULT_CUSTOM_ACCENT);
 }
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 export async function saveWallpaperOpacity(value: number): Promise<void> {
   if (!Number.isInteger(value) || value < 0 || value > 100) throw new Error('invalid_wallpaper_opacity');
   await saveLocalPreference(store(), WALLPAPER_OPACITY_KEY, value, 100);
 }
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 export async function saveWallpaperMask(dark: boolean, value: number): Promise<void> {
   await saveLocalPreference(store(), dark ? WALLPAPER_DARK_KEY : WALLPAPER_LIGHT_KEY,
     maskOpacity(value), dark ? 0.45 : 0.2);
 }
 /** 新图先完整编码并关闭文件，再发布路径；旧图只在保存确认后移除。 */
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 export async function saveWallpaper(pixels: PixelMap | null, lossless: boolean = false): Promise<void> {
   const saved: preferences.Preferences = store();
   const previous: string = await readLocalPreference(saved, WALLPAPER_KEY, '') as string;
@@ -68,6 +78,6 @@ export async function saveWallpaper(pixels: PixelMap | null, lossless: boolean =
   await saveLocalPreference(saved, WALLPAPER_KEY, path, '', previous);
   if (previous !== '' && previous !== path && previous.startsWith(context().filesDir + '/wallpaper-')) {
     try { if (fileIo.accessSync(previous)) fileIo.unlinkSync(previous); }
-    catch (error) { console.warn('[appearance] Old wallpaper cleanup failed'); }
+    catch (error) { AppLog.warn('Appearance', '[appearance] Old wallpaper cleanup failed'); }
   }
 }

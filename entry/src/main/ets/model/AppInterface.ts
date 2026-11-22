@@ -1,14 +1,17 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { DESKTOP_WINDOW_TITLE_BAR } from './WindowSafeLayout';
+import { HOME_LANDSCAPE_ACTIONS, HOME_DIRECT_ACTION_IDS } from './HomeLayout';
+import { APPEARANCE_ELEMENT_ITEMS, APPEARANCE_ELEMENT_CONTROLS } from './AppearanceElements';
 import { SURFACE_MATERIAL_ITEMS } from './SurfaceMaterial';
 import { APPEARANCE_CUSTOMIZATION_ITEMS } from './AppearanceCustomization';
 import { deckDetailShortcuts } from './DeckDetailShortcut';
 import { HOME_INTRO_ACTIONS } from './HomeIntro';
 import type { HomeIntroAction } from './HomeIntro';
-// SPDX-License-Identifier: AGPL-3.0-or-later
 import { KEYBOARD_HELP_SECTIONS } from './KeyboardShortcuts';
 import type { DirectoryView } from './DirectoryTree';
 import { FILTERED_DECK_ACTIONS } from './FilteredDeckCommands';
 import { DECK_TONE_CHOICES } from './DeckTone';
-import { FEEDBACK_ACTIONS } from './InteractionFeedback';
+import { DIALOG_ACTION_PRESENTATION, FEEDBACK_ACTIONS } from './InteractionFeedback';
 import { CARD_FLAGS } from './CardMarking';
 import { IMPORT_RESULT_ACTIONS } from './ImportResults';
 import { REVIEW_AUDIO_PREFERENCES } from './ReviewAudioPreferences';
@@ -16,6 +19,7 @@ import { STUDY_KEYBOARD_FIELDS } from './StudyKeyboard';
 import { STUDY_GESTURE_FIELDS } from './StudyGestureConfig';
 import { SETTINGS_GROUPS, SOFTWARE_HELP_ITEMS, INTRO_ABOUT_ITEMS } from './SettingsStructure';
 import { DECK_OPTION_GROUPS } from './DeckOptionsCatalog';
+import { NOTE_AUDIO_GENERATE_TITLE, NOTE_AUDIO_IMPORT_TITLE, NOTE_AUDIO_SPEECH_APPLY_TITLE, NOTE_AUDIO_PLAY_ICON } from './NoteAudioDraft';
 import type { NoteAudioStatus } from './NoteAudioDraft';
 import { DRAWING_COLORS, DRAWING_TEXT_HANDLES, DRAWING_TEXT_RESIZE_MODE, DRAWING_COLOR_PLACEMENT,
   noteDrawingImageActionKey } from './NoteDrawing';
@@ -28,6 +32,8 @@ export interface AppInterfaceContext {
   agent: boolean;
   cloudDeck: boolean;
   themeHasTextures: boolean;
+  desktop?: boolean;
+  leaderboardHidden?: boolean;
 }
 export interface AppInterfaceItem {
   id: string;
@@ -83,6 +89,7 @@ export const STATS_INTERFACE_SECTIONS: AppInterfaceItem[] = [
 export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
   { id: 'close', titleKey: 'study_whiteboard_close', iconKey: 'ic_common_close' },
   { id: 'opacity', titleKey: 'study_whiteboard_opacity', condition: 'official_suite' },
+  { id: 'screenshot', titleKey: 'study_whiteboard_screenshot', condition: 'global_navigation' },
   { id: 'reset_view', titleKey: 'study_whiteboard_reset_view', condition: 'global_navigation' },
   { id: 'official_tools', titleKey: 'study_whiteboard_official_tools', condition: 'official_suite' },
   { id: 'undo', titleKey: 'image_occlusion_undo', iconKey: 'ic_study_undo', condition: 'local_suite' },
@@ -112,18 +119,26 @@ export const WHITEBOARD_INTERFACE_ITEMS: AppInterfaceItem[] = [
 
 /** 菜单直接遍历这里的条目；标签、顺序和显隐由 UI 与 JIDE 共用。 */
 export const HOME_SYNC_CHOICES: AppInterfaceItem[] = [
+  { id: 'huawei_cloud_upload', titleKey: 'huawei_cloud_sync', iconKey: 'ic_sync_upload' },
+  { id: 'huawei_cloud_download', titleKey: 'huawei_cloud_sources', iconKey: 'ic_sync_download' },
   { id: 'cloud', titleKey: 'sync_choice_cloud', opens: 'sync' },
   { id: 'device', titleKey: 'sync_choice_device', opens: 'device_link' }
 ];
 
 export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'surface_material_settings', titleKey: 'surface_material', parent: 'settings', items: SURFACE_MATERIAL_ITEMS },
-  { id: 'appearance_customization', titleKey: 'settings_directory_appearance', parent: 'settings', items: APPEARANCE_CUSTOMIZATION_ITEMS },
+  { id: 'appearance_customization', titleKey: 'settings_directory_appearance', parent: 'settings', items: [...APPEARANCE_CUSTOMIZATION_ITEMS, ...APPEARANCE_ELEMENT_ITEMS, ...APPEARANCE_ELEMENT_CONTROLS] },
   { id: 'home_sync_choice', titleKey: 'sync_choice_title', instructionsKey: 'sync_choice_hint', parent: 'home',
     items: HOME_SYNC_CHOICES.concat([{ id: 'close', titleKey: 'close' }]) },
   { id: 'keyboard_shortcuts', titleKey: 'glossary_shortcuts_label', instructionsKey: 'glossary_shortcuts_help',
     parent: 'settings', items: KEYBOARD_HELP_SECTIONS.map((section): AppInterfaceItem => ({ id: section.id, titleKey: section.titleKey }))
       .concat([{ id: 'retry', titleKey: 'common_retry', condition: 'study_bindings_load_failed' }, { id: 'close', titleKey: 'done' }]) },
+  { id: 'leaderboard_settings', titleKey: 'leaderboard_title', parent: 'settings',
+    items: SETTINGS_GROUPS.find((group): boolean => group.id === 'leaderboard_settings')?.items ?? [] },
+  { id: 'huawei_account', titleKey: 'account_profile_title', instructionsKey: 'account_profile_hint', parent: 'settings',
+    items: SETTINGS_GROUPS.find((group): boolean => group.id === 'huawei_account')?.items ?? [] },
+  { id: 'huawei_cloud', titleKey: 'huawei_cloud_title', instructionsKey: 'huawei_cloud_hint', parent: 'settings',
+    items: SETTINGS_GROUPS.find((group): boolean => group.id === 'huawei_cloud')?.items ?? [] },
   { id: 'device_link', titleKey: 'device_link_title', instructionsKey: 'device_link_hint', parent: 'settings',
     items: SETTINGS_GROUPS.find((group): boolean => group.id === 'device_link')?.items ?? [] },
   { id: 'device_pairing_code', titleKey: 'device_link_code_title', instructionsKey: 'device_link_code_hint', parent: 'device_link',
@@ -171,15 +186,19 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
         titleKey: option.titleKey, condition: menu.toolId }))) },
   { id: 'home', titleKey: 'home_interface_title', instructionsKey: 'home_actions_instructions', parent: '', items: [
     { id: 'more', titleKey: 'study_more', iconKey: 'ic_home_more', opens: 'home_more' },
-    { id: 'agent', titleKey: 'ai_agent_title', opens: 'agent', agentOnly: true },
-    { id: 'search', titleKey: 'home_search_title', opens: 'home_search' },
-    { id: 'browser', titleKey: 'browser_title', opens: 'browser' },
-    { id: 'sync', titleKey: 'home_sync', opens: 'sync' },
-    { id: 'create', titleKey: 'create_deck', opens: 'home_create' },
+    { id: 'agent', titleKey: 'ai_agent_title', iconKey: 'ic_study_agent', opens: 'agent', agentOnly: true },
+    { id: 'search', titleKey: 'home_search_title', iconKey: 'ic_settings_search', opens: 'home_search' },
+    { id: 'browser', titleKey: 'browser_title', iconKey: 'ic_home_browser', opens: 'browser' },
+    { id: 'sync', titleKey: 'home_sync', iconKey: 'ic_home_sync', opens: 'sync' },
+    { id: 'create', titleKey: 'create_deck', iconKey: 'ic_home_new', opens: 'home_create' },
+    ...HOME_LANDSCAPE_ACTIONS.filter((item): boolean => HOME_DIRECT_ACTION_IDS.includes(item.id)),
     { id: 'today', titleKey: 'settings_home_today_summary', condition: 'home_today_summary' },
     { id: 'decks', titleKey: 'home_interface_decks', opens: 'deck_details' },
     { id: 'deck_menu', titleKey: 'deck_more', opens: 'deck_row_menu', condition: 'deck_context_menu' },
     { id: 'reorder', titleKey: 'deck_menu_reorder', opens: 'deck_reorder', condition: 'deck_context_menu' }
+  ] },
+  { id: DESKTOP_WINDOW_TITLE_BAR, titleKey: 'window_pin', parent: '', items: [
+    { id: 'window_pin', titleKey: 'window_pin', iconKey: 'ic_editor_pin', condition: 'pc_freeform_window' }
   ] },
   { id: 'glass_suggestion', titleKey: 'glass_suggestion_title', parent: 'home', items: [
     { id: 'keep', titleKey: 'glass_suggestion_keep' }, { id: 'confirm', titleKey: 'glass_suggestion_confirm' }
@@ -197,9 +216,9 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'history', titleKey: 'collection_history_title', opens: 'collection_history' },
     { id: 'stats', titleKey: 'stats_page_title', opens: 'stats' },
     { id: 'reminders', titleKey: 'reminder_list_title', opens: 'reminders' },
-    { id: 'software_help', titleKey: 'study_more', opens: 'software_help' },
+    { id: 'leaderboard', titleKey: 'leaderboard_title', opens: 'study_leaderboard', iconKey: 'ic_home_leaderboard', condition: 'leaderboard_visible' },
   ] },
-  { id: 'software_help', titleKey: 'study_more', parent: 'home_more',
+  { id: 'software_help', titleKey: 'settings_about_title', parent: 'settings',
     items: [...SOFTWARE_HELP_ITEMS, { id: 'close', titleKey: 'close' }] },
   { id: 'intro', titleKey: 'home_intro_title', parent: 'home', items: [...HOME_INTRO_ACTIONS.map((action: HomeIntroAction): AppInterfaceItem =>
     ({ id: action.id, titleKey: action.titleKey })), ...INTRO_ABOUT_ITEMS] },
@@ -230,6 +249,9 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'more', titleKey: 'deck_more', iconKey: 'ic_home_more', opens: 'deck_row_menu' },
     { id: 'study', titleKey: 'start_study', opens: 'study' }
   ] },
+  ...['study', 'browser', 'edit_note', 'note_draft_preview', 'deck_options', 'stats', 'add_note', 'agent', 'reminders', 'settings'].map((page): AppInterfaceSurface => ({ id: 'page_toolbar_' + page, titleKey: 'home_layout_wheel', parent: page, items: [] })),
+  { id: 'home_action_wheel', titleKey: 'home_interface_title', parent: 'home', items: HOME_LANDSCAPE_ACTIONS },
+  { id: 'deck_action_wheel', titleKey: 'home_interface_decks', parent: 'deck_details', items: [] },
   { id: 'deck_actions', titleKey: 'deck_more', parent: 'deck_details', items: [] },
   { id: 'custom_study', titleKey: 'custom_study_title', parent: 'deck_details', items: [
     { id: 'value', titleKey: 'custom_study_value_label' },
@@ -441,8 +463,13 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'new', titleKey: 'ai_agent_history_new', iconKey: 'ic_home_new', condition: 'history' },
     { id: 'memory_create', titleKey: 'ai_agent_memory_create', iconKey: 'ic_home_new', opens: 'agent_memory_editor', condition: 'memory' },
     { id: 'input', titleKey: 'ai_card_input_hint', condition: 'conversation' },
-    { id: 'import', titleKey: 'ai_agent_import_files', condition: 'conversation' },
-    { id: 'submit', titleKey: 'ai_card_send', condition: 'conversation' }
+    { id: 'import', titleKey: 'ai_agent_import_files', iconKey: 'ic_home_new', condition: 'conversation' },
+    { id: 'voice', titleKey: 'ai_agent_deepseek_voice', iconKey: 'ic_audio_record_on', condition: 'conversation' },
+    { id: 'submit', titleKey: 'ai_card_send', iconKey: 'ic_common_arrow_up', condition: 'conversation' }
+  ] },
+  { id: 'external_mcp_settings', titleKey: 'ai_agent_external_mcp', parent: 'settings', items: [
+    { id: 'enable', titleKey: 'ai_agent_external_mcp' },
+    { id: 'copy', titleKey: 'ai_agent_external_copy' }
   ] },
   { id: 'agent_more', titleKey: 'study_more', parent: 'agent', items: [
     { id: 'settings', titleKey: 'ai_agent_settings_page_title', iconKey: 'ic_home_settings', opens: 'agent_settings' },
@@ -455,6 +482,12 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   { id: 'agent_settings', titleKey: 'ai_agent_settings_page_title', parent: 'agent', items: [
     { id: 'memory', titleKey: 'agent_memory_title', iconKey: 'ic_agent_memory', opens: 'agent_memory' },
     ...(SETTINGS_GROUPS.find((group): boolean => group.id === 'ai')?.items ?? [])
+  ] },
+  { id: 'official_ai', titleKey: 'official_ai_title', parent: 'agent_settings', items: [
+    { id: 'quantity', titleKey: 'official_ai_quantity' },
+    { id: 'login', titleKey: 'official_ai_login' },
+    { id: 'purchase', titleKey: 'official_ai_buy' }, { id: 'restore', titleKey: 'official_ai_restore' },
+    { id: 'billing_help', titleKey: 'official_ai_billing_help' }
   ] },
   { id: 'agent_history_management', titleKey: 'agent_history_manage', parent: 'agent_settings', items: [
     { id: 'search', titleKey: 'agent_history_search' },
@@ -492,7 +525,21 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'deck', titleKey: 'stats_deck_all', condition: 'charts_and_decks' },
     { id: 'year', titleKey: 'stats_history_range_year', condition: 'charts' },
     { id: 'all', titleKey: 'stats_history_range_all', condition: 'charts' },
-    { id: 'sections', titleKey: 'stats_page_title', opens: 'stats_sections', condition: 'charts' }
+    { id: 'sections', titleKey: 'stats_page_title', opens: 'stats_sections', condition: 'charts' },
+  ] },
+  { id: 'study_leaderboard', titleKey: 'leaderboard_title', parent: 'home_more', instructionsKey: 'leaderboard_disclosure', items: [
+    { id: 'close', titleKey: 'close', iconKey: 'ic_common_close' },
+    { id: 'settings', titleKey: 'leaderboard_settings_title', iconKey: 'ic_home_settings' },
+    { id: 'anonymous', titleKey: 'leaderboard_publish_anonymous' },
+    { id: 'metric', titleKey: 'leaderboard_metric' },
+    { id: 'period', titleKey: 'leaderboard_period' },
+    { id: 'filter', titleKey: 'leaderboard_filter' },
+    { id: 'login', titleKey: 'leaderboard_login', condition: 'signed_out' },
+    { id: 'sample', titleKey: 'leaderboard_sample', condition: 'signed_in' },
+    { id: 'share_profile', titleKey: 'leaderboard_share_profile', condition: 'consent_with_profile' },
+    { id: 'publish', titleKey: 'leaderboard_publish', condition: 'consent' },
+    { id: 'retry', titleKey: 'common_retry', condition: 'board_error' },
+    { id: 'leave', titleKey: 'leaderboard_leave', condition: 'joined' }
   ] },
   { id: 'stats_sections', titleKey: 'stats_page_title', parent: 'stats', items: STATS_INTERFACE_SECTIONS },
   ...STATS_INTERFACE_SECTIONS.map((item: AppInterfaceItem): AppInterfaceSurface => ({
@@ -530,8 +577,7 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ] },
   { id: 'note_visual_manage', titleKey: 'note_visual_manage', instructionsKey: 'note_visual_instructions', parent: '', items: [
     { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },
-    { id: 'add', titleKey: 'note_visual_add', iconKey: 'ic_editor_image' },
-    { id: 'drawing', titleKey: 'note_drawing_new', opens: 'note_drawing_editor' }
+    { id: 'add', titleKey: 'note_visual_add', iconKey: 'ic_editor_image' }
   ] },
   { id: 'note_drawing_editor', titleKey: 'note_drawing_title', instructionsKey: 'note_drawing_instructions', parent: 'note_visual_manage', items: [
     { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },
@@ -549,9 +595,16 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
   ] },
   { id: 'note_audio_manage', titleKey: 'note_audio_manage', parent: '', items: [
     { id: 'close', titleKey: 'cancel' }, { id: 'apply', titleKey: 'done' },
-    { id: 'add', titleKey: 'note_audio_add' }, { id: 'record', titleKey: 'note_audio_record' },
+    { id: 'add', titleKey: NOTE_AUDIO_IMPORT_TITLE }, { id: 'record', titleKey: 'note_audio_record' },
+    { id: 'generate_speech', titleKey: NOTE_AUDIO_GENERATE_TITLE, opens: 'note_audio_speech', condition: 'not_recording' },
     { id: 'pause', titleKey: 'note_audio_pause', condition: 'recording' },
     { id: 'cancel_recording', titleKey: 'note_audio_record_cancel', condition: 'recording' }
+  ] },
+  { id: 'note_audio_speech', titleKey: NOTE_AUDIO_GENERATE_TITLE, parent: 'note_audio_manage', items: [
+    { id: 'close', titleKey: 'cancel' }, { id: 'text', titleKey: 'note_audio_speech_input' },
+    { id: 'generate', titleKey: NOTE_AUDIO_GENERATE_TITLE },
+    { id: 'preview', titleKey: 'note_audio_play', iconKey: NOTE_AUDIO_PLAY_ICON, condition: 'speech_ready' },
+    { id: 'apply', titleKey: NOTE_AUDIO_SPEECH_APPLY_TITLE, iconKey: DIALOG_ACTION_PRESENTATION.confirmIconKey }
   ] },
   { id: 'tag_picker', titleKey: 'tags_choose', parent: '', items: [
     { id: 'search', titleKey: 'tags_search_hint' },
@@ -582,11 +635,19 @@ export const APP_INTERFACE_SURFACES: AppInterfaceSurface[] = [
     { id: 'exit', titleKey: 'custom_scheduling_exit', iconKey: 'ic_common_close' }, { id: 'continue', titleKey: 'custom_scheduling_continue' }
   ] },
   { id: 'note_links', titleKey: 'note_links_title', parent: 'study', items: [
-    { id: 'search', titleKey: 'note_links_search' }, { id: 'save', titleKey: 'note_links_save' },
-    { id: 'close', titleKey: 'done' }
+    { id: 'search', titleKey: 'note_reference_search' }, { id: 'open_result', titleKey: 'note_preview_card_label' },
+    { id: 'add_reference', titleKey: 'note_links_add', iconKey: 'ic_study_link' }, { id: 'save', titleKey: 'note_links_save' },
+    { id: 'close', titleKey: 'cancel' },
+    { id: 'graph', titleKey: 'note_link_graph_open', opens: 'note_link_graph' }
+  ] },
+  { id: 'note_link_graph', titleKey: 'note_link_graph_title', parent: 'note_links', items: [
+    { id: 'close', titleKey: 'browser_preview_close' },
+    { id: 'preview', titleKey: 'note_preview_card_label' },
+    { id: 'center', titleKey: 'note_link_graph_center' }
   ] },
   { id: 'note_links_draft', titleKey: 'note_links_title', instructionsKey: 'note_reference_hint', parent: 'edit_note_form', items: [
-    { id: 'close', titleKey: 'done' }, { id: 'search', titleKey: 'note_reference_search' }
+    { id: 'close', titleKey: 'done' }, { id: 'search', titleKey: 'note_reference_search' },
+    { id: 'graph', titleKey: 'note_link_graph_open_saved', opens: 'note_link_graph' }
   ] },
   { id: 'note_reference_picker', titleKey: 'note_reference_title', instructionsKey: 'note_reference_hint', parent: 'note_editor_wheel', items: [
     { id: 'close', titleKey: 'cancel' }, { id: 'search', titleKey: 'note_reference_search' }, { id: 'confirm', titleKey: 'browser_detail_confirm' }
@@ -628,7 +689,8 @@ export function visibleInterfaceItems(surfaceId: string, context: AppInterfaceCo
   const surface = APP_INTERFACE_SURFACES.find((entry: AppInterfaceSurface): boolean => entry.id === surfaceId);
   if (surface === undefined) return [];
   return surface.items.filter((item: AppInterfaceItem): boolean =>
-    !(item.fullOnly && context.simple) && !(item.agentOnly && !context.agent) && !(item.cloudOnly && !context.cloudDeck));
+    !(item.fullOnly && context.simple) && !(item.agentOnly && !context.agent) && !(item.cloudOnly && !context.cloudDeck) &&
+    !(item.condition === 'leaderboard_visible' && context.leaderboardHidden === true));
 }
 
 export function deckRowMenuItems(simple: boolean, filtered: boolean): AppInterfaceItem[] {
@@ -687,13 +749,17 @@ export const SETTINGS_HEADER_ITEMS: AppInterfaceItem[] = [
   { id: 'full', titleKey: 'settings_simple_mode_full', iconKey: 'ic_mode_experimental' }
 ];
 
-export function settingsHeaderItems(simple: boolean): AppInterfaceItem[] {
+export function settingsHeaderItems(simple: boolean, sideWheel: boolean = false): AppInterfaceItem[] {
+  if (sideWheel) return SETTINGS_HEADER_ITEMS;
   return SETTINGS_HEADER_ITEMS.filter((item): boolean => item.id === 'back' || item.id === (simple ? 'simple' : 'full'))
     .map((item): AppInterfaceItem => ({ id: item.id === 'back' ? 'back' : 'mode', titleKey: item.titleKey, iconKey: item.iconKey }));
 }
 
 /** 设置壳和 JIDE 使用同一个当前模式入口，菜单内名称仍由原模式选择器展示。 */
-export function settingsHeaderControls(simple: boolean, menuOpen: boolean): AppInterfaceControl[] {
+export function settingsHeaderControls(simple: boolean, menuOpen: boolean, sideWheel: boolean = false): AppInterfaceControl[] {
+  if (sideWheel) return SETTINGS_HEADER_ITEMS.map((item): AppInterfaceControl => ({ id: item.id, title: '',
+    titleKey: item.titleKey, iconKey: item.iconKey, enabled: true,
+    selected: item.id === (simple ? 'simple' : 'full') }));
   return settingsHeaderItems(simple).map((item): AppInterfaceControl => ({ id: item.id, title: '',
     titleKey: item.titleKey, iconKey: item.iconKey, enabled: true, selected: item.id === 'mode' && menuOpen }));
 }
@@ -713,6 +779,7 @@ export interface AgentInterfaceContext {
   memoryCanCreate?: boolean;
   history: boolean; processing: boolean; parsing: boolean; batchRunning: boolean;
   pendingClarification: boolean; canSubmit: boolean;
+  voiceAvailable?: boolean; voiceState?: string; speechActive?: boolean;
 }
 
 export function agentInterfaceTitle(mode: string, history: boolean, memory: boolean = false, settings: boolean = false): string {
@@ -725,27 +792,31 @@ export function agentImportLabelKey(parsing: boolean): string {
   return parsing ? 'ai_agent_file_parsing' : 'ai_agent_import_files';
 }
 
-/** 两个输入动作按全部可见文案共同测宽，解析和取消切换不挤动输入框。 */
-export function agentComposerLabelKeys(): string[] {
-  return [agentImportLabelKey(false), agentImportLabelKey(true), 'ai_card_send', 'ai_agent_cancel'];
-}
 export function reminderEditorTitle(creating: boolean): string {
   return creating ? 'reminder_edit_title_create' : 'reminder_edit_title_edit';
 }
 
 export function agentInterfaceControls(context: AgentInterfaceContext): AppInterfaceMenuItem[] {
   const surface = APP_INTERFACE_SURFACES.find((entry): boolean => entry.id === 'agent');
-  return (surface?.items ?? []).filter((item): boolean => item.condition === undefined ||
+  return (surface?.items ?? []).filter((item): boolean => item.id !== 'voice' || context.voiceAvailable === true)
+    .filter((item): boolean => item.condition === undefined ||
     (item.condition === 'memory' ? context.memory === true :
       !context.memory && !context.settings && (item.condition === 'conversation_or_history' ||
         (item.condition === 'history' ? context.history : !context.history))))
     .map((item): AppInterfaceMenuItem => ({ id: item.id,
       titleKey: item.id === 'submit' && context.processing ? 'ai_agent_cancel' :
-        item.id === 'import' ? agentImportLabelKey(context.parsing) : item.titleKey, opens: item.opens,
+        item.id === 'import' ? agentImportLabelKey(context.parsing) :
+        item.id === 'voice' && context.voiceState === 'recording' ? 'ai_agent_deepseek_voice_finish' :
+        item.id === 'voice' && context.voiceState === 'transcribing' ? 'ai_agent_deepseek_voice_transcribing' : item.titleKey,
+      iconKey: item.id === 'submit' && context.processing ? 'ic_common_close' :
+        item.id === 'voice' && context.voiceState === 'recording' ? 'ic_audio_recording' : item.iconKey,
+      opens: item.opens,
       condition: item.condition, selected: false,
       enabled: item.id === 'back' ? !context.settingsBusy : item.id === 'memory_create' ? context.memoryCanCreate === true : ['more', 'new'].includes(item.id) ?
         !context.processing && !context.parsing && !context.batchRunning : item.id === 'input' ?
-          !context.pendingClarification : item.id === 'import' ?
+          !context.pendingClarification : item.id === 'voice' ?
+            !context.processing && !context.parsing && !context.pendingClarification && !context.speechActive &&
+            (context.voiceState === '' || context.voiceState === 'recording') : item.id === 'import' ?
             !context.processing && !context.parsing && !context.pendingClarification : context.processing || context.canSubmit }));
 }
 
@@ -759,10 +830,13 @@ export interface AgentSettingsInterfaceContext {
 }
 export function agentSettingsControls(context: AgentSettingsInterfaceContext): AppInterfaceControl[] {
   const surface = APP_INTERFACE_SURFACES.find((entry): boolean => entry.id === 'agent_settings');
-  return (surface?.items ?? []).filter((item): boolean => item.condition === undefined ||
-    (item.condition === 'custom_provider' ? context.provider === 'custom' :
-      item.condition === 'builtin_provider' ? context.provider !== 'custom' :
-        item.condition === 'web_enabled' && context.web.webEnabled))
+  return (surface?.items ?? []).filter((item): boolean => !(context.provider === 'official' && item.id.startsWith('ai_web_')))
+    .filter((item): boolean => item.condition === undefined ||
+    (item.condition === 'official_provider' ? context.provider === 'official' :
+      item.condition === 'self_key_provider' ? context.provider !== 'official' :
+      item.condition === 'custom_provider' ? context.provider === 'custom' :
+      item.condition === 'builtin_provider' ? context.provider !== 'custom' && context.provider !== 'official' :
+        item.condition === 'web_enabled' && context.provider !== 'official' && context.web.webEnabled))
     .map((item): AppInterfaceControl => ({ id: item.id, title: '', titleKey: item.titleKey, iconKey: item.iconKey,
       enabled: item.id.startsWith('history_') ? context.historyReady === true && !context.busy && !context.web.busy :
         item.id === 'memory' ? !context.busy && !context.web.busy : item.id.startsWith('ai_web_') ?
@@ -879,16 +953,18 @@ export function noteDrawingInterfaceObservation(status: NoteDrawingStatus): AppI
 export function noteAudioInterfaceObservation(status: NoteAudioStatus): AppInterfaceObservation {
   const surface = APP_INTERFACE_SURFACES.find((entry): boolean => entry.id === 'note_audio_manage');
   const items: AppInterfaceControl[] = (surface?.items ?? [])
-    .filter((item): boolean => item.id !== 'add' || !status.recording)
+    .filter((item): boolean => (item.id !== 'add' && item.condition !== 'not_recording') || !status.recording)
     .filter((item): boolean => item.condition !== 'recording' || status.recording)
     .map((item): AppInterfaceControl => ({ id: item.id, title: '',
       titleKey: item.id === 'record' && status.recording ? 'note_audio_record_done' :
-        item.id === 'pause' && status.paused ? 'note_audio_resume' : item.titleKey,
-      enabled: !status.working && (item.id === 'close' || item.id === 'apply' ? !status.recording && !status.disabled :
+        item.id === 'pause' && status.paused ? 'note_audio_resume' : item.titleKey, opens: item.opens,
+      enabled: !status.working && (item.id !== 'generate_speech' || status.speechEnabled === true) &&
+        (item.id === 'close' || item.id === 'apply' ? !status.recording && !status.disabled :
         status.recording || !status.disabled), selected: item.id === 'record' && status.recording }));
   for (const attachment of status.attachments) {
     items.push({ id: attachment.id + '-play', title: '',
       titleKey: attachment.playing ? 'note_audio_stop' : 'note_audio_play',
+      iconKey: attachment.playing ? undefined : NOTE_AUDIO_PLAY_ICON,
       enabled: !status.working && !status.disabled, selected: attachment.playing });
     if (attachment.replace) items.push({ id: attachment.id + '-replace', title: '', titleKey: 'note_media_replace',
       enabled: !status.working && !status.disabled && !status.recording, selected: false });
@@ -900,6 +976,21 @@ export function noteAudioInterfaceObservation(status: NoteAudioStatus): AppInter
     busy: status.working, controlsComplete: items.length <= 100, items: items,
     values: [{ id: 'recording', value: String(status.recording) }, { id: 'paused', value: String(status.paused) },
       { id: 'recorded_seconds', value: String(status.seconds) }, { id: 'has_error', value: String(status.hasError) }] };
+}
+
+export function noteSpeechInterfaceObservation(working: boolean, canGenerate: boolean, ready: boolean,
+  playing: boolean, foreground: boolean): AppInterfaceObservation {
+  const surface = APP_INTERFACE_SURFACES.find((entry): boolean => entry.id === 'note_audio_speech');
+  const items = (surface?.items ?? []).filter((item): boolean => ready || item.condition !== 'speech_ready')
+    .map((item): AppInterfaceControl => ({ id: item.id, title: '',
+      titleKey: item.id === 'generate' && working ? 'ai_card_generating' :
+        item.id === 'preview' && playing ? 'note_audio_stop' : item.titleKey,
+      iconKey: item.id === 'preview' && playing ? undefined : item.iconKey,
+      enabled: item.id === 'close' || (foreground && !working &&
+        (item.id === 'generate' ? canGenerate : item.id === 'text' || ready)),
+      selected: item.id === 'preview' && playing }));
+  return { surface: 'note_audio_speech', sectionId: '', selectedId: '', optionIds: [],
+    optionLabels: [], optionsTotal: items.length, busy: working, controlsComplete: true, items: items, values: [] };
 }
 
 export function noteEditorFormatObservation(toolId: string, fieldName: string, source: boolean,

@@ -31,6 +31,7 @@ import type { EditableNote } from '../proto/messages/NoteMessages';
 import type { RenderedCard, TemplateNode, 空卡报告 } from '../proto/messages/CardRenderingMessages';
 import { decodeExtractAvTagsResponse, decodeExtractLatexResponse, decodeRenderCardResponse, decode空卡报告, encodeExtractAvTagsRequest, encodeExtractLatexRequest, encodeRenderExistingCardRequest, encodeRenderUncommittedCardRequest, encodeRenderingString, encodeCompareAnswerRequest, encodeExtractClozeForTypingRequest, encode空请求 } from '../proto/messages/CardRenderingMessages';
 import type { AvTagsResult } from '../proto/messages/CardRenderingMessages';
+import { AppLog } from '../model/AppLog';
 export class 卡片渲染服务 {
     private readonly 会话: 后端会话 = 后端会话.获取实例();
     async encodeIriPaths(html: string): Promise<string> {
@@ -51,7 +52,7 @@ export class 卡片渲染服务 {
                 question = rendered.questionAudio.text;
             }
             catch (error) {
-                console.info('Question audio tags: ' + String(error));
+                AppLog.info('CardRender', 'Question audio tags: ' + String(error));
             }
         }
         // 对齐 Anki/AnkiDroid：FrontSide 使用已提取 AV 的题面，题面声音不会再次成为答案自动播放项。
@@ -67,7 +68,7 @@ export class 卡片渲染服务 {
                 answer = rendered.answerAudio.text;
             }
             catch (error) {
-                console.info('Answer audio tags: ' + String(error));
+                AppLog.info('CardRender', 'Answer audio tags: ' + String(error));
             }
         }
         rendered.questionHtml = await this.encodeIriPaths(question);

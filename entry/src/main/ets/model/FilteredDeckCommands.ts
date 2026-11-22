@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { 过滤牌组更新, 搜索条件 } from '../proto/messages/DeckMessages';
 import { encode过滤牌组更新, decode过滤牌组更新 } from '../proto/messages/DeckMessages';
-import { AutoSyncScheduler, autoSyncScheduler } from './AutoSyncScheduler';
-import { SyncActivity, syncActivity } from './SyncSettings';
+import { autoSyncScheduler } from './AutoSyncScheduler';
+import type { AutoSyncScheduler } from './AutoSyncScheduler';
+import { syncActivity } from './SyncSettings';
+import type { SyncActivity } from './SyncSettings';
 
 export const FILTERED_DECK_ACTIONS: FilteredDeckMenuAction[] = [
   { id: 'empty_filtered', titleKey: 'filtered_deck_empty' },

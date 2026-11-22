@@ -10,7 +10,7 @@ export interface 官方公告展示项 {
   actionUrl: string;
 }
 
-interface 原始官方公告 {
+export interface 原始官方公告 {
   id?: string;
   enabled?: boolean;
   titleZh?: string;
@@ -147,6 +147,14 @@ export function 解析可展示官方公告(
 
 function 两位(value: number): string {
   return value < 10 ? `0${value}` : `${value}`;
+}
+
+/** 使用设备时区展示服务器记录的发布时间，保留到秒。 */
+export function 格式化公告发布时间(value: string): string {
+  const date: Date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  return `${date.getFullYear()}-${两位(date.getMonth() + 1)}-${两位(date.getDate())} ` +
+    `${两位(date.getHours())}:${两位(date.getMinutes())}:${两位(date.getSeconds())}`;
 }
 
 /**

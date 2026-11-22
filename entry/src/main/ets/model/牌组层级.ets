@@ -31,6 +31,7 @@
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
 import { 牌组色调 } from './主页模型';
 import type { 牌组汇总 } from './主页模型';
+import { isHomeDeckHidden } from './HiddenDecks';
 import { orderDeckChildren } from './DeckReorder';
 
 const 色调轮转池: 牌组色调[] = [牌组色调.Blue, 牌组色调.Purple, 牌组色调.Mint, 牌组色调.Amber];
@@ -143,6 +144,6 @@ export function 可见牌组行(行集: 牌组汇总[], 展开ID集合: Set<stri
   隐藏ID集合: Set<string> | null = null): 牌组汇总[] {
   const 隐藏集: Set<string> = 隐藏ID集合 ?? new Set<string>();
   return 行集.filter((行: 牌组汇总): boolean =>
-    !隐藏集.has(行.id) &&
+    !isHomeDeckHidden(行.id, 行.ancestorIds, 隐藏集) &&
     行.ancestorIds.every((祖先ID: string): boolean => 展开ID集合.has(祖先ID)));
 }

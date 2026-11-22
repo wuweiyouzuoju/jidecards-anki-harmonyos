@@ -87,6 +87,7 @@ export async function 保存颜色主题(主题: 颜色主题): Promise<void> {
 }
 
 /** 由 ThemeColorSession 串行调用，一次 flush 保存自定义种子和主题身份。 */
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 export async function 保存自定义颜色主题(seed: string, adaptation?: AccentAdaptation): Promise<void> {
   const accent: string = normalizedAccent(seed);
   if (adaptation !== undefined) { adaptationStrength(adaptation.light); adaptationStrength(adaptation.dark); }

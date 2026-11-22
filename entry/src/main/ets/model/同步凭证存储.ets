@@ -53,6 +53,8 @@ const 媒体待同步键: string = 'media_sync_pending';
 // 默认 true（保持既有行为）。用户关闭后 syncCollection 传 syncMedia=false，
 // rslib 不会挂起媒体同步任务，同步面板也不进媒体阶段。
 const 媒体同步开关键: string = 'sync_media_enabled';
+const ANKI_SETUP_KEY: string = 'anki_sync_setup_complete';
+const HUAWEI_SETUP_KEY: string = 'huawei_cloud_setup_complete';
 const CUSTOM_SERVER_KEY: string = 'custom_sync_server';
 // 新版要求重新确认；旧 auto_sync_enabled 即使为 true 也不再读取。
 // 固定使用此键，后续启动/升级保留用户在新版重新确认的选择。
@@ -77,7 +79,7 @@ export async function saveCustomSyncServer(input: string): Promise<string> {
   if (store === null) throw new Error('Sync preferences unavailable');
   const previous: string = 读取字符串(store, CUSTOM_SERVER_KEY);
   if (endpoint === previous) return endpoint;
-  const keys: string[] = [CUSTOM_SERVER_KEY, HKEY键, 端点键, 用户名键, 媒体待同步键];
+  const keys: string[] = [CUSTOM_SERVER_KEY, HKEY键, 端点键, 用户名键, 媒体待同步键, ANKI_SETUP_KEY];
   const values: string[] = keys.map((key: string): string => 读取字符串(store, key));
   try {
     store.putSync(CUSTOM_SERVER_KEY, endpoint);
@@ -85,6 +87,7 @@ export async function saveCustomSyncServer(input: string): Promise<string> {
     store.deleteSync(端点键);
     store.deleteSync(用户名键);
     store.deleteSync(媒体待同步键);
+    store.deleteSync(ANKI_SETUP_KEY);
     await store.flush();
   } catch (error) {
     for (let index: number = 0; index < keys.length; index++) store.putSync(keys[index], values[index]);
@@ -204,6 +207,7 @@ export function 保存同步凭证(凭证: 同步凭证信息): void {
     return;
   }
   try {
+    if (读取字符串(存储, HKEY键) !== 凭证.hkey) 存储.deleteSync(ANKI_SETUP_KEY);
     存储.putSync(HKEY键, 凭证.hkey);
     存储.putSync(端点键, 凭证.endpoint);
     存储.putSync(用户名键, 凭证.username);
@@ -234,6 +238,7 @@ export function 保存同步凭证(凭证: 同步凭证信息): void {
 export async function saveSyncCredentialsVerified(auth: 同步凭证信息): Promise<void> {
   const store: preferences.Preferences | null = 打开存储();
   if (store === null) throw new Error('sync_storage_unavailable');
+  if (读取字符串(store, HKEY键) !== auth.hkey) store.deleteSync(ANKI_SETUP_KEY);
   await store.put(HKEY键,auth.hkey);
   await store.put(端点键,auth.endpoint);
   await store.put(用户名键,auth.username);
@@ -316,6 +321,7 @@ export function 清除同步凭证(): void {
   }
   try {
     存储.deleteSync(HKEY键);
+    存储.deleteSync(ANKI_SETUP_KEY);
     存储.deleteSync(端点键);
     存储.deleteSync(用户名键);
     存储.deleteSync(媒体待同步键);
@@ -328,9 +334,9 @@ export function 清除同步凭证(): void {
 /** @throws {Error} 用户确认的注销必须等待落盘，失败不能声称已经注销。 */
 export async function clearSyncCredentialsVerified(): Promise<void> {
   const store = 打开存储(); if (store === null) throw new Error('sync_storage_unavailable');
-  for (const key of [HKEY键,端点键,用户名键,媒体待同步键]) await store.delete(key);
+  for (const key of [HKEY键,端点键,用户名键,媒体待同步键,ANKI_SETUP_KEY]) await store.delete(key);
   await store.flush();
-  for (const key of [HKEY键,端点键,用户名键,媒体待同步键]) if (await store.has(key)) throw new Error('sync_logout_unverified');
+  for (const key of [HKEY键,端点键,用户名键,媒体待同步键,ANKI_SETUP_KEY]) if (await store.has(key)) throw new Error('sync_logout_unverified');
 }
 
 // ========================================================
@@ -463,4 +469,31 @@ export function 加载媒体同步开关(): boolean {
 export function loadVisibleSyncAuth(): 同步凭证信息 | null {
   const auth: 同步凭证信息 | null = 加载同步凭证();
   return auth !== null && isSyncEndpointVisible(auth.endpoint, OFFICIAL_ANKIWEB_SYNC_UI_ENABLED) ? auth : null;
+}
+
+export function hasAnkiSyncSetup(): boolean {
+  return loadVisibleSyncAuth() !== null && readSyncSetup(ANKI_SETUP_KEY);
+}
+
+export function hasHuaweiCloudSetup(): boolean {
+  return readSyncSetup(HUAWEI_SETUP_KEY);
+}
+
+function readSyncSetup(key: string): boolean {
+  try {
+    const store = 打开存储();
+    return store !== null && 读取字符串(store, key) === '1';
+  } catch (error) { return false; }
+}
+
+export function recordSyncSetup(provider: string, hkey: string = ''): void {
+  const store = 打开存储();
+  if (store === null) return;
+  try {
+    if (provider === 'anki' && (hkey === '' || 读取字符串(store, HKEY键) !== hkey)) return;
+    store.putSync(provider === 'anki' ? ANKI_SETUP_KEY : HUAWEI_SETUP_KEY, '1');
+    静默落盘(store);
+  } catch (error) {
+    hilog.warn(同步日志域, 同步日志标签, 'Unable to persist completed sync setup');
+  }
 }

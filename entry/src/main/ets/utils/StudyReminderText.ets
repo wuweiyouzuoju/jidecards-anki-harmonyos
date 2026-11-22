@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { common } from '@kit.AbilityKit';
+import { AppLog } from '../model/AppLog';
 
 /** 发布与预览共用资源和替换规则；用户存储的文案不随语言切换改写。 */
 export function reminderText(key: string, ...args: Array<string | number>): string {
@@ -8,7 +9,7 @@ export function reminderText(key: string, ...args: Array<string | number>): stri
     if (context === undefined) throw new Error('reminder_context_unavailable');
     return context.resourceManager.getStringByNameSync(key, ...args);
   } catch (error) {
-    console.error('[reminder] Resource unavailable: ' + key);
+    AppLog.error('StudyReminder', '[reminder] Resource unavailable: ' + key);
     return '[' + key + ']';
   }
 }

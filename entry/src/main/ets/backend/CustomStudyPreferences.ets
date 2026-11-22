@@ -1,5 +1,5 @@
-import { customStudyValueValid } from '../model/CustomStudyOptions';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { customStudyValueValid } from '../model/CustomStudyOptions';
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 

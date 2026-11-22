@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { normalizeKeyboardChord } from './KeyboardInput';
 export { normalizeKeyboardChord as normalizeStudyChord, keyboardChord as studyChord, KeyboardPressSession as StudyKeyboardSession } from './KeyboardInput';
-export type StudyInputCommand = 'none' | 'consume' | 'undo' | 'back' | 'delete' | 'bury' | 'suspend' | 'replay' | 'flip' | 'again' | 'hard' | 'good' | 'easy' |
+export type StudyInputCommand = 'delete_note' | 'page_up' | 'page_down' | 'tag' | 'card_info' | 'reschedule_note' | 'user_action_1' | 'user_action_2' | 'user_action_3' | 'user_action_4' | 'user_action_5' | 'user_action_6' | 'user_action_7' | 'user_action_8' | 'user_action_9' | 'none' | 'consume' | 'undo' | 'back' | 'delete' | 'bury' | 'suspend' | 'replay' | 'flip' | 'again' | 'hard' | 'good' | 'easy' |
   'edit' | 'mark' | 'flag0' | 'flag1' | 'flag2' | 'flag3' | 'flag4' | 'flag5' | 'flag6' | 'flag7' |
   'menu' | 'guide' | 'whiteboard' | 'auto_advance' | 'redo' | 'bury_note' | 'suspend_note' | 'add' | 'hint' | 'all_hints' | 'previous_info' | 'voice_replay' | 'voice_record' | 'voice_save';
 

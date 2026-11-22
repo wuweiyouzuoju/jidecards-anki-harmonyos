@@ -2,12 +2,14 @@
 import type { EditableNote } from '../proto/messages/NoteMessages';
 import type { CardAnswerInput, CongratsInfo, QueuedCardsView, SchedulingStatesRaw, StudyCard } from '../proto/messages/SchedulerMessages';
 import type { RenderedCard } from '../proto/messages/CardRenderingMessages';
-import { AutoSyncScheduler, autoSyncScheduler } from './AutoSyncScheduler';
-import { SyncActivity, syncActivity } from './SyncSettings';
+import { autoSyncScheduler } from './AutoSyncScheduler';
+import type { AutoSyncScheduler } from './AutoSyncScheduler';
+import { syncActivity } from './SyncSettings';
+import type { SyncActivity } from './SyncSettings';
 import { StudyOptions } from './StudyTiming';
 import { CardRenderPrefetch } from './CardRenderPrefetch';
 import type { JideChoiceQuestion } from './JideChoice';
-import { ReviewPreferences } from '../proto/messages/PreferencesMessages';
+import type { ReviewPreferences } from '../proto/messages/PreferencesMessages';
 import type { CardMarkingState, FlagLabels } from './CardMarking';
 import type { UndoStatus } from '../proto/messages/CollectionMessages';
 

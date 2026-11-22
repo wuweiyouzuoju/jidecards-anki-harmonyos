@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { AutoSyncScheduler, autoSyncScheduler } from './AutoSyncScheduler';
+import { autoSyncScheduler } from './AutoSyncScheduler';
+import type { AutoSyncScheduler } from './AutoSyncScheduler';
 
 export interface BackupBackend {
   create(force: boolean): Promise<boolean>;

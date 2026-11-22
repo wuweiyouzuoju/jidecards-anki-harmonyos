@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { AiContentExportPolicy, AiContentExportBackend, AiExportScope, AI_CONTENT_PROVENANCE_KEY } from '../model/AiContentExportPolicy';
+import { AiContentExportPolicy, AI_CONTENT_PROVENANCE_KEY } from '../model/AiContentExportPolicy';
+import type { AiContentExportBackend, AiExportScope } from '../model/AiContentExportPolicy';
 import { 配置服务 } from './配置服务';
 import { 搜索服务 } from './搜索服务';
 import { 笔记服务 } from './笔记服务';

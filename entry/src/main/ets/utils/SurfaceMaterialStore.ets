@@ -45,11 +45,30 @@ export function initializeSurfaceMaterial(): void {
   AppStorage.setOrCreate<boolean>(GLASS_SUGGESTION_PENDING_KEY, pending);
 }
 
-/** 回复只记录一次；确认切换失败时不吞掉推荐，也不覆盖原材质。 */
-export async function completeGlassSuggestion(useGlass: boolean): Promise<void> {
-  if (useGlass) await saveSurfaceMaterial('glass');
-  await saveLocalPreference(surfacePreferences(), GLASS_SUGGESTION_HANDLED_KEY, true, false);
+let glassSuggestionCompletion: Promise<void> | undefined = undefined;
+
+/** @throws {Error} 回复保存失败时由宿主保留当前提示并展示错误。 */
+export function completeGlassSuggestion(useGlass: boolean): Promise<void> {
+  if (glassSuggestionCompletion !== undefined) return glassSuggestionCompletion;
+  // 材质广播可能重建首页，先撤下推荐，避免新宿主读到尚未清除的 pending。
   AppStorage.setOrCreate<boolean>(GLASS_SUGGESTION_PENDING_KEY, false);
+  glassSuggestionCompletion = persistGlassSuggestion(useGlass).finally((): void => {
+    glassSuggestionCompletion = undefined;
+  });
+  return glassSuggestionCompletion;
+}
+
+/** @throws {Error} 保存失败恢复推荐资格并向调用者传播。 */
+async function persistGlassSuggestion(useGlass: boolean): Promise<void> {
+  try {
+    if (useGlass) await saveSurfaceMaterial('glass');
+    await saveLocalPreference(surfacePreferences(), GLASS_SUGGESTION_HANDLED_KEY, true, false);
+  } catch (error) {
+    const pending: boolean = AppStorage.get<string>(SURFACE_MATERIAL_KEY) !== 'glass' &&
+      surfacePreferences().getSync(GLASS_SUGGESTION_HANDLED_KEY, false) !== true;
+    AppStorage.setOrCreate<boolean>(GLASS_SUGGESTION_PENDING_KEY, pending);
+    throw error as Error;
+  }
 }
 
 /** @throws {Error} 设置页与 JIDE 共用确认保存、回读和广播；写入不随页面离开取消。 */
@@ -59,6 +78,7 @@ export async function saveSurfaceMaterial(style: string, expected: string | null
 }
 
 
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 function readMaterialOpacity(store: preferences.Preferences, flatKey: string, glassKey: string,
   defaults: MaterialOpacity): MaterialOpacity {
   const flat = store.getSync(flatKey, defaults.flat);
@@ -69,6 +89,7 @@ function readMaterialOpacity(store: preferences.Preferences, flatKey: string, gl
   };
 }
 
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 async function saveMaterialOpacity(material: string, value: number, key: string, flatKey: string, glassKey: string,
   defaults: MaterialOpacity): Promise<void> {
   if (!isSurfaceMaterial(material) || !validModuleOpacity(value)) throw new Error('invalid_surface_opacity');
@@ -78,14 +99,17 @@ async function saveMaterialOpacity(material: string, value: number, key: string,
   AppStorage.setOrCreate<MaterialOpacity>(key, readMaterialOpacity(store, flatKey, glassKey, defaults));
 }
 
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 export async function saveModuleOpacity(material: string, value: number): Promise<void> {
   await saveMaterialOpacity(material, value, MODULE_OPACITY_KEY, FLAT_MODULE_OPACITY_KEY, GLASS_MODULE_OPACITY_KEY, DEFAULT_MODULE_OPACITY);
 }
 
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 export async function saveButtonOpacity(material: string, value: number): Promise<void> {
   await saveMaterialOpacity(material, value, BUTTON_OPACITY_KEY, FLAT_BUTTON_OPACITY_KEY, GLASS_BUTTON_OPACITY_KEY, DEFAULT_BUTTON_OPACITY);
 }
 
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 export async function saveDialogOpacity(material: string, value: number): Promise<void> {
   await saveMaterialOpacity(material, value, DIALOG_OPACITY_KEY, FLAT_DIALOG_OPACITY_KEY, GLASS_DIALOG_OPACITY_KEY, DEFAULT_DIALOG_OPACITY);
 }

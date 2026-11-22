@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { StudyTiming, StudyOptions, StudyAdvanceAction } from './StudyTiming';
+import { StudyTiming, StudyAdvanceAction } from './StudyTiming';
+import type { StudyOptions } from './StudyTiming';
 
 export interface StudyTimerState {
   version: number;

@@ -17,7 +17,7 @@ export interface NoteEditorWheelState {
   optionId?: string;
   referencesEnabled?: boolean;
 }
-export interface NoteEditorWheelTool extends NoteEditorTool { active: boolean; }
+export interface NoteEditorWheelTool extends NoteEditorTool { active: boolean; enabled?: boolean; feedback?: string; badge?: string; }
 export function noteWheelToolIsToggle(id: string, source: boolean): boolean {
   return !source && NOTE_EDITOR_FORMAT_TOGGLE_IDS.indexOf(id) >= 0;
 }
@@ -148,14 +148,24 @@ interface NoteEditorWheelField {
   id: string;
   available: boolean;
   onActive: (active: boolean) => void;
+  onPresentation: () => void;
 }
 /** 一份表单持有一个会话；默认首字段，焦点切换只转交拥有者，失焦仍显示。 */
 export class NoteEditorWheelSession {
   private fields: NoteEditorWheelField[] = [];
   private activeId: string = '';
   private visible: boolean = true;
-  register(id: string, available: boolean, onActive: (active: boolean) => void): void {
-    this.fields.push({ id: id, available: available, onActive: onActive });
+  opacity: number = 1;
+  offset: number = 0;
+  setPresentation(opacity: number, offset: number): void {
+    if (this.opacity === opacity && this.offset === offset) return;
+    this.opacity = opacity;
+    this.offset = offset;
+    for (const field of this.fields) field.onPresentation();
+  }
+  register(id: string, available: boolean, onActive: (active: boolean) => void,
+    onPresentation: () => void = (): void => {}): void {
+    this.fields.push({ id: id, available: available, onActive: onActive, onPresentation: onPresentation });
     this.reconcile();
   }
   activate(id: string): void {
@@ -167,7 +177,11 @@ export class NoteEditorWheelSession {
     if (field === undefined || field.available === available) return;
     field.available = available; this.reconcile();
   }
-  setVisible(visible: boolean): void { this.visible = visible; this.reconcile(); }
+  setVisible(visible: boolean): void {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    this.reconcile();
+  }
   remove(id: string): void {
     const field: NoteEditorWheelField | undefined = this.fields.find((item: NoteEditorWheelField): boolean => item.id === id);
     this.fields = this.fields.filter((item: NoteEditorWheelField): boolean => item.id !== id);
@@ -181,4 +195,24 @@ export class NoteEditorWheelSession {
     for (const field of this.fields) if (field.id !== this.activeId || !this.visible) field.onActive(false);
     if (this.visible) this.fields.find((field: NoteEditorWheelField): boolean => field.id === this.activeId)?.onActive(true);
   }
+}
+
+export interface CompactActionGrid {
+  columns: number; rows: number; size: number; gap: number; width: number; height: number;
+}
+/** 方形操作键两列紧排；为边缘收起手柄留独立28vp槽，按钮之间只留4vp。 */
+export function compactActionGrid(count: number, scale: number = 1): CompactActionGrid {
+  const columns: number = Math.min(2, Math.max(1, count));
+  const rows: number = Math.max(1, Math.ceil(count / columns));
+  const size: number = 40 * scale;
+  const gap: number = 4 * scale;
+  return { columns: columns, rows: rows, size: size, gap: gap,
+    width: columns * size + (columns + 1) * gap + 28,
+    height: rows * size + (rows + 1) * gap };
+}
+export function compactActionPosition(index: number, count: number, right: boolean, scale: number = 1): NoteWheelItemPosition {
+  const grid: CompactActionGrid = compactActionGrid(count, scale);
+  const stride: number = grid.size + grid.gap;
+  return { x: grid.gap + (right ? 0 : 28) + index % grid.columns * stride,
+    y: grid.gap + Math.floor(index / grid.columns) * stride };
 }

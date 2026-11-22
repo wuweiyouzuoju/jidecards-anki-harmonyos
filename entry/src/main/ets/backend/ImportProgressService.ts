@@ -2,7 +2,8 @@
 import { 后端会话 } from './后端会话';
 import { 集合方法 } from './服务索引';
 import { CollectionProgress } from '../proto/generated/CoreMessages';
-import { ImportOperation, ImportCancelled } from '../model/ImportOperation';
+import { ImportCancelled } from '../model/ImportOperation';
+import type { ImportOperation } from '../model/ImportOperation';
 import { 后端错误 } from './错误类型';
 export function importProgressText(bytes: Uint8Array): string {
     const m = new CollectionProgress(bytes);

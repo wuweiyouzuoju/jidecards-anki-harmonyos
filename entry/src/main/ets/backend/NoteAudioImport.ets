@@ -33,7 +33,14 @@ export async function importNoteAudio(uri: string): Promise<string> {
  * @throws {Error} 选择无效文件不加入草稿。
  */
 export async function stageNoteAudio(uri: string, cacheDir: string): Promise<string> {
-  const data: Uint8Array = await readNoteAudio(uri);
+  return await stageNoteAudioBytes(await readNoteAudio(uri), cacheDir);
+}
+
+/** 缓存副本由既有附件草稿清理规则管理。
+ * @throws {Error} 无法创建或写入缓存副本。
+ */
+export async function stageNoteAudioBytes(data: Uint8Array, cacheDir: string): Promise<string> {
+  if (data.byteLength <= 0 || data.byteLength > MAX_NOTE_AUDIO_BYTES) throw new Error('Invalid audio size');
   const path: string = `${cacheDir}/note-audio-${Date.now()}-${Math.floor(Math.random() * 1000000)}.${noteAudioExtension(data)}`;
   const file: fs.File = await fs.open(path, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
   try {

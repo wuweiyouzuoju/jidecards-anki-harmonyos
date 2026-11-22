@@ -4,6 +4,23 @@ export const WINDOW_SAFE_BOTTOM_KEY: string = 'windowSafeBottom';
 export const WINDOW_SAFE_LEFT_KEY: string = 'windowSafeLeft';
 export const WINDOW_SAFE_RIGHT_KEY: string = 'windowSafeRight';
 export const WINDOW_HEIGHT_KEY: string = 'windowHeightVp';
+export const WINDOW_SIZE_KEY: string = 'windowSizeVp';
+export const DESKTOP_WINDOW_TITLE_BAR: string = 'desktop_window_title_bar';
+export const WINDOW_TITLE_BAR_LAYOUT_KEY: string = 'window_title_bar_layout';
+export const WINDOW_PINNED_KEY: string = 'window_pinned';
+
+export const HIDDEN_WINDOW_TITLE_BAR: WindowTitleBarLayout = {
+  height: 0, controlsWidth: 0, controlsTop: 0, controlsHeight: 0
+};
+
+export interface WindowTitleBarLayout {
+  height: number;
+  controlsWidth: number;
+  controlsTop: number;
+  controlsHeight: number;
+}
+
+export interface WindowSizeVp { width: number; height: number; }
 export const WINDOW_KEYBOARD_TOP_KEY: string = 'windowKeyboardTopVp';
 
 /** 当前应用窗口坐标，单位 vp；仅在实际菜单宿主边界转换为局部坐标。 */
@@ -53,4 +70,22 @@ export function safeDialogMaxHeight(viewportHeight: number, safeTop: number, saf
   gap: number, ratio: number): number {
   const available: number = safeMenuGeometry(viewportHeight, 0, safeTop, safeBottom, gap).maxHeight;
   return available * Math.min(1, Math.max(0, ratio));
+}
+
+/** 只补足宿主尚未避开的水平安全区。 */
+export function remainingHorizontalInset(inset: number, existing: number): number {
+  return Math.max(0, inset - Math.max(0, existing));
+}
+
+export interface BackdropHorizontalTransform { scale: number; pivot: string; }
+
+/** 补齐宿主通过水平避让留出的边缘，限于系统安全区内的缺口。 */
+export function backdropHorizontalTransform(left: number, width: number, windowWidth: number,
+  safeLeft: number, safeRight: number): BackdropHorizontalTransform {
+  const rightGap: number = windowWidth - left - width;
+  const before: number = left > 0 && left <= safeLeft + 1 ? left : 0;
+  const after: number = rightGap > 0 && rightGap <= safeRight + 1 ? rightGap : 0;
+  const extra: number = before + after;
+  return width > 0 && windowWidth > 0 && extra > 0 ?
+    { scale: 1 + extra / width, pivot: `${100 * before / extra}%` } : { scale: 1, pivot: '50%' };
 }

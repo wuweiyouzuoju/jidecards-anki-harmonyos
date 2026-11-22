@@ -99,6 +99,7 @@ export interface 桌面卡片数据 {
   // 页1：今日进度（主页今日进度卡样式：完成/待学/进度条/牌组数/今日答对率）
   今日完成数: number;       // = graphs.today.answerCount
   待学数: number;           // 牌组树 newCount+learnCount+reviewCount 聚合
+  待复习数?: number;         // 旧存量快照未区分待学和待复习
   牌组数: number;           // 牌组树节点数
   今日答对率: number;        // correctCount/answerCount，0-1；-1 表示今日无答题
   // 页2：记忆率
@@ -192,7 +193,8 @@ function 聚合分布桶(桶数组: [number, number][], 上限: number): [number
 // @输出
 // 桌面卡片数据（已剥离 Map/Resource 等不可序列化类型）
 // ========================================================
-export function 提取卡片数据(图表数据: GraphsView, 待学数: number = 0, 牌组数: number = 0, 小时窗口: number = 0, 分离暂停: boolean = false): 桌面卡片数据 {
+export function 提取卡片数据(图表数据: GraphsView, 待学数: number = 0, 牌组数: number = 0,
+  小时窗口: number = 0, 分离暂停: boolean = false, 待复习数?: number): 桌面卡片数据 {
   const 主题色: 主题色载体 = 读取主题色();
   const 当前时刻: Date = new Date();
 
@@ -310,6 +312,7 @@ export function 提取卡片数据(图表数据: GraphsView, 待学数: number =
   return {
     今日完成数,
     待学数,
+    待复习数,
     牌组数,
     今日答对率,
     记忆率,
@@ -407,7 +410,7 @@ export async function 保存卡片数据(数据: 桌面卡片数据): Promise<vo
     }
     fileIo.renameSync(temporary, path);
   } catch (error) {
-    hilog.error(0x0000, 日志域, `保存卡片数据异常: ${error}`);
+    hilog.error(0x4342, 日志域, `保存卡片数据异常: ${error}`);
     throw new Error(error instanceof Error ? error.message : String(error));
   }
   await 推送到所有卡片(数据);
@@ -504,7 +507,7 @@ export async function 加载卡片数据(上下文: common.Context): Promise<桌
   try {
     const 路径: string = `${上下文.getApplicationContext().filesDir}/${数据文件名}`;
     if (!fileIo.accessSync(路径)) {
-      hilog.info(0x0000, 日志域, `加载卡片数据: 文件不存在 ${路径}`);
+      hilog.info(0x4342, 日志域, `加载卡片数据: 文件不存在 ${路径}`);
       return null;
     }
     const 文件: fileIo.File = fileIo.openSync(路径, fileIo.OpenMode.READ_ONLY);
@@ -515,10 +518,10 @@ export async function 加载卡片数据(上下文: common.Context): Promise<桌
     fileIo.closeSync(文件);
     const 解码器: util.TextDecoder = util.TextDecoder.create('utf-8');
     const JSON串: string = 解码器.decodeToString(new Uint8Array(缓冲));
-    hilog.info(0x0000, 日志域, `加载卡片数据成功: ${路径}, ${JSON串.length} 字节`);
+    hilog.info(0x4342, 日志域, `加载卡片数据成功: ${路径}, ${JSON串.length} 字节`);
     return JSON.parse(JSON串) as 桌面卡片数据;
   } catch (错误) {
-    hilog.error(0x0000, 日志域, `加载卡片数据异常: ${错误}`);
+    hilog.error(0x4342, 日志域, `加载卡片数据异常: ${错误}`);
     return null;
   }
 }
@@ -593,9 +596,9 @@ async function 写formId文件(上下文: common.Context, formId: string): Promi
     fileIo.writeSync(写文件.fd, 写入串);
     fileIo.fsyncSync(写文件.fd);
     fileIo.closeSync(写文件);
-    hilog.info(0x0000, 日志域, `保存formId成功: ${formId}, 当前共 ${ids.length} 个`);
+    hilog.info(0x4342, 日志域, `保存formId成功: ${formId}, 当前共 ${ids.length} 个`);
   } catch (错误) {
-    hilog.error(0x0000, 日志域, `保存formId异常: ${错误}`);
+    hilog.error(0x4342, 日志域, `保存formId异常: ${错误}`);
   }
 }
 
@@ -653,19 +656,19 @@ async function 推送到所有卡片(数据: 桌面卡片数据): Promise<void> 
     ids = await 从系统拉取formId(上下文);
   }
   if (ids.length === 0) {
-    hilog.info(0x0000, 日志域, '推送到所有卡片: 无已注册 formId，跳过');
+    hilog.info(0x4342, 日志域, '推送到所有卡片: 无已注册 formId，跳过');
     return;
   }
   const JSON串: string = JSON.stringify(数据);
   // FormBindingData 跨进程传输有 2KB 上限，超限 updateForm 会失败导致卡片冻结在旧数据
-  hilog.info(0x0000, 日志域, `推送卡片 JSON 大小: ${JSON串.length} 字节, 目标 ${ids.length} 张卡片`);
+  hilog.info(0x4342, 日志域, `推送卡片 JSON 大小: ${JSON串.length} 字节, 目标 ${ids.length} 张卡片`);
   const 绑定数据: 卡片绑定载体 = { 'statsCardData': JSON串 };
   for (const id of ids) {
     try {
       await formProvider.updateForm(id, formBindingData.createFormBindingData(绑定数据));
-      hilog.info(0x0000, 日志域, `推送卡片成功: ${id}`);
+      hilog.info(0x4342, 日志域, `推送卡片成功: ${id}`);
     } catch (错误) {
-      hilog.error(0x0000, 日志域, `推送卡片失败: ${id}, ${错误}`);
+      hilog.error(0x4342, 日志域, `推送卡片失败: ${id}, ${错误}`);
       // 卡片可能已被移除，formId 失效；后续可考虑清理失效 formId
     }
   }
@@ -684,13 +687,13 @@ async function 从系统拉取formId(上下文: common.UIAbilityContext): Promis
     for (let i: number = 0; i < 信息列表.length; i++) {
       ids.push(信息列表[i].formId);
     }
-    hilog.info(0x0000, 日志域, `从系统拉取formId: ${ids.length} 张卡片`);
+    hilog.info(0x4342, 日志域, `从系统拉取formId: ${ids.length} 张卡片`);
     if (ids.length > 0) {
       await 覆盖写formId文件(上下文, ids);
     }
     return ids;
   } catch (错误) {
-    hilog.error(0x0000, 日志域, `从系统拉取formId失败: ${错误}`);
+    hilog.error(0x4342, 日志域, `从系统拉取formId失败: ${错误}`);
     return [];
   }
 }
@@ -704,6 +707,6 @@ async function 覆盖写formId文件(上下文: common.Context, ids: string[]): 
     fileIo.fsyncSync(写文件.fd);
     fileIo.closeSync(写文件);
   } catch (错误) {
-    hilog.error(0x0000, 日志域, `覆盖写formId文件失败: ${错误}`);
+    hilog.error(0x4342, 日志域, `覆盖写formId文件失败: ${错误}`);
   }
 }

@@ -44,6 +44,7 @@ export function dialogOpacityPercent(values: MaterialOpacity | undefined, materi
 export interface SurfaceMaterialItem { id: string; titleKey: string; }
 export const SURFACE_MATERIAL_ITEMS: SurfaceMaterialItem[] = [
   { id: 'surface_material', titleKey: 'surface_material' },
+  { id: 'glass_blur', titleKey: 'appearance_glass_blur' },
   { id: 'module_opacity', titleKey: 'module_opacity' },
   { id: 'button_opacity', titleKey: 'button_opacity' },
   { id: 'dialog_opacity', titleKey: 'dialog_opacity' }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { deviceInfo } from '@kit.BasicServicesKit';
 
 // ========================================================
 // @块ID UTIL-THEME-CTRL
@@ -65,12 +66,15 @@ export async function 应用系统栏样式(
     const 主窗口: window.Window = await window.getLastWindow(上下文);
     // 沉浸式全屏布局下，状态栏/导航栏背景设为透明，让应用内容（含弹层磨砂）透过显示。
     // 状态栏文字明暗根据深浅色模式设置，保证可读性。
-    await 主窗口.setWindowSystemBarProperties({
-      statusBarColor: '#00000000',
-      navigationBarColor: '#00000000',
-      isStatusBarLightIcon: 是否深色,
-      isNavigationBarLightIcon: 是否深色
-    });
+    if (canIUse('SystemCapability.WindowManager.WindowManager.Core')) {
+      if (deviceInfo.deviceType === '2in1') return;
+      await 主窗口.setWindowSystemBarProperties({
+        statusBarColor: '#00000000',
+        navigationBarColor: '#00000000',
+        isStatusBarLightIcon: 是否深色,
+        isNavigationBarLightIcon: 是否深色
+      });
+    }
   } catch (错误) {
     // 窗口尚未就绪或已销毁时，不让主题同步中断页面。
   }

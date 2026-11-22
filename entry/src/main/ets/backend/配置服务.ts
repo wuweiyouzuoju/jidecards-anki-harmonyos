@@ -33,7 +33,7 @@ import { CoreRpc } from '../proto/generated/CoreRpc';
 // ========================================================
 import { 后端会话 } from './后端会话';
 import type { SetConfigBoolRequest, SetConfigJsonRequest } from '../proto/messages/ConfigMessages';
-import { ConfigKeyBool } from '../proto/messages/ConfigMessages';
+import type { ConfigKeyBool } from '../proto/messages/ConfigMessages';
 import { decodeBoolResponse, decodeJsonResponse, encodeGetConfigBoolRequest, encodeSetConfigBoolRequest, encodeSetConfigJsonRequest, encodeStringRequest } from '../proto/messages/ConfigMessages';
 import { decodeOpChanges } from '../proto/messages/CollectionMessages';
 import type { OpChanges } from '../proto/messages/CollectionMessages';

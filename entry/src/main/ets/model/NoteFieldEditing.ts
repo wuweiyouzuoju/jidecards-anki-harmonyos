@@ -63,8 +63,6 @@ export interface NoteFieldEditingSupport {
   stickyControl: { titleKey: string; iconKey: string; selectedIconKey: string; placement: string };
   formPresentation: string;
   modeControlPlacement: string;
-  modeControlWideMinWidth: number;
-  modeControlRailWidth: number;
   expandControlPlacement: string;
   expandPresentation: string;
   expandTool: NoteEditorTool;
@@ -152,7 +150,8 @@ export const NOTE_FIELD_MEDIA_TOOLS: NoteEditorTool[] = [
   { id: 'image', titleKey: 'note_visual_add', iconKey: 'ic_editor_image', editing: 'field_media_dialog',
     mediaKinds: ['image', 'video'], videoFormats: NOTE_VIDEO_IMPORT_FORMATS, maxVideoBytes: MAX_NOTE_VIDEO_BYTES,
     opens: 'note_visual_manage' },
-  { id: 'audio', titleKey: 'note_audio_add', iconKey: 'ic_editor_audio', editing: 'field_media_dialog' }
+  { id: 'drawing', titleKey: 'note_drawing_new', iconKey: 'ic_editor_drawing', editing: 'field_media_dialog', opens: 'note_drawing_editor' },
+  { id: 'audio', titleKey: 'note_audio_add', iconKey: 'ic_editor_audio', editing: 'field_media_dialog', opens: 'note_audio_manage' }
 ];
 export function noteFieldMediaTool(id: string): NoteEditorTool {
   const tool: NoteEditorTool | undefined = NOTE_FIELD_MEDIA_TOOLS.find((item: NoteEditorTool): boolean => item.id === id);
@@ -167,6 +166,10 @@ export function noteFieldModeTool(id: string): NoteEditorTool {
   const tool: NoteEditorTool | undefined = NOTE_FIELD_MODE_TOOLS.find((item: NoteEditorTool): boolean => item.id === id);
   if (tool === undefined) throw new Error(`Unknown note field mode tool: ${id}`);
   return tool;
+}
+/** 模式按钮显示当前编辑模式的名称，与 JIDE 观察使用同一工具定义。 */
+export function noteFieldModeTitleKey(sourceMode: boolean): string {
+  return noteFieldModeTool(sourceMode ? 'source_edit' : 'visual').titleKey;
 }
 /** 新增页字段固定与JIDE观察共用名称和图标，两个编辑模式共享Core字段状态。 */
 export const NOTE_FIELD_STICKY_CONTROL = {
@@ -189,9 +192,7 @@ export const NOTE_FIELD_EDITING_SUPPORT: NoteFieldEditingSupport = {
   modeTools: NOTE_FIELD_MODE_TOOLS,
   stickyControl: NOTE_FIELD_STICKY_CONTROL,
   formPresentation: 'editor_settings_entry_and_keyboard_wheel_selectors; field_footer_manual_wheel_toggle; grouped_deck_and_notetype_shared_plain_selection_value_with_settings; draft_preview_icon; preview_flip_card_icon_both_sides_and_replay_audio_icon; visible_tag_card_with_removable_chips_and_existing_picker; reference_navigation_card; original_draft_and_save_guards',
-  modeControlPlacement: 'note_field_header_compact_current_mode_toggle; other_rich_inputs_keep_local_mode_controls',
-  modeControlWideMinWidth: 480,
-  modeControlRailWidth: 96,
+  modeControlPlacement: 'single_compact_current_mode_toggle_at_field_header_or_above_standalone_editor',
   expandControlPlacement: 'inside_bottom_right_of_each_input',
   expandPresentation: 'single_current_field_large_dialog_shared_draft_close_preserves_input',
   expandTool: NOTE_FIELD_EXPAND_TOOL,

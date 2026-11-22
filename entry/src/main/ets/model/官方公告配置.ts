@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/** 123 云盘静态托管的公开公告清单；客户端只读，不含管理凭据。 */
-export const 官方公告地址: string =
-  'https://4001784660.cdn.123clouddisk.com/4001784660/CET%E5%9B%9B%E5%85%AD%E7%BA%A7/announcement.json';
+/** ECS 公告查询入口，用户识别码和安装凭证通过请求正文与请求头传输。 */
+export const 官方公告地址: string = 'https://8.145.41.24/v1/announcements/query';
 
-/** 远程公告暂不投入使用；保留地址和已读记录，本地入门与幻彩提醒独立运行。 */
-export const OFFICIAL_ANNOUNCEMENTS_ENABLED: boolean = false;
+/** 调试与发行构建共用，服务器按公告受众筛选。 */
+export const OFFICIAL_ANNOUNCEMENTS_ENABLED: boolean = true;

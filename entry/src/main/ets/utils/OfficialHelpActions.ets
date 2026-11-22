@@ -4,6 +4,7 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { OFFICIAL_QQ_GROUP } from '../model/OfficialCommunity';
 import { namedResourceText, showToastSafely } from './UiFeedback';
 
+/** @throws {Error} 平台或持久化失败沿调用链交给原有错误反馈入口。 */
 async function copyText(text: string): Promise<void> {
   await pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text));
 }

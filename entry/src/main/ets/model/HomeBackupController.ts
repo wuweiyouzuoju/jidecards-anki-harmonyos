@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { BackupCoordinator, backupCoordinator } from './BackupCoordinator';
+import { backupCoordinator } from './BackupCoordinator';
+import type { BackupCoordinator } from './BackupCoordinator';
 import type { BackupBackend } from './BackupCoordinator';
 
 export interface HomeBackupHost {

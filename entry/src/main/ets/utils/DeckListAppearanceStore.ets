@@ -4,7 +4,8 @@ import { preferences } from '@kit.ArkData';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   DECK_LIST_NARROW_KEY, DECK_WIDTH_HINT_HANDLED_KEY, DECK_DOUBLE_COLUMN_HINT_HANDLED_KEY,
-  DECK_LIST_STYLE_KEY, isDeckListStyle, isNarrowDeckListStyle, deckListStyle
+  DECK_LIST_STYLE_KEY, DESKTOP_HOME_LAYOUT_KEY, availableDeckListStyles, defaultDeckListStyle,
+  isNarrowDeckListStyle, deckListStyle
 } from '../model/DeckListAppearance';
 import { saveLocalPreference } from './LocalPreferenceWrite';
 
@@ -19,6 +20,8 @@ function getDeckListPreferences(): preferences.Preferences {
 
 /** @throws {Error} 缺少新键时从旧宽窄偏好派生，损坏值不能冒充默认样式。 */
 export function legacyDeckListStyle(store: preferences.Preferences): string {
+  const desktop: boolean = AppStorage.get<boolean>(DESKTOP_HOME_LAYOUT_KEY) === true;
+  if (desktop) return defaultDeckListStyle(desktop);
   if (store.getSync(DECK_LIST_STYLE_KEY, '') !== '') { return 'single_wide'; }
   const narrow: preferences.ValueType = store.getSync(DECK_LIST_NARROW_KEY, false);
   if (typeof narrow !== 'boolean') { throw new Error('invalid_saved_setting:deck_list_style'); }
@@ -27,13 +30,14 @@ export function legacyDeckListStyle(store: preferences.Preferences): string {
 
 /** 首屏前恢复；旧安装沿用已保存的单列宽窄。 */
 export function initializeDeckListAppearance(): void {
-  let style: string = 'single_wide';
+  const desktop: boolean = AppStorage.get<boolean>(DESKTOP_HOME_LAYOUT_KEY) === true;
+  let style: string = defaultDeckListStyle(desktop);
   let hintHandled: boolean = false;
   let doubleColumnHintHandled: boolean = false;
   try {
     const store: preferences.Preferences = getDeckListPreferences();
     const stored: preferences.ValueType = store.getSync(DECK_LIST_STYLE_KEY, legacyDeckListStyle(store));
-    if (typeof stored === 'string' && isDeckListStyle(stored)) { style = stored; }
+    if (typeof stored === 'string' && availableDeckListStyles(desktop).includes(stored)) { style = stored; }
     hintHandled = store.getSync(DECK_WIDTH_HINT_HANDLED_KEY, false) === true;
     doubleColumnHintHandled = store.getSync(DECK_DOUBLE_COLUMN_HINT_HANDLED_KEY, false) === true;
   } catch (error) {
@@ -54,7 +58,9 @@ export async function completeDeckWidthHint(doubleColumn: boolean = false): Prom
 
 /** @throws {Error} 保存失败保持原外观，交由设置控件显示错误。 */
 export async function saveDeckListStyle(style: string, expected: string | null = null): Promise<void> {
-  if (!isDeckListStyle(style)) { throw new Error('invalid_setting_value'); }
+  if (!availableDeckListStyles(AppStorage.get<boolean>(DESKTOP_HOME_LAYOUT_KEY) === true).includes(style)) {
+    throw new Error('invalid_setting_value');
+  }
   const store: preferences.Preferences = getDeckListPreferences();
   await saveLocalPreference(store, DECK_LIST_STYLE_KEY, style, legacyDeckListStyle(store), expected, (): void => {
     AppStorage.setOrCreate<boolean>(DECK_LIST_NARROW_KEY, isNarrowDeckListStyle(style));

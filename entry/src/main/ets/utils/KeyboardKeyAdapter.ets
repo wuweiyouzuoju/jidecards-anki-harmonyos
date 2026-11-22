@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { KeyCode } from '@kit.InputKit';
 import { keyboardChord } from '../model/KeyboardInput';
+import { AppLog } from '../model/AppLog';
 export function keyboardEventChord(event: KeyEvent, fallbackControl: boolean = false): string {
-  if (event.metaKey !== undefined && event.metaKey !== 0) return '';
-  // AnkiDroid 的标点绑定按字符匹配，兼容非美式键盘布局。
-  const symbol: string = event.unicode === undefined || !Number.isInteger(event.unicode) || event.unicode < 0 || event.unicode > 0x10FFFF ? '' : String.fromCodePoint(event.unicode);
-  if (['*', '@', '!', '-', '='].includes(symbol) && !(event.getModifierKeyState?.(['Ctrl']) ?? fallbackControl) &&
-    !(event.getModifierKeyState?.(['Alt']) ?? false)) {
-    return symbol === '*' ? 'star' : symbol === '@' ? 'at' : symbol === '!' ? 'exclamation' : symbol === '-' ? 'minus' : 'equals';
-  }
-  return keyboardChord(keyboardKeyName(event.keyCode), {
-    ctrl: event.getModifierKeyState?.(['Ctrl']) ?? fallbackControl,
-    shift: event.getModifierKeyState?.(['Shift']) ?? false,
-    alt: event.getModifierKeyState?.(['Alt']) ?? false
-  });
+  try {
+    if (event.metaKey !== undefined && event.metaKey !== 0) return '';
+    // AnkiDroid 的标点绑定按字符匹配，兼容非美式键盘布局。
+    const symbol: string = event.unicode === undefined || !Number.isInteger(event.unicode) || event.unicode < 0 || event.unicode > 0x10FFFF ? '' : String.fromCodePoint(event.unicode);
+    if (['*', '@', '!', '-', '='].includes(symbol) && !(event.getModifierKeyState?.(['Ctrl']) ?? fallbackControl) &&
+      !(event.getModifierKeyState?.(['Alt']) ?? false)) {
+      return symbol === '*' ? 'star' : symbol === '@' ? 'at' : symbol === '!' ? 'exclamation' : symbol === '-' ? 'minus' : 'equals';
+    }
+    return keyboardChord(keyboardKeyName(event.keyCode), {
+      ctrl: event.getModifierKeyState?.(['Ctrl']) ?? fallbackControl,
+      shift: event.getModifierKeyState?.(['Shift']) ?? false,
+      alt: event.getModifierKeyState?.(['Alt']) ?? false
+    });
+  } catch (error) { AppLog.warn('Keyboard', '[keyboard] Modifier state unavailable; shortcut ignored'); return ''; }
 }
 export function keyboardKeyName(code: number): string {
   if (code >= KeyCode.KEYCODE_A && code <= KeyCode.KEYCODE_Z) return String.fromCharCode(97 + code - KeyCode.KEYCODE_A);

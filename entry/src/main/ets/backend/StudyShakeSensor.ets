@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { sensor } from '@kit.SensorServiceKit';
 import { StudyShakeDetector } from '../model/StudyGestureConfig';
+import { AppLog } from '../model/AppLog';
 
 /** 只拥有自己的加速度订阅；关闭先切断监听，off 失败仍可安全重试。 */
 export class StudyShakeSensor {
@@ -16,7 +17,7 @@ export class StudyShakeSensor {
       this.detector.clearPending();
       if (this.callback !== null) {
         try { sensor.off(sensor.SensorId.ACCELEROMETER, this.callback); this.callback = null; }
-        catch (error) { console.error(`Study shake unsubscribe: ${error}`); return 'failed'; }
+        catch (error) { AppLog.error('StudyShake', `Study shake unsubscribe: ${error}`); return 'failed'; }
       }
       return 'off';
     }
@@ -33,7 +34,7 @@ export class StudyShakeSensor {
     } catch (error) {
       this.unavailable = true;
       this.listener = null;
-      console.error(`Study shake subscribe: ${error}`);
+      AppLog.error('StudyShake', `Study shake subscribe: ${error}`);
       return 'failed';
     }
   }

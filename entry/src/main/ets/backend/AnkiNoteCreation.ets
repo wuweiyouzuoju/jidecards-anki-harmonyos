@@ -59,7 +59,7 @@ export class AnkiNoteCreation implements NoteCreationBackend {
     note.tags = input.tags;
     await this.addManualNote(note, input.deckId, allowDuplicate);
     try { if ((input.audios ?? []).length > 0) await discardNoteRecordings(input.audios ?? []); }
-    catch (error) { hilog.warn(0x0001, 'NoteCreation', 'Saved recording cleanup failed: %{public}s', `${error}`); }
+    catch (error) { hilog.warn(0x4342, 'NoteCreation', 'Saved recording cleanup failed: %{public}s', `${error}`); }
   }
 
   /** 使用显式目标牌组创建标准 IO 笔记，避免依赖复习页留下的 Core 当前牌组。

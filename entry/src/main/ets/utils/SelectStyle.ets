@@ -1,5 +1,6 @@
-import { usesGlassMaterial, darkMaterial, translucentGlassFill, themedGlassFill } from './GlassMaterial';
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { activeElementStyle } from './AppearanceElements';
+import { usesGlassMaterial, darkMaterial, translucentGlassFill, themedGlassFill } from './GlassMaterial';
 import { TextModifier, UIContext } from '@kit.ArkUI';
 import { 应用尺寸 } from './应用尺寸';
 import { SurfaceBorder } from './SurfaceBorder';
@@ -15,7 +16,7 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
   static readonly controlFont: Font = { size: 应用尺寸.字号_正文, weight: FontWeight.Medium };
   static readonly optionFont: Font = { size: 应用尺寸.字号_正文, weight: FontWeight.Normal };
   static readonly selectedOptionFont: Font = SelectStyle.controlFont;
-  static readonly selectedOptionColor: ResourceColor = $r('app.color.text_primary');
+  static selectedOptionColor(): ResourceColor { return activeElementStyle().text || $r('app.color.text_primary'); }
   static readonly selectedOptionSurface: ResourceColor = $r('app.color.surface_selected');
   static readonly controlRadius: number = 应用尺寸.radiusLg;
   static readonly controlBorder: BorderOptions = SurfaceBorder.options();
@@ -53,14 +54,14 @@ export class SelectStyle implements AttributeModifier<SelectAttribute> {
   applyNormalAttribute(instance: SelectAttribute): void {
     // 不调用会同时重置字体和圆角的 controlSize；这里只保留配色。
     instance
-      .fontColor($r('app.color.text_primary'))
+      .fontColor(activeElementStyle().text || $r('app.color.text_primary'))
       .backgroundColor(usesGlassMaterial(this.material) ? translucentGlassFill(this.surfaceColor) : (darkMaterial() ? '#000000' : '#FFFFFF'))
       .menuBackgroundColor(usesGlassMaterial(this.material) ? themedGlassFill(darkMaterial() ? '#D915171B' : '#CFFFFFFF', darkMaterial()) : (darkMaterial() ? '#000000' : '#FFFFFF'))
       .menuBackgroundBlurStyle(usesGlassMaterial(this.material) ? BlurStyle.COMPONENT_THIN : BlurStyle.NONE)
       .clip(true)
-      .optionFontColor($r('app.color.text_primary'))
+      .optionFontColor(activeElementStyle().text || $r('app.color.text_primary'))
       .optionBgColor(usesGlassMaterial(this.material) ? Color.Transparent : (darkMaterial() ? '#000000' : '#FFFFFF'))
-      .selectedOptionFontColor(SelectStyle.selectedOptionColor)
+      .selectedOptionFontColor(SelectStyle.selectedOptionColor())
       .selectedOptionBgColor(SelectStyle.selectedOptionSurface);
   }
 }

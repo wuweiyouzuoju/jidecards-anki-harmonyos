@@ -2,6 +2,7 @@
 import type { AvTagsResult, AvItem, TtsItem } from '../proto/messages/CardRenderingMessages';
 import { orderedAvItems } from '../proto/messages/CardRenderingMessages';
 import { isNoteVideoFilename } from './NoteVideoMedia';
+import { AppLog } from './AppLog';
 
 /** 原生播放器与行为测试共用的最小队列边界。 */
 export interface AudioQueuePlayer<T> {
@@ -45,12 +46,12 @@ export class CardAudioSession {
     this.version += 1;
     this.preparation = Promise.resolve();
     this.activePlayback = 0;
-    this.sound.停止().catch((error: Object): void => { console.info(`Card audio stop: ${error}`); });
-    this.tts.停止().catch((error: Object): void => { console.info(`Card TTS stop: ${error}`); });
+    this.sound.停止().catch((error: Object): void => { AppLog.info('CardAudio', `Card audio stop: ${error}`); });
+    this.tts.停止().catch((error: Object): void => { AppLog.info('CardAudio', `Card TTS stop: ${error}`); });
     this.work = this.work.then(async (): Promise<void> => {
       await this.sound.停止();
       await this.tts.停止();
-    }).catch((error: Object): void => { console.info(`Card audio cleanup: ${error}`); });
+    }).catch((error: Object): void => { AppLog.info('CardAudio', `Card audio cleanup: ${error}`); });
     return this.work;
   }
 
@@ -141,7 +142,7 @@ export class CardAudioSession {
     this.work = this.work.then(async (): Promise<void> => {
       await this.sound.释放();
       await this.tts.释放();
-    }).catch((error: Object): void => { console.info(`Card audio release: ${error}`); });
+    }).catch((error: Object): void => { AppLog.info('CardAudio', `Card audio release: ${error}`); });
     return this.work;
   }
 

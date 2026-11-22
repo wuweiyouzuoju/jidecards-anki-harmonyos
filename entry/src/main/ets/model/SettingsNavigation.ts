@@ -13,16 +13,17 @@ export interface SettingsEntry {
 
 /** 设置目录是界面和 JIDE 的共同入口，具体设置仍由原分组负责读写。 */
 export const SETTINGS_ENTRIES: SettingsEntry[] = [
-  { id: 'general', titleKey: 'settings_directory_general', descriptionKey: 'settings_directory_general_hint', fullOnly: false, agentOnly: false },
+  { id: 'general', searchKeys: ['account_profile_title', 'account_profile_nickname', 'account_profile_avatar', 'home_layout_title', 'home_layout_classic', 'home_layout_wheel'], titleKey: 'settings_directory_general', descriptionKey: 'settings_directory_general_hint', fullOnly: false, agentOnly: false },
   { id: 'scheduler', fullSearchKeys:['deck_fsrsParameters_label', 'study_gesture_title', 'study_gesture_entry_hint'], titleKey: 'settings_directory_review', descriptionKey: 'settings_directory_algorithm_hint', simpleDescriptionKey: 'settings_directory_review_simple_hint', searchKeys: ['settings_rollover', 'settings_learn_ahead', 'settings_timebox', 'settings_quick_answer', 'settings_study_haptics', 'settings_study_haptics_search', 'settings_review_shortcuts_search', 'settings_tap_zones_label', 'settings_study_gestures', 'settings_study_layout', 'settings_study_layout_row', 'settings_study_layout_bottom', 'settings_study_layout_float', 'settings_study_layout_smart'], fullOnly: false, agentOnly: false },
   { id: 'sync', titleKey: 'settings_directory_sync', descriptionKey: 'settings_directory_sync_hint', simpleDescriptionKey: 'settings_directory_sync_simple_hint', searchKeys: ['device_link_title', 'device_link_devices', 'device_link_scan'], fullOnly: false, agentOnly: false },
-  { id: 'editor', titleKey: 'settings_directory_editor', descriptionKey: 'settings_directory_editor_hint', searchKeys: ['editor_wheel_on_entry', 'editor_wheel_on_keyboard'], fullOnly: false, agentOnly: false },
-  { id: 'appearance', searchKeys: ['appearance_custom_color', 'appearance_light_adaptation', 'appearance_dark_adaptation', 'appearance_wallpaper', 'appearance_choose_wallpaper', 'appearance_wallpaper_opacity', 'module_opacity', 'button_opacity', 'dialog_opacity', 'settings_show_remaining', 'settings_show_intervals', 'settings_hide_audio_buttons', 'settings_interrupt_audio', 'surface_material', 'surface_material_flat', 'surface_material_glass', 'motion_style', 'motion_style_restrained', 'motion_style_lively'], titleKey: 'settings_directory_appearance', descriptionKey: 'settings_directory_appearance_hint', simpleDescriptionKey: 'settings_directory_appearance_simple_hint', fullOnly: false, agentOnly: false },
+  { id: 'editor', titleKey: 'settings_directory_editor', descriptionKey: 'settings_directory_editor_hint', searchKeys: ['editor_wheel_on_entry', 'editor_wheel_on_keyboard', 'editor_wheel_grip', 'editor_wheel_grip_hint'], fullOnly: false, agentOnly: false },
+  { id: 'appearance', searchKeys: ['appearance_customize', 'appearance_element_module_outline', 'appearance_element_text', 'appearance_element_border', 'appearance_element_outline', 'appearance_element_background', 'appearance_border_radius', 'appearance_border_width', 'appearance_glass_blur', 'appearance_custom_color', 'appearance_light_adaptation', 'appearance_dark_adaptation', 'appearance_wallpaper', 'appearance_choose_wallpaper', 'appearance_wallpaper_opacity', 'module_opacity', 'button_opacity', 'dialog_opacity', 'settings_show_remaining', 'settings_show_intervals', 'settings_hide_audio_buttons', 'settings_interrupt_audio', 'surface_material', 'surface_material_flat', 'surface_material_glass', 'motion_style', 'motion_style_restrained', 'motion_style_lively'], titleKey: 'settings_directory_appearance', descriptionKey: 'settings_directory_appearance_hint', simpleDescriptionKey: 'settings_directory_appearance_simple_hint', fullOnly: false, agentOnly: false },
   { id: 'data', titleKey: 'settings_data_management', descriptionKey: 'settings_directory_data_hint', simpleDescriptionKey: 'settings_directory_data_simple_hint', searchKeys: ['hidden_decks_entry', 'hidden_decks_entry_subtitle', 'transfer_import_file', 'transfer_import_file_hint', 'transfer_export_deck', 'backup_hub_title', 'backup_full_restore_hint'], fullOnly: false, agentOnly: false },
   { id: 'help', titleKey: 'settings_directory_help', descriptionKey: 'settings_directory_help_hint', fullOnly: false, agentOnly: false },
   { id: 'ai', titleKey: 'ai_agent_settings_title', descriptionKey: 'settings_directory_ai_hint', fullOnly: false, agentOnly: true },
   { id: 'redemption', titleKey: 'settings_directory_redemption', descriptionKey: 'settings_directory_redemption_hint', fullOnly: false, agentOnly: false },
-  { id: 'about', titleKey: 'study_more', descriptionKey: 'settings_directory_about_hint', fullOnly: false, agentOnly: false },
+  { id: 'advanced', titleKey: 'settings_directory_advanced', descriptionKey: 'settings_directory_advanced_hint', simpleDescriptionKey: 'leaderboard_title', searchKeys: ['leaderboard_show_home', 'leaderboard_title'], fullOnly: false, agentOnly: false },
+  { id: 'about', titleKey: 'settings_about_title', descriptionKey: 'settings_directory_about_hint', fullOnly: false, agentOnly: false },
 ];
 
 export function settingsEntryVisible(entry: SettingsEntry, simple: boolean, agent: boolean): boolean {
@@ -35,6 +36,8 @@ export function filterSettingsEntries(query: string, simple: boolean, agent: boo
   const terms: string[] = query.trim().toLocaleLowerCase().split(new RegExp('\\s+')).filter((term: string): boolean => term !== '');
   return SETTINGS_ENTRIES.filter((entry: SettingsEntry): boolean => {
     if (!settingsEntryVisible(entry, simple, agent)) return false;
+    // 空查询只需检查可见性，首屏和布局测量不读取搜索资源。
+    if (terms.length === 0) return true;
     const descriptionKey: string = simple ? (entry.simpleDescriptionKey ?? entry.descriptionKey) : entry.descriptionKey;
     const keys: string[] = (entry.searchKeys ?? []).concat(simple ? [] : (entry.fullSearchKeys ?? []));
     const keywords: string = keys.map((key: string): string => localize(key)).join(' ');

@@ -10,6 +10,7 @@ import { 牌组服务 } from '../backend/牌组服务';
 import { 后端会话 } from '../backend/后端会话';
 import { common } from '@kit.AbilityKit';
 import type { DeckTreeNode } from '../proto/messages/DeckMessages';
+import { AppLog } from './AppLog';
 
 // ========================================================
 // @名称 错误描述
@@ -19,14 +20,13 @@ function 错误描述(错误: Object): string {
   const e: BusinessError = 错误 as BusinessError;
   if (typeof e.code === 'number') {
     // 诊断日志：输出真实错误码到 hilog，便于定位 publishReminder 失败的根因
-    console.error(`[reminder] code=${e.code} msg=${e.message}`);
+    AppLog.error('StudyReminder', `[reminder] code=${e.code} msg=${e.message}`);
     if (e.code === 1700002) return reminderText('reminder_error_quota');
     return `code ${e.code}：${e.message}`;
   }
   return `${错误}`;
 }
 
-const 包名: string = 'com.jide.kapian';
 const 能力名: string = 'EntryAbility';
 
 // ========================================================
@@ -55,7 +55,8 @@ async function 计算待学数量(): Promise<[number, number]> {
 async function 发布单个提醒(
   项: 提醒项,
   待学数: number,
-  待复习数: number
+  待复习数: number,
+  包名: string
 ): Promise<number> {
   const 标题: string = reminderTitle(项.标题);
   const language: string = AppStorage.get<string>('系统语言') ?? 'zh-Hans';
@@ -111,7 +112,7 @@ export async function 首次引导通知设置(): Promise<void> {
     await notificationManager.openNotificationSettings(上下文);
     await 标记已引导通知设置();
   } catch (错误) {
-    console.error(`[reminder] 引导通知设置失败：${错误描述(错误)}`);
+    AppLog.error('StudyReminder', `[reminder] 引导通知设置失败：${错误描述(错误)}`);
   }
 }
 
@@ -158,7 +159,7 @@ async function 注册提醒通知渠道(): Promise<void> {
     };
     await reminderAgentManager.addNotificationSlot(渠道);
   } catch (错误) {
-    console.error(`[reminder] addNotificationSlot 失败：${错误描述(错误)}`);
+    AppLog.error('StudyReminder', `[reminder] addNotificationSlot 失败：${错误描述(错误)}`);
   }
 }
 
@@ -196,6 +197,9 @@ async function refreshReminders(): Promise<void> {
   // 注册服务提醒渠道，让到点通知默认走横幅/锁屏/铃声（而非仅下拉可见）
   await 注册提醒通知渠道();
   const 数量: [number, number] = await 计算待学数量();
+  const 上下文 = AppStorage.get<common.UIAbilityContext>('abilityContext');
+  if (上下文 === undefined) throw new Error('reminder_context_unavailable');
+  const 包名: string = 上下文.abilityInfo.bundleName;
   // 所有只读前置检查成功后才替换现有系统提醒。
   await 取消所有学习提醒();
   // 为每个开启的提醒项发布一个提醒
@@ -206,7 +210,7 @@ async function refreshReminders(): Promise<void> {
       continue;
     }
     try {
-      const id: number = await 发布单个提醒(设置.提醒项列表[i], 数量[0], 数量[1]);
+      const id: number = await 发布单个提醒(设置.提醒项列表[i], 数量[0], 数量[1], 包名);
       新ID列表.push(id);
     } catch (错误) {
       // 尽力发布剩余项；部分失败也必须告知调用方。

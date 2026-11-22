@@ -37,6 +37,7 @@ import { preferences } from '@kit.ArkData';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
 import { 牌组色调, 牌组色调键, 解析牌组色调 } from './主页模型';
+import { AppLog } from './AppLog';
 
 const 存储名: string = 'jidecards_deck_meta';
 const 色调键前缀: string = 'deck_tone_';
@@ -317,6 +318,6 @@ export async function 清除牌组背景图(牌组ID: string, expected: string |
   await saveLocalPreference(store, 背景图键(牌组ID), '', '', previous);
   if (previous !== '') {
     try { await fs.unlink(previous); }
-    catch (error) { console.warn('[deck-background] Orphan file cleanup failed: ' + String(error)); }
+    catch (error) { AppLog.warn('DeckMetadataStore', '[deck-background] Orphan file cleanup failed: ' + String(error)); }
   }
 }

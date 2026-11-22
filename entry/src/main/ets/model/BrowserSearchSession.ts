@@ -2,6 +2,7 @@
 import { browserFilterNode } from './BrowserQuickFilter';
 import { makeCardStateNode, SearchNodeCardState } from '../proto/messages/SearchMessages';
 import type { BrowserColumn, BrowserColumns, BrowserRow, BrowserCell, BrowserRowColor, SearchNode, SearchRequest, SortOrder } from '../proto/messages/SearchMessages';
+import { AppLog } from './AppLog';
 
 export interface BrowserDisplayRow {
   id: number;
@@ -138,6 +139,7 @@ export class BrowserSearchSession {
 
   private async execute(query: BrowserQuery, current: () => boolean): Promise<BrowserSearchResult | null> {
     if (!current()) return null;
+    const started: number = Date.now();
     await this.restoreContext(query);
     if (!current()) return null;
     if (this.columnsCache.length === 0) {
@@ -152,6 +154,7 @@ export class BrowserSearchSession {
       { kind: 'builtin', column: query.sortColumn, reverse: query.sortReverse };
     const ids: number[] = await this.backend.search({ search: search, order: order }, query.notes);
     if (!current()) return null;
+    AppLog.info('BrowserSearch', `[BrowserPerf] search ids ms=${Date.now() - started}`);
     const suspendedSearch: string = await this.backend.buildSearch(makeCardStateNode(SearchNodeCardState.CARD_STATE_SUSPENDED));
     if (!current()) return null;
     const suspendedIds: number[] = await this.backend.search({ search: suspendedSearch, order: { kind: 'none' } }, query.notes);
@@ -159,10 +162,12 @@ export class BrowserSearchSession {
     const suspended: Set<number> = new Set<number>(suspendedIds);
     const marked: Set<number> = new Set<number>(this.backend.markedIds === undefined ? [] : await this.backend.markedIds(query.notes));
     if (!current()) return null;
-    const rows: BrowserDisplayRow[] = await readBrowserRows(ids.slice(0, 200), suspended,
+    AppLog.info('BrowserSearch', `[BrowserPerf] marks ready ms=${Date.now() - started}`);
+    // 首屏只取一个并发批次；其余由列表触底分页，避免等待屏幕外的富文本渲染。
+    const rows: BrowserDisplayRow[] = await readBrowserRows(ids.slice(0, 20), suspended,
       (id: number): Promise<BrowserRow> => this.backend.row(id), current, marked);
     if (!current()) return null;
     return { columns: this.columnsCache.slice(), ids: ids, suspended: suspended, marked: marked,
-      rows: rows, consumed: Math.min(200, ids.length) };
+      rows: rows, consumed: Math.min(20, ids.length) };
   }
 }

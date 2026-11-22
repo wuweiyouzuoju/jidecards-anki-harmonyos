@@ -12,10 +12,16 @@ export interface NoteAudioStatus {
   paused: boolean;
   working: boolean;
   disabled: boolean;
+  speechEnabled?: boolean;
   seconds: number;
   hasError: boolean;
   attachments: NoteAudioAttachmentStatus[];
 }
+
+export const NOTE_AUDIO_IMPORT_TITLE = 'note_audio_import';
+export const NOTE_AUDIO_GENERATE_TITLE = 'note_audio_generate_speech';
+export const NOTE_AUDIO_SPEECH_APPLY_TITLE = 'note_audio_speech_apply';
+export const NOTE_AUDIO_PLAY_ICON = 'ic_audio_resume';
 
 import { noteMediaParts } from './NoteMediaParts';
 export interface NoteFieldAudio {

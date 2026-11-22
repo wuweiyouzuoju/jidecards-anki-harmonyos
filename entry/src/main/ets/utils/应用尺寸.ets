@@ -35,6 +35,7 @@ export class 应用尺寸 {
   static readonly dialogWideMaxWidth: number = 560;
   static readonly dialogMaxHeight: string = '88%';
   static readonly dialogHeightRatio: number = 0.88;
+  static readonly noteReferenceDialogHeight: number = 540;
   // ---- 字号 ----
   static readonly 字号_说明_小: number = 10; // 星期表头
   static readonly 字号_说明: number = 11; // 日历格数字、辅助提示
@@ -94,6 +95,11 @@ export class 应用尺寸 {
     return 窄版 ? 应用尺寸.narrowPageSectionGap : 应用尺寸.pageSectionGap;
   }
 
+  static twoCardGridBreakpoint(narrow: boolean): string {
+    const minimumCardWidth: number = 520;
+    return `${2 * minimumCardWidth + 应用尺寸.页面分组间距(narrow)}vp`;
+  }
+
   static 页面内容顶部间距(窄版: boolean): number {
     return 应用尺寸.页面分组间距(窄版);
   }
@@ -134,8 +140,8 @@ export class 应用尺寸 {
   }
 
   /** 页面固定操作区的底部留白，导航条存在时在其外侧继续避让。 */
-  static 操作区底部间距(窄版: boolean, 导航条高度: number): number {
-    return 应用尺寸.页面底部间距(窄版) + Math.max(0, 导航条高度);
+  static 操作区底部间距(窄版: boolean, 导航条高度: number, 最小留白: number = 0): number {
+    return Math.max(应用尺寸.页面底部间距(窄版), 最小留白) + Math.max(0, 导航条高度);
   }
   static readonly 紧凑控件高度: number = 36;
   static readonly searchFieldHeight: number = 44;

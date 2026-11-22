@@ -27,7 +27,7 @@ export class DeviceCollectionStore implements CollectionStore {
   private acquired: boolean = false;
   constructor(context: common.UIAbilityContext, own: string) { this.context = context; this.own = own; }
   /** @throws {Error} token 无效时拒绝构造路径。 */
-  private path(token: string): string {
+  packetPath(token: string): string {
     if (!/^[a-f0-9]{32}$/.test(token)) throw new Error('device_collection_invalid');
     return `${this.context.filesDir}/.device-collection/${token}.bin`;
   }
@@ -37,6 +37,14 @@ export class DeviceCollectionStore implements CollectionStore {
     this.acquired = true; autoSyncScheduler.beginOperation(this.owner);
     try { await 后端会话.获取实例().确保已打开(this.context.filesDir); }
     catch (error) { await this.release(); throw error instanceof Error ? error : new Error('device_collection_failed'); }
+  }
+  /** 已暂存的快照仍由本会话持有，等待网络期间可以归还卡库。 */
+  yieldCollection(): void {
+    if (this.acquired) {
+      this.acquired = false;
+      syncActivity.release(this.owner, Date.now());
+      autoSyncScheduler.endOperation(this.owner);
+    }
   }
   /** @throws {Error} 清理失败也先归还集合租约。 */
   async release(): Promise<void> {
@@ -48,12 +56,10 @@ export class DeviceCollectionStore implements CollectionStore {
       }
     }
     for (const token of this.owned) {
-      try { await fs.unlink(this.path(token)); } catch (error) { failure = true; }
+      try { await fs.unlink(this.packetPath(token)); } catch (error) { failure = true; }
     }
     this.files = []; this.owned = [];
-    if (this.acquired) {
-      this.acquired = false; syncActivity.release(this.owner, Date.now()); autoSyncScheduler.endOperation(this.owner);
-    }
+    this.yieldCollection();
     if (failure) throw new Error('device_collection_failed');
   }
   /** @throws {Error} 原生校验、事务或磁盘错误由任务宿主显示。 */
@@ -83,8 +89,8 @@ export class DeviceCollectionStore implements CollectionStore {
     return result;
   }
   /** @throws {Error} 有限缓冲读取与 SHA256 失败时不接受文件。 */
-  private async hash(token: string): Promise<string> {
-    const file = await fs.open(this.path(token), fs.OpenMode.READ_ONLY);
+  async hashFile(path: string): Promise<string> {
+        const file = await fs.open(path, fs.OpenMode.READ_ONLY);
     try {
       const md = cryptoFramework.createMd('SHA256'); const buffer = new ArrayBuffer(64 * 1024);
       let count = await fs.read(file.fd, buffer);
@@ -94,8 +100,8 @@ export class DeviceCollectionStore implements CollectionStore {
   }
   /** @throws {Error} 打开或哈希失败时不发送描述符。 */
   private async descriptor(token: string, bytes: number): Promise<ProgressFile> {
-    const hash = await this.hash(token);
-    this.files.push({ token, file: await fs.open(this.path(token), fs.OpenMode.READ_ONLY) });
+    const hash = await this.hashFile(this.packetPath(token));
+    this.files.push({ token, file: await fs.open(this.packetPath(token), fs.OpenMode.READ_ONLY) });
     return { token, bytes, hash };
   }
   /** @throws {Error} 原生导出或文件准备失败时不传输。 */
@@ -105,7 +111,7 @@ export class DeviceCollectionStore implements CollectionStore {
     return this.descriptor(token, result.bytes);
   }
   /** @throws {Error} 卡库不兼容或媒体清单无效时停止。 */
-  async plan(remote: string, local: string, mode: CollectionMode): Promise<ProgressFile> {
+  async plan(remote: string, local: string, mode: CollectionMode | 'cloud_replace'): Promise<ProgressFile> {
     const out = await linkRandom(16);
     const result = await this.call({ token: remote, own: this.own, local, out, mode }, 3); this.owned.push(out);
     return this.descriptor(out, result.bytes);
@@ -120,7 +126,7 @@ export class DeviceCollectionStore implements CollectionStore {
   async apply(remote: string, payload: string, mode: string): Promise<CollectionResult> {
     if (!this.owned.includes(remote) || !this.owned.includes(payload)) throw new Error('device_collection_invalid');
     const result = await this.call({ token: remote, own: this.own, payload, mode }, 1);
-    if (result.updated_objects + result.added_reviews + result.updated_media + result.deleted_media > 0 || mode === 'replace') {
+    if (result.updated_objects + result.added_reviews + result.updated_media + result.deleted_media > 0 || mode === 'replace' || mode === 'cloud_replace') {
       autoSyncScheduler.request();
     }
     return { updatedObjects: result.updated_objects, addedReviews: result.added_reviews,
@@ -136,7 +142,7 @@ export class DeviceCollectionStore implements CollectionStore {
   async receiveFile(): Promise<string> {
     const token = await linkRandom(16);
     await this.call({ token, own: this.own }, 2); this.owned.push(token);
-    this.files.push({ token, file: await fs.open(this.path(token), fs.OpenMode.READ_WRITE) });
+    this.files.push({ token, file: await fs.open(this.packetPath(token), fs.OpenMode.READ_WRITE) });
     return token;
   }
   /** @throws {Error} 拒绝未归本任务持有或已经关闭的文件。 */
@@ -163,6 +169,6 @@ export class DeviceCollectionStore implements CollectionStore {
   async verify(token: string, descriptor: ProgressFile): Promise<void> {
     const item = this.files.find((value: OpenCollectionFile): boolean => value.token === token)!;
     const file = this.opened(token); await fs.fsync(file.fd); await fs.close(file); item.file = null;
-    if ((await fs.stat(this.path(token))).size !== descriptor.bytes || await this.hash(token) !== descriptor.hash) throw new Error('device_collection_invalid');
+    if ((await fs.stat(this.packetPath(token))).size !== descriptor.bytes || await this.hashFile(this.packetPath(token)) !== descriptor.hash) throw new Error('device_collection_invalid');
   }
 }

@@ -215,7 +215,7 @@ export async function 设置FSRS开启状态(开启: boolean, expected: boolean 
     // 桌面卡片的"记忆率/难度分布"页需立即反映新状态，否则会一直显示
     // "未启用 FSRS"（仅靠首页加载触发推送，用户不回首页就不会刷新）。
     刷新桌面卡片数据().catch((错误: Object): void => {
-      hilog.error(0x0000, 'FSRS控制器', `切换FSRS后刷新桌面卡片数据失败: ${错误}`);
+      hilog.error(0x4342, 'FSRS控制器', `切换FSRS后刷新桌面卡片数据失败: ${错误}`);
   });
   return 开启;
   });
@@ -247,7 +247,7 @@ export async function 刷新桌面卡片数据(): Promise<void> {
     const tree: DeckTreeNode = await new 牌组服务().获取牌组树();
     await publishStatsWidget(createStatsWidget(graphs, tree, await 加载小时分布窗口(), await 加载分离暂停偏好()));
   } catch (错误) {
-    hilog.error(0x0000, 'FSRS控制器', `刷新桌面卡片数据异常: ${错误}`);
+    hilog.error(0x4342, 'FSRS控制器', `刷新桌面卡片数据异常: ${错误}`);
   }
 }
 

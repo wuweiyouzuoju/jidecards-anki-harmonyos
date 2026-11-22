@@ -5,9 +5,11 @@ export function settingsIcon(id: string): Resource {
   switch (id) {
     case 'editor':
     case 'editor_wheel': return $r('app.media.ic_study_edit');
+    case 'leaderboard_settings': return $r('app.media.ic_home_leaderboard');
     case 'home_today_summary':
       return $r('app.media.ic_home_stats');
     case 'general':
+    case 'huawei_account':
     case 'general_display':
       return $r('app.media.ic_settings_general');
     case 'scheduler':
@@ -30,9 +32,17 @@ export function settingsIcon(id: string): Resource {
       return $r('app.media.ic_settings_about');
     case 'advanced':
       return $r('app.media.ic_settings_advanced');
+    case 'huawei_cloud_sync':
+      return $r('app.media.ic_sync_upload');
+    case 'huawei_cloud_sources':
+    case 'huawei_cloud_restore':
+      return $r('app.media.ic_sync_download');
+    case 'huawei_cloud':
     case 'sync':
     case 'auto_sync':
     case 'device_link':
+      return $r('app.media.ic_home_sync');
+    case 'external_mcp':
       return $r('app.media.ic_home_sync');
     case 'ai':
       return $r('app.media.ic_study_agent');
@@ -91,7 +101,6 @@ export function settingsIcon(id: string): Resource {
       return $r('app.media.ic_settings_font');
     case 'study_display':
     case 'show_remaining':
-    case 'ai_batch_limit':
       return $r('app.media.ic_settings_remaining');
     case 'show_intervals':
       return $r('app.media.ic_settings_interval');

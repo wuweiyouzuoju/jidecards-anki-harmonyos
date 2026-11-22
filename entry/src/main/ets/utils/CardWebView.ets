@@ -6,6 +6,7 @@ import { 媒体基地址, CardScriptDiagnosticLabels } from '../model/学习卡�
 import { UIContext } from '@kit.ArkUI';
 import { resourceText } from './UiFeedback';
 import { CARD_RENDERING_SUPPORT } from '../model/CardRenderingSupport';
+import { AppLog } from '../model/AppLog';
 
 export const CARD_WEB_RENDER_TIMEOUT: string = 'card_render_timeout';
 
@@ -41,7 +42,7 @@ export class CardWebAttributes implements AttributeModifier<WebAttribute> {
           });
         } catch (error) {
           event.result.handleCancel();
-          console.warn(`Card diagnostics dialog unavailable: ${error}`);
+          AppLog.warn('CardWebView', `Card diagnostics dialog unavailable: ${error}`);
         }
         return true;
       });
@@ -114,7 +115,7 @@ export class CardWebView {
             this.controllerAt(1 - slot).setAudioMuted(true);
             this.controllerAt(1 - slot).onInactive();
             this.controllerAt(slot).setAudioMuted(!this.audioEnabled);
-          } catch (error) { console.info(`Card inactive: ${error}`); }
+          } catch (error) { AppLog.info('CardWebView', `Card inactive: ${error}`); }
           shown(background, appearanceOnly);
         },
         failed: reportFailure
@@ -143,7 +144,7 @@ export class CardWebView {
       try {
         this.controllerAt(slot).setAudioMuted(!(enabled && (this.buffer === null ||
           (this.hasDisplayed && this.buffer.activeSlot() === slot))));
-      } catch (error) { console.info(`Card audio mute: ${error}`); }
+      } catch (error) { AppLog.info('CardWebView', `Card audio mute: ${error}`); }
     }
   }
   /** @throws {Error} The page owns attach failures. */
@@ -155,7 +156,7 @@ export class CardWebView {
   show(html: string, key: number, side: string, scrollToAnswer: boolean = false): void {
     // 超时只报错，不伪造绘制确认；防止丢失确认后透明等待层无限阻断触摸。
     this.pendingRender = (): void => {
-      console.warn(`Card render acknowledgement timeout: key=${key}, side=${side}`);
+      AppLog.warn('CardWebView', `Card render acknowledgement timeout: key=${key}, side=${side}`);
       this.reset(true);
       this.failed(CARD_WEB_RENDER_TIMEOUT);
     };
