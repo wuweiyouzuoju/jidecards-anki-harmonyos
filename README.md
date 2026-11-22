@@ -1,26 +1,35 @@
-# jidecards（记得闪卡）
+<h1 align="center">记得闪卡 · jidecards</h1>
+
+<p align="center"><strong>每天一点，把知识记牢。</strong><br>面向 HarmonyOS NEXT 的开源闪卡应用，兼容 Anki 牌组，支持鸿蒙手机、平板和电脑。</p>
+
+<p align="center">
 
 [![CI](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/actions/workflows/ci.yml)
-[![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
-[![Source 26.11.09.9](https://img.shields.io/badge/source-26.11.09.9-6750a4.svg)](AppScope/app.json5)
-[![AppGallery](https://img.shields.io/badge/AppGallery-Download-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
+[![Source 26.11.22.19](https://img.shields.io/badge/source-26.11.22.19-6750a4.svg)](AppScope/app.json5)
 [![HarmonyOS NEXT](https://img.shields.io/badge/platform-HarmonyOS%20NEXT-0a59f7.svg)](https://www.harmonyos.com/)
+[![AppGallery](https://img.shields.io/badge/AppGallery-Download-0a59f7.svg)](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 
-jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪卡学习应用，支持鸿蒙手机、平板和电脑。导入 Anki 牌组后，可以离线复习、编辑资料、查看学习统计，并通过 AnkiWeb 同步。原生界面由 ArkTS/ArkUI 实现，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。
+</p>
 
-**当前源码版本：26.11.09.9（versionCode 3149）**
+<p align="center">
+  <a href="https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare">华为应用市场下载</a> ·
+  <a href="https://jidecards.com/">官网</a> ·
+  <a href="https://jidecards.com/guides/harmonyos-anki/">鸿蒙 Anki 使用指南</a> ·
+  <a href="docs/README.md">开发文档</a> ·
+  <a href="CHANGELOG.md">更新记录</a> ·
+  <a href="https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/issues">问题反馈</a>
+</p>
 
-每天一点，把知识记牢。用闪卡整理知识，以间隔复习建立自己的学习节奏。
+<p align="center"><img src="docs/assets/promo/phone/00-overview.png" alt="记得闪卡手机端十张功能总览" width="760"></p>
 
-应用可在[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)搜索“记得闪卡”下载安装。仓库构建版本的唯一事实来源是 [AppScope/app.json5](AppScope/app.json5)；商店实际上架版本以 AppGallery 页面为准。
+记得闪卡用原生 ArkTS/ArkUI 构建界面，集合、模板渲染、调度和同步复用锁定版本的 Anki Rust Core。导入 `.apkg` 牌组后即可离线复习、编辑卡片和查看统计，并可通过 AnkiWeb、华为云空间或设备直连在多台设备之间保留学习进度。
 
-官网：[jidecards.com](https://jidecards.com/) · [下载与功能](https://jidecards.com/works/jidecards/) · [鸿蒙 Anki 使用指南](https://jidecards.com/guides/harmonyos-anki/)
+**当前源码版本：26.11.22.19（versionCode 3159）** · [本次更新说明](docs/releases/26.11.22.19.md)
 
-已发布的源码构建：[26.11.09.9 签名 HAP 开发包](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/jidecards-v26.11.09.9-signed.hap) · [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/SHA256SUMS.txt) · [构建与安装说明](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v26.11.09.9)。
+仓库版本号只以 [AppScope/app.json5](AppScope/app.json5) 为准；应用市场实际上架的版本以 AppGallery 页面为准，README 不另行维护商店版本号。
 
-开发入口：[贡献指南](CONTRIBUTING.md) · [更新记录](CHANGELOG.md) · [文档导航](docs/README.md) · [问题反馈](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/issues)
-
-> jidecards 是独立开源项目，与 Ankitects、AnkiWeb 或 AnkiDroid 无关，也未获得其认可。
+> 记得闪卡是独立开源项目，与 Ankitects、AnkiWeb 或 AnkiDroid 无关，也未获得其认可。
 
 ## 独立开发声明
 
@@ -28,170 +37,154 @@ jidecards（中文名“记得闪卡”）是面向 HarmonyOS NEXT 的开源闪�
 
 ## 目录
 
-- [独立开发声明](#独立开发声明)
-- [项目特点](#项目特点)
 - [应用截图](#应用截图)
-- [安装与使用](#安装与使用)
+- [功能一览](#功能一览)
+- [安装](#安装)
 - [数据与隐私](#数据与隐私)
 - [从源码构建](#从源码构建)
+- [架构与工程质量](#架构与工程质量)
 - [项目结构与文档](#项目结构与文档)
 - [参与贡献](#参与贡献)
 - [版本与发布](#版本与发布)
 - [许可证与第三方声明](#许可证与第三方声明)
 
-当前源码加入自定义壁纸、主题色明暗适配与独立材质不透明度，完善宽屏编辑、半屏与悬浮窗口，以及新用户的首批牌组导入引导。详见 [26.11.09.9 源码更新说明](docs/releases/26.11.09.9.md)。应用市场版本以下载页面为准。
+## 应用截图
 
-## 项目特点
+以下为手机端界面，画面来自实际运行截图，只做缩放和标注，不重绘界面。
 
-以下介绍当前 `main` 的源码能力；应用市场实际上架版本以下载页面为准。
+<table>
+  <tr>
+    <td align="center" width="50%"><img src="docs/assets/promo/phone/01-personal-library.png" alt="你的个人知识卡库" width="300"><br><sub><b>01</b> 你的个人知识卡库</sub></td>
+    <td align="center" width="50%"><img src="docs/assets/promo/phone/02-decks-and-sources.png" alt="牌组与资料获取" width="300"><br><sub><b>02</b> 牌组与资料获取</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/promo/phone/03-multi-subject.png" alt="多学科学习" width="300"><br><sub><b>03</b> 多学科学习</sub></td>
+    <td align="center"><img src="docs/assets/promo/phone/04-spaced-review.png" alt="自动安排复习间隔" width="300"><br><sub><b>04</b> 自动安排复习间隔</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/promo/phone/05-study-modes.png" alt="多种学习方式" width="300"><br><sub><b>05</b> 多种学习方式</sub></td>
+    <td align="center"><img src="docs/assets/promo/phone/06-card-editing.png" alt="制卡编辑与预览" width="300"><br><sub><b>06</b> 制卡编辑与预览</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/promo/phone/07-search-and-browse.png" alt="检索与卡库管理" width="300"><br><sub><b>07</b> 检索与卡库管理</sub></td>
+    <td align="center"><img src="docs/assets/promo/phone/08-stats-and-reminders.png" alt="学习统计与提醒" width="300"><br><sub><b>08</b> 学习统计与提醒</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/promo/phone/09-sync-and-backup.png" alt="同步与独立备份" width="300"><br><sub><b>09</b> 同步与独立备份</sub></td>
+    <td align="center"><img src="docs/assets/promo/phone/10-multi-device.png" alt="鸿蒙多端布局" width="300"><br><sub><b>10</b> 鸿蒙多端布局</sub></td>
+  </tr>
+</table>
 
-3.8.0 相对 3.5.4 重整原生界面与材质，完善动效、牌组布局、字段与绘图编辑，新增轮盘自动展开设置并改善地区语言体验。双端引用与传统浏览为此前已有能力。调度与集合仍由锁定的 Anki Core 执行，详情见[3.8.0 更新说明](docs/releases/3.8.0.md)。
+平板端与电脑端同主题、同序号的宣传图分别位于 [docs/assets/promo/tablet/](docs/assets/promo/tablet/) 和 [docs/assets/promo/desktop/](docs/assets/promo/desktop/)，尺寸与制作约束见[宣传图说明](docs/assets/promo/README.md)。
 
-### 本轮界面与使用体验
+## 功能一览
 
-- 原生菜单、弹窗、选择器与按压反馈统一到公共组件，支持玻璃和扁平材质；首页摘要、牌组详情及学习答题区一并调整。
-- 浏览页提供传统多列表格模式，卡片与笔记各自保存列配置；支持列替换、增减和重排。
-- 新建和编辑笔记可插入正文卡片引用，学习与预览时打开目标；[Anki 电脑端配套插件](desktop/anki-note-links/README.md)需单独安装。字段编辑轮盘、富文本、绘图和草稿预览同步改进。
-- 提供 12 种语言与地区选项：简体中文、香港与台湾繁体中文、英式与美式英语、意大利语、日语、越南语、韩语、俄语、德语和法语；日期与数字采用对应地区格式。
-- JIDE 的功能目录与界面状态同步更新；JIDE 入口默认可见，配置模型服务后即可使用。
+| 领域 | 主要能力 |
+| --- | --- |
+| 复习与调度 | Anki 26.05 Core 调度、FSRS 与参数优化、四档或双按钮评分、撤销重做、埋藏与暂停 |
+| 卡片呈现 | 问答、完形填空、拼写输入、图片遮罩；图片、音频、MathJax、mhchem、MathML 与 TTS |
+| 牌组与浏览 | 层级牌组、Cards/Notes 浏览、Anki 搜索语法、传统多列表格、批量编辑、查找替换 |
+| 同步与备份 | AnkiWeb 与自定义服务器、华为云空间整库备份、设备直连（实验）、自动历史备份 |
+| 导入导出 | `.apkg` / `.colpkg`、CSV / TSV / TXT、系统文件打开入口、文本导出 |
+| 鸿蒙多端 | 手机、平板、鸿蒙电脑自适应布局，键盘鼠标操作，服务卡片，12 种语言与地区 |
+| JIDE 助手 | 自然语言制卡改卡、资料阅读、联网检索，所有写入先出草稿再确认（默认隐藏） |
 
 ### 复习与调度
 
-- 复用 Anki 26.05 Rust Core，提供兼容的集合、模板渲染和调度基础。
-- 支持 FSRS、目标记忆保持率、牌组选项、四档评分、撤销与重做、按卡片或整条笔记埋藏与暂停，以及学习完成页。
-- 提供 FSRS 参数优化、复习负担模拟，以及日切时间、提前学习窗口、时间盒等全局复习偏好；调度仍由 Anki Core 执行。
-- 支持普通问答、完形填空、拼写输入、图片遮罩，以及卡片中的图片、音频、MathJax、mhchem 和 MathML。
-- 使用原生音频播放器和 HarmonyOS CoreSpeechKit TTS；学习页和卡片预览共享渲染与媒体生命周期。
-- 深色模式改善固定字色和脚本追加正文的对比度，切回浅色恢复作者原有样式；复杂背景和特效仍需针对原卡验收。
-- 学习页可显示卡片提示、查看上一张卡片信息，并录制、回放和保存本次学习录音；未保存的录音在退出本次学习时清理。详见[学习与媒体](docs/development/study-media.md)。
+- 复用 Anki 26.05 Rust Core，集合格式、模板渲染与调度结果与 Anki 保持一致。
+- 支持 FSRS、目标记忆保持率、FSRS 参数优化、复习负担模拟，以及日切时间、提前学习窗口、时间盒等全局偏好。
+- 答案面可用四档评分，或只保留“忘记”和“良好”的双按钮评分；评分栏可停靠底部或悬浮。
+- 支持撤销与重做、按卡片或整条笔记埋藏与暂停、学习完成页、卡片提示和上一张卡片信息。
+- 学习页可录制和回放本次学习录音，白板可将当前卡面和笔迹保存为 PNG。详见[学习与媒体](docs/development/study-media.md)。
+- 深色模式改善固定字色和脚本追加正文的对比度，切回浅色时恢复作者原有样式。
 
-### 牌组、浏览与统计
+### 牌组、浏览与编辑
 
-- 支持层级牌组、新建、重命名、排序、拖动、别名、隐藏和牌组背景图片。
-- 牌组选项使用独立页面，提供离开前的草稿保护、预设管理与保存范围选择，并标明影响所有牌组的设置。详见[首页与牌组选项](docs/development/home.md)。
-- 提供 Cards/Notes 浏览、牌组树和标签树、Anki 搜索语法、保存搜索、字段与标签编辑、查找替换及批量操作。
-- 支持录音与音频附件、字段查重、笔记类型字段及模板管理；新建和编辑笔记可预览未保存内容、多模板与填空编号。
-- 提供学习进度、预测、年历热力图、复习间隔、记忆稳定期、难度、记忆可提取性和新增卡片等统计，并提供 2×4 桌面服务卡片。
-- 简洁模式覆盖日常学习；实验模式提供高级调度、笔记类型管理、自定义学习、过滤牌组等能力。
+- 层级牌组支持新建、重命名、排序、拖动、别名、隐藏和背景图片；牌组选项使用独立页面，带草稿保护与预设管理。详见[首页与牌组选项](docs/development/home.md)。
+- 浏览页提供卡片与笔记两种视图、牌组树和标签树、保存搜索和批量操作；传统表格模式下两种视图各自保存列配置。大屏下可分栏浏览与编辑。
+- 新建和编辑笔记可预览未保存内容、多模板与填空编号；支持字段查重、富文本、绘图、录音与音频附件，以及笔记类型和模板管理。
+- 正文可插入卡片引用，学习和预览时跳转到目标卡片；[Anki 电脑端配套插件](desktop/anki-note-links/README.md)需单独安装。
+- 统计包含学习进度、预测、年历热力图、复习间隔、记忆稳定期、难度、可提取性和新增卡片，并提供 2×4 桌面服务卡片。
+- 简洁版覆盖日常学习；实验版开放高级调度、自定义学习、过滤牌组等能力。
 
 ### 同步、导入与维护
 
-- 支持 AnkiWeb 集合与媒体同步、自定义同步端点、自动同步及全量上传/下载；自定义 CA 证书尚无用户配置入口，见[同步边界](docs/development/sync-data.md#自定义同步端点与证书边界)。
-- 已接入“设置 → 同步 → 设备直连”（实验功能）：同一 Wi-Fi 或热点下扫码配对，可分别授权学习记录同步或全部卡库和媒体同步。卡库来源/结构不一致时由接收设备明确确认替换并先备份；真实两机与 AnkiWeb 账号尚未验收，范围和限制见[设备直连](docs/development/sync-data.md)。
-- 支持 `.apkg` 牌组导入与导出、`.colpkg` 集合备份与恢复，并可选择媒体和调度信息；提供自动历史备份和恢复列表，历史备份不包含媒体。
-- 已接入系统文件打开入口接收 `.apkg`，确认导入选项后读取授权文件，兼容 Anki 专用 MIME `application/vnd.anki`。文件提供方与设备验收范围见[APKG 系统打开入口](docs/development/home.md#apkg-系统打开入口)。
-- 支持 CSV / TSV / TXT 导入预览、字段映射和重复处理；APKG 导入可配置更新策略，查看进度、取消及结果统计；整库替换提供空间预检和进程中断恢复。详见[数据导入](docs/development/import-data.md)。
-- 支持笔记文本和卡片文本导出，适合整理资料或交给其他工具处理；文本导出不包含媒体文件和复习进度。
-- 提供媒体引用检查、缺失文件检查、媒体回收站、数据库检查，以及标签和笔记维护工具。
-- 专属选择题制题路线已取消；已有题库的读取与学习兼容保留，[旧格式记录](docs/choice-apkg-v1.md)仅供兼容维护，不代表 JIDE 已接入专属制题能力。
+- AnkiWeb 集合与媒体同步、自定义同步端点、自动同步及全量上传/下载；自定义 CA 证书暂无配置入口，见[同步边界](docs/development/sync-data.md#自定义同步端点与证书边界)。
+- 华为云空间使用包含媒体的 Anki 整库备份包，恢复前自动创建本地备份，校验通过后才提示成功。
+- 设备直连（实验）：同一 Wi-Fi 或热点下扫码配对，可分别授权学习记录同步或整库与媒体同步。真实双机与 AnkiWeb 账号组合尚未完成验收，范围见[同步与数据](docs/development/sync-data.md)。
+- `.apkg` 导入可配置更新策略、查看进度和取消；整库替换提供空间预检和进程中断恢复。系统文件打开入口兼容 `application/vnd.anki`，见 [APKG 系统打开入口](docs/development/home.md#apkg-系统打开入口)。
+- CSV / TSV / TXT 导入支持预览、字段映射和重复处理，详见[数据导入](docs/development/import-data.md)；笔记与卡片文本导出不含媒体和复习进度。
+- 提供媒体引用与缺失检查、媒体回收站、数据库检查，以及标签和笔记维护工具。
 
-### HarmonyOS 体验
+### 鸿蒙多端体验
 
-- 提供蓝、绿、紫、青、橙、金、灰七套主题，支持浅色、深色和跟随系统外观。
-- 支持学习提醒、中文和 English 界面、可停靠或浮动的答题工具栏、卡片字号设置和动态背景。
-- 导航、列表、设置和统计使用 ArkUI；Anki 卡片 HTML/CSS 使用 HarmonyOS Web 组件渲染。
-
-### 键盘与鼠标
-
-- 快捷键与鼠标说明统一位于“设置 → 学习帮助 → 键盘快捷键”，按首页、浏览、学习、编辑和模板界面分组；学习部分显示当前生效的自定义绑定。
-- 新增和编辑笔记支持 Ctrl+Enter 保存、Ctrl+D 选择牌组、Ctrl+L 打开模板、Ctrl+N 选择笔记类型、Ctrl+Shift+T 编辑标签，以及字段跳转和常用格式快捷键。操作范围与焦点规则见[浏览与编辑](docs/development/browser-stats.md)。
-- 鼠标右键可在指针位置打开牌组操作菜单、进入或扩展浏览列表多选，以及调用目录树已有的长按操作；文字输入保留原生按键和右键菜单。
+- 同一套代码适配手机、平板和鸿蒙电脑：宽屏首页记住上次选择的牌组，短横屏和小窗口单独优化工具栏与操作区。
+- 鸿蒙电脑支持窗口置顶；鼠标右键打开牌组菜单或扩展多选，新增和编辑笔记支持 Ctrl+Enter 保存等快捷键。完整列表在“设置 → 学习帮助 → 键盘快捷键”，焦点规则见[浏览与编辑](docs/development/browser-stats.md)。
+- 七套预设主题，以及 RGB／HEX 自定义主题色、自定义壁纸、玻璃和扁平两种材质；支持浅色、深色和跟随系统。
+- 界面提供 12 种语言与地区：简体中文、香港与台湾繁体中文、英式与美式英语、意大利语、日语、越南语、韩语、俄语、德语和法语，日期和数字按地区格式显示。
+- 导航、列表、设置和统计使用 ArkUI；Anki 卡片 HTML/CSS 由 HarmonyOS Web 组件渲染。
 
 ### JIDE 应用内助手
 
-JIDE 提供统一的自然语言对话入口，也可以从牌组、浏览或学习页携带当前上下文进入。它通过受控工具协助学习和资料维护：
+JIDE 是统一的自然语言对话入口，也可以从牌组、浏览或学习页带着当前上下文进入，通过受控工具协助学习和资料维护。
 
-| 能力 | 当前范围 |
+| 能力 | 范围 |
 | --- | --- |
-| 制卡与改卡 | 生成、编辑字段和标签，选择或新建牌组与笔记类型，预览后确认保存 |
-| 资料阅读 | 导入 PDF、办公文档、电子书、文本、图片和视频；读取已有卡库图片/视频，支持视觉理解、系统 OCR、视频按时间取帧制卡并标注来源（不含声音转写） |
-| 学习与应用 | 读取学习概览、卡片统计、牌组选项与已接通的界面状态；确认修改部分设置、共享模板和卡片外观 |
-| 偏好与计算 | 用户确认保存的长期偏好；本地 JavaScript 纯计算沙箱，不获得文件、网络或卡库权限 |
-| 联网 | 独立开关下搜索与读取公开网页；Wikimedia 图片候选可随草稿确认导入 |
+| 制卡与改卡 | 生成和编辑字段、标签，选择或新建牌组与笔记类型，预览后确认保存 |
+| 资料阅读 | PDF、办公文档、电子书、文本、图片和视频；PDF 按需逐页读取，支持视觉理解、OCR 和视频按时间取帧 |
+| 学习与设置 | 读取学习概览、卡片统计和牌组选项；经确认修改部分设置、共享模板和卡片外观 |
+| 联网 | 独立开关下搜索并读取公开网页；Wikimedia 图片候选可随草稿确认导入 |
+| 外部 Agent | 鸿蒙电脑实验版可开启本机 MCP 接入，供外部 Agent 调用；写入仍在应用内确认 |
 
-卡库修改先生成可编辑草稿，展示字段、标签、目标和影响范围；用户确认后才写入。删除、类型迁移、共享模板等高风险操作需要二次确认，执行前重新检查数据基线。会话支持历史恢复、澄清和预算暂停后的继续。
+卡库修改先生成可编辑草稿，列出字段、标签、目标和影响范围，确认后才写入；删除、类型迁移、共享模板等高风险操作需二次确认，执行前重新检查数据基线。
 
-**AI 制卡、AI 改卡及设置入口默认开放。** 启动时统一发布 AppStorage 运行时开关。应用端联网工具默认关闭，启用并配置搜索密钥后可搜索和读取网页。详细能力、确认规则与限制见[应用内 Agent 说明](docs/development/agent.md)。
+**AI 会话、制卡、改卡及设置入口默认隐藏。** 实验版设置中的开发者调试入口可在本机解锁，启动时读取已保存状态并统一发布 AppStorage 开关；联网工具默认关闭，部分能力还需配置对应模型服务。详见[应用内 Agent 说明](docs/development/agent.md)和[外部 Agent 本地 MCP](docs/development/external-agent.md)。
 
-## 应用截图
-
-以下七张为 **2.9.22 版本的历史宣传图**，用于展示首页、学习、编辑、浏览、学习操作、统计和提醒的界面示例；当前界面以最新构建为准。点击图片可查看原图。
-
-<p align="center">
-  <a href="screenshots/promo-2.9.22/home.png"><img src="screenshots/promo-2.9.22/home.png" width="320" alt="记得闪卡 2.9.22：每天一点，把知识记牢；首页牌组与今日任务" /></a>
-</p>
-
-<p align="center">
-  <a href="screenshots/promo-2.9.22/study.png"><img src="screenshots/promo-2.9.22/study.png" width="220" alt="图片与例句，让记忆更具体：卡片学习与输入答案" /></a>
-  <a href="screenshots/promo-2.9.22/editor.png"><img src="screenshots/promo-2.9.22/editor.png" width="220" alt="自由编辑，打造专属卡片：可视与源码编辑、图片音频公式" /></a>
-  <a href="screenshots/promo-2.9.22/browser.png"><img src="screenshots/promo-2.9.22/browser.png" width="220" alt="快速查找，卡片井然有序：卡片搜索与筛选" /></a>
-</p>
-
-<p align="center">
-  <a href="screenshots/promo-2.9.22/actions.png"><img src="screenshots/promo-2.9.22/actions.png" width="220" alt="灵活操作，学习更加顺手：标星、旗标与今日跳过" /></a>
-  <a href="screenshots/promo-2.9.22/statistics.png"><img src="screenshots/promo-2.9.22/statistics.png" width="220" alt="复习有安排，进步看得见：FSRS 复习与学习统计" /></a>
-  <a href="screenshots/promo-2.9.22/reminders.png"><img src="screenshots/promo-2.9.22/reminders.png" width="220" alt="定时提醒，让学习成为习惯：提醒时间与待学待复习数量" /></a>
-</p>
-
-<details>
-<summary>查看应用内 Agent 截图</summary>
-
-从学习页进入 AI 改卡，查看字段草稿并逐项确认写入：
-
-<p align="center">
-  <img src="screenshots/agent-edit-01-entry.png" width="220" alt="学习页的 AI 改卡入口" />
-  <img src="screenshots/agent-edit-02-reasoning.png" width="220" alt="Agent 读取卡片字段" />
-  <img src="screenshots/agent-edit-03-draft.png" width="220" alt="AI 改卡草稿确认页" />
-</p>
-
-</details>
-
-## 安装与使用
+## 安装
 
 ### 普通用户
 
-从[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)安装“记得闪卡”，导入已有 `.apkg` 牌组后即可开始学习。首次使用建议先保留默认设置，熟悉评分和复习节奏后再调整 FSRS、提醒、主题或牌组选项。
+在[华为应用市场](https://appgallery.huawei.com/app/detail?id=com.jide.kapian&channelId=SHARE&source=appshare)搜索“记得闪卡”安装，导入已有 `.apkg` 牌组即可开始学习。建议先使用默认设置，熟悉评分和复习节奏后再调整 FSRS、提醒和外观。
+
+鸿蒙电脑另有独立应用“记得闪卡 PC”（`com.jide.kapian.pc`），可与原版同时安装，两者数据和授权互不迁移，构建方式见 [PC 构建与发布](docs/development/pc-build.md)。
 
 ### 签名 HAP 开发包
 
-[GitHub Release v26.11.09.9](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v26.11.09.9) 提供当前源码版本的签名 HAP、`SHA256SUMS.txt` 和构建说明。该包为 debug 开发构建，包含 arm64-v8a 与 x86_64 原生库；安装受包内签名及设备授权限制，不等同于应用市场安装包。开发设备仅覆盖安装：`hdc -t <connect-key> install -r <signed-hap>`，保留已有数据与签名身份。
+[GitHub Release v26.11.09.9](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/tag/v26.11.09.9) 提供 [签名 HAP](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/jidecards-v26.11.09.9-signed.hap) 与 [SHA-256 校验](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/releases/download/v26.11.09.9/SHA256SUMS.txt)。该包为 debug 开发构建，含 arm64-v8a 与 x86_64 原生库，安装受包内签名和设备授权限制，不等同于应用市场安装包。开发设备只做覆盖安装：`hdc -t <connect-key> install -r <signed-hap>`。
 
 ### 兼容范围
 
-- 支持搭载 HarmonyOS NEXT 的手机、平板和电脑（含 2-in-1 设备），最低兼容 API 21。
-- 支持常用 Anki 牌组格式和牌组自带媒体；不同牌组的自定义模板、插件字段和历史 schema 仍可能存在兼容差异。
-- 卡片宿主已接入作者 HTTP 脚本、嵌套依赖与授权表单的兼容处理，并反馈脚本加载或执行失败；联网与授权结果仍由牌组作者的服务决定。详见[作者脚本与授权表单](docs/development/study-media.md#作者脚本授权表单与网络兼容2026-10-15)。
-- AnkiWeb 同步需要用户自己的 AnkiWeb 账号；自定义同步服务器需要可用的 HTTPS 服务端点。
-- Anki 桌面插件、Qt/Python 界面和桌面 LaTeX 运行时不随应用提供。锁定 Core 的隔离往返回归不等于所有桌面端、AnkiDroid、网站和设备组合已验收；具体证据见[核心互通说明](docs/development/core-interop.md)。
+- 搭载 HarmonyOS NEXT 的手机、平板和电脑（含 2-in-1 设备），最低兼容 API 21。
+- 支持常用 Anki 牌组格式和自带媒体；自定义模板、插件字段和历史 schema 仍可能存在差异。作者 HTTP 脚本与授权表单的处理见[作者脚本与授权表单](docs/development/study-media.md#作者脚本授权表单与网络兼容2026-10-15)。
+- AnkiWeb 同步需要用户自己的账号；自定义同步服务器需要可用的 HTTPS 端点。
+- 不包含 Anki 桌面插件、Qt/Python 界面和桌面 LaTeX 运行时。锁定 Core 的往返回归不代表所有客户端与设备组合都已验收，证据见[核心互通说明](docs/development/core-interop.md)。
 
 ## 数据与隐私
 
-卡库、媒体、备份和 JIDE 会话保存在应用本地。同步按用户配置连接 AnkiWeb 或自定义服务器；公告读取和其他在线功能见对应设置及实现。
+卡库、媒体、备份和 JIDE 会话保存在本机。同步只按用户的配置连接 AnkiWeb、自定义服务器或华为云空间；设备直连的配对信息保存在本机，数据只在同一网络下已配对的个人设备之间传输。
 
-启用设备直连时，配对信息保存在本机，学习记录、卡库与媒体按各自授权通过同一网络在已配对的个人设备之间传输；设备直连与 AnkiWeb 同步共存。
-
-使用 JIDE 时，发送的消息以及工具提供给模型的卡片字段、资料片段或图片会交给所选模型服务。联网检索会把查询交给所选搜索服务。请按资料内容选择服务和发送范围；模型、搜索及同步凭证不应出现在问题报告或示例牌组中。JIDE 的发布开关、资料限制和确认机制见[应用内 Agent 说明](docs/development/agent.md)。
+使用 JIDE 时，消息及工具提供的卡片字段、资料片段或图片会发送给所选模型服务，联网检索的查询会发送给所选搜索服务。请按资料敏感程度选择服务；模型、搜索和同步凭证不应出现在问题报告或示例牌组中。
 
 ## 从源码构建
 
 ### 环境要求
 
-- Node.js 24.x（与 CI 一致）
-- DevEco Studio 6.1.0.860
-- HarmonyOS SDK 6.1.0.105，Compatible API 21、Target API 23
-- Rust 1.92.0（见 [rust-toolchain.toml](rust-toolchain.toml)）
-- `protoc`；主机测试需要 Visual Studio/MSVC，或配有 `cargo-zigbuild` 和 `zig` 的工具链
+| 工具 | 版本 |
+| --- | --- |
+| DevEco Studio | 26.0.0.851 |
+| HarmonyOS SDK | 26.0.0.105，最低兼容 API 21，目标 SDK 26.0.0 |
+| Node.js | 24.x（与 CI 一致） |
+| Rust | 1.92.0，见 [rust-toolchain.toml](rust-toolchain.toml) |
+| 其他 | `protoc`；主机测试需要 Visual Studio/MSVC，或 `cargo-zigbuild` 加 `zig` |
 
-### 准备 Anki Core
-
-先获取本仓库并进入项目目录：
+### 1. 获取源码与 Anki Core
 
 ```bash
 git clone https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos.git
 cd jidecards-anki-harmonyos
 ```
 
-Rust 后端锁定 Anki 26.05，提交为 `e64c6b1`。`third_party/` 被 `.gitignore` 排除，不是 Git submodule；首次构建前准备本地源码：
+Rust 后端锁定 Anki 26.05，提交 `e64c6b1`（见 [UPSTREAM.lock](UPSTREAM.lock)）。`third_party/` 不是 Git submodule，首次构建前在本地准备：
 
 ```bash
 git clone https://github.com/ankitects/anki.git third_party/anki
@@ -200,26 +193,21 @@ git -C third_party/anki rev-parse --short=7 HEAD
 git -C third_party/anki submodule update --init --depth 1 -- ftl/core-repo ftl/qt-repo
 ```
 
-Anki rslib 由 Ankitects Pty Ltd 及其贡献者提供，并依据 AGPL-3.0-or-later 授权。
+### 2. 配置签名
 
-### 安装依赖与构建
+公共 [build-profile.json5](build-profile.json5) 不保存个人签名材料。复制 [config/signing.example.json](config/signing.example.json) 为 `.local/signing.json` 并填入本机签名，或用环境变量 `JIDECARDS_SIGNING_CONFIG` 指向外部 JSON。覆盖安装必须沿用原签名身份，详见[签名文档](docs/development/signing.md)。
 
-公共 [build-profile.json5](build-profile.json5) 不保存个人签名材料。复制 [config/signing.example.json](config/signing.example.json) 为 `.local/signing.json`，填入本机已有签名；也可以用 `JIDECARDS_SIGNING_CONFIG` 指向外部 JSON 文件。覆盖安装必须沿用原有签名身份，签名配置和无签名构建说明见[签名文档](docs/development/signing.md)。
+### 3. 安装依赖、构建与测试
 
 ```bash
 ohpm install
 npm ci
-npm run doctor
-npm run build:app
+npm run doctor      # 检查本机工具链
+npm run build:app   # 构建 HAP
+npm test            # Node 契约与单元测试
 ```
 
-运行完整 Node 契约测试：
-
-```bash
-npm test
-```
-
-日常修改按[分级验证](docs/development/verification.md#按变更路径选择验证)运行资源检查或受影响测试；新增类型、组件、导入或平台 API 补增量构建，不因新对话重复全量验证。完整验收入口保留：
+日常修改按[分级验证](docs/development/verification.md#按变更路径选择验证)只运行受影响的检查；完整验收入口：
 
 ```bash
 npm run verify -- repo     # 可移植仓库与文档门禁
@@ -227,7 +215,28 @@ npm run verify -- native   # Rust 主机测试与原生门禁
 npm run verify             # 完整测试、双架构构建与签名 HAP
 ```
 
-设备验收只能使用 `hdc -t <connect-key> install -r <signed-hap>` 覆盖安装；不要卸载应用或清除用户数据。完整范围见[验证说明](docs/development/verification.md)。
+设备验收只能用 `hdc -t <connect-key> install -r <signed-hap>` 覆盖安装，不要卸载应用或清除用户数据。Mac 环境见 [Mac 构建](docs/development/mac-build.md)。
+
+## 架构与工程质量
+
+```text
+ArkUI 页面 / 组件          entry/src/main/ets/pages、components
+  -> 编排与纯模型          model/（*Session、*Controller，纯 TS，可在 Node 中直接测试）
+  -> 领域 Service          backend/（protobuf 编解码与写入边界）
+  -> Node-API 桥           native/（C++，只转发 3 个函数）
+  -> Rust FFI + Anki Core  native/rsharmony，锁定 Anki 26.05
+```
+
+上层依赖下层，下层不反向依赖页面或组件，`model/` 中的纯模型不接触平台 Kit。这些规则由测试强制检查，不只靠约定。
+
+| 方面 | 做法与证据 |
+| --- | --- |
+| 代码规范 | DevEco Code Linter（`@performance`、`@typescript-eslint` 推荐规则集），配置见 [code-linter.json5](code-linter.json5)，结果与规则调整依据见[代码检查记录](docs/quality/code-linter.md) |
+| 编码约定 | [编码规范](docs/development/coding-standards.md)：分层、命名、ArkTS 约束、资源、统一日志、注释与测试 |
+| 分层与依赖 | [architecture-boundaries 测试](tools/tests/architecture-boundaries.test.mjs)：导入可解析、无循环依赖、下层不依赖 UI、纯模型隔离平台能力 |
+| 自动化测试 | `npm test` 约 4000 个用例，覆盖调度、同步、导入、浏览、学习和 JIDE；Rust 侧另有 FFI 单元测试和真实 Anki Core 集成测试 |
+| 持续集成 | [CI](.github/workflows/ci.yml)：仓库测试、源码导出校验、浏览器卡片渲染、`cargo fmt` / `clippy -D warnings`、RPC 协议指纹 |
+| 文档契约 | 文档中的版本、SDK、锁定提交和发布开关由测试与源码配置比对，相对链接和章节锚点自动校验 |
 
 ## 项目结构与文档
 
@@ -235,42 +244,32 @@ npm run verify             # 完整测试、双架构构建与签名 HAP
 | --- | --- |
 | [entry/src/main/ets/](entry/src/main/ets/) | ArkTS 页面、组件、模型和应用内 Agent |
 | [native/](native/) | C++ Node-API 桥接与 Rust FFI |
-| [native/agent-sandbox/](native/agent-sandbox/) | 独立的 QuickJS-NG / wasmi 纯计算沙箱与测试 |
+| [native/agent-sandbox/](native/agent-sandbox/) | 独立的 QuickJS-NG / wasmi 纯计算沙箱 |
 | [tools/](tools/) | 测试、诊断、构建和 APKG 工具 |
-| [docs/](docs/) | 架构、开发约定、数据格式和验证说明 |
+| [docs/](docs/) | 架构、开发约定、数据格式、验证与发布说明 |
+| [docs/assets/promo/](docs/assets/promo/) | 手机、平板、电脑三端宣传图 |
 | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) | 编程 Agent 的任务入口与事实来源 |
 | [AGENTS.md](AGENTS.md) | 仓库开发约定与不变量 |
 
-进一步阅读：
-
-- [文档导航](docs/README.md)
-- [当前架构](docs/architecture.md)
-- [模块责任与边界](docs/development/ownership.md)
-- [开发任务契约](docs/development/task-contract.md)
-- [应用内 Agent 说明](docs/development/agent.md)
-- [开发状态与发布门禁](docs/DEVELOPMENT_PLAN.md)
+推荐阅读顺序：[文档导航](docs/README.md) → [当前架构](docs/architecture.md) → [编码规范](docs/development/coding-standards.md) → [模块责任与边界](docs/development/ownership.md) → [开发任务契约](docs/development/task-contract.md)。发布门禁见[开发状态与发布门禁](docs/DEVELOPMENT_PLAN.md)。
 
 ## 参与贡献
 
-欢迎通过 [Issues](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/issues) 提交问题和建议，通过 [Pull Requests](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/pulls) 贡献修复、文档和翻译。问题报告请附应用版本、设备型号、系统版本、复现步骤、预期与实际结果；日志和示例牌组请先移除账号、密钥及个人学习内容。
+欢迎通过 [Issues](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/issues) 报告问题、提出建议，通过 [Pull Requests](https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos/pulls) 提交修复、文档和翻译。问题报告请附应用版本、设备型号、系统版本、复现步骤及预期与实际结果；日志和示例牌组请先移除账号、密钥和个人学习内容。
 
-准备修改代码时先读[贡献指南](CONTRIBUTING.md)，再按[项目任务入口](PROJECT_CONTEXT.md)定位领域文档和验证范围。提交保持一个明确目的，包含相关实现、回归与说明；PR 模板区分自动检查和实际设备验收。
+修改代码前先读[贡献指南](CONTRIBUTING.md)，再按[项目任务入口](PROJECT_CONTEXT.md)定位领域文档和验证范围。每次提交保持一个明确目的，包含实现、回归测试和说明；PR 模板区分自动检查与实际设备验收。适合入手的方向：
 
-贡献可以从以下方向开始：
-
-- 使用不同 HarmonyOS API/设备进行兼容性回归并报告版本、设备和复现步骤。
+- 在不同 HarmonyOS 版本和设备上做兼容性回归。
 - 改进 Anki 牌组导入、公式、媒体、同步和统计的兼容性。
-- 完善中英文界面、用户文档、测试和构建工具。
-- 在实体设备上验证应用内 Agent 的联网、取消、普通写入和高风险写入边界。
+- 完善多语言界面、用户文档、测试和构建工具。
+- 在实体设备上验证 JIDE 的联网、取消和写入确认边界。
 
 ## 版本与发布
 
-当前源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。查看[更新记录](CHANGELOG.md)及[3.8.35 源码更新说明](docs/releases/3.8.35.md)；历史说明保留在 [docs/releases/](docs/releases/) 中。华为应用市场版本以下载页面为准，不在官网或 README 维护具体版本号。
+源码版本由 [AppScope/app.json5](AppScope/app.json5) 中的 `versionName` 和 `versionCode` 定义。每次版本的变更见[更新记录](CHANGELOG.md)，逐版说明在 [docs/releases/](docs/releases/)。华为应用市场的上架版本以下载页面为准。
 
-历史应用市场 2.9.22 的更新内容见 [2.9.22 应用市场版说明](docs/releases/appgallery-2.9.22.md)。GitHub 的 `appgallery-v2.9.22` 标签记录当时的版本介绍，自动生成的源码快照对应标签中的 2.9.10 / versionCode 2991，不随 main 的后续更新变化；应用安装请使用应用市场入口。
-
-发布前的构建、测试和设备验收要求见[开发状态与发布门禁](docs/DEVELOPMENT_PLAN.md)。CI 检查结果不代替实体设备验收；源码中的能力以当前发布开关为准。
+发布前的构建、测试和设备验收要求见[开发状态与发布门禁](docs/DEVELOPMENT_PLAN.md)和[应用市场发布](docs/development/appgallery-release.md)。CI 通过不代替实体设备验收；源码中的能力以当前发布开关为准。
 
 ## 许可证与第三方声明
 
-本项目采用 [AGPL-3.0-or-later](LICENSE) 许可。Anki rslib、MathJax、HarmonyOS 组件及其他依赖的版权和许可见 [NOTICE.md](NOTICE.md) 与各自源文件说明。
+本项目采用 [AGPL-3.0-or-later](LICENSE) 许可。Anki rslib 由 Ankitects Pty Ltd 及其贡献者提供，依据 AGPL-3.0-or-later 授权；MathJax、HarmonyOS 组件及其他依赖的版权与许可见 [NOTICE.md](NOTICE.md) 及各自源文件说明。
