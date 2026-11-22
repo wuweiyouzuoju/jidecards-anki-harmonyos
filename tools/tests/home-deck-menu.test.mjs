@@ -30,13 +30,12 @@ function menuHarness(locale = 'base') {
     interfaceItemText: loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceItemText', { APP_INTERFACE_SURFACES, ...uiFeedback }),
     ...uiFeedback,
     SurfaceTransition: { dialogEnterAnimation: () => ({}), dialogExitAnimation: () => ({}) },
-    SelectionDialog: props => props,
-    CustomDialogController: class { constructor(options) { this.options = options; } open() {} close() { this.closed = true; } },
     $r: id => id
   });
   const menu = new Menu(), events = [];
   Object.assign(menu, {
     deckId: '42', deckName: 'Parent::Deck', tone: 牌组色调.Blue,
+    toneAnchor: { left: 0, top: 0, width: 240, height: 340 },
     getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringByNameSync: key => dictionaries[locale][key] } }) }),
     onClose: () => events.push('close'),
     onToneChange: (deckId, tone) => events.push([deckId, tone]),
@@ -46,7 +45,7 @@ function menuHarness(locale = 'base') {
   return { menu, events, tracker };
 }
 
-test('deck tone choices retain every persisted value inside the shared dialog', () => {
+test('deck tone choices retain every persisted value inside the shared menu', () => {
   const { menu, events } = menuHarness();
   assert.deepEqual(DECK_TONE_CHOICES.map(choice => choice.tone), [牌组色调.Blue, 牌组色调.Purple, 牌组色调.Mint, 牌组色调.Amber, 牌组色调.Red, 牌组色调.None]);
   for (const choice of DECK_TONE_CHOICES) {
@@ -59,19 +58,21 @@ test('deck tone choices retain every persisted value inside the shared dialog', 
     assert.equal(item.iconTint, choice.colorKey ? 'app.color.' + choice.colorKey : undefined);
     assert.equal(item.icon, 'app.media.' + choice.iconKey);
     assert.equal(APP_INTERFACE_SURFACES.find(surface => surface.id === 'deck_tones').items.find(item => item.id === String(choice.tone)).iconKey, choice.iconKey);
-    menu.selectItem(item);
+    menu.selectTone(item.id, menu.toneSession);
     assert.deepEqual(events.slice(-2), ['close', ['42', choice.tone]]);
   }
   menu.tone = 牌组色调.Black;
   assert.equal(menu.toneItems().some(item => item.selected), false, 'historical black is not mislabeled');
   const calls = events.length;
-  menu.selectItem({ id: '-1' }); menu.selectItem({ id: '99' });
+  menu.selectTone('-1', menu.toneSession); menu.selectTone('99', menu.toneSession);
   assert.equal(events.length, calls);
   const source = read('components/home/HomeDeckRowMenu.ets');
   assert.match(source, /牌组列表项\(\{ deck: this\.deck/);
   assert.doesNotMatch(source, /DialogHeader\(/);
 
-  assert.match(source, /SelectionDialog\(/);
+  assert.match(source, /private toneMenu[\s\S]*?AnchoredMenu\(\{ refractionSource: this\.sourceId, fuseFromTrigger: false, materialRole: 'menu'/);
+  assert.match(source, /SelectionOptions\(/);
+  assert.doesNotMatch(source, /SelectionDialog|CustomDialogController/);
   assert.doesNotMatch(source, /children:.*toneItems|ForEach\(this.toneItems/);
   assert.match(source, /if \(this\.point !== undefined\) \{[\s\S]*CardActionMenu\(/);
   assert.match(source, /AnchoredMenu\(/);
@@ -133,21 +134,28 @@ test('busy, closed, removed and invalid entries cannot act; back closes colors b
   menu.aboutToDisappear(); menu.selectItem({ id: 'browser' }); menu.dismiss(); assert.deepEqual(events, []);
 });
 
-test('header and outside dismissal close the whole dialog even while colors are expanded', () => {
+test('outside dismissal closes one menu layer and respects the busy guard', () => {
   const { menu, events, tracker } = menuHarness();
   menu.toggleBranch({ id: 'tone' }); menu.publishInterface();
   menu.busy = true; menu.publishInterface();
   assert.equal(tracker.snapshot().find(item => item.surface === 'deck_row_menu').items.find(item => item.id === 'close').enabled, false);
   menu.dismiss(); assert.deepEqual(events, []);
-  menu.busy = false; menu.dismiss(); assert.deepEqual(events, ['close']);
+  assert.deepEqual(menu.expandedIds, ['tone']);
+  menu.busy = false; menu.dismiss();
+  assert.deepEqual(menu.expandedIds, []); assert.deepEqual(events, []);
+  menu.dismiss(); assert.deepEqual(events, ['close']);
 });
 
 test('closing the overlay cannot clear the accepted action target', () => {
   for (const color of [false, true]) {
     const { menu, events } = menuHarness();
     menu.onClose = () => { menu.deckId = ''; events.push('close'); };
-    if (color) menu.toggleBranch({ id: 'tone' });
-    menu.selectItem(color ? menu.toneItems()[0] : menu.menuItems().find(item => item.id === 'stats'));
+    if (color) {
+      menu.toggleBranch({ id: 'tone' });
+      menu.selectTone(String(牌组色调.Blue), menu.toneSession);
+    } else {
+      menu.selectItem(menu.menuItems().find(item => item.id === 'stats'));
+    }
     assert.deepEqual(events, ['close', ['42', color ? 牌组色调.Blue : 'stats']]);
   }
 });
@@ -461,7 +469,7 @@ test('right click uses the same current actions and guarded tone choices at a wi
  assert.equal(observed.values.find(value=>value.id==='presentation').value,'pointer_context_menu');
  assert.equal(observed.values.find(value=>value.id==='triggers').value,'long_press,right_click,details_more');
  const tones=entries.find(item=>item.id==='tone');assert.equal(tones.children,undefined);tones.action();
- assert.notEqual(menu.toneDialog.current(),null);menu.selectItem(menu.toneItems().find(item=>item.id===String(牌组色调.Mint)));
+ assert.deepEqual(menu.expandedIds,['tone']);menu.selectTone(String(牌组色调.Mint),menu.toneSession);
  assert.deepEqual(events,['close',['42',牌组色调.Mint]]);
  events.length=0;menu.busy=true;entries.find(item=>item.id==='rename').action();assert.deepEqual(events,[]);
  assert.ok(menu.contextEntries().every(item=>item.enabled===false));
@@ -553,18 +561,20 @@ test('detail more keeps the selected deck and routes move/reorder through existi
    'shared popup must render above phone details');
 });
 
-test('secondary tone dialog cancels to parent, guards stale callbacks and preserves its original deck', () => {
+test('tone submenu cancels to parent, guards stale callbacks and preserves its original deck', () => {
  const {menu,events,tracker}=menuHarness();
- menu.selectItem({id:'tone'});const first=menu.toneDialog.current();
- assert.ok(first);menu.publishInterface();
- assert.equal(tracker.snapshot().find(x=>x.surface==='deck_row_menu').values.find(x=>x.id==='tone_presentation').value,'secondary_dialog');
- first.options.builder.onClose();assert.equal(first.closed,true);assert.deepEqual(events,[]);
- menu.selectItem({id:'tone'});const second=menu.toneDialog.current();
- first.options.builder.onSelect(String(牌组色调.Red));assert.deepEqual(events,[]);assert.equal(menu.toneDialog.current(),second);
- menu.busy=true;second.options.builder.onSelect(String(牌组色调.Red));assert.deepEqual(events,[]);
- menu.busy=false;menu.deckId='99';second.options.builder.onSelect(String(牌组色调.Red));assert.deepEqual(events,[]);
- menu.deckId='42';second.options.builder.onSelect(String(牌组色调.Red));assert.deepEqual(events,['close',['42',牌组色调.Red]]);
- assert.equal(second.closed,true);assert.equal(menu.toneDialog.current(),null);
+ menu.selectItem({id:'tone'});const first=menu.toneSession;
+ menu.publishInterface();
+ assert.equal(tracker.snapshot().find(x=>x.surface==='deck_row_menu').values.find(x=>x.id==='tone_presentation').value,'submenu');
+ menu.closeTones(first);assert.deepEqual(menu.expandedIds,[]);assert.deepEqual(events,[]);
+ menu.selectItem({id:'tone'});const second=menu.toneSession;
+ menu.closeTones(first);menu.selectTone(String(牌组色调.Red),first);
+ assert.deepEqual(menu.expandedIds,['tone']);assert.deepEqual(events,[]);
+ menu.selectItem({id:'rename'});assert.deepEqual(events,[]);
+ menu.busy=true;menu.selectTone(String(牌组色调.Red),second);assert.deepEqual(events,[]);
+ menu.busy=false;menu.deckId='99';menu.selectTone(String(牌组色调.Red),second);assert.deepEqual(events,[]);
+ menu.deckId='42';menu.selectTone(String(牌组色调.Red),second);assert.deepEqual(events,['close',['42',牌组色调.Red]]);
+ assert.deepEqual(menu.expandedIds,[]);
 });
 
 test('lifted deck remains above its menu and fits the viewport width',()=>{
@@ -643,19 +653,18 @@ test('details more uses the available viewport before its first content measurem
   menu.aboutToDisappear();
 });
 
-test('more and long press use strong page blur only in glass across window sizes',()=>{
+test('more and long press keep page content sharp for both materials across window sizes',()=>{
  for(const width of [360,1200])for(const material of ['flat','glass'])for(const centered of [false,true]){
   const {menu,tracker}=menuHarness();menu.viewportWidth=width;menu.material=material;menu.centered=centered;
   menu.publishInterface();
-  const radius=material==='glass'?FOCUSED_DIALOG_BACKDROP_BLUR:0;
+  const radius=0;
   assert.equal(menu.backdropBlurRadius(),radius);
-  assert.ok(FOCUSED_DIALOG_BACKDROP_BLUR>=DEFAULT_DIALOG_BACKDROP_BLUR*4);
   assert.equal(tracker.snapshot().find(item=>item.surface==='deck_row_menu').values.find(value=>value.id==='backdrop_blur_radius').value,String(radius));
   menu.point={x:100,y:200};assert.equal(menu.backdropBlurRadius(),0);
   menu.aboutToDisappear();
  }
  const source=read('components/home/HomeDeckRowMenu.ets');
- assert.match(source,/DialogBackdrop\(\{ blurRadius: this\.backdropBlurRadius\(\), tracksHierarchy: false \}\)/);
+ assert.match(source,/DialogBackdrop\(\{ tracksHierarchy: false \}\)/);
  assert.doesNotMatch(source,/if \(!this\.centered/);
- assert.doesNotMatch(source,/\.blur\(|\.backdropBlur\(/,'the shared page scrim owns blur, never menu or preview');
+ assert.doesNotMatch(source,/\.blur\(|\.backdropBlur\(/,'menu hosts must not blur the page');
 });

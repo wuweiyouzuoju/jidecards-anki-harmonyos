@@ -59,7 +59,9 @@ test('translations preserve technical markup, links and HTML heading symbols', (
     }
     for(let level=1;level<=5;level++)assert.equal(values.get(`note_editor_heading_${level}_short`),'H'+level,locale.locale);
     const scope=JSON.parse(read(`AppScope/resources/${locale.resourceDirectory}/element/string.json`)).string;
-    assert.equal(scope.length,1);assert.equal(scope[0].name,'app_name');assert.ok(scope[0].value.trim().length>0);
+    // AppScope 只放应用名：default 产品用 app_name，独立的 pc 产品（build-profile.json5）用 app_name_pc。
+    assert.deepEqual(scope.map(item=>item.name).sort(),['app_name','app_name_pc'],locale.locale);
+    for(const item of scope)assert.ok(item.value.trim().length>0,locale.locale+'/'+item.name);
   }
 });
 

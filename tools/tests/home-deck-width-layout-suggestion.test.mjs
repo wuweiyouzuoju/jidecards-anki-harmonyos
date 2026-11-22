@@ -1,3 +1,4 @@
+import { materialHarness } from './surface-material-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,7 +32,7 @@ test('list reports insert, collapse, resize and density changes, and releases it
     replaceCount(count) { this.count = count; for (const l of this.listeners) l.onDataReloaded(); }
   }
   const List = loadComponentLogic('components/home/主页牌组列表.ets', '主页牌组列表', {
-    ...appearance, 应用尺寸, 牌组列表数据源: Source, Scroller: class {}
+    ...appearance, 应用尺寸, SeriesVisual: materialHarness('glass', false).SeriesVisual, 牌组列表数据源: Source, Scroller: class {}
   });
   const list = new List();
   let fontScale=1;
@@ -63,9 +64,9 @@ function homeHarness() {
   const interfaceTracker = new AppInterfaceTracker();
   let save = async () => { events.push('save-narrow'); };
   let complete = async () => { events.push('handled'); };
-  const Home = new Function('$r', 'saveDeckListStyle', 'completeDeckWidthHint', 'isDoubleColumnDeckListStyle', 'showToastSafely', 'DialogAlignment', 'deckLayoutSuggestion', 'resourceText', 'appInterface',
+  const Home = new Function('$r', 'saveDeckListStyle', 'completeDeckWidthHint', 'deckListColumnCount', 'showToastSafely', 'DialogAlignment', 'deckLayoutSuggestion', 'resourceText', 'appInterface',
     stripTypeScriptTypes(`class Home { ${methods} }`) + '; return Home;')(
-      key => key, async value => { assert.equal(value, home.deckWidthHintTarget); await save(); }, () => complete(), appearance.isDoubleColumnDeckListStyle,
+      key => key, async value => { assert.equal(value, home.deckWidthHintTarget); await save(); }, () => complete(), appearance.deckListColumnCount,
       (_ui, message) => events.push(message.message), { Center: 'center' }, appearance.deckLayoutSuggestion, (_ui, resource) => resource, interfaceTracker);
   const home = new Home();
   Object.assign(home, { autoSyncStartupReady: true, 加载状态: 'ready', deckListOverflow: true,
@@ -126,15 +127,16 @@ test('long-action window binds shared full labels to the original choices and pu
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
   const start = source.indexOf('  private readonly createDeckWidthDialog:');
   const field = source.slice(start, source.indexOf('\n  };', start) + 6);
-  const Host = new Function('$r', 'TextActionDialog', 'CustomDialogController', 'deckLayoutSuggestion',
+  const Host = new Function('$r', 'TextActionDialog', 'CustomDialogController', 'deckLayoutSuggestion', 'GLASS_HOME_SOURCE',
     stripTypeScriptTypes(`class Host { ${field} }`, { mode: 'transform' }) + '; return Host;')(
-      key => key, props => props, class { constructor(config) { this.config = config; } }, appearance.deckLayoutSuggestion);
+      key => key, props => props, class { constructor(config) { this.config = config; } }, appearance.deckLayoutSuggestion, 'home');
   for (const target of ['single_narrow', 'double_narrow']) {
     const host = new Host(), choices = [];
     Object.assign(host, { deckWidthHintTarget: target, deckWidthDialog: { guard: callback => callback, presentation: () => ({}) },
       finishDeckWidthHint: value => choices.push(value) });
     const dialog = host.createDeckWidthDialog(() => {}).config.builder;
     const expected = appearance.deckLayoutSuggestion(target);
+    assert.equal(dialog.refractionSource, 'home');
     assert.equal(dialog.confirmLabel, 'app.string.' + expected.confirmKey);
     assert.equal(dialog.cancelLabel, 'app.string.' + expected.keepKey);
     dialog.onConfirm(); dialog.onCancel(); assert.deepEqual(choices, [true, false]);
@@ -269,7 +271,7 @@ test('real grouped data source preserves complete subtrees through expansion, co
     replaceDecks(decks) { this.decks = decks; for (const l of this.listeners) l.onDataReloaded(); }
   }
   const List = loadComponentLogic('components/home/主页牌组列表.ets','主页牌组列表', {
-    ...appearance, 应用尺寸, 牌组列表数据源:Source, Scroller:class {}
+    ...appearance, 应用尺寸, SeriesVisual: materialHarness('glass', false).SeriesVisual, 牌组列表数据源:Source, Scroller:class {}
   });
   const list = new List();
   list.style = 'double_narrow'; list.narrow = true; list.加载状态 = 'ready'; list.viewportHeight = 263;
@@ -314,7 +316,7 @@ test('double columns fill the shorter side after a tall subtree and newly append
  const source=readFileSync(new URL('../../entry/src/main/ets/components/home/主页牌组列表.ets',import.meta.url),'utf8');
  assert.match(source,/WaterFlow\(\{ scroller: this\.牌组列表滚动器 \}\)/);
  assert.match(source,/FlowItem\(\)[\s\S]*ForEach\(group\.decks/);
- assert.match(source,/\.columnsTemplate\('1fr 1fr'\)/);
+ assert.match(source,/\.columnsTemplate\(this\.columnCount\(\) === 3 \? '1fr 1fr 1fr' : '1fr 1fr'\)/);
  assert.doesNotMatch(source,/\.lanes\(/,'paired list rows would reintroduce tall blank space');
 });
 

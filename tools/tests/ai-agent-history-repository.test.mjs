@@ -130,7 +130,7 @@ test('history tools reject invented IDs/arguments, redact secrets, read bounded 
 
 test('history tools are discoverable offline in all modes, registered as read only and do not grant card scope', () => {
   for (const mode of ['assistant', 'create', 'edit']) {
-    const discovery = new AgentToolDiscovery(filterAgentWebTools(agentFunctionTools(100, mode), false));
+    const discovery = new AgentToolDiscovery(filterAgentWebTools(agentFunctionTools(mode), false));
     const result = JSON.parse(discovery.discover('{"query":"历史会话"}'));
     for (const name of ['search_conversation_history', 'read_conversation_history']) {
       assert.ok(result.loadedNames.includes(name)); assert.equal(toolRiskOf(name), 'read');

@@ -134,7 +134,7 @@ test('Chinese and English move labels resolve to complete resources', () => {
 test('JIDE reads the actual move dialog controls and current capability in both languages', async () => {
   const h = componentHarness(); await h.feature.load();
   const context = {simple: false, agent: true, cloudDeck: false, themeHasTextures: false};
-  const tools = agentFunctionTools(100, 'assistant');
+  const tools = agentFunctionTools('assistant');
   const view = locale => {
     const strings = new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`, import.meta.url))).string.map(x => [x.name, x.value]));
     return buildAgentAppStructure(context, 'deck_move', '', key => strings.get(key), agentSettingDefinitions(), tools,

@@ -17,7 +17,7 @@ const stub = `
 export const aiContentExportPolicy = {recordNotes:async()=>{},recordNotetypes:async()=>{},assertExport:async()=>{}};
 
 export class AgentStreamObserver {} export class AgentTransportError extends Error {} export class AgentTransportSession {}
-export class DeepSeekAdapter {} export class OpenAIAdapter {} export class CustomAdapter {}
+export class OfficialAIAdapter {} export class DeepSeekAdapter {} export class OpenAIAdapter {} export class CustomAdapter {}
 export class AgentWorkspaceStore {} export const agentOperationCoordinator = {};
 export async function readAgentSettingValue() { throw Error("unexpected setting read"); }
 export async function saveAgentSettingValue() { throw Error("unexpected setting write"); }
@@ -73,7 +73,7 @@ export async function saveBrowserPreferences() {throw Error('unexpected browser 
 export class AnkiBrowserSearch {async columns(){throw Error('unexpected browser column read');}}
 `;
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
-const names = ['AiContentExportService','AgentTransport','DeepSeekAdapter','OpenAIAdapter','CustomAdapter','AgentWorkspaceStore','AppAgentOperations','AgentSettingCommands','WikimediaImageService',
+const names = ['AiContentExportService','AgentTransport','OfficialAIAdapter','DeepSeekAdapter','OpenAIAdapter','CustomAdapter','AgentWorkspaceStore','AppAgentOperations','AgentSettingCommands','WikimediaImageService',
  '牌组服务','笔记类型服务','搜索服务','笔记服务','卡片服务','标签服务','统计服务','AppThemeService','FSRS控制器',
  'CardTextSizeStore','DeckListAppearanceStore','MotionStyleStore','StudyHaptics','LocalPreferenceWrite','牌组顺序存储',
  'ReviewPreferencesService','StudyControlsService','数据迁移服务','FsrsService','AnkiDeckOptions','FilteredDeckService','BrowserPreferencesStore','AnkiBrowserSearch'];
@@ -201,10 +201,10 @@ function harness(rounds=[],limits,mode='create',documents=null,validate=null,def
  const requests=[];const events=[];
  runner.createSession=(_provider,request,observer)=>({async start(){requests.push(structuredClone(request));
  if(validate!==null)validate(JSON.parse(buildResponsesPayload(request)));
- for(const e of rounds.shift()??[])observer.onEvent(e);},cancel(){}});
+ for(const e of rounds.shift()??[]) {if(e instanceof Error)throw e;observer.onEvent(e);}},cancel(){}});
  const session=new AgentSessionController(runner,scope,store,auxiliary);
  const request=(text,instructions)=>({apiKey:'test',baseUrl:'https://example.test',model:'test',instructions,input:[item(text)],
- functionTools:catalog??agentFunctionTools(100,mode),deferTools,searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
+ functionTools:catalog??agentFunctionTools(mode),deferTools,searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
  requiresDraft:false,expectedDraftCount:0,reasoningEffort:'',maxOutputTokens:1024});
  const run=(text,resume='',expectedDraftCount=0,instructions='')=>{const value=request(text,instructions);value.expectedDraftCount=expectedDraftCount;return session.run('deepseek',value,{onEvent:e=>events.push(e)},resume);};
  return {scope,store,registry,cards,auxiliary,runner,session,requests,events,run};
@@ -227,7 +227,7 @@ test('on-demand discovery exposes real schemas in the next request and then exec
  await h.run('看看 English 牌组');
  assert.equal(h.requests[0].functionTools.some(tool=>tool.name==='list_decks'),false);
  const actual=h.requests[1].functionTools.find(tool=>tool.name==='list_decks');
- assert.deepEqual(actual,agentFunctionTools(100,'assistant').find(tool=>tool.name==='list_decks'));
+ assert.deepEqual(actual,agentFunctionTools('assistant').find(tool=>tool.name==='list_decks'));
  const output=JSON.parse(h.requests[2].input.find(item=>item.kind==='function_call_output'&&item.callId==='decks').output);
  assert.ok(output.decks.length>0);
  assert.deepEqual(fixture.writes,[]);
@@ -273,7 +273,7 @@ test('discovering a confirmation action still requires explicit confirmation and
 });
 
 test('discovery cannot load web tools excluded by this turn and does not count as a search',async()=>{
- const catalog=agentFunctionTools(100,'assistant').filter(tool=>!['web_search','read_webpage'].includes(tool.name));
+ const catalog=agentFunctionTools('assistant').filter(tool=>!['web_search','read_webpage'].includes(tool.name));
  const h=harness([[call('discover','discover_tools',{names:['web_search']})],
   [event('text_delta','联网未启用。')]],undefined,'assistant',null,null,true,catalog);
  await h.run('联网搜索');
@@ -305,12 +305,12 @@ test('long projects pass the old round limit, checkpoint paired tool results, an
  const plan={baseRevision:0,objective:'处理完整资料',notes:'从第二章继续，保留已确认约束。',
   steps:[{id:'read',title:'逐页读取',status:'in_progress'},{id:'draft',title:'生成草稿',status:'pending'}]};
  const rounds=[[call('plan','update_task_plan',plan)],
-   ...Array.from({length:18},(_,index)=>[call('read-'+index,'get_task_plan',{})]),
+   ...Array.from({length:101},(_,index)=>[call('read-'+index,'get_task_plan',{})]),
    [call('batch-one','get_task_plan',{}),call('batch-two','get_task_plan',{})], [event('text_delta','计划已保留。')]];
  const h=harness(rounds,undefined,'assistant');const checkpoints=[];
  h.session.setCheckpointListener(()=>checkpoints.push(structuredClone(h.session.exportState())));
- const result=await h.run('先制定计划，再分批处理资料');assert.equal(result.status,'completed');assert.equal(h.requests.length,21);
- assert.ok(checkpoints.length>=20);const persisted=checkpoints.findLast(x=>x.taskPlan?.revision===1&&x.paused);
+ const result=await h.run('先制定计划，再分批处理资料');assert.equal(result.status,'completed');assert.equal(h.requests.length,104);
+ assert.ok(checkpoints.length>=104);const persisted=checkpoints.findLast(x=>x.taskPlan?.revision===1&&x.paused);
  assert.ok(persisted);assert.equal(persisted.taskPlan.notes,plan.notes);
  for(const checkpoint of checkpoints) {
    const answered=new Set(checkpoint.input.filter(x=>x.kind==='function_call_output').map(x=>x.callId));
@@ -993,7 +993,7 @@ test('legacy checkpoints and missing checkpoints continue with historical data w
      await h.run('new request');
    } else {
      const request={apiKey:'test',baseUrl:'https://example.test',model:'test',instructions:'',input:[...oldInput,item('new request')],
-       functionTools:agentFunctionTools(100,'assistant'),searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
+       functionTools:agentFunctionTools('assistant'),searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
        requiresDraft:false,expectedDraftCount:0,reasoningEffort:'low',maxOutputTokens:1024};
      await h.session.run('deepseek',request,{onEvent(){}});
    }
@@ -1079,7 +1079,7 @@ test('switching to a text-only model removes previous page images before the act
  const source={kind:'function_call_output',role:'',content:'',callId:'page',name:'',argumentsJson:'',output:'{"documentId":"doc","page":1}',
   images:[{imageUrl:'data:image/jpeg;base64,YWJj'}]};
  const request={apiKey:'test',baseUrl:'https://example.test',model:'text-only',supportsImages:false,instructions:'',input:[source],
-  functionTools:agentFunctionTools(100,'assistant'),searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
+  functionTools:agentFunctionTools('assistant'),searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,
   requiresDraft:false,expectedDraftCount:0,reasoningEffort:'',maxOutputTokens:1024};
  await h.runner.run('custom',request,{onEvent:e=>h.events.push(e)});
  assert.equal(h.requests[0].input[0].images,undefined);
@@ -1121,4 +1121,52 @@ test('JIDE rename proposals must be the only tool in their batch',async()=>{
   [event('text_delta','需要单独提案。')]]);
  await h.run('改名');assert.ok(h.requests[1].input.some(x=>x.output?.includes('clarification_must_be_only_tool')));
  assert.equal(h.session.getAction(),null);
+});
+
+test('native DeepSeek requires a successful web result even when the search stream emitted completed', async () => {
+ for (const status of ['failed', 'completed']) {
+   const h = harness([[event('status', 'web_search_completed'), event('continuation_item', JSON.stringify({
+     type: 'web_search_call', id: 'search-1', kind: 'deep_search', status
+   })), event('text_delta', 'Answer')]], undefined, 'assistant');
+   const run = h.runner.run('deepseek', { apiKey: 'test', baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash',
+     instructions: '', input: [item('Search the web')], functionTools: [], searchMode: 'auto', nativeWebTools: true,
+     requiresWebSearch: true, requiresSearchEvidence: false, requiresDraft: false, expectedDraftCount: 0,
+     reasoningEffort: 'high', maxOutputTokens: 1024 }, { onEvent: entry => h.events.push(entry) });
+   if (status === 'failed') await assert.rejects(run, /web_search_not_executed/);
+   else assert.equal((await run).status, 'completed');
+   assert.equal(h.events.some(entry => entry.kind === 'tool_completed'), status === 'completed');
+ }
+});
+
+
+test('a truncated provider output continues automatically beyond one-response token budget', async()=>{
+ const h=harness([[event('text_delta','Part one'),event('status','provider_response_incomplete_max_output_tokens')],
+   [event('text_delta','Part two, finished')]],undefined,'assistant');
+ const result=await h.run('Finish both sections');
+ assert.equal(result.status,'completed');assert.equal(h.requests.length,2);
+ assert.ok(h.requests[1].input.some(x=>x.content.includes('Continue from the truncated response')));
+});
+
+test('interrupted streams persist a paused checkpoint and restore without executing partial tool arguments',async()=>{
+ fixture.writes=[];
+ const h=harness([[call('decks','list_decks',{query:'',limit:20})],
+   [event('text_delta','Useful unfinished explanation'),new Error('network disconnected')]],undefined,'assistant');
+ const checkpoints=[];h.session.setCheckpointListener(()=>checkpoints.push(structuredClone(h.session.exportState())));
+ await assert.rejects(()=>h.run('Analyze then explain'),/network disconnected/);
+ const state=checkpoints.at(-1);
+ assert.equal(state.paused,true);
+ assert.ok(state.input.some(x=>x.kind==='function_call_output'&&x.callId==='decks'));
+ assert.ok(state.input.some(x=>x.content.includes('Useful unfinished explanation')));
+ const resumed=harness([[event('text_delta','Finished')]],undefined,'assistant');
+ resumed.session.restore(state);await resumed.run('Continue','{"status":"continue"}');
+ assert.equal(resumed.requests.length,1);
+ assert.equal(resumed.events.some(e=>e.kind==='tool_started'),false);
+ assert.deepEqual(fixture.writes,[]);
+});
+
+test('failure checkpoint IO is reported rather than claiming the failed turn is recoverable',async()=>{
+ const h=harness([[new Error('offline')]],undefined,'assistant');
+ let attempts=0;h.session.setCheckpointListener(()=>{if(++attempts>1)throw Error('disk full');});
+ await assert.rejects(()=>h.run('task'),/agent_checkpoint_failed/);
+ assert.equal(h.session.isPaused(),true);
 });

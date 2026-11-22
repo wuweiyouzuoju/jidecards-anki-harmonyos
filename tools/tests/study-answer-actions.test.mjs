@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';import assert from 'node:assert/strict';
 import {loadComponentLogic} from './platform-module-harness.mjs';
+import {loadPlatformModule} from './platform-module-harness.mjs';
+import {localPreferenceApi} from './local-preference-harness.mjs';
 function harness(){const C=loadComponentLogic('components/StudyAnswerActionBar.ets','StudyAnswerActionBar',{颜色键:{动作主色:'action'},应用尺寸:{},$r:x=>x});return new C();}
 test('显示答案保留原阶段与忙碌守卫，无延迟调用原回调',()=>{
  const c=harness();let calls=0;c.显示答案回调=()=>calls++;
@@ -22,4 +24,20 @@ test('the mounted action reads live loading, busy and answer state instead of fr
  c.busy=true;assert.equal(c.actionEnabled(true),false);c.busy=false;c.stage='answer';
  assert.equal(c.actionEnabled(true),false);assert.equal(c.actionEnabled(false),true);
  c.busy=true;assert.equal(c.actionEnabled(false),false);
+});
+
+test('two-button preference survives restart and rejects failed or stale writes',async()=>{
+ const memory=new Map(),storage=new Map([['abilityContext',{}]]);let fail=false;
+ const AppStorage={get:key=>storage.get(key),setOrCreate:(key,value)=>storage.set(key,value)};
+ const store={getSync:(key,fallback)=>memory.has(key)?memory.get(key):fallback,
+  putSync:(key,value)=>memory.set(key,value),flush:async()=>{if(fail)throw Error('disk full');}};
+ const create=()=>loadPlatformModule('utils/StudyAnswerButtons.ets',
+  '({initializeStudyAnswerButtons,saveStudyTwoButtons,STUDY_TWO_BUTTONS_KEY})',
+  {AppStorage,preferences:{getPreferencesSync:()=>store},hilog:{warn(){}},...localPreferenceApi(AppStorage)});
+ let api=create();api.initializeStudyAnswerButtons();assert.equal(storage.get(api.STUDY_TWO_BUTTONS_KEY),false);
+ await api.saveStudyTwoButtons(true,false);
+ api=create();api.initializeStudyAnswerButtons();assert.equal(storage.get(api.STUDY_TWO_BUTTONS_KEY),true);
+ await assert.rejects(api.saveStudyTwoButtons(false,false),/setting_changed_since_proposal/);
+ fail=true;await assert.rejects(api.saveStudyTwoButtons(false,true),/disk full/);
+ api.initializeStudyAnswerButtons();assert.equal(storage.get(api.STUDY_TWO_BUTTONS_KEY),true);
 });

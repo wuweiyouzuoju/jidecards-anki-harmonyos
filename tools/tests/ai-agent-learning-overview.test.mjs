@@ -91,7 +91,7 @@ function fixture(mode='assistant') {
 
 test('every task mode advertises and executes a strict read-only overview without granting IDs or analysis progress', async () => {
   for (const mode of ['assistant','create','edit']) {
-    const definition = agentFunctionTools(25,mode).find(tool=>tool.name==='get_learning_overview');
+    const definition = agentFunctionTools(mode).find(tool=>tool.name==='get_learning_overview');
     assert.ok(definition); assert.equal(toolRiskOf(definition.name),'read');
     const f=fixture(mode); const args=JSON.parse(definition.exampleArgumentsJson);
     const before=f.scope.readableIds();

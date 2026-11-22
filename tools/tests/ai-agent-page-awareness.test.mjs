@@ -167,16 +167,21 @@ test('real audio field status reaches JIDE from both editor hosts with pause/res
       noteAudioParts: value => [{ text: value, filename: 'PRIVATE_FILENAME' }]
     });
     const field = new Field(); field.value = '[sound:PRIVATE_FILENAME]'; field.audios = [{ id: 5, uri: 'PRIVATE_URI' }];
+    field.speechVisible = true;
     field.onStatus = status => page.publishAudioStatus(status);
     field.aboutToAppear();
     const item = id => result(tracker, 'note_audio_manage').surfaces[0].items.find(x => x.id === id);
     assert.equal(item('record').title, zh.get('note_audio_record'));
+    assert.equal(item('generate_speech').title, zh.get('note_audio_generate_speech'));
+    assert.equal(item('generate_speech').enabled, true);
+    assert.equal(item('generate_speech').opens, 'note_audio_speech');
     assert.equal(item('pending-5-remove').title, zh.get('note_audio_remove'));
     assert.equal(item('pause').visibility, 'hidden');
     field.recording = field.disabled = true; field.publishStatus();
     assert.equal(item('record').title, zh.get('note_audio_record_done')); assert.equal(item('record').enabled, true);
     assert.equal(item('pause').title, zh.get('note_audio_pause')); assert.equal(item('close').enabled, false);
     assert.equal(item('apply').enabled, false); assert.equal(item('add').visibility, 'hidden');
+    assert.equal(item('generate_speech').visibility, 'hidden');
     field.paused = true; field.seconds = 12; field.publishStatus();
     assert.equal(item('pause').title, zh.get('note_audio_resume'));
     assert.equal(result(tracker, 'note_audio_manage', key => en.get(key)).surfaces[0].items.find(x => x.id === 'pause').title, en.get('note_audio_resume'));

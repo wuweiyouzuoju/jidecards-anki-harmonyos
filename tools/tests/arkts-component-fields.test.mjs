@@ -26,8 +26,9 @@ function sources(directory) {
 }
 
 // 提前拦截已实测会原样留在编译产物中的内联组件链；不代替 HAP/设备验收。
-function inlineBuilderComponents(source, builderNames) {
-  const component = '(?:Text|Column|Row|Stack|Button|Image|Scroll|List|ForEach)';
+function inlineBuilderComponents(source, builderNames, customComponents = []) {
+  const component = '(?:' + ['Text', 'Column', 'Row', 'Stack', 'Button', 'Image', 'Scroll', 'List', 'ForEach',
+    ...customComponents].map(name => name.replace(/[$]/g, '\\$')).join('|') + ')';
   return builderNames.filter(name => {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp(`(?<![$\\u200c\\u200d\\p{ID_Continue}])${escaped}\\s*:\\s*\\([^)]*\\)(?:\\s*:\\s*void)?\\s*=>\\s*\\{\\s*${component}\\s*\\(`, 'u').test(source);
@@ -41,6 +42,7 @@ function builderParamNames(source) {
 test('BuilderParam callbacks delegate to compiled builders instead of inline declarative component chains', () => {
   assert.deepEqual(inlineBuilderComponents('content: () => { Text(body).fontSize(16) }', ['content']), ['content']);
   assert.deepEqual(inlineBuilderComponents('content: (): void => { Column() { Text(body) } }', ['content']), ['content']);
+  assert.deepEqual(inlineBuilderComponents('header: (): void => { DialogHeader({ title }); }', ['header'], ['DialogHeader']), ['header']);
   assert.deepEqual(inlineBuilderComponents('content: () => { this.paragraph(body); }', ['content']), []);
   assert.deepEqual(inlineBuilderComponents('内容: () => { Text(body).fontSize(16) }', ['内容']), ['内容']);
   assert.deepEqual(inlineBuilderComponents('$content: () => { Column() { Text(body) } }', ['$content']), ['$content']);
@@ -49,8 +51,11 @@ test('BuilderParam callbacks delegate to compiled builders instead of inline dec
   const root = fileURLToPath(new URL('../../entry/src/main/ets/', import.meta.url));
   const files = sources(root).map(path => ({ path, source: readFileSync(path, 'utf8') }));
   const builderNames = [...new Set(files.flatMap(({ source }) => builderParamNames(source)))];
+  const customComponents = [...new Set(files.flatMap(({ source }) =>
+    [...source.matchAll(/^\s*(?:export\s+)?struct\s+([$\p{ID_Start}][$‌‍\p{ID_Continue}]*)\s*\{/gmu)]
+      .map(match => match[1])))];
   for (const file of files) {
-    assert.deepEqual(inlineBuilderComponents(file.source, builderNames), [], file.path);
+    assert.deepEqual(inlineBuilderComponents(file.source, builderNames, customComponents), [], file.path);
   }
 });
 test('state fields cannot shadow common ArkUI component attribute methods', () => {

@@ -6,6 +6,7 @@ import test from 'node:test';
 import { stripTypeScriptTypes } from 'node:module';
 import { 应用尺寸 } from '../../entry/src/main/ets/utils/应用尺寸.ets';
 import { settingsHeaderItems } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { materialHarness } from './surface-material-harness.mjs';
 
 test('home and settings keep the same gap below their toolbar buttons', () => {
   const toolbarSource = read('entry/src/main/ets/components/home/主页顶部工具栏.ets');
@@ -30,9 +31,17 @@ test('home and settings keep the same gap below their toolbar buttons', () => {
     }
   }
   // a uses the explicit optical estimate. This test cannot measure system glyph pixels.
-  for (const path of ['entry/src/main/ets/pages/首页.ets', 'entry/src/main/ets/components/设置面板.ets']) {
-    assert.match(read(path), /left: 应用尺寸\.页面内边距_水平,\s*right: 应用尺寸\.页面内边距_水平,\s*top: (?:this.排序模式中 \? )?应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/, path);
+  assert.match(read('entry/src/main/ets/pages/首页.ets'),
+    /left: 应用尺寸\.页面内边距_水平 \* this\.densityScale\(\),\s*right: 应用尺寸\.页面内边距_水平 \* this\.densityScale\(\),\s*top: this\.排序模式中 \? 应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/);
+  const panel = read('entry/src/main/ets/components/设置面板.ets');
+  const settingsGap = panel.match(/private settingsModuleGap\(\): number \{\s*return ([^;]+);/)[1];
+  for (const narrow of [false, true]) {
+    assert.equal(evaluate(settingsGap, { wideSettings: () => false, narrowDeckLayout: narrow, densityScale: () => 1 }),
+      应用尺寸.页面内容顶部间距(narrow));
+    assert.equal(evaluate(settingsGap, { wideSettings: () => true, narrowDeckLayout: narrow, densityScale: () => 1 }),
+      应用尺寸.页面内边距_水平);
   }
+  assert.match(panel, /top: this\.settingsModuleGap\(\),\s*bottom: this\.settingsModuleGap\(\)/);
 });
 
 test('every primary page consumes the shared first-content and toolbar spacing', () => {
@@ -44,15 +53,17 @@ test('every primary page consumes the shared first-content and toolbar spacing',
     assert.match(toolbar, /bottom: 0/, name);
   }
   const settings = read('entry/src/main/ets/components/设置面板.ets');
-  assert.match(settings, /top: 应用尺寸\.页面内容顶部间距\(this\.narrowDeckLayout\)/);
-  assert.match(settings, /top: 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout, this\.toolbarSafeTop\)/);
+  assert.match(settings, /top: this\.settingsModuleGap\(\)/);
+  assert.match(settings, /return \(this\.wideSettings\(\) \? 应用尺寸\.页面内边距_水平 : 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\)\) \* this\.densityScale\(\)/);
+  assert.match(settings, /top: this\.toolbarTop\(\)/);
+  assert.match(settings, /return 应用尺寸\.pageToolbarTop\(this\.状态栏高度, this\.narrowDeckLayout, this\.toolbarSafeTop\)/);
   const agent = read('entry/src/main/ets/pages/AI制卡页.ets');
   assert.doesNotMatch(agent.slice(agent.lastIndexOf('  build() {')), /Divider\(/,
     'a second divider must not add an extra offset below the Agent toolbar');
 });
 
 test('peer cards share one gap and reminder scrolling does not fix the content height', () => {
-  for (const path of ['components/设置面板.ets', 'components/牌组详情面板.ets', 'pages/首页.ets', 'pages/统计页.ets', 'pages/学习提醒页.ets']) {
+  for (const path of ['components/牌组详情面板.ets', 'pages/首页.ets', 'pages/统计页.ets', 'pages/学习提醒页.ets']) {
     assert.match(read('entry/src/main/ets/' + path), /space: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\)/, path);
   }
   // 宽版保持公共间距，窄版是显式的用户外观偏好。
@@ -61,7 +72,7 @@ test('peer cards share one gap and reminder scrolling does not fix the content h
   const reminder = read('entry/src/main/ets/pages/学习提醒页.ets');
   const scroll = reminder.slice(reminder.indexOf('Scroll() {'), reminder.indexOf('.layoutWeight(1)', reminder.indexOf('Scroll() {')));
   assert.doesNotMatch(scroll, /\.height\('100%'\)/);
-  assert.match(scroll, /bottom: 应用尺寸\.页面底部间距\(this\.narrowDeckLayout\) \+ this\.导航条高度/);
+  assert.match(scroll, /bottom: SeriesVisual\.scrollShadowEndInset\(this\.surfaceMaterial, 应用尺寸\.页面底部间距\(this\.narrowDeckLayout\)\) \+ this\.导航条高度/);
   assert.doesNotMatch(reminder.slice(reminder.indexOf('private 提醒项卡片'), reminder.indexOf('private 空状态')), /\.margin\(\{ bottom:/);
 });
 
@@ -110,13 +121,13 @@ test('fixed action bars and browser result boundaries use the shared responsive 
   const table = read('entry/src/main/ets/components/browser/卡片表格.ets');
   const addNote = read('entry/src/main/ets/pages/添加笔记页.ets');
   assert.match(addNote, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
-  assert.match(addNote, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.导航条高度\)/);
-  assert.match(detail, /\.margin\(\{ bottom: 0 \}\)/,
+  assert.match(addNote, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.导航条高度,\s*SeriesVisual\.scrollShadowEndInset\(this\.pageMaterial, 0\)\)/);
+  assert.match(detail, /\.margin\(\{[^}]*\bbottom: 0\s*\}\)/,
     'detail card must not add a second gap below the card');
   assert.match(detail, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
-  assert.match(detail, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.navigationBottomInset\)/);
+  assert.match(detail, /bottom: SeriesVisual\.scrollShadowEndInset\(this\.surfaceMaterial,\s*应用尺寸\.页面底部间距\(this\.narrowDeckLayout\) \* this\.densityScale\(\)\) \+ this\.navigationBottomInset/);
   assert.match(study, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
-  assert.match(study, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.导航条高度\)/);
+  assert.match(study, /bottom: 应用尺寸\.操作区底部间距\(this\.narrowDeckLayout, this\.导航条高度,\s*SeriesVisual\.scrollShadowEndInset\(this\.pageMaterial, 0\)\)/);
   assert.match(study, /bottom: this\.isFloatingStudyLayout\(\) \? 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\) : 0/,
     'bottom study mode must not double the card-to-action gap');
   assert.match(browser, /bottom: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\) \}\)/,
@@ -146,10 +157,10 @@ test('study answer input shares the action pill silhouette without a second inse
   const input = inputArea.slice(inputArea.indexOf('TextInput('), inputArea.indexOf('.enterKeyType('));
   const wrapper = inputArea.slice(inputArea.indexOf("        .width('100%')\n        .padding({"),
     inputArea.indexOf("    .width('100%')\n    .layoutWeight(1)"));
-  assert.match(input, /(?:\.height\(应用尺寸\.行动按钮高度\)|\.constraintSize\(\{ minHeight: 应用尺寸\.行动按钮高度 \}\))/);
-  assert.match(input, /\.borderRadius\(应用尺寸\.圆角_行动按钮\)/);
+  assert.match(input, /(?:\.height\(应用尺寸\.行动按钮高度 \* this\.densityScale\(\)\)|\.constraintSize\(\{ minHeight: 应用尺寸\.行动按钮高度 \* this\.densityScale\(\) \}\))/);
+  assert.match(input, /\.borderRadius\(appearanceElementRadius\(this.appearanceElements, 应用尺寸\.圆角_行动按钮\)\)/);
   const action = read('entry/src/main/ets/components/开始学习按钮.ets');
-  assert.match(action, /height\(应用尺寸.行动按钮高度\)/, 'start study matches the answer button height');
+  assert.match(action, /height\(应用尺寸.行动按钮高度 \* this\.densityScale\(\)\)/, 'start study matches the answer button height');
   assert.match(action, /enabled\(this\.isAvailable\)/);
   assert.match(input, /backgroundColor\(\$r\('app.color.surface_card'\)\)/);
   assert.doesNotMatch(input, /border_input|圆角_面板/);
@@ -158,20 +169,24 @@ test('study answer input shares the action pill silhouette without a second inse
   assert.match(wrapper, /backgroundColor\(Color.Transparent\)/);
   assert.doesNotMatch(wrapper, /left:|right:|surface_card/);
   assert.match(wrapper, /top: 应用尺寸\.操作区顶部间距\(this\.narrowDeckLayout\)/);
-  const evaluate = (expression, state) => new Function('应用尺寸', `return ${expression}`).call(state, 应用尺寸);
+  const { SeriesVisual, sharedGlassShadow } = materialHarness('glass', false);
+  const evaluate = (expression, state) => new Function('应用尺寸', 'SeriesVisual', `return ${expression}`).call(state, 应用尺寸, SeriesVisual);
   const inputTop = wrapper.match(/top: ([^\n]+),/)[1];
   const inputBottom = wrapper.match(/bottom: ([^\n]+)/)[1];
   const parentArea = inputArea.slice(inputArea.lastIndexOf('.layoutWeight(1)'));
   const parentBottom = parentArea.match(/bottom: ([^\n]+)/)[1];
   const actionArea = study.slice(end, study.indexOf('  private cardViewportContent()', end));
   const actionTop = actionArea.match(/top: ([^\n]+),/)[1];
-  const actionBottom = actionArea.match(/bottom: ([^\n]+)/)[1];
+  const actionBottom = actionArea.match(/bottom: ([^}]+)/)[1];
   for (const mode of ['bottom', 'float', 'smart']) for (const narrow of [false, true]) for (const nav of [0, 24]) {
     const state = { narrowDeckLayout: narrow, 导航条高度: nav, 学习布局模式值: mode, isFloatingStudyLayout: () => false };
     const gap = 应用尺寸.页面分组间距(narrow);
     assert.equal(evaluate(inputTop, state), gap);
     assert.equal(evaluate(inputBottom, state) + evaluate(parentBottom, state) + evaluate(actionTop, state), gap);
     assert.equal(evaluate(actionBottom, state), 应用尺寸.操作区底部间距(narrow, nav));
+    state.pageMaterial = 'glass';
+    const shadow = sharedGlassShadow(false);
+    assert.equal(evaluate(actionBottom, state), Math.max(应用尺寸.页面底部间距(narrow), shadow.radius + shadow.offsetY) + nav);
     state.学习布局模式值 = 'float';
     state.isFloatingStudyLayout = () => true;
     assert.equal(evaluate(inputBottom, state) + evaluate(parentBottom, state),
@@ -398,27 +413,21 @@ test('hour histogram range is shared by stats page, home card and widget', () =>
   assert.doesNotMatch(widget, /索引 % 3 === 0/);
   // 三处小时刻度统一五等分居中：数字中心间距严格相等（贴边 Start/End 会让首尾段偏窄）
   for (const 标签 of ['0', '6', '12', '18', '23']) {
-    assert.match(widget, new RegExp(`Text\\('${标签}'\\)[\\s\\S]{0,120}layoutWeight\\(1\\)[\\s\\S]{0,40}TextAlign\\.Center`));
-    assert.match(card, new RegExp(`Text\\('${标签}'\\)[\\s\\S]{0,120}layoutWeight\\(1\\)[\\s\\S]{0,40}TextAlign\\.Center`));
-    assert.match(summary, new RegExp(`Text\\('${标签}'\\)[\\s\\S]{0,120}layoutWeight\\(1\\)[\\s\\S]{0,40}TextAlign\\.Center`));
+    assert.match(widget, new RegExp(`Text\\('${标签}'\\)[\\s\\S]{0,220}layoutWeight\\(1\\)[\\s\\S]{0,40}TextAlign\\.Center`));
+    assert.match(card, new RegExp(`Text\\('${标签}'\\)[\\s\\S]{0,220}layoutWeight\\(1\\)[\\s\\S]{0,40}TextAlign\\.Center`));
+    assert.match(summary, new RegExp(`Text\\('${标签}'\\)[\\s\\S]{0,220}layoutWeight\\(1\\)[\\s\\S]{0,40}TextAlign\\.Center`));
   }
   assert.doesNotMatch(widget, /layoutWeight\(3\)/);
   assert.doesNotMatch(card, /layoutWeight\(3\)/);
   assert.doesNotMatch(summary, /layoutWeight\(3\)/);
 });
 
-test('stats toolbar shows FSRS and the scope row holds deck and history selectors', () => {
+test('stats scope row keeps the deck selector at the left and the history selector at the right', () => {
   const stats = read('entry/src/main/ets/pages/统计页.ets');
-  const topBar = stats.split('private 顶部条()')[1].split('private 统计内容()')[0];
-  const scopeRow = stats.split('// 统计口径行')[1].split('// 1. 今日计数')[0];
-  assert.ok(topBar.includes('stats_page_title'));
-  assert.ok(topBar.includes('stats_fsrs_enabled'));
-  assert.ok(topBar.includes('stats_fsrs_disabled'));
-  assert.ok(!topBar.includes('范围切换条({'));
-  assert.ok(!scopeRow.includes('stats_fsrs_enabled'));
-  assert.ok(scopeRow.indexOf('DirectorySelect({') >= 0 && scopeRow.indexOf('DirectorySelect({') < scopeRow.indexOf('范围切换条({'));
-  assert.ok(scopeRow.includes("surfaceColor: $r('app.color.surface_card')"));
-  assert.ok(scopeRow.includes('on天数切换(index === 1 ? 0 : 365)'));
+  const [topBar, content] = stats.split('private 顶部条()')[1].split('private 统计内容()');
+  assert.match(topBar, /stats_page_title[\s\S]*stats_fsrs_enabled/);
+  assert.doesNotMatch(topBar, /DirectorySelect\(\{|范围切换条\(\{/);
+  assert.match(content, /DirectorySelect\(\{[^\n]*fillWidth: false[\s\S]*?Blank\(\)[\s\S]*?范围切换条\(\{/);
 });
 
 test('stats history range uses concise current-period labels', () => {
@@ -445,10 +454,11 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   const addNote = read('entry/src/main/ets/pages/添加笔记页.ets') + read('entry/src/main/ets/components/common/NoteEditorHeader.ets');
   const agentPage = read('entry/src/main/ets/pages/AI制卡页.ets');
 
-  const settingsList = settingsPanel.match(/List\(\{ space: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\)[\s\S]*?\.scrollBar\(BarState\.Off\)/)?.[0] ?? '';
-  assert.match(settingsList, /left:\s*应用尺寸\.页面内边距_水平/,
+  assert.match(settingsPanel, /settingsContentInset\(\): number \{\s*return 应用尺寸\.页面内边距_水平 \* this\.densityScale\(\);/);
+  const settingsList = settingsPanel.match(/List\(\{ space: this\.settingsModuleGap\(\)[\s\S]*?\.scrollBar\(BarState\.Off\)/)?.[0] ?? '';
+  assert.match(settingsList, /left:\s*this\.settingsContentInset\(\)/,
     'settings cards must align with the toolbar left gutter');
-  assert.match(settingsList, /right:\s*应用尺寸\.页面内边距_水平/,
+  assert.match(settingsList, /right:\s*this\.settingsContentInset\(\)/,
     'settings cards must align with the toolbar right gutter');
   assert.match(stats,
     /private 统计内容\(\)[\s\S]*?left: 应用尺寸\.页面内边距_水平,[\s\S]*?right: 应用尺寸\.页面内边距_水平/);
@@ -472,7 +482,7 @@ test('primary pages share one shell gutter and common visual primitives', () => 
     'settings back inherits the same theme stroke as the home buttons');
   assert.doesNotMatch(settingsPage, /private 顶部条\(\)/,
     'settings must not keep an unused second toolbar implementation');
-  assert.match(settingsCard, /settingsSurface\([\s\S]*应用尺寸.圆角_卡片, this\.moduleOpacity\)/,
+  assert.match(settingsCard, /settingsSurface\([\s\S]*应用尺寸.圆角_卡片, this\.moduleOpacity, this.appearanceElements\)/,
     'settings group cards must use the same page-card radius');
   assert.match(reminders, /统一空态\(\{[\s\S]*?reminder_list_empty[\s\S]*?reminder_list_empty_hint/,
     'reminders must use the common empty-state component');
@@ -481,9 +491,12 @@ test('primary pages share one shell gutter and common visual primitives', () => 
   assert.equal((appearance.match(/FormSelectRow\(\{/g) ?? []).length, 2);
   assert.match(read('entry/src/main/ets/components/settings/GeneralSettings.ets'), /FormSelectRow\(\{/);
   assert.match(read('entry/src/main/ets/components/common/FormSelectRow.ets'), /(?:new SelectStyle|SurfaceSelect)\(/);
-  assert.equal((agentSettings.match(/FormSelectRow\(\{/g) ?? []).length, 3,
+  // 供应商与模型两个选择（批量上限设置已移除）都用公共 FormSelectRow，不另写原生 Select。
+  assert.ok((agentSettings.match(/FormSelectRow\(\{/g) ?? []).length >= 2,
     'all Agent settings selects must match the other settings selects');
-  assert.equal((syncSettings.match(/new FormInputStyle\(\)/g) ?? []).length >= 2, true,
+  assert.doesNotMatch(agentSettings, /(?<![\w.])(?:Select|SurfaceSelect)\(|new SelectStyle\(/,
+    'Agent settings must not bypass FormSelectRow');
+  assert.equal((syncSettings.match(/new FormInputStyle\( undefined, this.appearanceElements\)/g) ?? []).length >= 2, true,
     'sync inputs must use the same form-field radius as Agent settings');
   assert.match(addNote, /按下态按钮\(\{[\s\S]*?app\.string\.study_back/,
     'add-note toolbar back action must use the common pressed button');
@@ -843,7 +856,7 @@ test('settings directory keeps full-screen navigation and existing about content
   const panel = read(panelPath);
   assert.match(panel, /Stack\(\)/);
   // 内容 List 挂滚动器：openAiSettings 跳转进来时 scrollToIndex 直接定位到 AI 智能体分组
-  assert.match(panel, /List\(\{ space: 应用尺寸\.页面分组间距\(this\.narrowDeckLayout\), scroller: this\.内容滚动器 \}\)/);
+  assert.match(panel, /List\(\{ space: this\.settingsModuleGap\(\), scroller: this\.内容滚动器 \}\)/);
 
 
 

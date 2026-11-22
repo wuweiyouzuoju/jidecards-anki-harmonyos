@@ -11,7 +11,7 @@ const List = loadSharedMenu('ActionMenuList.ets', 'SharedActionMenuList', {TextA
 const menus = [
   { path: 'components/home/主页更多面板.ets', name: '主页更多面板', surface: 'home_more',
     callbacks: { history:'onHistory', settings: '设置回调',
-      stats: '统计回调', reminders: '提醒回调', software_help: 'onSoftwareHelp' } },
+      stats: '统计回调', reminders: '提醒回调', leaderboard: 'onLeaderboard' } },
   { path: 'components/主页操作面板.ets', name: '主页操作面板', surface: 'home_create',
     callbacks: { create_deck: '创建牌组回调', import: '导入牌组回调', cloud_deck: '获取直链牌组回调',
       filtered_deck: 'onCreateFilteredDeck' } }
@@ -46,11 +46,13 @@ test('both home menus retain registry order, full localized labels, icons and ca
       list.onSelect = id => menu.selectItem(id);
       for (const simple of [true, false]) {
         for (const enabled of [true, false]) {
-          menu.简洁模式 = simple; menu.Agent入口已启用 = enabled; menu.显示获取直链牌组 = enabled;
+          // 排行榜入口随「首页显示排行榜」开关显隐，与其他条件同轮覆盖显示和隐藏。
+          menu.简洁模式 = simple; menu.Agent入口已启用 = enabled; menu.显示获取直链牌组 = enabled; menu.leaderboardHidden = !enabled;
           const declarations = visibleInterfaceItems(spec.surface, {
             simple: spec.surface === 'home_create' ? simple : false,
             agent: spec.surface === 'home_more' ? enabled : false,
-            cloudDeck: spec.surface === 'home_create' ? enabled : false, themeHasTextures: false
+            cloudDeck: spec.surface === 'home_create' ? enabled : false, themeHasTextures: false,
+            leaderboardHidden: spec.surface === 'home_more' ? !enabled : false
           });
           list.items = menu.menuEntries();
           assert.deepEqual(list.items.map(entry => entry.id), declarations.map(entry => entry.id));

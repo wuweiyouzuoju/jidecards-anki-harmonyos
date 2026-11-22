@@ -51,5 +51,5 @@ test('field editors retain accessible placeholders while formatting is delegated
  const source=readFileSync(new URL('../../entry/src/main/ets/components/common/NoteFieldEditor.ets',import.meta.url),'utf8');
  assert.doesNotMatch(source,/this\.tool\(|FlexWrap\.Wrap|toggleMoreFormats/);
  assert.match(source,/buildNoteEditorWheel/);
- assert.match(source,/placeholder\(this.placeholderText\(\), \{ fontColor: \$r\('app.color.text_tertiary'\)/);
+ assert.match(source,/placeholder\(this.placeholderText\(\), \{ fontColor: appearanceElementColor\(this.appearanceElements, 'text_tertiary', \$r\('app.color.text_tertiary'\)\)/);
 });

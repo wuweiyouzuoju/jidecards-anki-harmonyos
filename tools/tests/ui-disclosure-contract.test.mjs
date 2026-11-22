@@ -50,7 +50,7 @@ test('shared chevron geometry is centered and cannot intercept the row action', 
   assert.equal((Math.min(...xs) + Math.max(...xs)) / 2, width / 2);
   assert.equal((Math.min(...ys) + Math.max(...ys)) / 2, height / 2);
   assert.equal(width, 24); assert.equal(height, 24);
-  assert.match(source, /stroke\(this.tint\)/);
+  assert.match(source, /stroke\(appearanceTextColor\(this.appearanceElements, this.tint\)\)/);
   assert.match(source, /hitTestBehavior\(HitTestMode.None\)/);
   assert.match(source, /accessibilityLevel\('no'\)/);
   assert.doesNotMatch(source, /Text\(|onClick\(/);

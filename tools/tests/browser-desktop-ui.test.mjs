@@ -4,11 +4,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
-import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { appLogFor, loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
+import { AppLog } from '../../entry/src/main/ets/model/AppLog.ts';
 import { editorPageHarness } from './editor-page-harness.mjs';
 import { browserKeyCommand } from '../../entry/src/main/ets/model/BrowserKeyboard.ts';
 import { selectBrowserRange, resolveBrowserRepresentativeCard } from '../../entry/src/main/ets/model/BrowserSelection.ts';
-import { defaultBrowserPreferences, updateBrowserPreferences, parseBrowserPreferences } from '../../entry/src/main/ets/model/BrowserPreferences.ts';
+import { browserActiveColumns, defaultBrowserPreferences, updateBrowserPreferences, parseBrowserPreferences } from '../../entry/src/main/ets/model/BrowserPreferences.ts';
 import { ConfigKeyBool } from '../../entry/src/main/ets/proto/messages/ConfigMessages.ts';
 import { AppInterfaceTracker, visibleInterfaceItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 
@@ -22,7 +23,7 @@ function pageMethods(names, dependencies = {}) {
     assert.ok(start >= 0, name);
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
-  const deps = { browserKeyCommand, selectBrowserRange, resolveBrowserRepresentativeCard, $r: name => ({id:-1,type:10003,params:[name]}),
+  const deps = { AppLog, browserKeyCommand, selectBrowserRange, resolveBrowserRepresentativeCard, $r: name => ({id:-1,type:10003,params:[name]}),
     ...dependencies };
   const Page = compileWithUiFeedback(...Object.keys(deps), stripTypeScriptTypes(`class Page {${methods.join('\n')}}`, {mode:'transform'}) + ';return Page;')(...Object.values(deps));
   return Object.assign(new Page(), {
@@ -63,6 +64,52 @@ test('preview edit preserves narrow-screen preview and opens the visible wide-sc
   assert.deepEqual(calls,[[101,false],[202,false]]);
 });
 
+test('pending note preview cannot reopen after Back or hide/show, and a newer request wins', async () => {
+  for (const cancel of ['back', 'hide', 'newer']) {
+    const p = pageMethods(['打开预览', 'onBackPress', 'browserHidden', 'cancelResultFocus'], { appInterface: { hidePage() {} } });
+    const gate = deferred();
+    Object.assign(p, { previewReadVersion: 0, 浏览模式值: 'notes', 结果ID列表: [1,2], batchDialog: 'none',
+      取能力上下文: () => ({filesDir:'/files'}), 笔记服务实例: { 获取笔记的卡片: id => id === 1 ? gate.promise : Promise.resolve([202]) } });
+    const first = p.打开预览(1);
+    if (cancel === 'back') p.onBackPress();
+    if (cancel === 'hide') { p.browserHidden(); p.browserVisible = true; }
+    if (cancel === 'newer') await p.打开预览(2);
+    gate.resolve([101]); await first;
+    if (cancel === 'newer') assert.deepEqual(p.previewCardIds, [202]);
+    else assert.notEqual(p.显示预览, true, cancel);
+  }
+});
+
+test('selection preview rejects late results across hide/show and repeated requests', async () => {
+  const p = pageMethods(['previewSelection', 'browserHidden', 'cancelResultFocus'], { appInterface: { hidePage() {} } });
+  const gates = [deferred(), deferred()]; let request = 0;
+  Object.assign(p, { previewReadVersion: 0, captureBrowserSelection: () => ({ids:[1], mode:'notes'}),
+    isBrowserSelectionCurrent: () => true, 取能力上下文: () => ({filesDir:'/files'}),
+    笔记服务实例: { 获取笔记的卡片: () => gates[request++].promise } });
+  const first = p.previewSelection(), second = p.previewSelection();
+  gates[1].resolve([202]); await second; gates[0].resolve([101]); await first;
+  assert.deepEqual(p.previewCardIds, [202]);
+  p.显示预览 = false; request = 0;
+  gates[0] = deferred(); const hidden = p.previewSelection();
+  p.browserHidden(); p.browserVisible = true; gates[0].resolve([303]); await hidden;
+  assert.equal(p.显示预览, false);
+});
+
+test('resizing a retained wide editor never replaces its draft with the focused search result', () => {
+  const p = pageMethods(['openInitialWideEditor']); let calls = 0;
+  Object.assign(p, { browserWidth: 1200, wideEditorOpened: false, focusedRowId: 22, inlineEditorId: 11,
+    openEditPage: () => calls++ });
+  p.openInitialWideEditor(); assert.equal(calls, 0);
+  p.inlineEditorId = 0; p.openInitialWideEditor(); assert.equal(calls, 1);
+});
+
+test('failed edit navigation keeps the browser usable and reports the failure', () => {
+  const p = pageMethods(['openEditPage'], { AppStorage: { get: () => 0 } });
+  Object.assign(p, { browserWidth: 800, pathStack: {pushPath() { throw Error('route failed'); }} });
+  assert.doesNotThrow(() => p.openEditPage(1, false));
+  assert.equal(p.editingPageOpen, false); assert.equal(p.refreshError, 'route failed');
+});
+
 test('actual key handler protects native input selection and busy writes, and Escape uses the overlay owner', () => {
   const p = pageMethods(['handleBrowserKey','keyboardBlocked'], {KeyType:{Down:0},browserKeyName: code => code});
   const commands = []; let stopped = 0;
@@ -75,6 +122,102 @@ test('actual key handler protects native input selection and busy writes, and Es
   p.handleBrowserKey(event('escape')); assert.deepEqual(commands,['select_all']);
   p.handleBrowserKey({...event('escape'),getModifierKeyState:()=>false}); assert.deepEqual(commands,['select_all','close']);
   p.browserVisible = false; p.handleBrowserKey(event('a')); assert.equal(stopped,2);
+});
+
+function searchFocusHarness(search) {
+  const calls = [], warnings = [];
+  const page = pageMethods(['提交搜索', '执行搜索', 'resultsReadyForFocus', 'focusBrowserControl', 'browserHidden',
+    'searchInputFocusChanged', 'cancelResultFocus', 'keyboardBlocked', 'dispatchBrowserShortcut'], {
+    appInterface: { hidePage() {} }, browserActiveColumns,
+    AppLog: appLogFor({ info() {}, warn: message => warnings.push(message) })
+  });
+  Object.assign(page, {
+    pendingResultFocus: 0, resultFocusVersion: 0, searchVersion: 0, previewReadVersion: 0,
+    preferencesLoaded: true, browserPreferences: defaultBrowserPreferences(), searchSession: { search },
+    退出多选() {}, persistBrowserPreferences() {}, openInitialWideEditor() {},
+    取能力上下文: () => ({ filesDir: '/collection' }),
+    getUIContext: () => ({ getFocusController: () => ({ requestFocus: id => calls.push(id) }) })
+  });
+  const Table = loadComponentLogic('components/browser/卡片表格.ets', '卡片表格', {});
+  const table = new Table();
+  table.onResultsLaidOut = version => page.resultsReadyForFocus(version);
+  return { page, table, calls, warnings };
+}
+
+const oneSearchRow = id => ({ ids: [id], rows: [{ id }], columns: [], consumed: 1 });
+
+test('submitted search hands off focus once after a nonempty List is laid out, including a reused List', async () => {
+  const { page, table, calls } = searchFocusHarness(async () => oneSearchRow(11));
+  page.searchInputFocusChanged(true);
+  page.提交搜索('first'); await settle();
+  table.resultFocusVersion = page.resultFocusVersion;
+  table.notifyResultsLaidOut();
+  table.resultListAreaChanged({ width: 100, height: 0 });
+  assert.deepEqual(calls, []);
+  assert.equal(page.searchFocused, true);
+  table.resultListAreaChanged({ width: 100, height: 100 });
+  table.notifyResultsLaidOut();
+  assert.deepEqual(calls, ['browser-result-list']);
+  page.searchInputFocusChanged(false);
+  page.提交搜索('second'); await settle();
+  table.resultFocusVersion = page.resultFocusVersion;
+  table.notifyResultsLaidOut();
+  assert.deepEqual(calls, ['browser-result-list', 'browser-result-list']);
+});
+
+test('zero results and true search failures do not hand off focus, and focus failure is separate', async () => {
+  const { page, table, calls, warnings } = searchFocusHarness(async ({ text }) => {
+    if (text === 'empty') return { ids: [], rows: [], columns: [], consumed: 0 };
+    if (text === 'broken') throw new Error('search failed');
+    return oneSearchRow(11);
+  });
+  page.提交搜索('empty'); await settle();
+  assert.equal(page.阶段, 'list'); assert.deepEqual(page.结果ID列表, []);
+  assert.equal(page.resultFocusVersion, 0); assert.equal(page.pendingResultFocus, 0);
+  page.提交搜索('broken'); await settle();
+  assert.equal(page.阶段, 'error'); assert.equal(page.错误详情, 'search failed');
+  assert.equal(page.resultFocusVersion, 0); assert.deepEqual(calls, []);
+  page.提交搜索('working'); await settle();
+  page.getUIContext = () => ({ getFocusController: () => ({ requestFocus() { throw new Error('150003'); } }) });
+  table.resultFocusVersion = page.resultFocusVersion;
+  table.resultListAreaChanged({ width: 100, height: 100 });
+  assert.equal(page.阶段, 'list'); assert.deepEqual(page.结果ID列表, [11]);
+  assert.equal(page.refreshError, ''); assert.match(warnings[0], /150003/);
+});
+
+test('an older search and its List layout cannot steal focus from a newer search', async () => {
+  const older = deferred(), newer = deferred();
+  const { page, table, calls } = searchFocusHarness(({ text }) => (text === 'old' ? older : newer).promise);
+  page.提交搜索('old'); const oldVersion = page.searchVersion;
+  page.提交搜索('new'); const newVersion = page.searchVersion;
+  newer.resolve(oneSearchRow(22)); await settle();
+  assert.equal(page.resultFocusVersion, newVersion);
+  table.resultFocusVersion = oldVersion;
+  table.resultListAreaChanged({ width: 100, height: 100 });
+  assert.deepEqual(calls, []);
+  older.resolve(oneSearchRow(11)); await settle();
+  assert.deepEqual(page.结果ID列表, [22]); assert.equal(page.resultFocusVersion, newVersion);
+  table.resultFocusVersion = newVersion;
+  table.notifyResultsLaidOut(); table.notifyResultsLaidOut();
+  assert.deepEqual(calls, ['browser-result-list']);
+});
+
+test('leaving, opening an overlay or returning to input cancels pending list focus', async () => {
+  for (const interruption of ['hide and show', 'overlay', 'input focus', 'input interaction', 'Ctrl+F']) {
+    const { page, table, calls } = searchFocusHarness(async () => oneSearchRow(11));
+    page.提交搜索('first'); await settle();
+    table.resultFocusVersion = page.resultFocusVersion;
+    if (interruption === 'hide and show') { page.browserHidden(); page.browserVisible = true; }
+    else if (interruption === 'overlay') page.displayDialog = 'columns';
+    else if (interruption === 'input focus') page.searchInputFocusChanged(true);
+    else if (interruption === 'input interaction') page.cancelResultFocus();
+    else {
+      page.dispatchBrowserShortcut('search');
+      assert.deepEqual(calls, ['browser-search-input'], 'shortcut requests focus synchronously');
+    }
+    table.resultListAreaChanged({ width: 100, height: 100 });
+    assert.deepEqual(calls, interruption === 'Ctrl+F' ? ['browser-search-input'] : [], interruption);
+  }
 });
 
 test('keyboard undo and redo invoke the guarded history backend directly', async () => {

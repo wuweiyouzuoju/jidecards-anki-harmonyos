@@ -11,7 +11,7 @@ const turn = () => new Promise(resolve => setImmediate(resolve));
 function loadPlayer(name, dependencies) {
   const source = readFileSync(new URL(`../../entry/src/main/ets/utils/${name}.ets`, import.meta.url), 'utf8')
     .replace(/^import .*\r?\n/gm, '').replace(/^export /gm, '');
-  const globals = {
+  const globals = { canIUse: () => true,
     AudioQueueCompletion,
     harmonyTtsVoiceName, ttsSpeakOptions,
     hilog: { info() {}, warn() {}, error() {} },

@@ -10,7 +10,7 @@ import { emptyDeckConfigSettings } from '../../entry/src/main/ets/proto/messages
 const source = readFileSync(new URL('../../entry/src/main/ets/components/home/DeckOptionField.ets', import.meta.url), 'utf8');
 const start = source.indexOf('export struct DeckOptionEditor');
 const end = source.indexOf('  build() {', start);
-const logic = source.slice(start, end).replace('export struct', 'class').replaceAll('@State ', '') + '}';
+const logic = source.slice(start, end).replace('export struct', 'class').replaceAll('@State ', '').replace(/@StorageProp\([^)]*\)\s*/g, '') + '}';
 const Editor = new Function(stripTypeScriptTypes(logic, { mode: 'transform' }) + ';return DeckOptionEditor;')();
 
 test('single-field validation reuses deck rules and does not change the active draft', () => {

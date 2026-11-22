@@ -1,8 +1,9 @@
+import { compactLandscapeScale } from '../../entry/src/main/ets/model/AppLayoutState.ts';
 import {loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { homeHeaderGeometry, homeSummaryGeometry, homeSummaryStacksMetrics } from '../../entry/src/main/ets/model/HomeHeaderLayout.ts';
+import { homeHeaderGeometry, homeSummaryCardCount, homeSummaryGeometry, homeSummaryStacksMetrics } from '../../entry/src/main/ets/model/HomeHeaderLayout.ts';
 import { safePopupContentHeight, safeMenuGeometry, keyboardViewportHeight, windowSafeInsets, safeDialogMaxHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
 import { searchHomeDecks } from '../../entry/src/main/ets/model/HomeDeckSearch.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
@@ -136,7 +137,7 @@ test('the real window owner publishes the union in vp and the shared anchored me
 
 function homeHeader() {
   const Header = loadComponentLogic('components/home/HomeSummaryHeader.ets', 'HomeSummaryHeader', {
-    homeHeaderGeometry,
+    compactLandscapeScale, homeHeaderGeometry,
     空主页快照: {}, 应用尺寸: dimensions
   });
   const header = new Header(); header.narrowDeckLayout = true;
@@ -159,9 +160,9 @@ test('the real header publishes one measured menu region below the buttons and c
 
 test('home button footprint and toolbar/card edges match the public navigation dimensions and safety bounds', () => {
   const page=readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets',import.meta.url),'utf8');
-  const expression=page.match(/\.padding\(\{ top: this\.排序模式中 \? 0 : (应用尺寸\.pageToolbarTop[^\n]+),/)[1];
+  const expression=page.match(/\.padding\(\{ top: this\.排序模式中 \? 0 : ((?:\()?应用尺寸\.pageToolbarTop[^\n]+),/)[1];
   for(const narrow of [false,true]) for(const status of [0,24,40]) for(const safe of [0,status,status+18]) {
-    const state={状态栏高度:status,narrowDeckLayout:narrow,safeTop:safe};
+    const state={状态栏高度:status,narrowDeckLayout:narrow,safeTop:safe,densityScale:()=>1};
     const buttonTop=new Function('应用尺寸',`return ${expression}`).call(state,dimensions);
     const gap=dimensions.页面内容顶部间距(narrow);
     const toolbarBottom=dimensions.pageToolbarHeight(status,narrow,safe);
@@ -197,8 +198,9 @@ test('both home menus retain the button gap when their host has a title bar or n
     return page.slice(start,page.indexOf('\n  }',start)+4);
   }).join('\n');
   const Host=new Function(stripTypeScriptTypes(`class Host { ${methods} }`,{mode:'transform'})+';return Host;')();
-  const menuInputs=[...page.matchAll(/toolbarBounds: this.homeActionAnchor, alignEnd: (false|true)/g)];
-  assert.deepEqual(menuInputs.map(match=>match[1]),['false','true']);
+  assert.match(page, /toolbarBounds: this.homeActionAnchor, alignEnd: false/);
+  assert.match(page, /toolbarBounds: this.homeActionAnchor, alignEnd: true/);
+  const menuInputs = [['', 'false'], ['', 'true']];
   const Menu=loadSharedMenu('AnchoredMenu.ets','SharedAnchoredMenu',{
     MenuSlideScope:class{},Scroller:class{},应用尺寸:dimensions,safeMenuGeometry,keyboardViewportHeight
   });
@@ -256,7 +258,10 @@ test('home uses grouped small icon buttons and public menus while summary pages 
   assert.deepEqual([...header.matchAll(/source: \$r\('app.media.([^']+)'\)/g)].map(match=>match[1]),
     ['ic_study_agent','ic_settings_search','ic_home_browser','ic_home_more','ic_home_new','ic_home_sync']);
   assert.match(header,/this.moreButton\(\)\s*Blank\(\).width\(this.geometry\(\).actionSeparation\).flexShrink\(0\)\s*Row\(\{ space: this.geometry\(\).actionGap \}\) \{\s*this.agentButton\(\)\s*this.searchButton\(\)\s*this.browserButton\(\)\s*this.syncButton\(\)\s*this.createButton\(\)/);
-  assert.match(header,/if \(this.actionsVisible\) \{ this.actions\(\) \}\s*if \(this.showSummary\) \{ this.summaryCard\(\) \}/);
+  assert.match(header,/if \(this.actionsVisible\) \{ this.actions\(\) \}\s*if \(this.showSummary\) \{\s*Row\([^\n]*\) \{\s*this.summaryCard\(0\)\s*if \(this.summaryCount\(\) === 2\) \{ this.summaryCard\(1\) \}/);
+  assert.equal(homeSummaryCardCount(false, 1200, 12), 1);
+  assert.equal(homeSummaryCardCount(true, 491, 12), 1);
+  assert.equal(homeSummaryCardCount(true, 492, 12), 2);
   assert.doesNotMatch(header,/bindPopup|enableArrow|MenuSurface/);
   assert.equal((header.match(/IconActionButton\(\{/g) ?? []).length, 6);
   assert.match(read('components/common/AnchoredMenu.ets'), /SharedAnchoredMenu\(/);

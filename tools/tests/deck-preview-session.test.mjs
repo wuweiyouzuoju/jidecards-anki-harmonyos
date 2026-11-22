@@ -11,7 +11,8 @@ import { 协议读取器 } from '../../entry/src/main/ets/proto/core/ProtoReader
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { appInterfaceDependencies } from './app-interface-harness.mjs';
 import { componentMethods } from './sync-panel-harness.mjs';
-import { isDoubleColumnDeckListStyle } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import { deckListColumnCount } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import { compactLandscapeScale } from '../../entry/src/main/ets/model/AppLayoutState.ts';
 import { HomeSyncStatusController, homeSyncLabelKey, homeSyncIndicator } from '../../entry/src/main/ets/model/HomeSyncStatusController.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
@@ -19,15 +20,14 @@ const scopes = [DeckPreviewScope.TodayRemaining, DeckPreviewScope.Due, DeckPrevi
 
 test('home cancels pending preview across background/return, deck reselection, long press and back', async () => {
   const source = readFileSync(new URL('../../entry/src/main/ets/pages/首页.ets', import.meta.url), 'utf8');
-  const Page = componentMethods(source, ['打开牌组预览', 'openDeckMenu', 'syncForegroundChanged', 'closeSyncChoice', 'previewDeckChanged', 'homeActionControls', 'publishHomeInterface', 'onBackPress'], {
-    ...appInterfaceDependencies(), isDoubleColumnDeckListStyle, homeSyncLabelKey, homeSyncIndicator, $r: key => key
+  const Page = componentMethods(source, ['打开牌组预览', 'closeHomeActions', '公告收件版本变化', 'homeAnnouncementsEnabled', 'cancelPreviewLoading', 'openDeckMenu', 'syncForegroundChanged', 'closeSyncChoice', 'previewDeckChanged', 'homeActionControls', 'publishHomeInterface', 'onBackPress'], {
+    ...appInterfaceDependencies(), OFFICIAL_ANNOUNCEMENTS_ENABLED: true, remoteAnnouncementsEnabled: () => true, deckListColumnCount, homeSyncLabelKey, homeSyncIndicator, $r: key => key
   });
-  Page.prototype.closeHomeActions = new Function(source.match(/private closeHomeActions\(\): void \{([^\n]*)\}/)[1]);
   for (const reason of ['background', 'deck', 'long_press', 'back']) {
     const pending = deferred(), toasts = [];
     const page = new Page();
     Object.assign(page, {
-      getUIContext: () => ({getFrameNodeById:()=>null}), deckMenuId: '', deckMenuBackRequest: 0, syncChoiceGeneration: 0, syncChoiceVisible: reason === 'background', syncChoiceChecking: reason === 'background',
+      sideWheelLayout: () => false, getUIContext: () => ({getFrameNodeById:()=>null}), deckMenuId: '', deckMenuBackRequest: 0, syncChoiceGeneration: 0, syncChoiceVisible: reason === 'background', syncChoiceChecking: reason === 'background',
       deckPreviewSession: new DeckPreviewSession({ cardIds: () => pending.promise }),
       syncController: { foregroundChanged() {}, cancel() {} }, backupController: { schedule() {}, stop() {} },
       syncStatusController: new HomeSyncStatusController({ auth: () => null, canRead: () => false,
@@ -42,6 +42,7 @@ test('home cancels pending preview across background/return, deck reselection, l
     });
     const loading = page.打开牌组预览(DeckPreviewScope.TodayRemaining);
     assert.equal(page.预览加载中, true);
+    assert.equal(page.previewWaiting, true);
     if (reason === 'background') {
       page.syncForeground = false; page.syncForegroundChanged();
       assert.equal(page.syncChoiceVisible, false);
@@ -59,6 +60,7 @@ test('home cancels pending preview across background/return, deck reselection, l
     pending.resolve([111]); await loading;
     assert.equal(page.显示卡片预览, false, reason);
     assert.equal(page.预览加载中, false, reason);
+    assert.equal(page.previewWaiting, false, reason);
     assert.deepEqual(toasts, [], reason);
   }
 });
@@ -109,6 +111,7 @@ test('native preview protocol round-trips scope and packed IDs without touching 
 
 const Details = () => {
   const Host = loadComponentLogic('components/home/HomeDeckDetails.ets', 'HomeDeckDetails', {
+    compactLandscapeScale, WINDOW_SIZE_KEY: 'windowSize',
     ...appInterfaceDependencies(), interfaceItemText: (_context, _surface, id) => id,
     应用尺寸: loadPlatformModule('utils/应用尺寸.ets', '应用尺寸', {}),
     DECK_LIST_NARROW_KEY: 'narrow', PAGE_SURFACE_KEY: 'surface', AI_AGENT_CHANNELS_APP_STORAGE_KEY: 'agent', APP_FOREGROUND_KEY: 'foreground'

@@ -98,7 +98,10 @@ test('widget publisher preserves aggregation and serializes accepted writes acro
     平铺牌组树:()=>[1,2,3],提取卡片数据:(...args)=>args,
     保存卡片数据:async value=>{calls.push(value);if(value==='old')await gate.promise;if(value==='bad')throw Error('disk');}
   });
-  assert.deepEqual(p.createStatsWidget('graph',{children:[{newCount:2,learnCount:3,reviewCount:4}]},2,true),['graph',9,3,2,true]);
+  assert.deepEqual(p.createStatsWidget('graph',{children:[
+    {newCount:2,learnCount:3,reviewCount:4,children:[{newCount:2,learnCount:3,reviewCount:4}]},
+    {newCount:1,learnCount:0,reviewCount:2}
+  ]},2,true),['graph',12,3,2,true,6]);
   const old=p.publishStatsWidget('old'), next=p.publishStatsWidget('next');await settle();assert.deepEqual(calls,['old']);
   gate.resolve();await Promise.all([old,next]);
   await assert.rejects(p.publishStatsWidget('bad'),/disk/);await p.publishStatsWidget('recovered');

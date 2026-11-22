@@ -7,7 +7,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { uiFeedback } from './ui-feedback-harness.mjs';
 import { visibleSettingsGroups } from '../../entry/src/main/ets/model/SettingsStructure.ts';
-import { DECK_LIST_STYLES, deckListStyleTitleKey } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import { DECK_LIST_STYLES, availableDeckListStyles, deckListStyleTitleKey } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 import { themeTextWrappers, themeTextArguments } from './theme-text-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
@@ -84,7 +84,7 @@ test('language and width selectors recalculate real translations while preservin
   const context = { getHostContext: () => ({ resourceManager: {
     getStringSync: key => resources[locale].get(key), getStringByNameSync: key => resources[locale].get(key)
   } }) };
-  const dependencies = { ...uiFeedback, $r, DECK_LIST_STYLES, deckListStyleTitleKey, 当前语言模式: () => resolveAppLocale(locale) };
+  const dependencies = { ...uiFeedback, $r, DECK_LIST_STYLES, availableDeckListStyles, deckListStyleTitleKey, 当前语言模式: () => resolveAppLocale(locale) };
   const General = loadComponentLogic('components/settings/GeneralSettings.ets', 'GeneralSettings', dependencies);
   const Width = loadComponentLogic('components/settings/DeckWidthControl.ets', 'DeckWidthControl', dependencies);
   const general = new General(), width = new Width();

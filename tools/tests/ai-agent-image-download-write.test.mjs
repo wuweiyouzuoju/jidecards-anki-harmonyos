@@ -16,7 +16,7 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
 test('image search is an explicit read tool in both create and edit catalogs', () => {
   for (const mode of ['create', 'edit']) {
-    const tool = agentFunctionTools(5, mode).find((item) => item.name === 'search_images');
+    const tool = agentFunctionTools(mode).find((item) => item.name === 'search_images');
     assert.ok(tool, mode);
     const schema = JSON.parse(tool.parametersJson);
     assert.deepEqual(schema.required, ['query', 'limit']);

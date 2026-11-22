@@ -81,14 +81,13 @@ test('history axis reserves actual localized label widths at large font scales a
   assert.match(source, /scrollable\(ScrollDirection\.Horizontal\)/);
   assert.match(source, /Text\(this\.dayLabel\(day\)\)[\s\S]*?\.maxLines\(1\)\.wordBreak\(WordBreak\.NORMAL\)/);
 });
-const methods = source.slice(source.indexOf('  aboutToAppear()'), source.indexOf('  build()'));
-const js = stripTypeScriptTypes(`class HistoryHarness { ${methods} }`, { mode: 'transform' });
 function harness(fetch) {
   let timerCallback;
   let cleared = 0;
-  const Harness = new Function('buildDeckStudyHistory', 'historyStudyDayKey', 'setInterval', 'clearInterval',
-    js + '\nreturn HistoryHarness;')(buildDeckStudyHistory, historyStudyDayKey,
-    fn => { timerCallback = fn; return 1; }, () => { cleared++; });
+  const Harness = loadComponentLogic('components/DeckStudyHistoryCard.ets', 'DeckStudyHistoryCard', {
+    buildDeckStudyHistory, historyStudyDayKey, WINDOW_SIZE_KEY: 'windowSize', 应用尺寸: {},
+    统计服务: class {}, setInterval: fn => { timerCallback = fn; return 1; }, clearInterval: () => { cleared++; }
+  });
   const state = Object.assign(new Harness(), {
     service: { 获取图表统计: fetch }, active: true, requestId: 0, timer: -1,
     search: 'did:10', loading: false, failed: false, history: buildDeckStudyHistory(graphs()), dayKey: ''

@@ -1,3 +1,4 @@
+import { ContinuationSession, studyContinuationFingerprint } from '../../entry/src/main/ets/model/ContinuationSession.ts';
 import * as noteReferencesApi from '../../entry/src/main/ets/model/NoteReferences.ts';
 import { BrowserOperationController } from '../../entry/src/main/ets/model/BrowserOperationController.ts';
 import { assertNoteEditorUnchanged } from '../../entry/src/main/ets/model/NoteEditorConflict.ts';
@@ -22,7 +23,7 @@ export function appInterfaceDependencies() {
   const flagMenuChoices = loadPlatformModule('components/common/FlagMenuChoices.ets', 'flagMenuChoices', {
     CARD_FLAGS, customFlagLabel, $r: key => key, namedResourceText: (_context, key) => 'app.string.' + key
   });
-  return { HOME_SYNC_CHOICES, discardNoteRecordings: async () => {}, completeStudyGestures, studyGestureCommand, validateStudyControls,
+  return { gestureNoteAction: '', continuationSession: new ContinuationSession(), studyContinuationFingerprint, HOME_SYNC_CHOICES, discardNoteRecordings: async () => {}, completeStudyGestures, studyGestureCommand, validateStudyControls,
     StudyShakeSensor: loadPlatformModule('backend/StudyShakeSensor.ets', 'StudyShakeSensor', { StudyShakeDetector, sensor: {SensorId:{ACCELEROMETER:1},on(){},off(){},getSingleSensorSync(){} } }),
     agentOperationHosts:new AgentOperationHosts(), appInterface: new AppInterfaceTracker(), FEEDBACK_ACTIONS, resultUndoStatus, OFFICIAL_ANNOUNCEMENTS_ENABLED, visibleInterfaceItems, studyInterfaceMenu, actionMenuRows, visibleActionMenuRows, toggleActionMenuBranch,
     $r: key => key, CARD_FLAGS, customFlagLabel, flagMenuChoices,

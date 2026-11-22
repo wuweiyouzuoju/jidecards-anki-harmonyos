@@ -6,6 +6,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {defaultBrowserPreferences, updateBrowserPreferences, parseBrowserPreferences, browserActiveColumns, browserDisplayKeys, replaceBrowserColumn, browserPreferencePatch, BROWSER_TRADITIONAL_CARD_COLUMNS, BROWSER_TRADITIONAL_NOTE_COLUMNS} from '../../entry/src/main/ets/model/BrowserPreferences.ts';
 import {AppInterfaceTracker, browserToolbarItems} from '../../entry/src/main/ets/model/AppInterface.ts';
 import {loadComponentLogic} from './platform-module-harness.mjs';
+import { AppLog } from '../../entry/src/main/ets/model/AppLog.ts';
 
 function harness() {
   const source=readFileSync(new URL('../../entry/src/main/ets/pages/浏览页.ets',import.meta.url),'utf8');
@@ -16,7 +17,7 @@ function harness() {
   });
   let stored=defaultBrowserPreferences();const calls=[];let saveError=null;
   const save=async patch=>{if(saveError)throw saveError;stored=updateBrowserPreferences(stored,patch);return stored;};
-  const Page=new Function('saveBrowserPreferences','browserDisplayKeys','replaceBrowserColumn',stripTypeScriptTypes(`class Page {${methods.join('\n')}}`,{mode:'transform'})+';return Page;')(save,browserDisplayKeys,replaceBrowserColumn);
+  const Page=new Function('AppLog','saveBrowserPreferences','browserDisplayKeys','replaceBrowserColumn',stripTypeScriptTypes(`class Page {${methods.join('\n')}}`,{mode:'transform'})+';return Page;')(AppLog,save,browserDisplayKeys,replaceBrowserColumn);
   const page=new Page();Object.assign(page,{browserPreferences:stored,operations:{isAlive:()=>true},阶段:'list',浏览模式值:'cards',keyboardBlocked:()=>false,publishInterface:()=>calls.push(['observe']),执行搜索:async()=>calls.push(['search']),打开预览:id=>calls.push(['preview',id]),openEditPage:(id,note)=>calls.push(['edit',id,note])});
   return {page,calls,stored:()=>stored,fail:error=>{saveError=error;}};
 }
@@ -105,15 +106,30 @@ test('traditional column manager can retain more than sixteen available Core col
   assert.throws(()=>updateBrowserPreferences(value,{traditionalCardsColumns:Array.from({length:65},(_,i)=>'column-'+i)}));
 });
 
-test('traditional rows use a full-width table, Core background state and selection priority',()=>{
-  const Table=loadComponentLogic('components/browser/卡片表格.ets','卡片表格',{$r:key=>key,SurfaceBorder:{options:width=>({width})},CARD_FLAGS:[{color:'transparent'},{color:'#D92D20'}],browserRowFlag:color=>color===3?1:0,BrowserRowColor:{COLOR_MARKED:1,COLOR_SUSPENDED:2,COLOR_BURIED:10}});
+test('traditional rows preserve Core backgrounds and reuse the focused card outline',()=>{
+  const Table=loadComponentLogic('components/browser/卡片表格.ets','卡片表格',{$r:key=>key,
+    SurfaceBorder:{options:(width,color)=>({width,color})},insetMaterialFill:color=>color,
+    CARD_FLAGS:[{color:'transparent'},{color:'#D92D20'}],browserRowFlag:color=>color===3?1:0,
+    BrowserRowColor:{COLOR_MARKED:1,COLOR_SUSPENDED:2,COLOR_BURIED:10}});
   const table=new Table();table.tableLayout=true;table.displayKeys=['question','answer'];assert.equal(table.tableWidth(),500);
+  const flagRow={id:1,color:3};
+  table.actionColor='#4C58CC';
+  table.focusedId=1;
+  const focusedOutline=table.rowBorder(flagRow);
+  table.focusedId=0;
   table.traditionalLayout=true;assert.equal(table.tableWidth(),'100%');
   assert.equal(table.rowBackground({id:1,color:1}),'app.color.browser_row_marked');
   assert.equal(table.rowBackground({id:1,color:2}),'app.color.browser_row_suspended');
   assert.equal(table.rowBackground({id:1,color:10}),'app.color.browser_row_buried');
-  assert.equal(table.rowBackground({id:1,color:3}),'#33D92D20');
-  table.选中IDs=[1];assert.equal(table.rowBackground({id:1,color:3}),'app.color.surface_selected');assert.deepEqual(table.rowBorder({id:1,color:3}),{width:{bottom:0.5}});
+  assert.deepEqual(table.rowBorder(flagRow).width,{bottom:0.5});
+  table.选中IDs=[1];
+  assert.equal(table.rowBackground(flagRow),'#33D92D20');
+  assert.equal(table.rowBackground({id:1,color:0}),'app.color.surface_card');
+  assert.deepEqual(table.rowBorder(flagRow),focusedOutline);
+  assert.deepEqual(table.rowBorder({id:1,color:0}).color,{top:'#4C58CC',right:'#4C58CC',bottom:'#4C58CC',left:'#4C58CC'});
+  table.选中IDs=[];
+  table.focusedId=1;
+  assert.deepEqual(table.rowBorder(flagRow),focusedOutline);
 });
 
 test('virtualized rendering invalidates old cell snapshots when content or column context changes',()=>{

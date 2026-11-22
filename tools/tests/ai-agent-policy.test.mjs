@@ -4,18 +4,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  DEFAULT_BATCH_LIMIT,
-  MAX_BATCH_LIMIT,
   SearchEvidenceError,
   SearchExecutionError,
   enforceSearchEvidence,
   enforceSearchExecution,
-  normalizeBatchLimit,
   explicitSourceEvidenceRequested,
   explicitWebSearchForbidden,
   explicitWebSearchRequested,
   registerToolCallId,
-  splitAffectedCardIds,
   toolRiskOf,
 } from '../../entry/src/main/ets/model/agent/AgentPolicy.ts';
 import {
@@ -64,17 +60,6 @@ test('tool risks keep reads automatic, ordinary writes draft-only, and structura
   assert.equal(toolRiskOf('remove_notes'), 'high_risk');
   assert.equal(toolRiskOf('update_note_type_templates'), 'high_risk');
   assert.equal(toolRiskOf('arbitrary_rpc'), 'blocked');
-});
-
-test('batch limit defaults to 100, clamps at 1000, and splits without losing order', () => {
-  assert.equal(DEFAULT_BATCH_LIMIT, 100);
-  assert.equal(MAX_BATCH_LIMIT, 1000);
-  assert.equal(normalizeBatchLimit(0), DEFAULT_BATCH_LIMIT);
-  assert.equal(normalizeBatchLimit(1500), MAX_BATCH_LIMIT);
-  const ids = Array.from({ length: 205 }, (_, index) => index + 1);
-  const batches = splitAffectedCardIds(ids, 100);
-  assert.deepEqual(batches.map((batch) => batch.length), [100, 100, 5]);
-  assert.deepEqual(batches.flat(), ids);
 });
 
 test('tool-call ids are accepted once per turn', () => {

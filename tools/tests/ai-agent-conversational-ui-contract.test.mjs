@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { stripTypeScriptTypes } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 import { motionApi } from './motion-harness.mjs';
@@ -35,8 +36,8 @@ test('create setup is an assistant-side local card instead of a fixed top form',
   assert.doesNotMatch(setup, /AgentDisclosureCard/);
   assert.doesNotMatch(setup, /ai_agent_setup_title_create|ai_agent_setup_instruction|readinessText|onToggle/);
   assert.match(setup, /backgroundColor\(insetMaterialFill\(\$r\('app\.color\.surface_card'\)\)\)/);
-  assert.match(setup, /border\(SurfaceBorder\.options\(\)\)/);
-  assert.match(setup, /borderRadius\(应用尺寸\.圆角_面板\)/);
+  assert.match(setup, /border\(SurfaceBorder\.options\( undefined, undefined, this.appearanceElements\)\)/);
+  assert.match(setup, /borderRadius\(appearanceElementRadius\(this.appearanceElements, 应用尺寸\.圆角_面板\)\)/);
   assert.match(setup, /padding\(应用尺寸\.卡片内边距\)/);
   assert.doesNotMatch(page, /setupExpanded|ai_agent_target_settings/);
 });
@@ -82,8 +83,14 @@ test('clarification is a separate assistant bubble with explicit continuation', 
 test('composer readiness and clarification lifecycle remain controlled by the page', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(page, /private canSubmit\(\): boolean/);
-  assert.match(page, /return this\.readinessReason\(\) === 'ready'/);
-  assert.match(page, /\.enabled\(this\.interfaceEnabled\('submit'\)\)/);
+  const method=page.match(/  private canSubmit\(\): boolean \{[^]*?\n  }/)[0];
+  const Page=new Function(stripTypeScriptTypes('class Page {'+method+'}',{mode:'transform'})+';return Page;')();
+  const instance=new Page();
+  for(const externalBusy of [false,true]) for(const reason of ['ready','busy','missing_target']) {
+    Object.assign(instance,{externalBridge:{isBusy:()=>externalBusy},readinessReason:()=>reason});
+    assert.equal(instance.canSubmit(),!externalBusy && reason==='ready');
+  }
+  assert.match(page, /isInteractive: this\.interfaceEnabled\('submit'\)/);
   assert.match(page, /canSubmit: this\.canSubmit\(\)/);
   assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /context\.processing \|\| context\.canSubmit/);
   assert.match(page, /hasPendingClarification\(\)/);
@@ -134,7 +141,7 @@ test('reasoning opens by default while tool details stay collapsed independently
 test('tool details use compact framed rows; reasoning is gray and independently bounded', () => {
   const disclosure = read('entry/src/main/ets/components/agent/AgentDisclosureCard.ets');
   assert.match(disclosure, /backgroundColor\(insetMaterialFill\(\$r\('app\.color\.surface_card'\)\)\)/);
-  assert.match(disclosure, /borderRadius\(应用尺寸.圆角_面板\)/);
+  assert.match(disclosure, /borderRadius\(appearanceElementRadius\(this.appearanceElements, 应用尺寸\.圆角_面板\)\)/);
   assert.match(disclosure, /SymbolGlyph\(/);
   assert.match(disclosure, /constraintSize\(\{ maxHeight: 240 \}\)/);
   const dimensions = loadPlatformModule('utils/应用尺寸.ets', '应用尺寸', {});

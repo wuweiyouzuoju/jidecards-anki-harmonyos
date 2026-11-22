@@ -5,19 +5,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { loadPlatformModule } from './platform-module-harness.mjs';
 import { visibleInterfaceItems } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 
-test('JIDE is available at startup without a developer unlock', () => {
+test('JIDE stays hidden at startup until the saved developer unlock loads', () => {
   const startup = read('entry/src/main/ets/entryability/EntryAbility.ets');
   const features = read('entry/src/main/ets/model/ReleaseFeatures.ets');
-  assert.match(startup, /AppStorage\.setOrCreate<boolean>\(AI_AGENT_CHANNELS_APP_STORAGE_KEY, true\)/);
-  assert.doesNotMatch(features, /developer_debug_agent_enabled|enableAiAgentChannels/);
+  assert.match(startup, /AppStorage\.setOrCreate<boolean>\(AI_AGENT_CHANNELS_APP_STORAGE_KEY, false\)/);
+  assert.match(features, /developer_debug_agent_enabled/);
+  assert.match(startup, /initializeAiAgentChannels\(\)/);
   for (const simple of [false, true]) {
-    const context = {simple,agent:true,cloudDeck:false,themeHasTextures:false};
-    assert.ok(visibleInterfaceItems('home',context).some(item=>item.id==='agent'));
+    const context = {simple,agent:false,cloudDeck:false,themeHasTextures:false};
+    assert.equal(visibleInterfaceItems('home',context).some(item=>item.id==='agent'), false);
   }
 });
 
@@ -187,9 +189,9 @@ test('preselected edit hides selectors, keeps global reads, and proposes discove
   assert.match(page,
     /if \(this\.hasFixedEditSelection\(\)\) \{[\s\S]*if \(this\.消息列表\.length === 0\)[\s\S]*Text\(this\.selectedEditContext\(\)\)[\s\S]*\} else \{[\s\S]*AgentSetupCard\(/);
   assert.match(page,
-    /private providerFunctionToolsForTurn\(allowWeb: boolean = true\): ProviderFunctionTool\[\][\s\S]*return filterAgentWebTools\(agentFunctionTools\(this\.agentSettings\.batchLimit, this\.pageMode\), allowWeb\)/);
+    /private providerFunctionToolsForTurn\(allowWeb: boolean = true\): ProviderFunctionTool\[\][\s\S]*return filterAgentWebTools\(agentFunctionTools\(this\.pageMode\), allowWeb\)/);
   assert.match(page, /const functionTools: ProviderFunctionTool\[\] = this\.providerFunctionToolsForTurn\(allowWeb\)/);
-  assert.match(page, /setInterfaceTools\(functionTools, allowWeb \? await loadAgentSearchProvider\(\) : ''\)/);
+  assert.match(page, /setInterfaceTools\(functionTools, searchProvider, nativeWeb\)/);
   assert.match(page, /functionTools: functionTools/);
   const instructions = read('entry/src/main/ets/model/agent/AgentSessionContext.ts');
   assert.match(instructions, /用户审核具体范围后才能保存/);
@@ -215,12 +217,11 @@ test('tool traces translate stable provider IDs into detailed localized display 
   assert.equal(strings.get('ai_agent_tool_name_card_statistics'), '读取卡片统计与最近复习历史');
 });
 
-test('shared page rebuilds stable ID scope and batch policy for every user turn', () => {
+test('shared page rebuilds stable ID scope for every user turn', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(page, /private 重建本轮AgentScope\(\)/);
   assert.match(page, /runAgentTurn[\s\S]*this\.重建本轮AgentScope\(\)/);
   assert.match(page, /this\.agentScope\.beginTurn\(\)/);
-  assert.match(page, /configureBatchLimit\(this\.agentSettings\.batchLimit\)/);
   assert.match(page, /providerFunctionToolsForTurn\(allowWeb\)/);
 });
 
@@ -281,8 +282,8 @@ test('search preference never turns an ordinary card draft into a mandatory-evid
   assert.doesNotMatch(page,
     /requiresSearchEvidence:\s*this\.agentSettings\.searchMode\s*===\s*'always'/,
     'the always-search preference must not discard a successful local draft without sources');
-  assert.match(page, /searchMode:\s*'off'/,
-    'web search is permanently disabled: every provider turn must run with search off');
+  assert.match(page, /searchMode:\s*nativeWeb \? 'auto' : 'off'/,
+    'native web search follows the current provider configuration and web switch');
 });
 
 test('AI configuration is localized and only lives in the settings group', () => {
@@ -318,17 +319,17 @@ test('AI page title uses equal side regions around the screen midpoint', () => {
 
 test('settings API key, custom endpoint and custom model inputs share one visual style', () => {
   const settings = read('entry/src/main/ets/components/settings/AIAgent设置分组.ets');
-  assert.equal((settings.match(/new FormInputStyle\(\)/g) ?? []).length, 3);
+  assert.equal((settings.match(/new FormInputStyle\(\s*(?:undefined, )?this.appearanceElements\)/g) ?? []).length, 3);
   const style = read('entry/src/main/ets/utils/FormInputStyle.ets');
   assert.match(style, /backgroundColor\(insetMaterialFill\(\$r\('app\.color\.surface_card'\)\)\)/);
-  assert.match(style, /\.border\(SurfaceBorder\.options\(\)\)/);
+  assert.match(style, /\.border\(SurfaceBorder\.options\(undefined, undefined, this\.appearance\)\)/);
 });
 
 test('an in-flight Agent turn is cancellable from the send button and exposes localized failures', () => {
   const page = read('entry/src/main/ets/pages/AI制卡页.ets') + read('entry/src/main/ets/model/agent/AgentConversationView.ts');
   assert.match(page, /private 取消当前请求\(\): void/);
   assert.match(page, /this\.agentRunner\.cancel\(\)/);
-  assert.match(page, /ActionStatus\([\s\S]*Text\(this\.interfaceLabel\('submit'\)\)/);
+  assert.match(page, /IconActionButton\(\{ source: this\.[^\n]+\$r\('app\.media\.ic_common_close'\)[^\n]+ic_common_arrow_up[^\n]*\n\s+label: this\.interfaceLabel\('submit'\)/);
   assert.match(read('entry/src/main/ets/model/AppInterface.ts'), /item\.id === 'submit' && context\.processing \? 'ai_agent_cancel'/);
   assert.match(page, /if \(this\.处理中\) \{ this\.取消当前请求\(\); \}/);
   assert.match(page, /ai_agent_web_search_unsupported/);
@@ -401,4 +402,17 @@ test('Agent writes broadcast both refresh ticks with disjoint scopes', () => {
   const saveBlock = page.match(/private async 保存单卡\([\s\S]*?\n  \}/)?.[0] ?? '';
   assert.doesNotMatch(saveBlock, /cardContentChangedTick/,
     'the legacy create path must not raise the card content tick');
+});
+
+
+test('developer gate persists only after a valid key and a successful flush', async () => {
+ const state=new Map([['abilityContext',{}]]);let saved=false,fail=false;
+ const gate=loadPlatformModule('model/ReleaseFeatures.ets','({initializeAiAgentChannels,enableAiAgentChannels})',{
+ AppStorage:{get:key=>state.get(key),setOrCreate:(key,value)=>state.set(key,value)},
+ preferences:{getPreferences:async()=>({get:async()=>saved,put:async(_key,value)=>{saved=value;},flush:async()=>{if(fail)throw Error('disk failure');}})}});
+ await gate.initializeAiAgentChannels();assert.equal(state.get('aiAgentChannelsEnabled'),false);
+ assert.equal(await gate.enableAiAgentChannels('invalid'),false);assert.equal(saved,false);
+ fail=true;await assert.rejects(gate.enableAiAgentChannels('JideCards Developer Debug + 3.0.0'));assert.equal(state.get('aiAgentChannelsEnabled'),false);
+ fail=false;assert.equal(await gate.enableAiAgentChannels('JideCards Developer Debug + 3.0.0'),true);
+ state.set('aiAgentChannelsEnabled',false);await gate.initializeAiAgentChannels();assert.equal(state.get('aiAgentChannelsEnabled'),true);
 });

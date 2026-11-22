@@ -262,7 +262,7 @@ test('real JIDE structure receives smart layout and sensor state from the produc
   page.publishInterface();
   const strings = new Map(JSON.parse(readFileSync(new URL('../../entry/src/main/resources/base/element/string.json', import.meta.url))).string.map(x => [x.name, x.value]));
   const context = { simple: true, agent: true, cloudDeck: false, themeHasTextures: false };
-  const tools = agentFunctionTools(100, 'assistant');
+  const tools = agentFunctionTools('assistant');
   const structure = buildAgentAppStructure(context, 'study', '', key => strings.get(key), agentSettingDefinitions(), tools, tracker.snapshot());
   const values = new Map(structure.observations.find(x => x.surface === 'study').values.map(x => [x.id, x.value]));
   assert.equal(values.get('study_layout'), 'smart'); assert.equal(values.get('grip_availability'), 'unsupported'); assert.equal(values.get('grip_side'), 'left');

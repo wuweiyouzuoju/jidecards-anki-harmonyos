@@ -49,13 +49,13 @@ test('localized settings search respects simple and developer gates', () => {
     const simple = filterSettingsEntries('', true, false, localize).map(entry => entry.id);
     assert.ok(simple.includes('scheduler') && !simple.includes('ai'));
     assert.deepEqual(filterSettingsEntries('FSRS', true, false, localize), []);
-    assert.deepEqual(simple, ['general', 'scheduler', 'sync', 'editor', 'appearance', 'data', 'help', 'redemption', 'about']);
+    assert.deepEqual(simple, ['general', 'scheduler', 'sync', 'editor', 'appearance', 'data', 'help', 'redemption', 'advanced', 'about']);
     for (const simpleMode of [true, false]) {
       for (const query of (locale === 'base' ? ['隐藏', '隐藏牌组', '恢复显示', '导入文件', 'CSV', '备份与恢复'] : ['hidden', 'hidden decks', 'restore', 'import file', 'CSV', 'backups and restore'])) {
         assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), query === '隐藏' ? ['appearance','data'] : ['data']);
       }
       for (const query of (locale === 'base' ? ['指纹', '识别码', '兑换'] : ['fingerprint', 'app ID', 'redeem'])) {
-        assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), query === 'app ID' ? ['appearance', 'redemption'] : ['redemption']);
+        assert.deepEqual(filterSettingsEntries(query, simpleMode, false, localize).map(entry => entry.id), query === 'app ID' ? ['editor', 'appearance', 'redemption'] : ['redemption']);
       }
     }
     for (const query of (locale === 'base' ? ['隐藏卡面音频按钮', '显示答案时中断音频'] : ['Hide on-card audio buttons', 'Interrupt audio when showing the answer'])) {
@@ -71,7 +71,7 @@ test('localized settings search respects simple and developer gates', () => {
       assert.deepEqual(filterSettingsEntries(locale === 'base' ? '快捷答题方式' : 'quick answer mode', simpleMode, false, localize).map(entry => entry.id), ['scheduler']);
     }
     assert.deepEqual(filterSettingsEntries(locale === 'base' ? '自定义服务器' : 'custom server', true, false, localize).map(entry => entry.id), ['sync']);
-    assert.ok(simple.includes('scheduler') && !simple.includes('advanced'));
+    assert.ok(simple.includes('scheduler') && simple.includes('advanced'));
     assert.ok(simple.includes('about') && simple.includes('sync'));
     assert.deepEqual(filterSettingsEntries('FsRs', false, false, localize).map(entry => entry.id), ['scheduler']);
     assert.deepEqual(filterSettingsEntries(locale === 'base' ? '字体' : 'FONT', true, false, localize).map(entry => entry.id), ['appearance']);
@@ -83,7 +83,7 @@ test('settings search stays visible in detail pages and returns to directory for
   assert.match(SETTINGS_PANEL_SOURCE,
     /private settingsSearchField\(\)[\s\S]*?LiveSearchField\([\s\S]*?onSettingsSearchChange/);
   assert.match(SETTINGS_PANEL_SOURCE,
-    /搜索框属于设置面板公共壳[\s\S]*?this\.settingsSearchField\(\)[\s\S]*?ForEach\(\[this\.activeSection\][\s\S]*?List\(/);
+    /搜索框属于设置面板公共壳[\s\S]*?this\.settingsSearchField\(\)[\s\S]*?ForEach\(\[this\.sectionContentKey\(\)\][\s\S]*?List\(/);
   assert.match(SETTINGS_PANEL_SOURCE,
     /value\.trim\(\) !== '' && this\.activeSection !== ''[\s\S]*?this\.activeSection = ''/);
 });

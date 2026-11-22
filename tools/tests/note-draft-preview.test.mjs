@@ -13,6 +13,16 @@ const deferred = () => { let resolve; const promise = new Promise(r => resolve=r
 const note = () => ({id:42,guid:'keep',notetypeId:123,mtimeSecs:99,usn:8,fields:['saved','answer'],tags:['saved']});
 const input = () => ({notetypeId:123,note:note(),fields:['draft <img src="existing.png">','[sound:existing.mp3]'],tags:['draft'],
   images:[{id:1,fieldIndex:0,uri:'photo://one',filename:''}],audios:[]});
+test('Back leaves a new-note linked preview only after its inner layer has consumed Back', async () => {
+  const h = creationPageHarness(); await h.ready;
+  h.page.字段值列表 = ['retained draft','answer']; h.page.linksOpen = true;
+  h.page.linkedIds = [42]; h.page.linkedBack = () => true;
+  h.page.onBackPress(); assert.deepEqual(h.page.linkedIds,[42]);
+  h.page.linkedBack = () => false; h.page.onBackPress();
+  assert.deepEqual(h.page.linkedIds,[]); assert.equal(h.page.linkedBack,null);
+  assert.equal(h.page.linksOpen,true); assert.deepEqual(h.page.字段值列表,['retained draft','answer']);
+  assert.deepEqual(h.writes,[]); assert.deepEqual(h.pops,[]);
+});
 function fixture({cloze=false}={}) {
   const calls=[],states=[];
   const backend={
@@ -214,6 +224,10 @@ test('showing the retained editor clears preview guards even when the pop callba
   const form=new Form();form.preview=input();form.fieldValues=['retained','answer'];form.restoreAfterPreview();
   assert.equal(form.preview,null);assert.deepEqual(form.fieldValues,['retained','answer']);
   const host=editorPageHarness();const initial=host.page.previewReturnRequest;
+  host.page.restoreEditorAfterPreview();assert.equal(host.page.previewReturnRequest,initial);
+  host.page.pathStack.pushPath=()=>{};
+  assert.equal(host.page.openPreview(input(),()=>{}),true);
+  host.page.restoreEditorAfterPreview();assert.equal(host.page.previewReturnRequest,initial+1);
   host.page.restoreEditorAfterPreview();assert.equal(host.page.previewReturnRequest,initial+1);
 });
 

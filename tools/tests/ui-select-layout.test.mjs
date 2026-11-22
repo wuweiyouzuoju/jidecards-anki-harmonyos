@@ -7,37 +7,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
 const root = fileURLToPath(new URL('../../entry/src/main/ets/', import.meta.url));
 const read = path => menuPresentation(path,readFileSync(join(root, path), 'utf8'));
-
-test('restored custom batch limits remain the selected option instead of highlighting 1000', () => {
-  const path = 'components/settings/AIAgent设置分组.ets';
-  const Settings = loadComponentLogic(path, 'AIAgent设置分组', {
-    DEEPSEEK_PROVIDER: { defaultModel: 'deepseek-chat' }, OPENAI_PROVIDER: { defaultModel: 'gpt-4' }
-  });
-  // Execute the actual row properties, including its callback, rather than duplicating the index formula.
-  const binding = read(path).match(/FormSelectRow\(\{ label: settingsItemText\(this\.getUIContext\(\), 'ai_batch_limit'[\s\S]*?\}\s*\}\)/)[0];
-  const props = binding.slice(binding.indexOf('{'), binding.lastIndexOf(')'));
-  const getProps = new Function('settingsItemText', stripTypeScriptTypes('const props = ' + props + ';', { mode: 'transform' }) + 'return props;');
-  for (const saved of [1, 37, 100, 250, 500, 999, 1000]) {
-    const settings = new Settings();
-    settings.getUIContext = () => ({});
-    settings.batchLimit = saved;
-    settings.ready = true; settings.loading = false; settings.webState.busy = false;
-    const row = getProps.call(settings, () => 'batch limit');
-    assert.equal(row.value, String(saved));
-    assert.equal(row.options[row.selectedIndex]?.value, row.value, 'restored ' + saved);
-    assert.deepEqual(row.options.map(option => Number(option.value)), [...new Set([100, 250, 500, 1000, saved])].sort((a, b) => a - b));
-    for (const invalid of [-1, row.options.length, 0.5, NaN, Infinity]) row.onSelect(invalid);
-    assert.equal(settings.batchLimit, saved);
-    const target = row.options.findIndex(option => option.value === '500');
-    row.onSelect(target); assert.equal(settings.batchLimit, 500);
-    settings.loading = true; row.onSelect(0); assert.equal(settings.batchLimit, 500, 'late disabled callback is ignored');
-  }
-});
 
 function files(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
@@ -95,7 +68,7 @@ test('button, menu and selected item share a font size with one owner for each f
   style.applyNormalAttribute(instance);
   assert.equal(calls.some(([name]) => /font$|fontSize|fontWeight|controlSize/i.test(name)), false,
     'diffed modifiers must not own or reset fonts when Select options are rebuilt');
-  assert.equal(calls.find(([name]) => name === 'selectedOptionFontColor')[1], SelectStyle.selectedOptionColor);
+  assert.equal(calls.find(([name]) => name === 'selectedOptionFontColor')[1], SelectStyle.selectedOptionColor());
   assert.equal(calls.find(([name]) => name === 'selectedOptionBgColor')[1], SelectStyle.selectedOptionSurface);
 });
 
@@ -132,8 +105,8 @@ test('all enum controls use the shared selector while hierarchy selectors retain
   }
   assert.ok(shared >= 16);
   assert.match(read('components/common/SurfaceSelect.ets'), /SelectionOptions\(/);
-  assert.match(read('components/common/SurfaceSelect.ets'), /radius:12/);
-  assert.match(read('components/common/SelectionDialog.ets'), /SelectionOptions\(/);
+  assert.match(read('components/common/SurfaceSelect.ets'), /radius:appearanceElementRadius\(this.appearanceElements, 12\)/);
+  assert.match(read('components/home/HomeDeckRowMenu.ets'), /SelectionOptions\(/);
   assert.match(read('components/common/DirectorySelect.ets'), /SelectionValueButton\(/);
   const appearance = read('components/settings/外观分组.ets');
   assert.equal((appearance.match(/FormSelectRow\(/g) ?? []).length, 2);
@@ -346,9 +319,9 @@ test('study more uses the measured toolbar edge without applying a second wide-s
 });
 
 
-test('selector arrow follows actual popup placement and closes perpendicular to that direction', () => {
-  const {selectionPopupAngle, selectionClosedAngle} = loadPlatformModule('components/common/SelectionMenuLayout.ts',
-    '({selectionPopupAngle, selectionClosedAngle})', {});
+test('selector arrow follows actual popup placement', () => {
+  const {selectionPopupAngle} = loadPlatformModule('components/common/SelectionMenuLayout.ts',
+    '({selectionPopupAngle})', {});
   const trigger={left:200,top:300,width:80,height:44};
   for (const [popup,angle] of [
     [{left:120,top:350,width:160,height:140},90],
@@ -356,7 +329,6 @@ test('selector arrow follows actual popup placement and closes perpendicular to 
     [{left:290,top:260,width:160,height:140},0],
     [{left:30,top:260,width:160,height:140},180]]) {
     assert.equal(selectionPopupAngle(trigger,popup),angle);
-    assert.equal(selectionClosedAngle(angle),Math.abs(angle)===90?0:90);
   }
 });
 

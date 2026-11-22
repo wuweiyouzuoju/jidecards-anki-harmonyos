@@ -157,14 +157,14 @@ test('memory observation exposes only current card actions with shared icons and
 });
 
 test('known DeepSeek budgets support long material and checkpoints preserve it without silently truncating',()=>{
-  const budget=agentExecutionBudget('deepseek','deepseek-flash');assert.equal(budget.maxOutputTokens,131072);
+  const budget=agentExecutionBudget('deepseek','deepseek-flash');assert.equal(budget.maxOutputTokens,undefined);
   assert.equal(budget.contextBudgetChars,768000);
-  assert.deepEqual(agentExecutionBudget('custom','deepseek-flash'),{contextBudgetChars:240000,maxOutputTokens:32768});
+  assert.deepEqual(agentExecutionBudget('custom','deepseek-flash'),{contextBudgetChars:240000});
   const input=[{kind:'message',role:'user',content:'中'.repeat(400000)+'END',callId:'',name:'',argumentsJson:'',output:''}];
   const value={apiKey:'test',baseUrl:'https://example.test',model:'deepseek-flash',instructions:'',input,functionTools:[],
     searchMode:'off',requiresWebSearch:false,requiresSearchEvidence:false,requiresDraft:false,expectedDraftCount:0,
     reasoningEffort:'low',maxOutputTokens:budget.maxOutputTokens,contextBudgetChars:budget.contextBudgetChars};
-  assert.equal(providerRequestFitsContext(value),true);assert.equal(JSON.parse(buildResponsesPayload(value)).max_output_tokens,131072);
+  assert.equal(providerRequestFitsContext(value),true);assert.equal(Object.hasOwn(JSON.parse(buildResponsesPayload(value)),'max_output_tokens'),false);
   const state=safeAgentSessionState({input,readableIds:[[],[],[],[]],retrieval:{snapshots:[],readNoteIds:[],approvedNoteIds:[]},
     action:null,waitingCallId:'',paused:true});assert.equal(state.input[0].content,input[0].content);
   delete value.contextBudgetChars;assert.equal(providerRequestFitsContext(value),false);

@@ -18,7 +18,7 @@ test('requested mappings preserve phase and choice rules, four zones and disable
     assert.equal(resolveStudyGesture(action, state), expected);
   }
   assert.equal(resolveStudyGesture('double', { ...state, phase: 'question' }), 'flip');
-  for (const action of ['left', 'right']) assert.equal(resolveStudyGesture(action, { ...state, phase: 'question' }), 'none');
+  for (const action of ['left', 'right']) assert.equal(resolveStudyGesture(action, { ...state, phase: 'question' }), 'flip');
   for (const [x, y, command] of [[0.2, 0.2, 'again'], [0.8, 0.2, 'hard'], [0.2, 0.8, 'good'], [0.8, 0.8, 'easy']]) {
     assert.equal(resolveStudyGesture('tap', { ...state, gestures: false, tapZones: true }, x, y), command);
     assert.equal(resolveStudyGesture('tap', { ...state, choice: true }, x, y), 'none');
@@ -191,7 +191,7 @@ test('settings selection disables duplicate input and restores actual mode after
     StudyQuickAnswerMode, loadStudyQuickAnswerMode: async () => 0,
     saveStudyQuickAnswerMode: () => new Promise((resolve, reject) => { finish = { resolve, reject }; })
   });
-  const host = Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null, 简洁模式: true, updateShakeSensor() {} });
+  const host = Object.assign(new Host(), { gestureNoteAction: '', recoveryMessage: '', resultMessage: '', resultUndo: null, 简洁模式: true, updateShakeSensor() {} });
   const saving = host.changeControl(1);
   assert.equal(host.controlsSaving, true); assert.equal(host.selectedMode, 1);
   await host.changeControl(2); assert.equal(host.selectedMode, 1);
@@ -216,7 +216,7 @@ function pageHarness() {
     'completeStudyGestures', 'studyGestureCommand', 'studyGestureTapInput', 'RATING_AGAIN', 'RATING_HARD', 'RATING_GOOD', 'RATING_EASY', 'BURY_SUSPEND_MODE_BURY_USER', 'BURY_SUSPEND_MODE_SUSPEND', 'validateStudyControls', 'mappedStudyCommand',
     stripTypeScriptTypes('class Host {' + methods + '}', { mode: 'transform' }) + ';return Host;')(
     StudyQuickAnswerMode, resolveStudyGesture, () => completed, async () => { saved++; completed = true; }, { now: () => now }, completeStudyGestures, studyGestureCommand, studyGestureTapInput, 0, 1, 2, 3,BURY_SUSPEND_MODE_BURY_USER,BURY_SUSPEND_MODE_SUSPEND,validateStudyControls,mappedStudyCommand);
-  const page = Object.assign(Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null, 简洁模式: true, updateShakeSensor() {} }), { timeboxNotice: null, 阶段: 'question', requestVersion: 1, interactionVersion: 1,
+  const page = Object.assign(Object.assign(new Host(), { gestureNoteAction: '', recoveryMessage: '', resultMessage: '', resultUndo: null, 简洁模式: true, updateShakeSensor() {} }), { timeboxNotice: null, 阶段: 'question', requestVersion: 1, interactionVersion: 1,
     controlsJson:JSON.stringify(defaultStudyControls()),quickAnswerMode: StudyQuickAnswerMode.TapZones, choiceQuestion: null, pendingHtml: '', controllerReady: true,
     展示时刻毫秒: 500, isCurrentRequest: v => v === 1, stopStudyTimers() {}, startStudyTimers() {}, clearChoiceAutoAdvance() {},
     studyCardShown() { scripts.push(this.interactionVersion); }, 显示答案() { commands.push('flip'); },
@@ -275,7 +275,7 @@ test('JIDE gesture overrides apply to the actual page while choice feedback and 
   const {page,commands}=pageHarness();
   page.controlsJson=JSON.stringify({...defaultStudyControls(),gestureMode:'gestures',gestures:[{input:'left',command:'easy'}]});
   page.阶段='answer';page.handleStudyGesture('left',0,0,1,1);assert.deepEqual(commands,[3]);commands.length=0;
-  page.阶段='question';page.handleStudyGesture('left',0,0,1,1);assert.deepEqual(commands,[]);
+  page.阶段='question';page.handleStudyGesture('left',0,0,1,1);assert.deepEqual(commands,['flip']);commands.length=0;
   page.choiceQuestion={};page.阶段='answer';page.handleStudyGesture('right',0,0,1,1);assert.deepEqual(commands,['continue']);commands.length=0;
   page.choiceQuestion=null;page.studyMenuOpen=true;page.handleStudyGesture('left',0,0,1,1);assert.deepEqual(commands,[]);
   page.studyMenuOpen=false;page.controlsJson=JSON.stringify({...defaultStudyControls(),gestureMode:'off'});
@@ -290,7 +290,7 @@ test('full gestures resolve current face/layout, every study action, disabled mo
     埋藏或暂停当前卡:record('bury/suspend'),playStudyAudio:record('replay'),openNoteEditor:record('edit'),
     changeMarking:record('mark/flag'),openStudyMenu:record('menu'),showStudyGuide:record('guide'),
     executeMenuAction:record('whiteboard'),configureAutoAdvance:record('auto_advance'),openAddNote:record('add'),revealHints:record('hint'),
-    openPreviousInfo:record('previous_info'),openVoice:record('voice')});
+    openPreviousInfo:record('previous_info'),openVoice:record('voice'),runGestureScript:record('script'),openCurrentInfo:record('info'),openGestureNoteAction:record('note_action')});
   for(const {id:command} of STUDY_GESTURE_ACTIONS.slice(1)) {
     page.阶段=command==='flip'?'question':'answer';
     config.bindings=[{input:'up',command,side:'both'}];page.controlsJson=JSON.stringify({...defaultStudyControls(),gestureConfig:config});
@@ -300,7 +300,7 @@ test('full gestures resolve current face/layout, every study action, disabled mo
   page.controlsJson=JSON.stringify({...defaultStudyControls(),gestureConfig:config});
   page.handleStudyGesture('tap',0.5,0.5,1,1);assert.deepEqual(commands,[3]);commands.length=0;
   page.handleStudyGesture('left',0,0,1,1);assert.deepEqual(commands,[],'full configuration does not inherit old swipe defaults');
-  page.阶段='question';page.handleStudyGesture('up',0,0,1,1);assert.deepEqual(commands,[]);
+  page.阶段='question';page.handleStudyGesture('up',0,0,1,1);assert.deepEqual(commands,['flip']);commands.length=0;
   page.阶段='answer';
   for(const field of ['webInputFocused','answerInputFocused','studyMenuOpen','customSchedulingWarning','手写模式','cardRenderPending','flipPending']) {
     page[field]=true;page.handleStudyGesture('up',0,0,1,1);assert.deepEqual(commands,[],field);page[field]=false;

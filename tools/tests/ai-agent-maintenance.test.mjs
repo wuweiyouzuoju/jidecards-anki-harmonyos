@@ -1,4 +1,4 @@
-import { STUDY_GESTURE_INPUTS, STUDY_GESTURE_ACTIONS, completeStudyGestures, assertStudyGestureEdit, defaultStudyGestureConfig } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
+import { STUDY_GESTURE_SUPPORT,STUDY_GESTURE_INPUTS, STUDY_GESTURE_ACTIONS, completeStudyGestures, assertStudyGestureEdit, defaultStudyGestureConfig } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
 import { SIMPLE_MODE_KEY } from '../../entry/src/main/ets/model/AppLayoutState.ts';
 import { effectiveStudyKeyboard } from '../../entry/src/main/ets/model/StudyControls.ts';
 import { STUDY_KEYBOARD_ACTIONS } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
@@ -67,7 +67,7 @@ function fixture() {
     saveBrowserPreferences:async(patch,expected)=>{assert.equal(JSON.stringify(state.browserPreferences),expected);if(state.browserWriteError)throw Error('disk');
       state.browserPreferences=updateBrowserPreferences(state.browserPreferences,patch);state.writes.push('browser');return state.browserPreferences;}};
   const dependencies={...browserDependencies,decodeMaintenanceArguments,collectionPreferenceEdits,agentRestoreStockKind,patchAgentNotetypeFields,patchAgentNotetypeLatex,createAgentAction,
-    STUDY_GESTURE_INPUTS,STUDY_GESTURE_ACTIONS,completeStudyGestures,assertStudyGestureEdit,SIMPLE_MODE_KEY,AppStorage:{get:key=>key===SIMPLE_MODE_KEY?state.simple:undefined},validateStudyControls,effectiveStudyKeyboard,STUDY_KEYBOARD_ACTIONS,reviewPreferences,readStudyControls:async()=>structuredClone(state.controls),
+    STUDY_GESTURE_SUPPORT,STUDY_GESTURE_INPUTS,STUDY_GESTURE_ACTIONS,completeStudyGestures,assertStudyGestureEdit,SIMPLE_MODE_KEY,AppStorage:{get:key=>key===SIMPLE_MODE_KEY?state.simple:undefined},validateStudyControls,effectiveStudyKeyboard,STUDY_KEYBOARD_ACTIONS,reviewPreferences,readStudyControls:async()=>structuredClone(state.controls),
     笔记服务:Notes,卡片服务:Cards,笔记类型服务:Types,readAgentNotetypeImpact,readAgentExportSnapshot};
   const Registry=loadPlatformModule('backend/agent/AgentToolRegistry.ets','AgentToolRegistry',{
     toolRiskOf,parseAgentToolJsonObject,decodeAgentClarificationRequest,AgentApprovalRequired});
@@ -92,7 +92,7 @@ function fixture() {
 
 test('all three modes expose the actual maintenance schemas; manual interface catalogs do not gain entry points', () => {
   for(const mode of ['assistant','create','edit'])for(const tool of agentMaintenanceTools()) {
-    assert.ok(agentFunctionTools(100,mode).some(item=>item.name===tool.name));
+    assert.ok(agentFunctionTools(mode).some(item=>item.name===tool.name));
     assert.doesNotThrow(()=>decodeMaintenanceArguments(tool.name,tool.exampleArgumentsJson));
     assert.notEqual(toolRiskOf(tool.name),'blocked');
   }
@@ -187,7 +187,7 @@ test('JIDE full gestures use the shared catalog, localized preview and experimen
     {input:'up',command:'replay',side:'both'},{input:'nine_center',command:'good',side:'answer'}]};
   const read=JSON.parse((await f.call('get_advanced_settings',{group:'study'})).outputJson);
   assert.deepEqual(read.gestureInputs,STUDY_GESTURE_INPUTS);assert.deepEqual(read.gestureActions,STUDY_GESTURE_ACTIONS);
-  assert.equal(read.gestureExperimentalOnly,true);assert.equal(read.gestureEditable,true);assert.equal(read.effectiveGestureConfig,null);
+  assert.equal(read.gestureCompatibility,STUDY_GESTURE_SUPPORT);assert.equal(read.gestureExperimentalOnly,true);assert.equal(read.gestureEditable,true);assert.equal(read.effectiveGestureConfig,null);
   const after={...defaultStudyControls(),gestureConfig:config};
   const action=(await f.call('propose_update_study_controls',{controlsJson:JSON.stringify(after)})).action;
   assert.deepEqual(f.state.writes,[]);

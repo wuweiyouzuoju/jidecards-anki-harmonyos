@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
-import { safeDialogMaxHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
+import { backdropHorizontalTransform, safeDialogMaxHeight } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
+import { materialHarness } from './surface-material-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = path => readFileSync(new URL(path, root), 'utf8').replaceAll('\r\n', '\n');
@@ -200,6 +201,23 @@ test('the shared frame dismisses only when the owner allows it', () => {
   frame.canDismiss = true; frame.dismiss(); assert.equal(closes, 1);
 });
 
+test('scroll and Web content inside protected dialogs cannot dismiss the backdrop', () => {
+  let closes = 0;
+  const frame = instance('components/common/DialogFrame.ets', ['dismiss', 'dismissFromClick'], {
+    protectPanelGestures: true, canDismiss: true, onDismiss() { closes++; }
+  });
+  frame.dismissFromClick({windowX: 4, windowY: 10});
+  assert.equal(closes, 0);
+  frame.panelArea = {globalPosition: {x: 16, y: 60}, width: 320, height: 500};
+  frame.dismissFromClick({windowX: 190, windowY: 320});
+  assert.equal(closes, 0);
+  frame.dismissFromClick({windowX: 8, windowY: 320});
+  assert.equal(closes, 1);
+  frame.canDismiss = false;
+  frame.dismissFromClick({windowX: 8, windowY: 320});
+  assert.equal(closes, 1);
+});
+
 function ownerSlotPattern(slot) {
   // Explicit void and an inferred return type have the same lexical this; method references do not.
   return new RegExp(`${slot}\\s*:\\s*\\(\\s*\\)\\s*(?::\\s*void\\s*)?=>\\s*\\{\\s*this\\.`, 'u');
@@ -217,16 +235,32 @@ test('browser centered selector slots retain their parent receiver', () => {
  }
 });
 
+test('modal scrim fills sideways safe-area padding for all window orientations', () => {
+  for (const [left, width, windowWidth, safeLeft, safeRight, expectedLeft, expectedRight] of [
+    [0, 955, 1000, 0, 45, 0, 1000],
+    [45, 955, 1000, 45, 0, 0, 1000],
+    [20, 935, 1000, 20, 45, 0, 1000],
+    [0, 600, 600, 0, 0, 0, 600],
+    [100, 600, 1000, 20, 45, 100, 700],
+  ]) {
+    const transform = backdropHorizontalTransform(left, width, windowWidth, safeLeft, safeRight);
+    const extra = (transform.scale - 1) * width;
+    const pivot = parseFloat(transform.pivot) / 100;
+    assert.ok(Math.abs(left - extra * pivot - expectedLeft) < 0.01);
+    assert.ok(Math.abs(left + width + extra * (1 - pivot) - expectedRight) < 0.01);
+  }
+});
+
 test('shared chrome owns theme, scroll limits and safe areas; slots retain their owner', () => {
   const backdrop = read('components/common/DialogBackdrop.ets');
   assert.match(backdrop, /@StorageProp\('themeMode'\)/);
   assert.match(backdrop, /@StorageProp\('systemDarkMode'\)/);
-  assert.match(backdrop, /backgroundEffect\(\(this\.materialOverride \|\| this\.material\) === 'glass' && this\.blurRadius > 0 \?/);
+  assert.doesNotMatch(backdrop, /backgroundEffect\(|backdropBlur\(|backgroundBlurStyle\(/, 'page scrims must keep background text and patterns sharp');
   assert.match(backdrop, /expandSafeArea/);
   const frame = read('components/common/DialogFrame.ets');
   assert.match(frame, /Scroll\(\)[\s\S]*maxHeight: this.bodyHeight\(\)/);
-  assert.match(frame, /\.height\(this\.usableHeight\(\)\)\.alignContent\(Alignment\.Center\)/);
-  assert.match(frame, /\.width\('100%'\)\.height\('100%'\)(?:\s*\.onClick\([^\n]*\))?\s*\.alignContent\(Alignment\.Top\)/,
+  assert.match(frame, /\.height\(this\.usableHeight\(\)\)\.id\(this\.dialogGlassSource\)\.alignContent\(Alignment\.Center\)/);
+  assert.match(frame, /\.width\('100%'\)\.height\('100%'\)(?:\s*\.(?:id|onVisibleAreaChange|onClick)\([\s\S]*?\))*\s*\.alignContent\(Alignment\.Top\)/,
     'keyboard-sized inner viewport must start at the root top, so the root cannot clip the lower body');
   assert.match(frame, /this.header\(\)[\s\S]*flexShrink\(0\)/);
   for (const path of readdirSync(root, { recursive: true }).filter(p => p.endsWith('.ets'))) {
@@ -245,7 +279,7 @@ test('shared chrome owns theme, scroll limits and safe areas; slots retain their
 
 test('preview fill mode and ordinary form scrolling share the available height after header and padding', () => {
   const dimensions=loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{});
-  const Frame=loadComponentLogic('components/common/DialogFrame.ets','DialogFrame',{应用尺寸:dimensions,safeDialogMaxHeight});
+  const Frame=loadComponentLogic('components/common/DialogFrame.ets','DialogFrame',{应用尺寸:dimensions,safeDialogMaxHeight, SeriesVisual:materialHarness('flat', false).SeriesVisual});
   const frame=new Frame();
   assert.equal(frame.fillBody,false,'ordinary dialogs keep content-sized scrolling by default');
   for(const [viewport,header,expected] of [[800,56,589.92],[400,56,237.92],[400,112,181.92],[240,112,41.12],[120,112,0]]) {
@@ -263,13 +297,44 @@ test('preview fill mode and ordinary form scrolling share the available height a
 
 test('fixed reference footer reserves measured height without changing ordinary dialogs or keyboard insets',()=>{
   const dimensions=loadPlatformModule('utils/应用尺寸.ets','应用尺寸',{});
-  const Frame=loadComponentLogic('components/common/DialogFrame.ets','DialogFrame',{应用尺寸:dimensions,safeDialogMaxHeight});
+  const Frame=loadComponentLogic('components/common/DialogFrame.ets','DialogFrame',{应用尺寸:dimensions,safeDialogMaxHeight, SeriesVisual:materialHarness('flat', false).SeriesVisual});
   const frame=new Frame();frame.headerHeight=104;frame.footerHeight=72;frame.safeTop=24;frame.safeBottom=12;
   for(const [viewport,keyboardTop] of [[800,0],[400,0],[800,340],[240,0]]) {
     frame.viewportHeight=viewport;frame.keyboardTop=keyboardTop;
     frame.showFooter=false;const ordinary=frame.bodyHeight();frame.showFooter=true;
     assert.equal(frame.bodyHeight(),Math.max(0,ordinary-72-dimensions.间距_12));
     frame.showFooter=false;assert.equal(frame.bodyHeight(),ordinary);
+  }
+});
+
+test('glass dialog scroll owns shadow space inside the frame and preserves the height budget', () => {
+  const dimensions = loadPlatformModule('utils/应用尺寸.ets', '应用尺寸', {});
+  const { SeriesVisual, sharedGlassShadow } = materialHarness('glass', false);
+  const Frame = loadComponentLogic('components/common/DialogFrame.ets', 'DialogFrame', {
+    应用尺寸: dimensions, safeDialogMaxHeight, SeriesVisual
+  });
+  const shadow = sharedGlassShadow(false);
+  assert.ok(dimensions.卡片内边距 >= shadow.radius + Math.abs(shadow.offsetX));
+  for (const actionsAtBottom of [false, true]) for (const showFooter of [false, true]) {
+    const frame = Object.assign(new Frame(), {
+      surfaceMaterial: 'glass', actionsAtBottom, showFooter, headerHeight: 56, footerHeight: 42
+    });
+    for (const [viewportHeight, safeTop, safeBottom, keyboardTop] of [[800, 0, 0, 0], [450, 24, 16, 300]]) {
+      Object.assign(frame, { viewportHeight, safeTop, safeBottom, keyboardTop });
+      assert.equal(frame.scrollOwnsShadowInsets(), true);
+      assert.ok(frame.bodyPaddingTop() >= shadow.radius - shadow.offsetY);
+      assert.ok(frame.bodyPaddingBottom() >= shadow.radius + shadow.offsetY);
+      const reserved = frame.headerHeight + frame.framePaddingTop() + frame.framePaddingBottom() +
+        (showFooter ? frame.footerHeight + frame.footerMarginTop() : 0);
+      assert.equal(frame.bodyHeight(), Math.max(0, frame.frameMaxHeight() - reserved));
+      assert.equal(frame.hasSectionAfterBody() ? frame.framePaddingBottom() : frame.bodyPaddingBottom(),
+        SeriesVisual.scrollShadowEndInset('glass', dimensions.卡片内边距));
+    }
+    frame.fillBody = true;
+    assert.equal(frame.scrollOwnsShadowInsets(), false);
+    assert.equal(frame.framePaddingTop(), dimensions.卡片内边距);
+    assert.equal(frame.framePaddingBottom(), shadow.radius + shadow.offsetY);
+    assert.equal(frame.bodyPaddingBottom(), 0);
   }
 });
 

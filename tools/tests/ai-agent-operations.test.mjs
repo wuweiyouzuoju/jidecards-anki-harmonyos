@@ -103,7 +103,7 @@ function coreFixture() {
 
 test('all operation definitions are discoverable in every mode, strictly validated and localized',()=>{
   for(const mode of ['assistant','edit','create']) {
-    const catalog=agentFunctionTools(100,mode);
+    const catalog=agentFunctionTools(mode);
     for(const tool of operations.agentOperationDefinitions()){
       assert.equal(catalog.filter(t=>t.name===tool.name).length,1);assert.equal(toolRiskOf(tool.name),tool.risk);
       assert.doesNotThrow(()=>operations.decodeOperationArguments(tool.name,tool.exampleArgumentsJson));

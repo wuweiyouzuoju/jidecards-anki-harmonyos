@@ -24,7 +24,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 const transportStub = `export class AgentStreamObserver {} export class AgentTransportError extends Error {} export class AgentTransportSession {}`;
 const transportStubUrl = 'data:text/javascript;base64,' + Buffer.from(transportStub).toString('base64');
-const adapterStub = `export class DeepSeekAdapter {} export class OpenAIAdapter {} export class CustomAdapter {}`;
+const adapterStub = `export class OfficialAIAdapter {} export class DeepSeekAdapter {} export class OpenAIAdapter {} export class CustomAdapter {}`;
 const adapterStubUrl = 'data:text/javascript;base64,' + Buffer.from(adapterStub).toString('base64');
 const registryStub = `export class AgentToolRegistry {} export class AgentToolResult {}`;
 const registryStubUrl = 'data:text/javascript;base64,' + Buffer.from(registryStub).toString('base64');
@@ -39,7 +39,7 @@ export const sanitizeAgentToolJson = (text) => ({ text });
 const diagnosticsStubUrl = 'data:text/javascript;base64,' + Buffer.from(diagnosticsStub).toString('base64');
 const loaderCode = `export function resolve(specifier, context, nextResolve) {
   if (specifier === './AgentTransport') return { url: ${JSON.stringify(transportStubUrl)}, shortCircuit: true };
-  if (specifier === './DeepSeekAdapter' || specifier === './OpenAIAdapter' || specifier === './CustomAdapter') {
+  if (specifier === './OfficialAIAdapter' || specifier === './DeepSeekAdapter' || specifier === './OpenAIAdapter' || specifier === './CustomAdapter') {
     return { url: ${JSON.stringify(adapterStubUrl)}, shortCircuit: true };
   }
   if (specifier === './AgentToolRegistry') return { url: ${JSON.stringify(registryStubUrl)}, shortCircuit: true };

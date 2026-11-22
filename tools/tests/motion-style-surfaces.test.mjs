@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { surfaceMotionApi } from './motion-harness.mjs';
+import { loadPlatformModule } from './platform-module-harness.mjs';
 import { nativeDialogHostClass } from './platform-module-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
@@ -35,7 +36,7 @@ test('pages, section switches, dialogs and overlays read the same current profil
     assert.deepEqual(dialog.enter.combined.value, { x: scale, y: scale });
     assert.equal(dialog.enter.options.duration, 200);
     assert.equal(dialog.exit.combined, undefined, 'dialog closing does not shrink');
-    assert.deepEqual(dialog.exit.options, { duration, curve: 'ease-out' });
+    assert.equal(dialog.exit, api.TransitionEffect.IDENTITY, 'native window owns closing; content must not animate a second time');
     const overlay = surface.pageOverlay();
     assert.deepEqual(overlay.options, options);
     assert.equal(overlay.combined, undefined, 'full preview background and Web do not slide');
@@ -51,14 +52,17 @@ test('all nine destinations keep equivalent forward and return callbacks', () =>
     ['NoteDraftPreviewPage', 'NoteDraftPreviewPage', 'opacityValue', 'navigationOffset']
   ]) {
     const source = read('pages/' + file + '.ets');
-    const marker = 'CustomTransition.getInstance().注册NavParam(';
+    const marker = source.includes('CustomTransition.getInstance().registerPage(') ?
+      'CustomTransition.getInstance().registerPage(' : 'CustomTransition.getInstance().注册NavParam(';
     const start = source.indexOf(marker);
     assert.ok(start >= 0, name);
     let end = start + marker.length, depth = 1;
     while (depth) { if (source[end] === '(') depth++; else if (source[end] === ')') depth--; end++; }
     let callbacks;
-    const state = {};
-    const registry = { 注册NavParam: (id, begin, finish) => { assert.equal(id, name); callbacks = { begin, finish }; } };
+    const state = {wheelSession: {setPresentation() {}, setVisible() {}}};
+    const Registry = loadPlatformModule('utils/自定义转场.ets', 'CustomTransition', { navigationEnterOffset: api.navigationEnterOffset });
+    const registry = Registry.getInstance();
+    registry.注册NavParam = (id, begin, finish) => { assert.equal(id, name); callbacks = { begin, finish }; };
     const invoke = new Function('CustomTransition', 'navigationEnterOffset',
       stripTypeScriptTypes(source.slice(start, end) + ';', { mode: 'transform' }));
     invoke.call(state, { getInstance: () => registry }, api.navigationEnterOffset);
@@ -95,10 +99,34 @@ test('settings only enable local motion after mounting and use the current navig
     assert.equal(host.previousSection, target);
   }
   assert.equal(publications, 5);
-  assert.match(source, /ForEach\(\[this\.activeSection\]/);
-  assert.match(source, /\.transition\(SurfaceTransition\.pageContent\(this\.sectionForward, this\.animateSection\)\)/);
+  assert.match(source, /ForEach\(\[this\.sectionContentKey\(\)\]/);
+  assert.match(source, /\.transition\(SurfaceTransition\.pageContent\(this\.sectionForward, this\.animateSection, this\.surfaceMaterial === 'glass'\)\)/);
   assert.doesNotMatch(source, /\.transition\(.*(?:dialog\(|backdrop\(|OPACITY)/,
     'settings child panels own their effects; host must not wrap another transition');
+});
+
+test('glass and flat pages share opacity and motion preference throughout entrance', () => {
+  for (const style of ['restrained', 'lively']) {
+    const { SurfaceTransition } = surfaceMotionApi(style);
+    for (const forward of [true, false]) {
+      const glass = SurfaceTransition.pageContent(forward, true, true);
+      const flat = SurfaceTransition.pageContent(forward, true, false);
+      assert.equal(glass.enter.kind, 'opacity');
+      assert.equal(glass.enter.value, 0);
+      assert.deepEqual(glass.enter.combined.value, flat.enter.combined.value);
+      assert.deepEqual(glass.enter.options, flat.enter.options);
+    }
+  }
+  for (const [file, state] of [['设置页', '转场透明度'], ['添加笔记页', '转场透明度'], ['EditNotePage', 'opacityValue']]) {
+    const page = read('pages/' + file + '.ets');
+    const expression = page.match(/\.opacity\((this\.[^\n]+)\)\n    \.translate/)[1];
+    for (const material of ['glass', 'flat']) {
+      for (const progress of [0, 0.5, 1]) {
+        assert.equal(new Function('return ' + expression).call({ [state]: progress,
+          surfaceMaterial: material, pageMaterial: material }), progress, file);
+      }
+    }
+  }
 });
 
 test('same surface effects have one owner across all modal implementations', () => {
@@ -119,7 +147,7 @@ test('same surface effects have one owner across all modal implementations', () 
   assert.equal(owners, 3, 'three thin adapters supply motion preferences to the same public presentation');
   const panel = sharedSource('harmony/shared/PopupPanel.ets');
   assert.equal((panel.match(/\.transition\(/g) ?? []).length, 1);
-  assert.match(panel, /TransitionEffect\.asymmetric\(TransitionEffect\.IDENTITY, this\.exitTransition\)/);
+  assert.match(panel, /\.transition\(!this\.surfaceVisible \? TransitionEffect\.IDENTITY : this\.usesGlass\(\) \? this\.glassTransition\(\) : this\.flatTransition\)/);
   assert.doesNotMatch(read('components/牌组选项面板.ets'), /SurfaceTransition\.(?:dialog|backdrop)/);
   assert.match(read('pages/DeckOptionsPage.ets'), /注册NavParam\('DeckOptionsPage'/);
   for (const file of ['components/提醒编辑面板.ets', 'components/browser/查找替换对话框.ets',
@@ -192,8 +220,7 @@ test('persistent native-dialog owners create current-style windows on each open'
       api.setStyle(style); host[field].open(host[name]);
       const options = host[field].current().options;
       assert.equal(options.openAnimation.duration, 0, path + ': content owns the entrance');
-      assert.equal(options.closeAnimation.duration, duration, path);
-      assert.equal(options.closeAnimation.curve, 'ease-out', path);
+      assert.equal(options.closeAnimation.duration, 0, path + ': closing must not duplicate the content animation');
     }
     assert.equal(closed, 2, path);
   }

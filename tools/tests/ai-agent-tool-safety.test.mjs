@@ -29,13 +29,17 @@ test('semantic tool arguments reject unknown and raw backend fields', () => {
   }
 });
 
-test('tool arguments reject malformed JSON, invalid IDs and oversized arrays', () => {
+test('tool arguments reject malformed JSON, and invalid IDs', () => {
   assert.throws(() => decodeAgentToolArguments('get_note_context', '{bad'), /invalid_tool_arguments/);
   assert.throws(() => decodeAgentToolArguments('get_note_context', '{"noteIds":[0]}'), /invalid_tool_arguments/);
-  assert.throws(() => decodeAgentToolArguments(
-    'propose_delete_cards',
-    JSON.stringify({ cardIds: Array.from({ length: 1001 }, (_, index) => index + 1) }),
-  ), /tool_batch_too_large/);
+});
+
+test('tool decoders preserve more than 1000 cards and IDs in one request', () => {
+  const cardIds = Array.from({ length: 1001 }, (_, index) => index + 1);
+  const cards = cardIds.map(id => ({ fields: [String(id), 'answer'] }));
+  const created = decodeAgentToolArguments('create_flashcards', JSON.stringify({ cards })).createNotes;
+  assert.deepEqual(created.map(note => note.fields), cards.map(card => card.fields));
+  assert.deepEqual(decodeAgentToolArguments('propose_delete_cards', JSON.stringify({ cardIds })).cardIds, cardIds);
 });
 
 test('create-flashcards schema accepts content only and rejects model-supplied app context', () => {

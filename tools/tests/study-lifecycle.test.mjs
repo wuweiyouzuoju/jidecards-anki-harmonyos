@@ -1,7 +1,8 @@
+import { studyContinuationFingerprint } from '../../entry/src/main/ets/model/ContinuationSession.ts';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 import { appInterfaceDependencies, studyInterfaceMethods } from './app-interface-harness.mjs';
 import { attachStudySession } from './study-session-harness.mjs';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { appLogFor, loadPlatformModule } from './platform-module-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import fs from 'node:fs';
 import test from 'node:test';
@@ -18,12 +19,12 @@ const methods = names.map(name => {
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
 const interfaceDeps = appInterfaceDependencies();
-const Page = compileWithUiFeedback('CARD_WEB_RENDER_TIMEOUT', 'cardScriptDiagnosticLabels', ...Object.keys(interfaceDeps), 'DialogAlignment', 'playStudyHaptic', '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', 'CustomTransition', '刷新桌面卡片数据', 'AppStorage', 'SECONDS_PER_DAY', '$r', 'console',
+const Page = compileWithUiFeedback('CARD_WEB_RENDER_TIMEOUT', 'cardScriptDiagnosticLabels', ...Object.keys(interfaceDeps), 'DialogAlignment', 'playStudyHaptic', '构建卡片HTML', '剥除拼写标记', '提取拼写标记', '原始侧HTML', '媒体基地址', 'CustomTransition', '刷新桌面卡片数据', 'AppStorage', 'SECONDS_PER_DAY', '$r', 'AppLog',
   stripTypeScriptTypes(`class Page { ${methods.join('\n')} ${studyInterfaceMethods(source)} }`, {mode:'transform'}) + '; return Page;')(
   loadPlatformModule('utils/CardWebView.ets', 'CARD_WEB_RENDER_TIMEOUT', {}), () => undefined, ...Object.values(interfaceDeps),
   { Center: 0 }, () => {}, (card, side) => `${card.id}-${side}`, html => html, () => null,
   (card, side) => `${card.id}-${side}`, 'media://',
-  {getInstance:()=>({注销NavParam(){}})}, async()=>{}, {setOrCreate(){}}, 86400, key=>key, {info(){},warn(){}});
+  {getInstance:()=>({注销NavParam(){}})}, async()=>{}, {setOrCreate(){}}, 86400, key=>key, appLogFor({info(){},warn(){}}));
 function deferred() {
   let resolve, reject;
   const promise = new Promise((a,b) => { resolve = a; reject = b; });
@@ -428,5 +429,27 @@ test('delete confirmation cannot delete a different card after queue or request 
     else page.requestVersion++;
     dialog.buttons[1].action(); await new Promise(resolve => setImmediate(resolve));
     assert.equal(deleted, 0);
+  }
+});
+
+
+test('continuation verifies the actual freshly loaded snapshot before restoring input or permitting study', async () => {
+  for (const matches of [false, true]) {
+    const {page, displayed, answers} = harness();
+    const snapshot = await page.studySession.loadNext(1, () => true);
+    page.pendingContinuation = {cardId: matches ? snapshot.card.cardId : 'wrong-card', noteId: snapshot.card.noteId,
+      fingerprint: studyContinuationFingerprint(snapshot.card, snapshot.rendered), typedAnswer: 'retained input', answerShown: true};
+    await page.加载下一张卡();
+    assert.deepEqual(answers, [], 'restoring never scores a card');
+    if (matches) {
+      assert.equal(page.已输入答案, 'retained input');
+      assert.equal(page.pendingContinuation, null);
+      assert.equal(page.continuationAnswerPending, true, 'answer restoration waits for a ready document');
+      assert.equal(displayed.at(-1), 'A-question');
+    } else {
+      assert.equal(page.阶段, 'error');
+      assert.equal(page.recoveryMessage, 'app.string.continuation_sync_required');
+      assert.deepEqual(displayed, [], 'a mismatched snapshot must not be presented as resumed study');
+    }
   }
 });

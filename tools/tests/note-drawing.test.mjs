@@ -559,10 +559,14 @@ test('PNG importer preserves embedded editing source in the normal Anki image pa
   assert.deepEqual(JSON.parse(new TextDecoder().decode(drawingMetadata(writes[0][1]))),doc);
 });
 
-test('new drawing stays below the existing add row and every image pen reuses the shared icon button',()=>{
-  const source=readFileSync(new URL('../../entry/src/main/ets/components/editor/NoteMediaDialog.ets',import.meta.url),'utf8');
-  assert.ok(source.indexOf("actionLabel: $r('app.string.note_visual_add')")<source.indexOf("actionLabel: $r('app.string.note_drawing_new')"));
-  assert.match(source,/IconActionButton\(\{ source: \$r\('app.media.ic_study_edit'\)/);
+test('direct whiteboard entry opens a blank drawing and applies it to the existing field draft', () => {
+  const h = mediaDialogHarness(async () => [], { startDrawing: true, initialValue: 'existing field' });
+  assert.equal(h.dialog.drawingActive, true);
+  assert.equal(h.dialog.drawingSource, '');
+  h.dialog.finishDrawing('new.png', h.dialog.drawingVersion);
+  assert.equal(h.events.filter(event => Array.isArray(event) && event[0] === 'apply').length, 1);
+  assert.equal(h.dialog.value, 'existing field');
+  assert.equal(h.dialog.images.length, 1);
 });
 
 function drawingStore() {

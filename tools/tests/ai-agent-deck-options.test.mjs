@@ -40,7 +40,7 @@ function fixture(){
 }
 test('deck options are a real registered write proposal in all modes, with a shared field allowlist and strict schema',()=>{
  const [tool]=agentDeckOptionsFunctionTools();assert.equal(toolRiskOf(tool.name),'write');
- for(const mode of ['create','edit','assistant'])assert.ok(agentFunctionTools(100,mode).some(x=>x.name===tool.name));
+ for(const mode of ['create','edit','assistant'])assert.ok(agentFunctionTools(mode).some(x=>x.name===tool.name));
  assert.deepEqual(JSON.parse(tool.parametersJson).properties.changes.items.properties.key.enum,agentWritableDeckOptionFields().map(x=>x.key));
  parseAgentToolJsonObject(tool.name,tool.exampleArgumentsJson);
  for(const bad of [null,{}, {deckId:7,scope:'all',changes:[]}, {deckId:7,scope:'deck',changes:[{key:'other',value:'anything'}]},

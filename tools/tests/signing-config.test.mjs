@@ -38,3 +38,12 @@ test('tracked build config has no personal signing materials; template validates
   assert.equal(parseLocalSigning(readFileSync(new URL('../../config/signing.example.json', import.meta.url), 'utf8')).products[0].name, 'default');
   assert.match(readFileSync(new URL('../../.gitignore', import.meta.url), 'utf8'), /^\/\.local\/$/m);
 });
+
+test('PC product requires its own explicit signing mapping', () => {
+  const profile = { app: { products: [{ name: 'default' }, { name: 'pc' }] } };
+  const config = local();
+  assert.equal(applyLocalSigning(profile, config).app.products[1].signingConfig, undefined);
+  config.signingConfigs.push({ ...config.signingConfigs[0], name: 'pc-test' });
+  config.products.push({ name: 'pc', signingConfig: 'pc-test' });
+  assert.equal(applyLocalSigning(profile, config).app.products[1].signingConfig, 'pc-test');
+});

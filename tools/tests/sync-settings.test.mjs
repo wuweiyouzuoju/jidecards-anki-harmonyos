@@ -53,7 +53,7 @@ function preferencesHarness(officialUiEnabled = false) {
     flush: async () => { if (state.fail) throw new Error('disk full'); state.durable = new Map(state.values); }
   };
   const names = ['loadCustomSyncServer', 'saveCustomSyncServer', 'loadAutoSyncEnabled', 'saveAutoSyncEnabled',
-    'loadVisibleSyncAuth', '保存同步凭证', '加载同步凭证', '保存同步端点', '清除同步凭证', '设置媒体待同步', '加载媒体待同步'];
+    'hasAnkiSyncSetup', 'hasHuaweiCloudSetup', 'recordSyncSetup', 'loadVisibleSyncAuth', '保存同步凭证', '加载同步凭证', '保存同步端点', '清除同步凭证', '设置媒体待同步', '加载媒体待同步'];
   const api = new Function('preferences', 'AppStorage', 'hilog', 'normalizeSyncServer', 'isSyncEndpointVisible', 'OFFICIAL_ANKIWEB_SYNC_UI_ENABLED',
     stripTypeScriptTypes(source, { mode: 'transform' }) + '\nreturn {' + names.join(',') + '};')(
     { getPreferencesSync: () => { if (state.unavailable) throw Error('unavailable'); return store; } },
@@ -279,4 +279,27 @@ test('official UI gate covers default and explicit official hosts and can be res
     assert.match(ui, /loadVisibleSyncAuth/);
     assert.doesNotMatch(ui, /加载同步凭证\(/);
   }
+});
+
+test('homepage setup records require successful provider setup and follow the current credentials', async () => {
+  const h = preferencesHarness(true);
+  assert.equal(h.hasHuaweiCloudSetup(), false);
+  assert.equal(h.hasAnkiSyncSetup(), false);
+  await h.saveCustomSyncServer('https://one.example/');
+  const auth = { username: 'user', hkey: 'one-only', endpoint: 'https://one.example/' };
+  h.保存同步凭证(auth);
+  h.recordSyncSetup('anki', 'stale-key');
+  assert.equal(h.hasAnkiSyncSetup(), false);
+  h.recordSyncSetup('anki', auth.hkey);
+  h.recordSyncSetup('huawei');
+  assert.equal(h.hasAnkiSyncSetup(), true);
+  assert.equal(h.hasHuaweiCloudSetup(), true);
+  h.保存同步端点('https://redirect.example/');
+  assert.equal(h.hasAnkiSyncSetup(), true);
+  h.保存同步凭证({ ...auth, hkey: 'new-key' });
+  assert.equal(h.hasAnkiSyncSetup(), false);
+  h.recordSyncSetup('anki', 'new-key');
+  await h.saveCustomSyncServer('https://two.example/');
+  assert.equal(h.hasAnkiSyncSetup(), false);
+  assert.equal(h.hasHuaweiCloudSetup(), true);
 });

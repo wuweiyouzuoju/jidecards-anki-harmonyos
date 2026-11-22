@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import * as links from '../../entry/src/main/ets/model/NoteLinks.ts';
+import { noteLinkGraph } from '../../entry/src/main/ets/model/NoteLinkGraph.ts';
+import { NoteLinkOrbit } from '../../entry/src/main/ets/model/NoteLinkOrbit.ts';
 import { noteLinkBridgeScript } from '../../entry/src/main/ets/model/NoteLinkBridge.ts';
 import { loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
 import { NoteEditorWheelSession } from '../../entry/src/main/ets/model/NoteEditorWheel.ts';
@@ -63,7 +65,7 @@ function backendFixture() {
   class Notes { async 获取笔记(id){return structuredClone(notes.get(id));} async 更新笔记(updates){writes++;for(const n of updates) notes.set(n.id,structuredClone(n));} }
   class Types { async 获取笔记类型(){return {fieldNames:['Front','Back','关联']};} }
   const Type=loadPlatformModule('backend/NoteLinksService.ts','NoteLinksService',{
-    ...links,...references,后端会话:{获取实例:()=>session},笔记服务:Notes,笔记类型服务:Types,搜索服务:class{},
+    ...links,...references,noteLinkGraph,后端会话:{获取实例:()=>session},笔记服务:Notes,笔记类型服务:Types,搜索服务:class{},
     autoSyncScheduler:{beginOperation(){operations++;},endOperation(){operations--;},request(){syncs++;}},
     syncActivity:{waitForCollection:async()=>{}}
   });
@@ -80,6 +82,42 @@ test('production service persists both mirrors in one Core write and round-trips
   assert.match(f.notes.get(1).fields[2],/<b>New<\/b>/);
   await f.service.change(await f.service.load(1),'b','remove');
   assert.equal((await f.service.load(2)).view.incoming.length,0);assert.equal(f.operations,0);
+});
+test('read-only neighborhood preserves reciprocal edges, missing targets and sibling card IDs', async () => {
+  const f = backendFixture();
+  f.notes.get(1).fields[2] = links.serializeNoteLinks(data('a', ['b', 'missing'], '<b>Focus</b>'));
+  f.notes.get(2).fields[2] = links.serializeNoteLinks(data('b', ['a']));
+  const graph = await f.service.neighborhood(1);
+  assert.deepEqual(graph.nodes.map(n => [n.guid, n.label, n.cardIds]),
+    [['a', 'Focus', [10, 11]], ['b', 'B', [20, 21]], ['missing', 'missing', []]]);
+  assert.deepEqual(graph.edges, [{source: 0, target: 1}, {source: 0, target: 2}, {source: 1, target: 0}]);
+  assert.deepEqual(f.calls, [0, 1]);
+  assert.equal(f.writes, 0);
+  assert.equal(f.operations, 0);
+});
+test('selected orbit holds after inertia and subsequent drags start from the displayed pose', () => {
+  const orbit = new NoteLinkOrbit();
+  orbit.reset(5, 1000, false);
+  const initial = orbit.project(350, 370, 1);
+  assert.equal(initial[0].x, 175);
+  assert.equal(new Set(initial.map(node => node.depth.toFixed(3))).size, 5);
+  orbit.paused = true;
+  orbit.rotate(45, 8, 1700);
+  const dragged = orbit.project(350, 370, 1);
+  orbit.release(1716, false);
+  for (let time = 1732; time < 2400; time += 16) orbit.step(time, 16);
+  const settled = orbit.project(350, 370, 1);
+  assert.notDeepEqual(settled, dragged);
+  assert.equal(orbit.step(2450, 16), false);
+  assert.deepEqual(orbit.project(350, 370, 1), settled);
+  orbit.rotate(-32, -7, 2500);
+  assert.notDeepEqual(orbit.project(350, 370, 1), settled);
+  orbit.release(2520, true);
+  assert.equal(orbit.step(2550, 16), false);
+  orbit.paused = false;
+  const beforeIdle = orbit.project(350, 370, 1);
+  assert.equal(orbit.step(3600, 16), true);
+  assert.notDeepEqual(orbit.project(350, 370, 1), beforeIdle);
 });
 test('stale edits and missing targets cannot be reported as committed writes', async () => {
   const f=backendFixture(), stale=await f.service.load(1);
@@ -126,7 +164,9 @@ test('link panel publishes actual counts and ignores a read completing after dis
   });
   const panel=new Type();panel.getUIContext=()=>({});panel.mounted=true;panel.noteId=1;
   panel.snapshot={view:{outgoing:[{}],incoming:[{},{}]}};panel.publishInterface();
-  assert.deepEqual(observations.at(-1).values,[{id:'outgoing_count',value:'1'},{id:'incoming_count',value:'2'}]);
+  assert.deepEqual(observations.at(-1).values,
+    [{id:'outgoing_count',value:'1'},{id:'incoming_count',value:'2'},{id:'result_count',value:'0'}]);
+  assert.equal(observations.at(-1).items.find(item => item.id === 'graph').enabled, true);
   panel.snapshot=null;const task=panel.load();panel.aboutToDisappear();
   resolve({guid:'stale',view:{outgoing:[],incoming:[]}});await task;
   assert.equal(panel.snapshot,null);
@@ -141,4 +181,20 @@ test('production study timer stays paused while the links overlay is open', () =
     audioSession:{isPlaying:()=>false},autoAdvanceSettings:{resolve:()=>({})}});
   assert.equal(page.studyTimerState().active,false);page.noteLinksOpen=false;
   assert.equal(page.studyTimerState().active,true);assert.equal(page.阶段,'answer');
+});
+
+test('editor count uses the loaded note and graph only, preserving incoming and broken outgoing links', async () => {
+  const f=backendFixture();
+  f.notes.get(1).fields[2]=links.serializeNoteLinks(data('a',['missing']));
+  f.notes.get(2).fields[2]=links.serializeNoteLinks(data('b',['a']));
+  f.service.notes.获取笔记=async()=>{throw Error('redundant note read');};
+  f.service.resolve=async()=>{throw Error('counts must not resolve target cards');};
+  assert.equal(await f.service.count(f.notes.get(1),()=>true),2);
+  assert.deepEqual(f.calls,[0]);assert.equal(f.operations,0);
+  assert.equal(await f.service.count(f.notes.get(1),()=>false),null);
+  assert.deepEqual(f.calls,[0]);
+  let current=true;f.service.graph=async()=>{current=false;return [];};
+  assert.equal(await f.service.count(f.notes.get(1),()=>current),null);assert.equal(f.operations,0);
+  f.service.graph=async()=>{throw Error('graph failed');};
+  await assert.rejects(f.service.count(f.notes.get(1),()=>true),/graph failed/);assert.equal(f.operations,0);
 });

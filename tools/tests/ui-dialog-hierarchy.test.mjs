@@ -109,3 +109,21 @@ test('page-only menu backdrops do not shrink the next real dialog',async()=>{
  const next=hierarchy.enter(88,480);assert.equal(next.widthPercent,88);assert.equal(next.maximumWidth,480);
  menu.aboutToDisappear();hierarchy.leave(next.id);
 });
+
+test('dialog warms its child menu source only after the entrance finishes', async () => {
+  const {loadComponentLogic} = await import('./platform-module-harness.mjs');
+  const visibility = [];
+  const Frame = loadComponentLogic('components/common/DialogFrame.ets', 'DialogFrame', {
+    应用尺寸: {dialogWidth: '88%', dialogMaxWidth: 480},
+    dialogGlassSourceMounted() {},
+    setGlassSourceFreeze() {},
+    glassSourceVisibility(_ui, _source, visible) { visibility.push(visible); }
+  });
+  const dialog = new Frame();
+  dialog.getUIContext = () => ({});
+  dialog.sourceVisible = true;
+  dialog.syncGlassSource();
+  dialog.finishPreparation();
+  dialog.aboutToDisappear();
+  assert.deepEqual(visibility, [false, true, false]);
+});

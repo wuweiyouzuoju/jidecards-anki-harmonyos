@@ -107,8 +107,13 @@ test('navigation applies one fade transition including the home boundary', () =>
   ]) {
     const source = read(path);
     assert.match(source, new RegExp(`注销NavParam\\('${name}'\\)`), path);
-    assert.match(source, /this\.转场透明度 = isExit \? 1 : 0/);
-    assert.match(source, /this\.转场透明度 = isExit \? 0 : 1/);
+    if (source.includes('.registerPage(')) {
+      assert.match(source, /this\.转场透明度 = opacity/);
+      assert.match(source, /this\.navigationOffset = offset/);
+    } else {
+      assert.match(source, /this\.转场透明度 = isExit \? 1 : 0/);
+      assert.match(source, /this\.转场透明度 = isExit \? 0 : 1/);
+    }
   }
 });
 

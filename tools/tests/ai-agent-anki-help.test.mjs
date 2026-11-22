@@ -173,7 +173,7 @@ test('actual resource adapter registers read-only tools with Registry and report
 test('all task modes declare offline help and current runtime prompts use it only when both handlers are available',()=>{
   const limits={maxProviderCalls:8,maxToolCalls:20};
   for(const mode of ['assistant','create','edit']) {
-    const tools=agentFunctionTools(100,mode);
+    const tools=agentFunctionTools(mode);
     for(const tool of agentAnkiHelpTools())assert.equal(tools.filter(t=>t.name===tool.name).length,1);
     const instructions=buildAgentRuntimeInstructions(tools,0,0,limits);
     assert.match(instructions,/优先 search_anki_help/);assert.match(instructions,/旧会话引用需重新核对/);
@@ -187,7 +187,7 @@ test('actual page declares help only when mounted and keeps it available with we
   assert.ok(start>=0);const method=source.slice(start,source.indexOf('\n  }',start)+4);
   const Page=new Function('agentFunctionTools','filterAgentWebTools','isAgentDocumentTool','isAgentAnkiHelpTool','isAgentNoteMediaTool',
     stripTypeScriptTypes('class Page { '+method+' }',{mode:'transform'})+';return Page;')(agentFunctionTools,filterAgentWebTools,isAgentDocumentTool,isAgentAnkiHelpTool,isAgentNoteMediaTool);
-  const page=new Page();Object.assign(page,{agentSettings:{batchLimit:100},pageMode:'assistant',documentAccess:null,navigationSession:null,ankiHelpTools:null});
+  const page=new Page();Object.assign(page,{agentSettings:{},pageMode:'assistant',documentAccess:null,navigationSession:null,ankiHelpTools:null});
   assert.ok(page.providerFunctionToolsForTurn(false).every(t=>!isAgentAnkiHelpTool(t.name)));
   page.ankiHelpTools={};const names=page.providerFunctionToolsForTurn(false).map(t=>t.name);
   assert.ok(names.includes('search_anki_help')&&names.includes('read_anki_help'));

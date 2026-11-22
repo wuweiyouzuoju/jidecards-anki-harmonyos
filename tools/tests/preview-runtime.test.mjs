@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
-import { loadPlatformModule } from './platform-module-harness.mjs';
+import { appLogFor, loadPlatformModule } from './platform-module-harness.mjs';
 import { CardAudioSession } from '../../entry/src/main/ets/model/CardAudioSession.ts';
 import { CardRenderPrefetch } from '../../entry/src/main/ets/model/CardRenderPrefetch.ts';
 import { buildPreviewInteractionScript } from '../../entry/src/main/ets/model/PreviewInteraction.ts';
@@ -33,14 +33,14 @@ test('preview overlay admits child input while keeping loading input blocked', (
 const names = ['aboutToAppear', 'aboutToDisappear', 'updateActivity', 'stopAudio', 'playCurrentAudio',
   '预览刷新版本变化', '取当前卡片ID', '加载当前卡', '应用HTML', 'webFailed', 'installActionBridge', 'onControllerAttached回调',
   '翻面', '上一张', '下一张', '请求编辑字段', '请求AI改卡', 'selectPreviewAction', '预览更多菜单', 'focusPreviewCard', 'dismissMoreMenu',
-  'requestMoreMenuClose', 'backNoteLink', 'pushLinkedPreview', 'previewCardShown', 'cardThemeChanged'];
+  'requestMoreMenuClose', 'backNoteLink', 'pushLinkedPreview', 'previewCardShown', 'cardThemeChanged', 'referenceThemeChanged'];
 const methods = names.map(name => {
   const start = source.search(new RegExp(`^  (?:private )?(?:async )?${name}\\(`, 'm'));
   assert.ok(start >= 0, name);
   return source.slice(start, source.indexOf('\n  }', start) + 4);
 });
 const Page = new Function('noteLinkBridgeScript', 'NoteLinksProxy', '构建卡片HTML', '剥除拼写标记', '原始侧HTML', '媒体基地址', 'appendCardScript', 'cardScriptDiagnosticLabels',
-  '解码文件名', 'buildPreviewInteractionScript', 'renderPreviewAnswer', 'readCardMarking', 'parseFlagLabels', '$r', 'actionIcon', 'PreviewActionProxy', 'console', 'reviewPreferences',
+  '解码文件名', 'buildPreviewInteractionScript', 'renderPreviewAnswer', 'readCardMarking', 'parseFlagLabels', '$r', 'actionIcon', 'PreviewActionProxy', 'AppLog', 'reviewPreferences',
   stripTypeScriptTypes(`class Page {${methods.join('\n')}}`, { mode: 'transform' }) + '\nreturn Page;')(
   noteLinkBridgeScript, NoteLinksProxy, 构建卡片HTML, 剥除拼写标记, 原始侧HTML, 'https://jidecards-media.local/', appendCardScript, () => undefined,
   name => { try { return decodeURIComponent(name); } catch { return name; } },
@@ -48,7 +48,7 @@ const Page = new Function('noteLinkBridgeScript', 'NoteLinksProxy', '构建卡�
   loadPlatformModule('utils/ActionIcons.ets', 'actionIcon', { $r: key => key }),
   class { onAction(action, version) { this.dispatch(action, version); } },
   // 故障注入的预期日志只留在替身中，避免 Windows Node 测试 IPC 与多字节 stdout 混写。
-  { info() {} }, { read: async () => ({hideAudioPlayButtons:false}) }
+  appLogFor({ info() {} }), { read: async () => ({hideAudioPlayButtons:false}) }
 );
 const card = id => ({ questionNodes: [{ text: `front-${id}[sound:%E4%B8%AD.mp3]`, replacement: null }],
   answerNodes: [{ text: `back-${id}[sound:back.mp3]`, replacement: null }], css: '', latexSvg: false, isEmpty: false });
@@ -97,6 +97,28 @@ function harness() {
   } };
   return { page, displayed, sounds, tts, renderedIds, events, service };
 }
+
+test('late preview acknowledgements do not touch a released controller and scroll failures preserve the card', () => {
+  const { page } = harness();
+  page.linkedReturnScroll = 120;
+  page.mounted = false;
+  page.cardWeb.controllerAt = () => { throw Error('released controller'); };
+  assert.doesNotThrow(() => page.previewCardShown(''));
+  assert.equal(page.linkedReturnScroll, 120);
+  page.mounted = true;
+  assert.doesNotThrow(() => page.previewCardShown(''));
+  assert.equal(page.hasRenderedCard, true);
+  assert.equal(page.cardRenderPending, false);
+});
+
+test('native Web synchronous errors cannot escape theme updates or background media pause', () => {
+  const { page } = harness();
+  page.网页控制器.runJavaScript = () => { throw Error('controller unavailable'); };
+  assert.doesNotThrow(() => page.referenceThemeChanged());
+  page.foreground = false;
+  assert.doesNotThrow(() => page.updateActivity());
+  assert.equal(page.moreMenuOpen, false);
+});
 
 test('theme changes update the preview surface without replaying audio or rendering a new card', async () => {
   const h = harness();
@@ -633,10 +655,10 @@ test('both preview hosts pass current card IDs to edit mode and restore preview 
     const hostSource = read(`entry/src/main/ets/pages/${file}.ets`);
     const start = hostSource.indexOf(`  private async ${method}(`);
     const body = hostSource.slice(start, hostSource.indexOf('\n  }', start) + 4);
-    const Host = vm.runInNewContext(stripTypeScriptTypes(`class Host { ${body} }; Host;`));
+    const Host = vm.runInNewContext(stripTypeScriptTypes(`class Host { ${body} }; Host;`), { ensureHuaweiAIAccount: async () => true });
     for (const configured of [true, false]) {
       const host = new Host(), paths = [];
-      Object.assign(host, { [visible]: true, [ids]: [11, 22], 预览初始索引: 1, 预览刷新版本: 0,
+      Object.assign(host, { getUIContext: () => ({}), [visible]: true, [ids]: [11, 22], 预览初始索引: 1, 预览刷新版本: 0,
         editor: { visible: false, busy: false }, [stack]: { pushPath: path => paths.push(path) },
         isAIConfigured: async () => configured, 暂停主页官方公告检查() {}, 返回主页后刷新() {}, 执行搜索() {} });
       await host[method](22);
@@ -653,6 +675,7 @@ test('both preview hosts pass current card IDs to edit mode and restore preview 
       let finish;
       host.isAIConfigured = () => new Promise(resolve => { finish = resolve; });
       const pending = host[method](22);
+      await new Promise(resolve => setImmediate(resolve));
       host.预览初始索引 = 0;
       finish(true); await pending;
       assert.equal(paths.length, 1, 'a stale preview target must not open another AI page');
@@ -667,7 +690,7 @@ test('preview wiring stays read-only, handles web errors, and preserves home/edi
   assert.match(source, /onRenderExited/);
   assert.match(source, /browser_preview_retry/);
   assert.match(source, /if \(this\.agentEnabled\)/);
-  assert.match(read('entry/src/main/ets/pages/浏览页.ets'), /interactionEnabled: !this\.editingPageOpen/);
+  assert.match(read('entry/src/main/ets/pages/浏览页.ets'), /interactionEnabled: this\.browserVisible && !this\.editingPageOpen/);
   const home = read('entry/src/main/ets/pages/首页.ets');
   const editor = home.match(/private 关闭预览并编辑[\s\S]*?\n  }/)[0];
   assert.match(editor, /onPop:[\s\S]*this\.显示卡片预览 = true/);
@@ -683,15 +706,17 @@ test('preview wiring stays read-only, handles web errors, and preserves home/edi
 });
 
 
-test('linked preview restores the source IDs, side and scroll without publishing nested positions', async () => {
+test('linked preview restores the source IDs, side, scroll and search without publishing nested positions', async () => {
   const {page,events}=harness();await page.加载当前卡();await settle(page);
-  page.当前面='answer';page.currentLinkScroll=240;page.noteLinksOpen=true;
+  page.当前面='answer';page.currentLinkScroll=240;page.noteLinksOpen=true;page.noteLinksNoteId=5;
   const positions=events.filter(e=>Array.isArray(e)&&e[0]==='position').length;
-  page.pushLinkedPreview([99,100]);await settle(page);
+  page.pushLinkedPreview([99,100],'target');await settle(page);
   assert.deepEqual(page.previewIds,[99,100]);assert.equal(page.当前面,'answer');assert.equal(page.noteLinksOpen,false);
   assert.equal(events.filter(e=>Array.isArray(e)&&e[0]==='position').length,positions);
+  page.noteLinksNoteId=6;
   assert.equal(page.backNoteLink(),true);await settle(page);
   assert.deepEqual(page.previewIds,[11,22,33]);assert.equal(page.当前索引值,0);assert.equal(page.当前面,'answer');
+  assert.equal(page.noteLinksQuery,'target');assert.equal(page.noteLinksNoteId,5);
   assert.equal(page.noteLinksOpen,true);assert.ok(events.some(e=>typeof e==='string'&&e.includes('window.scrollTo(0,240)')));
   page.noteLinksOpen=false;assert.equal(page.backNoteLink(),false);
 });

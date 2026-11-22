@@ -22,7 +22,9 @@ test('native confirmations use adaptive button arrays instead of fixed paired la
 test('long action dialogs keep complete text in content-sized vertical controls', () => {
   const source=readFileSync('entry/src/main/ets/components/common/TextActionDialog.ets','utf8');
   assert.match(source,/@CustomDialog/);
-  assert.match(source,/DialogFrame\(\{ nativeHost: true, actionsAtBottom: true/);
+  const config = source.match(/DialogFrame\(\{([^\n]+)\n/)?.[1] ?? '';
+  assert.match(config,/\bnativeHost: true\b/);
+  assert.match(config,/\bactionsAtBottom: true\b/);
   assert.match(source,/PrimaryActionButton\(\{ label: this\.confirmLabel, onAction: this\.onConfirm \}\)/);
   assert.match(source,/按下态按钮\(\{ 文案: this\.cancelLabel, fillWidth: true, 点击回调: this\.onCancel \}\)/);
   assert.doesNotMatch(source,/maxLines\(|textOverflow\(|minFontSize\(|\.height\(/);

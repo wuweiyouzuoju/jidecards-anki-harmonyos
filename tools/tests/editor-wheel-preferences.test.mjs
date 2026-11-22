@@ -14,7 +14,12 @@ test('wheel preferences initialize independently and only broadcast confirmed sa
  api.initializeEditorWheelPreferences();assert.equal(current.get(model.WHEEL_ON_ENTRY_KEY),true);assert.equal(current.get(model.WHEEL_ON_KEYBOARD_KEY),true);
  await api.saveEditorWheelPreference(model.WHEEL_ON_ENTRY_KEY,false,true);
  assert.equal(current.get(model.WHEEL_ON_ENTRY_KEY),false);assert.equal(current.get(model.WHEEL_ON_KEYBOARD_KEY),true);
+ assert.equal(current.get(model.WHEEL_GRIP_KEY),true);
+ await api.saveEditorWheelPreference(model.WHEEL_GRIP_KEY,false,true);
+ api.initializeEditorWheelPreferences();
+ assert.equal(current.get(model.WHEEL_GRIP_KEY),false);
+ assert.equal(current.get(model.WHEEL_ON_KEYBOARD_KEY),true);
  fail=true;await assert.rejects(api.saveEditorWheelPreference(model.WHEEL_ON_KEYBOARD_KEY,false));assert.equal(current.get(model.WHEEL_ON_KEYBOARD_KEY),true);
  await assert.rejects(api.saveEditorWheelPreference('wrong',true));
- for(const key of [model.WHEEL_ON_ENTRY_KEY,model.WHEEL_ON_KEYBOARD_KEY]) assert.ok(agentPreferenceDefinitions().some(def=>def.id===key&&def.defaultValue===true));
+ for(const key of [model.WHEEL_ON_ENTRY_KEY,model.WHEEL_ON_KEYBOARD_KEY,model.WHEEL_GRIP_KEY]) assert.ok(agentPreferenceDefinitions().some(def=>def.id===key&&def.defaultValue===true));
 });

@@ -40,7 +40,7 @@ test('tap layouts use card-local bounds; full bindings never inherit defaults or
   for(const x of [-1,1.01,NaN,Infinity]) assert.equal(gestures.studyGestureTapInput('nine',x,0.5),'');
   assert.equal(gestures.studyGestureTapInput('invalid',0.5,0.5),'');
   assert.equal(gestures.studyGestureCommand({...config,bindings:[]},'left','answer'),'none');
-  assert.equal(gestures.studyGestureCommand({...config,bindings:[{input:'up',command:'good',side:'both'}]},'up','question'),'none');
+  assert.equal(gestures.studyGestureCommand({...config,bindings:[{input:'up',command:'good',side:'both'}]},'up','question'),'flip');
   assert.equal(gestures.studyGestureCommand(config,'double','answer'),'none');
   assert.ok(!gestures.activeStudyGestureInputs(config,'answer').includes('double'));
   assert.ok(gestures.activeStudyGestureInputs(config,'question').includes('double'));
@@ -51,7 +51,7 @@ function editor(overrides={}) {
   const Dialog=loadComponentLogic('components/settings/StudyGestureSettings.ets','StudyGestureSettings',{
     ...gestures,defaultStudyControls,SIMPLE_MODE_KEY,namedResourceText:(_context,key)=>key,
     appInterface:{observe(){},leave(){}},readStudyControls:async()=>defaultStudyControls(),
-    saveStudyControls:async next=>next,...overrides});
+    saveStudyControls:async next=>next,resourceText:(_context,key)=>key,showToastSafely:()=>{},...overrides});
   return Object.assign(new Dialog(),{simple:false,alive:true,loaded:true,busy:false,getUIContext:()=>({})});
 }
 test('real settings replace overlapping bindings, retain other layout and keyboard, and save only in experimental mode',async()=>{
@@ -78,6 +78,38 @@ test('settings retain failed drafts, ignore old reads, and finish accepted write
   const read=page.reload();page.aboutToDisappear();release(defaultStudyControls());await read;assert.equal(page.loaded,false);
   const leaving=editor({saveStudyControls:()=>new Promise(resolve=>{release=resolve;})});
   leaving.onClose=()=>assert.fail('closed departed dialog');const save=leaving.save();leaving.aboutToDisappear();release();await save;
+});
+
+test('gesture editor accepts every layout and reports draft actions, reload and save',async()=>{
+  const notices=[];
+  const page=editor({showToastSafely:(_context,options)=>notices.push(options.message)});
+  await page.reload();
+  for(const [index,layout] of ['four','nine','points'].entries()){
+    page.setLayout(index);assert.equal(page.tapLayout,layout);
+  }
+  page.setLayout(3);assert.equal(page.tapLayout,'points');
+  page.gesturesEnabled=true;page.add();
+  assert.equal(page.result,'app.string.study_gesture_binding_draft');
+  page.reset();
+  assert.equal(page.gesturesEnabled,true);
+  assert.equal(page.tapLayout,'points');
+  assert.equal(page.result,'app.string.study_gesture_reset_draft');
+  await page.reload(true);
+  assert.equal(page.result,'app.string.study_gesture_reloaded');
+  await page.save();
+  assert.deepEqual(notices,['app.string.study_gesture_saved']);
+});
+
+test('editing one card side retains the other side of an existing shared binding',()=>{
+  const page=editor();
+  page.bindings=[{input:'up',command:'replay',side:'both'}];
+  page.inputIndex=0;page.sideIndex=1;
+  page.commandIndex=gestures.STUDY_GESTURE_ACTIONS.findIndex(item=>item.id==='edit');
+  page.add();
+  const config={version:1,enabled:true,tapLayout:'four',bindings:page.bindings};
+  assert.equal(gestures.studyGestureCommand(config,'up','question'),'edit');
+  assert.equal(gestures.studyGestureCommand(config,'up','answer'),'replay');
+  assert.doesNotThrow(()=>gestures.validateStudyGestureConfig(config));
 });
 
 test('shared persistence rejects full-gesture edits in simple mode and keeps old configurations across unrelated saves',async()=>{
@@ -134,8 +166,8 @@ test('real page listens for shake only on an enabled visible foreground regular 
   const Page=new Function('completeStudyGestures','studyGestureCommand','showToastSafely','$r',stripTypeScriptTypes('class Page{'+methods+'}',{mode:'transform'})+';return Page;')(
     gestures.completeStudyGestures,gestures.studyGestureCommand,()=>{},key=>key);
   const config={version:1,enabled:true,tapLayout:'four',bindings:[{input:'shake',command:'replay',side:'both'}]};
-  const calls=[];const page=Object.assign(new Page(),{简洁模式:false,controls:()=>({...defaultStudyControls(),gestureConfig:config}),
-    阶段:'question',mounted:true,页面已显示:true,foreground:true,choiceQuestion:null,recoveryMessage:'',timeboxNotice:null,
+  const calls=[];const page=Object.assign(new Page(),{gestureNoteAction:'',简洁模式:false,controls:()=>({...defaultStudyControls(),gestureConfig:config}),
+    gestureNoteAction:'',阶段:'question',mounted:true,页面已显示:true,foreground:true,choiceQuestion:null,recoveryMessage:'',timeboxNotice:null,
     controllerReady:true,pendingHtml:'',requestVersion:7,interactionVersion:9,
     shakeSensor:{update:(enabled,listener)=>{calls.push({enabled,listener});return enabled?'available':'off';}},handleStudyGesture:(...args)=>calls.push(args)});
   page.updateShakeSensor();assert.equal(calls[0].enabled,true);const listener=calls[0].listener;page.requestVersion=8;listener();assert.deepEqual(calls.at(-1),['shake',0,0,7,9]);
@@ -144,3 +176,13 @@ test('real page listens for shake only on an enabled visible foreground regular 
     const old=page[key];page[key]=value;page.updateShakeSensor();assert.equal(calls.at(-1).enabled,false,key);page[key]=old;
   }
 });
+
+ test('all custom gesture ratings flip on question, respect side, and directional regions match AnkiDroid',()=>{
+ for(const command of ['again','hard','good','easy']) for(const input of gestures.STUDY_GESTURE_INPUTS.map(x=>x.id)) {
+  const cfg={...gestures.defaultStudyGestureConfig(),enabled:true,bindings:[{input,command,side:'both'}]};
+  assert.equal(gestures.studyGestureCommand(cfg,input,'question'),'flip');
+  assert.equal(gestures.studyGestureCommand(cfg,input,'answer'),command);
+  assert.equal(gestures.studyGestureCommand({...cfg,bindings:[{input,command,side:'answer'}]},input,'question'),'none');
+ }
+ for(const [x,y,expected] of [[.5,.1,'top'],[.9,.5,'right'],[.5,.9,'bottom'],[.1,.5,'left']]) assert.equal(gestures.studyGestureTapInput('points',x,y),'point_'+expected);
+ });

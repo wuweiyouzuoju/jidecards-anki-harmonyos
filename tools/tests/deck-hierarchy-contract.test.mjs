@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
+import { 可见牌组行 } from '../../entry/src/main/ets/model/牌组层级.ets';
 
 function projectUrl(relativePath) {
   return new URL(`../../${relativePath}`, import.meta.url);
@@ -59,4 +60,19 @@ test('deck rows disclose and indent children while creation composes a normalize
   assert.match(panel, /initialParentId/);
   assert.match(panel, /onConfirm: \(fullName: string\) => void/);
   assert.match(panel, /组合牌组路径/);
+});
+
+test('home deck rows keep expanded siblings and omit hidden branches', () => {
+  const decks = [
+    { id: 'a', ancestorIds: [] }, { id: 'b', ancestorIds: ['a'] },
+    { id: 'c', ancestorIds: ['a', 'b'] }, { id: 'd', ancestorIds: ['a'] },
+    { id: 'e', ancestorIds: [] }, { id: 'f', ancestorIds: ['e'] }
+  ];
+  const ids = (expanded, hidden = []) => 可见牌组行(decks, new Set(expanded), new Set(hidden)).map(row => row.id);
+  assert.deepEqual(ids([]), ['a', 'e']);
+  assert.deepEqual(ids(['a']), ['a', 'b', 'd', 'e']);
+  assert.deepEqual(ids(['a', 'b']), ['a', 'b', 'c', 'd', 'e']);
+  assert.deepEqual(ids(['e']), ['a', 'e', 'f']);
+  assert.deepEqual(ids(['a', 'b'], ['b']), ['a', 'd', 'e']);
+  assert.deepEqual(ids(['a', 'b'], ['a']), ['e']);
 });

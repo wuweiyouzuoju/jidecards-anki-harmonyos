@@ -19,6 +19,7 @@ import { compactAgentToolOutputs, safeAgentSessionState } from '../../entry/src/
 import { buildResponsesPayload } from '../../entry/src/main/ets/model/agent/ProviderProtocol.ts';
 import * as schemas from '../../entry/src/main/ets/model/agent/AgentToolSchemas.ts';
 import { validateAgentNoteFields } from '../../entry/src/main/ets/model/agent/AgentNoteValidation.ts';
+import { pagingDependencies } from './agent-text-paging-harness.mjs';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 
 function harness(t) {
@@ -35,6 +36,7 @@ function harness(t) {
     closeSync:f=>fs.closeSync(typeof f==='number'?f:f.fd), fsyncSync:fs.fsyncSync,
     statSync:f=>typeof f==='number'?fs.fstatSync(f):fs.statSync(f), lstatSync:fs.lstatSync,
     readSync:(fd,b,o)=>fs.readSync(fd,new Uint8Array(b),0,o.length,o.offset),
+    async copyFile(fd,dest){await fs.promises.writeFile(dest,fs.readFileSync(fd));},
     writeSync:(fd,b)=>fs.writeSync(fd,new Uint8Array(b)), renameSync:fs.renameSync,
     readTextSync:p=>fs.readFileSync(p,'utf8'), listFileSync:fs.readdirSync,
     rmdirSync:p=>fs.rmSync(p,{recursive:true})};
@@ -56,7 +58,7 @@ function harness(t) {
     async recognizeText(){return {value:'画面中的知识点'};},async release(){events.push('ocr-release');}};
   const AgentVideoReader=loadPlatformModule('backend/agent/AgentVideoReader.ets','AgentVideoReader',{fs:nativeFs,media});
   const AgentDocumentStore=loadPlatformModule('backend/agent/AgentDocumentStore.ets','AgentDocumentStore',{
-    fs:nativeFs,image,textRecognition,AgentVideoReader,isSupportedAgentVideoFile:fileModel.isSupportedAgentVideoFile,
+    ...pagingDependencies(nativeFs), fs:nativeFs,image,textRecognition,AgentVideoReader,isSupportedAgentVideoFile:fileModel.isSupportedAgentVideoFile,
     normalizeAgentDocumentText,UTF8编码:s=>new TextEncoder().encode(s),
     util:{Base64Helper:class{encodeToStringSync(b){return Buffer.from(b).toString('base64');}}}});
   const store=new AgentDocumentStore({filesDir:root});
@@ -64,7 +66,7 @@ function harness(t) {
   const scope=new AgentScope();scope.registerReadableNoteIds([1]);
   const Notes=class {async 获取笔记(){if(fixture.noteWait)await fixture.noteWait;return {fields:fixture.fields.slice()};}};
   const AgentNoteMediaTools=loadPlatformModule('backend/agent/AgentNoteMediaTools.ets','AgentNoteMediaTools',{
-    fs:nativeFs,笔记服务:Notes,...mediaModel,...fileModel});
+    ...pagingDependencies(nativeFs), fs:nativeFs,笔记服务:Notes,...mediaModel,...fileModel});
   const tools=new AgentNoteMediaTools({filesDir:root},scope,store,access);
   const registry=new AgentToolRegistry();tools.register(registry);
   const call=(name,args)=>registry.execute({name,argumentsJson:JSON.stringify(args),callId:name});
@@ -129,7 +131,7 @@ test('unknown notes, changed references, unsafe paths, missing files and symlink
   assert.deepEqual(h.store.list('chat'),[]);
 });
 
-test('the existing user file picker stages video attachments and applies the video-specific size limit',async t=>{
+test('the existing user file picker stages video attachments reads large video attachments locally without a file-size cutoff',async t=>{
   const h=harness(t);
   const picker={DocumentSelectOptions:class{},DocumentViewPicker:class {
     async select(){return [path.join(h.root,'collection.media/lesson.mp4')];}
@@ -143,8 +145,12 @@ test('the existing user file picker stages video attachments and applies the vid
   const result=await access.execute('read_video_frames',JSON.stringify({documentId:files[0].documentId,timestampsSeconds:[1]}));
   assert.equal(result.images.length,1);
   assert.ok(!fileModel.buildAgentImportedFilesContext(files).includes('base64'));
-  const stat=h.nativeFs.statSync;h.nativeFs.statSync=fd=>{const value=stat(fd);return {size:fileModel.AGENT_IMPORT_MAX_VIDEO_BYTES+1};};
-  const oversized=await select({filesDir:h.root},10,'large');assert.equal(oversized[0].errorCode,'file_too_large');
+  // A sparse file exceeds the old cap without allocating video data in the test.
+  const video=path.join(h.root,'collection.media/lesson.mp4');
+  fs.truncateSync(video,65*1024*1024);
+  const large=await select({filesDir:h.root},10,'large');
+  assert.equal(large[0].errorCode,'');
+  assert.equal(large[0].byteSize,65*1024*1024);
 });
 
 test('a cancelled or changed-conversation note read cannot publish a media snapshot',async t=>{
@@ -217,7 +223,7 @@ test('portrait video sizing and partial decode failure preserve usable frames an
 
 test('media capabilities are discoverable in every mode and video source/checkpoint contracts reject invented data',()=>{
   for(const mode of ['assistant','create','edit']) {
-    const catalog=agentFunctionTools(100,mode);
+    const catalog=agentFunctionTools(mode);
     const discovery=new AgentToolDiscovery(catalog);
     const result=JSON.parse(discovery.discover('{"names":["list_note_media","import_note_media","read_video_frames"]}'));
     assert.equal(result.tools.length,3);

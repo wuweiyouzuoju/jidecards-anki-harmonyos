@@ -120,5 +120,6 @@ test('key adapter recognizes alphabet, number pad, function and device keys and 
   assert.equal(adapter.studyKeyName(2112),'numpad9');assert.equal(adapter.studyKeyName(2401),'code:2401');
   assert.equal(adapter.studyEventChord({keyCode:2040,getModifierKeyState:keys=>['Ctrl','Shift'].includes(keys[0])}),'ctrl+shift+x');
   assert.equal(adapter.studyEventChord({keyCode:2}),'');
+  assert.equal(adapter.studyEventChord({keyCode:2040,getModifierKeyState:()=>{throw Error('platform failure');}}),'','failed modifier reads cannot trigger an unmodified shortcut');
   assert.equal(adapter.studyEventChord({keyCode:2001,metaKey:1}),'','Meta+1 cannot fall through to a rating');
 });

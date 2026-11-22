@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
+import { ContinuationSession } from '../../entry/src/main/ets/model/ContinuationSession.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
@@ -35,8 +36,8 @@ function harness() {
     answer:async input=>{if(failed)throw Error('answer failed');answers.push(input);step++;reps++;},undo:async()=>{},
     buryCard:async()=>{},removeCard:async()=>{},unburyDeck:async()=>{}};
   const controller=new StudySessionController(backend,new AutoSyncScheduler(),new SyncActivity(),()=>now);
-  const Page=new Function('Date','playStudyHaptic','gradeJideChoice','RATING_GOOD','RATING_HARD','resultUndoStatus','$r','BURY_SUSPEND_MODE_BURY_USER',
-    stripTypeScriptTypes('class Page {'+body+'}',{mode:'transform'})+';return Page;')({now:()=>now},()=>{},gradeJideChoice,2,1,resultUndoStatus,key=>key,2);
+  const Page=new Function('Date','playStudyHaptic','gradeJideChoice','RATING_GOOD','RATING_HARD','resultUndoStatus','$r','BURY_SUSPEND_MODE_BURY_USER','continuationSession',
+    stripTypeScriptTypes('class Page {'+body+'}',{mode:'transform'})+';return Page;')({now:()=>now},()=>{},gradeJideChoice,2,1,resultUndoStatus,key=>key,2,new ContinuationSession());
   const page=Object.assign(Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null }),{screenAwake:null,mounted:true,页面已显示:true,foreground:true,requestVersion:1,
     controllerReady:true,studyMenuOpen:false,autoAdvanceSettingsOpen:false,editingPageOpen:false,
     studyGuideVisible:false,tapZonesGuideVisible:false,手写模式:false,评分中:false,flipPending:false,

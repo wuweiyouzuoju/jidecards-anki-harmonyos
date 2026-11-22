@@ -19,19 +19,21 @@ test('announcement acknowledgements use one bounded Preferences record', () => {
 
 test('announcement hosting has one public URL and no management credential', () => {
   const source = read('../../entry/src/main/ets/model/官方公告配置.ts');
-  assert.match(source, /https:\/\/4001784660\.cdn\.123clouddisk\.com\/4001784660\/CET%E5%9B%9B%E5%85%AD%E7%BA%A7\/announcement\.json/);
+  assert.match(source, /https:\/\/8\.145\.41\.24\/v1\/announcements\/query/);
   assert.doesNotMatch(source, /(clientSecret|clientID|accessToken|refreshToken|password|管理密钥)/i);
 });
 
-test('paused announcement service does not create an HTTP client', async () => {
-  assert.equal(OFFICIAL_ANNOUNCEMENTS_ENABLED, false);
+test('ECS announcement presentation reads the durable inbox without network', async () => {
+  assert.equal(OFFICIAL_ANNOUNCEMENTS_ENABLED, true);
+  const cached = {id: 'stored-id'};
   const Service = loadPlatformModule('backend/官方公告服务.ets', '官方公告服务', {
     OFFICIAL_ANNOUNCEMENTS_ENABLED, 官方公告地址,
-    http: { createHttp: () => { assert.fail('paused announcements must not access the network'); } }
+    remoteAnnouncementsEnabled: () => true,
+    读取已接收公告: async () => cached,
+    解析可展示官方公告: (raw) => JSON.parse(raw).announcement,
+    http: {createHttp: () => assert.fail('ECS presentation must not create an HTTP request')}
   });
-  for (const service of [new Service(), new Service('https://example.com/announcement.json')]) {
-    assert.equal(await service.加载公告('2.9.10', 'zh'), null);
-  }
+  assert.deepEqual(await new Service().加载公告('26.11.18.16', 'zh-Hans'), cached);
 });
 
 test('announcement service performs one uncached GET under a hard two-second deadline', () => {
@@ -103,9 +105,11 @@ test('home wires announcement service, acknowledgment and presentation', () => {
   assert.match(source, /onOpenDetails:[\s\S]*打开官方公告详情\(\)/);
 });
 
-test('home delegates announcement scheduling to its owner without polling', () => {
+test('home consumes persisted heartbeat announcements without polling', () => {
   const source = read('../../entry/src/main/ets/pages/首页.ets');
-  assert.match(source, /announcementController\.request\(/);
+  assert.match(source, /@StorageProp\(公告收件版本键\) @Watch\('公告收件版本变化'\)/);
+  assert.match(source, /公告收件待检查/);
+  assert.doesNotMatch(source, /announcementController\.request\(/);
   assert.match(source, /announcementController\.pause\(/);
   assert.doesNotMatch(source, /官方公告延迟检查任务|上次官方公告检查开始时间|setInterval\(/);
 });

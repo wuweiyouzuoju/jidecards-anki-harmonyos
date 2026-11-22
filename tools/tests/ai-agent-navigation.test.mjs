@@ -4,6 +4,7 @@ import { agentExecutionBudget } from '../../entry/src/main/ets/model/agent/Agent
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
+import { AppLog } from '../../entry/src/main/ets/model/AppLog.ts';
 import { APP_PAGE_ROUTES, APP_NAVIGATION_ACTIONS, appPageName, browserNavigationQuery, appNavigationRequested, validateAppNavigation, appNavigationStackBlockReason } from '../../entry/src/main/ets/model/navigation/AppNavigation.ts';
 import { AgentAppNavigationSession, agentAppNavigationTools } from '../../entry/src/main/ets/model/agent/AgentAppNavigation.ts';
 import { buildAgentAppStructure, agentInterfaceRevision } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
@@ -57,7 +58,7 @@ test('navigation accepts real semantic actions and rejects arbitrary paths, IDs 
   }
   for (const args of [null, [], {}, {action:'rpc'}, {action:'start_study'}, {action:'start_study',deckId:0},
     {action:'open_stats',deckId:4}, {action:'open_browser',notesMode:'true'}, {action:'open_browser',query:'x'.repeat(1001)},
-    {action:'open_settings',sectionId:'advanced'}, {action:'open_settings',sectionId:4},
+    {action:'open_settings',sectionId:'nonexistent'}, {action:'open_settings',sectionId:4},
     {action:'open_edit_note',noteId:-1}, {action:'open_edit_note',noteId:null}, {action:'open_card_preview',cardId:'9'},
     {action:'open_card_preview',cardId:1.5}, {action:'open_stats',name:'SettingsPage'}, {action:'open_stats',params:{apiKey:'secret'}}]) {
     assert.throws(() => validateAppNavigation(args, context));
@@ -76,7 +77,7 @@ test('navigation queues once, rechecks the deck and opens only after a successfu
   assert.deepEqual(f.state.calls,[]);
   await assert.rejects(f.queue({action:'open_stats'}),/already_queued/);
   f.state.deckName='英语::四级新版';
-  await f.session.finish(true,generation);await f.session.finish(true,generation);
+  assert.equal(await f.session.finish(true,generation),true);assert.equal(await f.session.finish(true,generation),false);
   assert.equal(f.state.calls.length,1);assert.equal(f.state.calls[0].deckName,'英语::四级新版');
   assert.deepEqual(f.state.reads,[4,4]);
 });
@@ -186,7 +187,7 @@ test('late deck reads and the previous turn finalizer cannot navigate or consume
   session.cancel();resolve('Deck');await assert.rejects(queued,/cancelled/);assert.deepEqual(calls,[]);
   const f=fixture();const first=f.session.beginTurn('打开统计');await f.queue({action:'open_stats'});
   const second=f.session.beginTurn('打开提醒');await f.queue({action:'open_reminders'});
-  await f.session.finish(true,first);assert.deepEqual(f.state.calls,[]);
+  assert.equal(await f.session.finish(true,first),false);assert.deepEqual(f.state.calls,[]);
   await f.session.finish(true,second);assert.equal(f.state.calls[0].surface,'reminders');
 });
 
@@ -205,7 +206,7 @@ test('registry treats navigation as its own permission class and never creates a
 });
 
 test('app cognition is rebuilt from shared routes and actual current tools on every request', () => {
-  const tools=agentFunctionTools(100,'assistant');const limits={maxProviderCalls:8,maxToolCalls:40};
+  const tools=agentFunctionTools('assistant');const limits={maxProviderCalls:8,maxToolCalls:40};
   const old=agentInterfaceRevision(tools);
   const structure=buildAgentAppStructure(context,'app','',key=>key,[],tools,[]);
   assert.equal(structure.revision,old);assert.equal(structure.destinations.length,APP_PAGE_ROUTES.length);
@@ -323,9 +324,9 @@ test('root deck navigation rejects unavailable targets and open forms before any
 test('the actual hidden-page callback cancels navigation and clears foreground ownership', () => {
   const source=read('pages/AI制卡页.ets');const body=source.match(/\.onHidden\(\(\): void => \{([^\n]+)\}\)/)[1];
   let cancelled=0,menuClosed=0;const events=[],wheelVisibility=[];const page={isAgentPageVisible:true,
-    closeMoreMenu:()=>menuClosed++,
+    closeMoreMenu:()=>menuClosed++,stopDeepSeekMedia:()=>{},
     wheelSession:{setVisible:visible=>wheelVisibility.push(visible)},navigationSession:{cancel:()=>cancelled++}};
-  new Function('appInterface',body).call(page,{hidePage:id=>events.push(id)});
+  new Function('appInterface','externalMcpService',body).call(page,{hidePage:id=>events.push(id)}, {detach:()=>{}});
   assert.equal(menuClosed,1);assert.equal(cancelled,1);assert.equal(page.isAgentPageVisible,false);assert.deepEqual(events,['agent']);
   assert.deepEqual(wheelVisibility,[false]);
 });
@@ -353,10 +354,10 @@ test('the real JIDE turn finalizer saves history before navigation and discards 
   const body=source.slice(start,source.indexOf('\n  }',start)+4);
   const deps={
     agentExecutionBudget,
-    explicitYearClozeRequested:()=>false,explicitWebSearchForbidden:()=>true,
+    AgentTransportError:class extends Error {},explicitYearClozeRequested:()=>false,explicitWebSearchForbidden:()=>true,
     explicitWebSearchRequested:()=>false,explicitSourceEvidenceRequested:()=>false,inferRequestedCardCount:()=>0,
     页面Agent观察者:class {constructor(callback){this.onEvent=callback;}},
-    appendAgentTimelineText:(timeline,kind,text)=>timeline.push({kind,text}),$r:key=>key
+    appendAgentTimelineText:(timeline,kind,text)=>timeline.push({kind,text}),$r:key=>key,AppLog
   };
   const Page=new Function(...Object.keys(deps),stripTypeScriptTypes('class Page {'+body+'}',{mode:'transform'})+';return Page;')(...Object.values(deps));
   for (const mode of ['completed','failed','paused','awaiting_clarification','hidden','superseded','unsaved_form','cancelled_completed','cancelled_failed']) {
@@ -364,9 +365,9 @@ test('the real JIDE turn finalizer saves history before navigation and discards 
     const nav=new AgentAppNavigationSession({context:()=>context,canNavigate:()=>true,collectionBusy:()=>false,
       assertReadableTarget(){},readTarget:async()=>'',navigate:request=>{
         if(mode==='unsaved_form')throw Error('navigation_unsaved_page');events.push('navigate');opened.push(request);}});
-    Object.assign(page,{pageDisposed:false,cardBatch:{isRunning:()=>false},处理中:false,themeUndoBusy:false,
+    Object.assign(page,{resumeBackgroundTask:()=>{},pageDisposed:false,cardBatch:{isRunning:()=>false},处理中:false,themeUndoBusy:false,
       agentRunner:{},navigationSession:nav,agentScope:{configureCreateConstraints(){}},documentAccess:null,
-      pageMode:'assistant',消息列表:[],conversationId:'conversation',agentTurnVersion:0,AI配置:{},agentSettings:{batchLimit:100},
+      pageMode:'assistant',消息列表:[],conversationId:'conversation',agentTurnVersion:0,AI配置:{},agentSettings:{},
       重建本轮AgentScope(){},storeClarificationAnswerMessageId(){},currentModelSupportsImages:()=>false,
       空消息:(role,text)=>({id:++seq,角色:role,正文:text,providerText:'',timeline:[],变更草稿列表:[]}),
       追加消息:message=>page.消息列表.push(message),更新消息:(index,update)=>update(page.消息列表[index]),

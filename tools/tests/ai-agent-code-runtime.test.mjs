@@ -15,11 +15,11 @@ export default {
  cancel(id) { state.cancelled.push(id); }
 };
 export class AgentStreamObserver {} export class AgentTransportError extends Error {} export class AgentTransportSession {}
-export class DeepSeekAdapter {} export class OpenAIAdapter {} export class CustomAdapter {}
+export class OfficialAIAdapter {} export class DeepSeekAdapter {} export class OpenAIAdapter {} export class CustomAdapter {}
 `;
 const stubUrl = 'data:text/javascript;base64,' + Buffer.from(stub).toString('base64');
 register('data:text/javascript;base64,' + Buffer.from(`export function resolve(s,c,next) {
- if(s==='libagent_sandbox.so'||['./AgentTransport','./DeepSeekAdapter','./OpenAIAdapter','./CustomAdapter'].includes(s))
+ if(s==='libagent_sandbox.so'||['./AgentTransport','./OfficialAIAdapter','./DeepSeekAdapter','./OpenAIAdapter','./CustomAdapter'].includes(s))
  return {url:${JSON.stringify(stubUrl)},shortCircuit:true};return next(s,c);
 }`).toString('base64'), import.meta.url);
 const { state } = await import(stubUrl);
@@ -36,7 +36,7 @@ function success(resultJson='42') { return JSON.stringify({ok:true,resultJson});
 
 test('code schema and risk agree in both modes; limits count UTF-8, not JS characters',()=>{
   for(const mode of ['create','edit']) {
-    const tool=agentFunctionTools(100,mode).find(t=>t.name==='execute_code');
+    const tool=agentFunctionTools(mode).find(t=>t.name==='execute_code');
     assert.ok(tool);assert.equal(toolRiskOf(tool.name),'read');
     assert.equal(JSON.parse(tool.parametersJson).additionalProperties,false);
     assert.ok(decodeCodeArguments(tool.exampleArgumentsJson));

@@ -124,7 +124,7 @@ test('ordinary outlines, form controls and separators use the common border inst
   assert.match(read('components/home/HomeDeckDetails.ets'), /IconActionButton\(\{ toolbarStyle: true/,
     'detail toolbar delegates its homepage outline to the public icon button');
   assert.match(read('utils/GlassSurface.ets'),/outline: BorderOptions \| undefined = undefined/);
-  assert.match(read('utils/GlassSurface.ets'),/\.border\(this\.outline \?\?/);
+  assert.match(read('utils/GlassSurface.ets'),/if \(this\.outline !== undefined\) instance\.border\(this\.outline\)/);
   const deck = read('components/牌组列表项.ets');
   assert.doesNotMatch(deck, /bindPopup\(/, 'deck rows delegate menus to the root shared surface');
   assert.match(read('components/home/HomeDeckRowMenu.ets'), /AnchoredMenu\(\{/);

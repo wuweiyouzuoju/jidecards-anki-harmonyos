@@ -2,6 +2,8 @@ import { editorPageHarness } from './editor-page-harness.mjs';
 import { NoteEditorSession, initialNoteEditorState } from '../../entry/src/main/ets/model/NoteEditorSession.ts';
 import { initialTransferState } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
+import { appLogFor } from './platform-module-harness.mjs';
+import { AppLog } from '../../entry/src/main/ets/model/AppLog.ts';
 import { loadBrowserRows } from '../../entry/src/main/ets/model/BrowserSearchSession.ts';
 import { setCardFlags } from '../../entry/src/main/ets/model/CardMarking.ts';
 import { toggleBrowserCardState } from '../../entry/src/main/ets/model/BrowserCardState.ts';
@@ -13,6 +15,7 @@ import { inspectBrowserReposition } from '../../entry/src/main/ets/model/Browser
 import { HomeWorkCoordinator } from '../../entry/src/main/ets/model/HomeWorkCoordinator.ts';
 import { HomeStartupSequence } from '../../entry/src/main/ets/model/HomeStartupSequence.ts';
 import test from 'node:test';
+import { ContinuationSession } from '../../entry/src/main/ets/model/ContinuationSession.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
@@ -27,7 +30,7 @@ import { HomeSyncStatusController, homeSyncIndicator, homeSyncLabelKey } from '.
 import { SyncActivity } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../../entry/src/main/ets/model/官方公告配置.ts';
-import { isDoubleColumnDeckListStyle } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import { deckListColumnCount } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 import { announcementLocale } from '../../entry/src/main/ets/model/AppLocales.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
@@ -39,6 +42,8 @@ function pageMethods(file, names, dependencies = {}) {
     assert.ok(start >= 0, name);
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
+  // 页面日志进入测试注入的 console 替身；未注入时使用真实 AppLog。
+  if (dependencies.AppLog === undefined) dependencies.AppLog = dependencies.console ? appLogFor(dependencies.console) : AppLog;
   Object.assign(dependencies, { loadNoteEditor, loadBrowserRows, resolveBrowserCardIds, resolveBrowserNoteIds, resolveBrowserRepresentativeCard,
     snapshotNotetypeChange, browserActiveColumns, inspectBrowserReposition });
   return compileWithUiFeedback(...Object.keys(dependencies), stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`,
@@ -82,17 +87,19 @@ test('browser editor cancellation preserves preview, while a saved note refreshe
   assert.deepEqual(refreshes, [true]); assert.equal(page.预览刷新版本, 1);
 });
 
-function homeHarness(announcementsEnabled = true) {
+function homeHarness(announcementsEnabled = true, remoteEnabled = () => true) {
   const response = deferred(), timers = new Map(); let next = 0;
   const events = [], interfaceTracker = new AppInterfaceTracker();
-  const Page = pageMethods('首页', ['homeActivity', 'canPresentStartupPrompt', 'homeActionControls', 'publishHomeInterface', 'homeActivityChanged', 'startupHost',
+  const syncActivity = new SyncActivity();
+  const Page = pageMethods('首页', ['homeActivity', 'homeAnnouncementsEnabled', 'restoreContinuation', 'canPresentStartupPrompt', 'homeActionControls', 'publishHomeInterface', 'homeActivityChanged', 'startupHost',
     '尝试显示官方公告', '尝试展示待展示官方公告', '请求主页官方公告检查', '暂停主页官方公告检查',
     '继续首次弹窗序列', 'closeHomeIntro', 'onBackPress', 'autoSyncCollectionFinished', 'presentPendingSyncWarning'], {
+    syncActivity, continuationSession: new ContinuationSession(),
     canPresentHomePrompt, announcementLocale, bundleManager: { BundleFlag: {}, getBundleInfoForSelf: async () => ({ versionName: 'test' }) },
     后端会话: { 获取实例: () => ({ 是否就绪: () => true }) }, 当前语言模式: () => 'zh',
     是否已确认官方公告: async () => false, 是否已完成云端牌组引导: async () => false,
-    CLOUD_DECK_CHANNEL_ENABLED: false, OFFICIAL_ANNOUNCEMENTS_ENABLED: announcementsEnabled,
-    appInterface: interfaceTracker, isDoubleColumnDeckListStyle, homeSyncIndicator, homeSyncLabelKey,
+    CLOUD_DECK_CHANNEL_ENABLED: false, OFFICIAL_ANNOUNCEMENTS_ENABLED: announcementsEnabled, remoteAnnouncementsEnabled: remoteEnabled,
+    appInterface: interfaceTracker, deckListColumnCount, homeSyncIndicator, homeSyncLabelKey,
     isHomeIntroCompleted: async () => events.includes('welcome-persist'),
     completeHomeIntro: async () => events.push('welcome-persist'),
     completeGlassSuggestion: async () => {},
@@ -102,6 +109,7 @@ function homeHarness(announcementsEnabled = true) {
     setTimeout: (fn, delay) => { const id = ++next; timers.set(id, { fn, delay }); return id; }, clearTimeout: id => timers.delete(id)
   });
   const page = new Page();
+  page.sideWheelLayout = () => false;
   page.transfer = initialTransferState();
   page.syncAccountState = 'normal'; page.syncIndicator = 'hidden'; page.syncStatusText = '';
   page.syncStatusController = new HomeSyncStatusController({
@@ -121,7 +129,6 @@ function homeHarness(announcementsEnabled = true) {
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {},
     打开云端牌组弹窗() { page.显示云端牌组弹窗 = true; events.push('cloud'); }
   });
-  const syncActivity = new SyncActivity();
   page.syncController = new HomeSyncController(page.syncScheduler, syncActivity, () => ({
     activity: () => page.homeActivity(), syncCollectionBusy: () => page.autoSyncCollectionBusy === true,
     isDisposed: () => page.homeDisposed, isForeground: () => page.syncForeground && !page.homeDisposed,
@@ -159,8 +166,7 @@ test('home startup wake waits for the active preference read instead of continua
 });
 
 test('paused remote announcements perform no checks or scheduling and still show the local intro', async () => {
-  assert.equal(OFFICIAL_ANNOUNCEMENTS_ENABLED, false);
-  const { page, interfaceTracker } = homeHarness(OFFICIAL_ANNOUNCEMENTS_ENABLED);
+  const { page, interfaceTracker } = homeHarness(false);
   const forbidden = () => { assert.fail('paused announcements must not load, check, present or schedule'); };
   page.官方公告服务实例.加载公告 = forbidden;
   page.announcementController.check = forbidden;
@@ -176,6 +182,19 @@ test('paused remote announcements perform no checks or scheduling and still show
   page.publishHomeInterface();
   assert.equal(interfaceTracker.snapshot().find(v => v.surface === 'home').values
     .find(v => v.id === 'official_announcements_enabled').value, 'false');
+});
+
+test('a remote pause during startup lets the intro proceed even with a pending announcement', async () => {
+  let remoteEnabled = true;
+  const { page, response } = homeHarness(true, () => remoteEnabled);
+  const startup = page.startupSequence.start(page.startupHost());
+  await settle();
+  remoteEnabled = false;
+  response.resolve({ id: 'paused-during-read' });
+  await startup;
+  assert.equal(page.显示官方公告, false);
+  assert.equal(page.显示欢迎弹窗, true);
+  assert.equal(page.announcementController.hasPending(), true);
 });
 
 test('manual sync is considered before an unseen announcement can occupy the home dialog slot', async () => {

@@ -61,10 +61,11 @@ function textHarness(locale='base') {
     }}})}
   });
 }
-function serviceHarness(items=[item()],locale='base') {
+function serviceHarness(items=[item()],locale='base',bundleName='com.jide.kapian') {
   const events=[],state={items,readError:false,treeError:false,permission:true,failPublish:0,tree:{children:[{newCount:2,learnCount:3,reviewCount:4}]}};
   const service=loadPlatformModule('model/学习提醒服务.ets','刷新学习提醒',{
-    ...textHarness(locale),AppStorage:{get:key=>key==='系统语言'?(locale==='base'?'zh-Hans':locale.replace('_','-')):({filesDir:'/data'})},
+    ...textHarness(locale),AppStorage:{get:key=>key==='系统语言'?(locale==='base'?'zh-Hans':locale.replace('_','-')):
+      ({filesDir:'/data',abilityInfo:{bundleName}})},
     加载学习提醒设置:async()=>{events.push('read');if(state.readError)throw Error('read');return {提醒项列表:state.items};},
     保存提醒ID列表:async ids=>events.push(['ids',ids]),
     notificationManager:{isNotificationEnabled:async()=>state.permission,requestEnableNotification:async()=>{},SlotType:{SERVICE_INFORMATION:1}},
@@ -94,11 +95,14 @@ test('partial reminder publication reports failure and a later refresh can recov
 });
 test('preview and notification share actual Chinese/English defaults and replace every legacy token',async()=>{
   for(const locale of ['base','en_US']) {
-    const text=textHarness(locale),h=serviceHarness([item()],locale);
+    const bundleName = locale === 'base' ? 'com.jide.kapian' : 'com.jide.kapian.pc';
+    const text=textHarness(locale),h=serviceHarness([item()],locale,bundleName);
     await h.service();
     const payload=h.events.find(x=>Array.isArray(x)&&x[0]==='publish')[1];
     assert.equal(payload.title,text.reminderTitle(''));
     assert.equal(payload.content,text.reminderContent('','5','4'));
+    assert.equal(payload.wantAgent.pkgName, bundleName);
+    assert.equal(payload.maxScreenWantAgent.pkgName, bundleName);
     assert.equal(text.reminderContent('{{new}} {{待学}} {{review}} {{待复习}}','X','Y'),'X X Y Y');
     assert.equal(text.reminderTitle('custom title'),'custom title');
     if(locale==='en_US')assert.doesNotMatch(payload.title+payload.content,/\p{Script=Han}/u);

@@ -111,7 +111,7 @@ test('theme selection and redemption use the same entitlement mapping', () => {
 
 test('navigation owns one persistent background outside route content', () => {
   const home = read('entry/src/main/ets/pages/首页.ets');
-  assert.match(home, /build\(\)\s*\{\s*Stack\(\)\s*\{\s*ThemeBackground\(\{ transitionActive: this\.backgroundTransitionActive \}\)\.id\(GLASS_BACKGROUND_SOURCE\)\s*Navigation\(this\.页面栈\)/);
+  assert.match(home, /private windowContent\(\)\s*\{\s*Stack\(\)\s*\{\s*ThemeBackground\(\{ transitionActive: this\.backgroundTransitionActive \}\)\.id\(GLASS_BACKGROUND_SOURCE\)\s*Navigation\(this\.页面栈\)/);
   assert.equal(home.match(/ThemeBackground\(/g).length, 1);
   assert.doesNotMatch(read('entry/src/main/ets/components/common/GlassSource.ets'), /ThemeBackground|SharedPageBackground/);
   const visibility = home.slice(home.indexOf('.onNavBarStateChange('), home.indexOf('// 用箭头函数包裹'));

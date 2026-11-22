@@ -45,7 +45,7 @@ test('shared secondary buttons retain ordinary colors and stable selection borde
     应用尺寸: dimensions, $r: resource
   });
   const Button = loadComponentLogic('components/common/按下态按钮.ets', '按下态按钮', {
-    应用尺寸: dimensions, $r: resource, SurfaceBorder, GLASS_HIGHLIGHT_COLORS: []
+    应用尺寸: dimensions, $r: resource, SurfaceBorder, GLASS_HIGHLIGHT_COLORS: [], darkMaterial:()=>false
   });
   const button = new Button();
   button.selectable = true; button.selected = true;
@@ -58,7 +58,7 @@ test('shared secondary buttons retain ordinary colors and stable selection borde
   button.字色 = 'danger'; button.selectionColor = 'cyan';
   button.selected = true;
   assert.equal(button.labelColor(), 'danger', 'ordinary actions ignore selection state');
-  assert.deepEqual(button.buttonBorder(), { width: dimensions.卡片边框, color: 'app.color.surface_border' });
+  assert.deepEqual(button.buttonBorder(), { width: 0, color: 'app.color.surface_border' });
   button.selectable = true;
   assert.equal(button.labelColor(), 'cyan');
   assert.deepEqual(button.buttonBorder(), { width: 2, color: 'cyan' });
@@ -113,7 +113,7 @@ test('dialog header icon and text actions preserve names, theme, danger and disa
   });
   // 执行生产渲染传入的配置，再执行公共按钮的真实禁用守卫。
   const bindings = [...read('components/common/DialogHeader.ets').matchAll(/按下态按钮\((\{[\s\S]*?\})\)/g)]
-    .map(match => new Function('$r', 'return (' + match[1] + ');'));
+    .map(match => new Function('$r', 'return (' + match[1].replace(/appearanceElementColor\(this.appearanceElements, '[^']+', (\$r\('[^']+'\))\)/g, '$1') + ');'));
   assert.equal(bindings.length, 2);
   const header = new Header();
   assert.equal(header.actionUsesIcon(), true, 'ordinary confirmation defaults to the shared check icon');
@@ -224,7 +224,7 @@ test('image surfaces share theme resources without changing image or gesture geo
   assert.equal(attributes.clip, true);
   assert.deepEqual([attributes.width, attributes.height, attributes.padding, attributes.onTouch], [320,210,0,'image-handler']);
   for (const file of ['components/common/NoteImagePreview.ets', 'components/图片遮罩编辑器.ets']) {
-    assert.match(read(file), /attributeModifier\(new ImageSurfaceStyle\(\)\)/);
+    assert.match(read(file), /attributeModifier\(new ImageSurfaceStyle\(\s*(?:undefined, )?this.appearanceElements\)\)/);
   }
   assert.match(read('pages/添加笔记页.ets'), /NoteImagePreview\(\{ source: this\.图片遮盖_源图Uri \}\)/);
   for (const theme of ['base', 'dark']) {
@@ -258,7 +258,7 @@ test('settings switches share geometry; help, hint and host failure states remai
   assert.match(row, /this.hint === '' \? 0 : 应用尺寸.间距_12/g);
   assert.match(row, /if \(this.hint !== ''\)/);
   assert.match(row, /HelpLabel\(\{[\s\S]*?isHelpEnabled: this.isHelpEnabled, onHelp: this.onHelp/);
-  assert.doesNotMatch(row.replace(/@StorageProp\('系统语言'\)[^;]*;/, '').replace(/@StorageProp\(颜色键\.动作主色\)[^;]*;/, ''), /@State|@Storage|margin\(|offset\(/);
+  assert.doesNotMatch(row.replace(/@StorageProp\('appearance_elements_active'\)[^;]*;/, '').replace(/@StorageProp\('系统语言'\)[^;]*;/, '').replace(/@StorageProp\(颜色键\.动作主色\)[^;]*;/, ''), /@State|@Storage|margin\(|offset\(/);
   const scheduler = read('components/settings/调度器分组.ets');
   assert.match(scheduler, /if \(this.是否启用FSRS === null\)[\s\S]*settings_fsrs_loading[\s\S]*else \{\s*SettingsToggleRow/);
   assert.match(read('components/settings/外观分组.ets'), /ThemeMotionControl\(\{ isDark: this.是否深色 \}\)/);

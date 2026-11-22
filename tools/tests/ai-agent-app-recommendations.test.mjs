@@ -9,7 +9,7 @@ import { agentFunctionTools } from '../../entry/src/main/ets/model/agent/AgentTo
 import { APP_NAVIGATION_ACTIONS } from '../../entry/src/main/ets/model/navigation/AppNavigation.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 
-const tools = agentFunctionTools(100, 'assistant');
+const tools = agentFunctionTools('assistant');
 const strings = locale => new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`, import.meta.url), 'utf8')).string.map(x => [x.name, x.value]));
 const zh = strings('base'), en = strings('en_US');
 const observation = (surface, extra = {}) => ({surface, sectionId:'', selectedId:'', optionIds:[], optionLabels:[], busy:false, ...extra});

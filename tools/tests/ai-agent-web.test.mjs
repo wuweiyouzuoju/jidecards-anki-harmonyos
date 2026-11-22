@@ -142,7 +142,7 @@ test('cancel during pending request rejects late content and allows the next exp
 });
 test('all entry modes share local web declarations and disabling web preserves local capabilities',()=>{
   for(const mode of ['assistant','create','edit']){
-    const tools=agentFunctionTools(100,mode);const enabled=filterAgentWebTools(tools,true);const disabled=filterAgentWebTools(tools,false);
+    const tools=agentFunctionTools(mode);const enabled=filterAgentWebTools(tools,true);const disabled=filterAgentWebTools(tools,false);
     for(const name of ['web_search','read_webpage']) assert.ok(enabled.some(t=>t.name===name));
     assert.deepEqual(disabled.map(t=>t.name),tools.filter(t=>!['web_search','read_webpage'].includes(t.name)).map(t=>t.name));
     assert.ok(disabled.some(t=>t.name==='execute_code'));

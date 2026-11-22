@@ -1,3 +1,4 @@
+import { loadPlatformModule } from './platform-module-harness.mjs';
 import { compileWithUiFeedback } from './ui-feedback-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
@@ -15,9 +16,9 @@ const Deck = compileWithUiFeedback('牌组色调', '$r', stripTypeScriptTypes(
   'class Deck { ' + method + ' }', { mode: 'transform' }) + '; return Deck;')(牌组色调, id => ({ id }));
 
 test('None produces a transparent stripe with no theme gradient in every theme', () => {
-  const stripe = source.match(/Column\(\)\s*\.width\(应用尺寸\.色条宽度\)[\s\S]*?\.borderRadius\(应用尺寸\.圆角_色条\)/)?.[0];
+  const stripe = source.match(/Column\(\)\s*\.width\(应用尺寸\.色条宽度\)[\s\S]*?\.borderRadius\(appearanceElementRadius\(this.appearanceElements, 应用尺寸\.圆角_色条\)\)/)?.[0];
   assert.ok(stripe);
-  const render = compileWithUiFeedback('Column', '应用尺寸', 'Color', '牌组色调', stripe);
+  const render = compileWithUiFeedback('Column', '应用尺寸', 'Color', '牌组色调', 'appearanceElementRadius', stripe);
   const deck = new Deck();
   for (const theme of THEME_CATALOG) {
     deck.visual = theme;
@@ -29,7 +30,8 @@ test('None produces a transparent stripe with no theme gradient in every theme',
         backgroundColor(color) { state.background = color; return this; },
         linearGradient(value) { state.gradient = value; return this; }
       };
-      render.call(deck, () => column, {}, { Transparent: 'transparent' }, 牌组色调);
+      deck.appearanceElements='';
+      render.call(deck, () => column, {}, { Transparent: 'transparent' }, 牌组色调, loadPlatformModule('utils/AppearanceElements.ets','appearanceElementRadius',{}));
       assert.equal(state.gradient, null, theme.id);
       assert.deepEqual(state.background, tone === 牌组色调.None ? 'transparent' : { id: 'app.color.deck_red' }, theme.id);
     }

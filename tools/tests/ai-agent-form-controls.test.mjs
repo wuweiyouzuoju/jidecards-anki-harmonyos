@@ -76,7 +76,7 @@ test('all Agent text areas share appearance; options have explicit selection and
   for (const path of [file, 'components/agent/AgentEditableCard.ets', 'pages/AI制卡页.ets']) {
     const source = read(path);
     const areas = [...source.matchAll(/TextArea\([\s\S]*?\.onChange\(/g)];
-    for (const [area] of areas) assert.match(area, /\.attributeModifier\(new FormTextAreaStyle\(\)\)/, path);
+    for (const [area] of areas) assert.match(area, /\.attributeModifier\(new FormTextAreaStyle\(\s*(?:undefined, )?this.appearanceElements(?:, true)?\)\)/, path);
     count += areas.length;
   }
   assert.equal(count, 2);

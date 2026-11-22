@@ -25,7 +25,7 @@ test('complex settings audit has discoverable evidence, tool prerequisites and c
   const audit = 'settings-integration-audit-2026-10-11.md';
   for (const file of ['docs/README.md','tools/README.md','docs/development/verification.md',
     'entry/src/main/ets/components/settings/SETTINGS_PARITY.md']) assert.ok(read(file).includes(audit), file);
-  const report = read('docs/development/' + audit);
+  const report = read('docs/archive/development/' + audit);
   assert.ok(report.includes('SETTINGS_PARITY.md'));
   assert.ok(report.includes('修复前已复现问题'));
   assert.ok(report.includes('修复结果'));
@@ -99,7 +99,8 @@ test('current documentation follows application and SDK configuration', () => {
   const compatibleSdk = buildProfile.compatibleSdkVersion.match(/^(.+)\((\d+)\)$/);
   const compatibleVersion = compatibleSdk?.[1];
   const compatibleApi = compatibleSdk?.[2];
-  const targetApi = buildProfile.targetSdkVersion.match(/\((\d+)\)$/)?.[1];
+  const targetSdk = buildProfile.targetSdkVersion.match(/^(\d+)\.\d+\.\d+(?:\((\d+)\))?$/);
+  const targetApi = targetSdk?.[2] ?? targetSdk?.[1];
   const lockedMinVersion = lockValue(upstream, 'HARMONY_MIN_VERSION');
   const lockedMinApi = lockValue(upstream, 'HARMONY_MIN_API');
   const lockedTargetApi = lockValue(upstream, 'HARMONY_TARGET_API');
@@ -143,10 +144,10 @@ test('current capability documentation follows release gates and runtime constan
   assert.match(releaseFeatures,
     /AI_AGENT_CHANNELS_APP_STORAGE_KEY:\s*string\s*=\s*'aiAgentChannelsEnabled'/);
   const entryAbility = read('entry/src/main/ets/entryability/EntryAbility.ets');
-  assert.match(entryAbility, /AppStorage\.setOrCreate<boolean>\(AI_AGENT_CHANNELS_APP_STORAGE_KEY, true\)/);
-  assert.match(agentPage, /searchMode:\s*'off'/);
-  assert.match(readme, /AI 制卡、AI 改卡及设置入口默认开放/);
-  assert.match(agentDesign, /默认开放全部 Agent 入口[\s\S]*AppStorage/);
+  assert.match(entryAbility, /AppStorage\.setOrCreate<boolean>\(AI_AGENT_CHANNELS_APP_STORAGE_KEY, false\)/);
+  assert.match(agentPage, /searchMode:\s*nativeWeb \? 'auto' : 'off'/);
+  assert.match(readme, /AI 会话、制卡、改卡及设置入口默认隐藏/);
+  assert.match(agentDesign, /默认隐藏全部 Agent 入口[\s\S]*AppStorage/);
   assert.match(cardHtml, /https:\/\/jidecards-media\.local\//);
   assert.match(architecture, /https:\/\/jidecards-media\.local\//);
   assert.match(architecture, /签名与链接器可用性以实际构建为准/);

@@ -76,6 +76,15 @@ test('draft Web and sound requests route owned cache files and stop playback whe
   assert.equal(stops,2);assert.equal(resets,1);
   preview.onReleaseAvailable=release=>{registered=release;};preview.aboutToAppear();
   await registered();assert.equal(releases,1);assert.equal(preview.attached,false);
+  const audioEnabled=[];preview.cardWeb.setAudioEnabled=value=>audioEnabled.push(value);
+  preview.foreground=true;preview.isVisible=true;preview.linkedIds=[42];preview.linkedBack=()=>true;
+  assert.equal(preview.referenceBack(),true);assert.deepEqual(preview.linkedIds,[42]);
+  preview.linkedBack=()=>false;assert.equal(preview.referenceBack(),true);
+  assert.deepEqual(preview.linkedIds,[]);assert.equal(preview.linkedBack,null);
+  assert.equal(audioEnabled.at(-1),true,'returning from a reference restores the draft Web audio policy');
+  preview.alive=true;preview.attached=true;
+  preview.controller.runJavaScript=()=>{throw Error('controller unavailable');};
+  assert.doesNotThrow(()=>preview.referenceThemeChanged());
 });
 
 test('draft preview waits for both Web controllers, retains same-card flips and stages a new revision',async()=>{

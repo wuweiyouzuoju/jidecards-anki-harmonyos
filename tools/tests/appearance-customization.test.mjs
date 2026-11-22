@@ -14,6 +14,13 @@ test('custom accents validate complete RGB values and do not mutate preset defin
  assert.equal(customTheme('#ABCDEF').seed,'#ABCDEF');assert.equal(themeDefinition('custom').seed,original);
  assert.ok(THEME_CATALOG.some(x=>x.id==='custom'));
 });
+test('custom accent changes leave the default page background independent in both modes',()=>{
+ for(const dark of [false,true]) for(const seed of ['#FF0000','#00FF00','#0000FF','#FFFFFF','#000000']) {
+  for(const adaptation of [0,50,100]) {
+   assert.equal(解析主题色板('custom',dark,seed,adaptation).页面底色微染,dark?'#10151D':'#F5F7FA');
+  }
+ }
+});
 test('custom seeds generate distinct accessible light/dark actions without changing learning semantic colors',()=>{
  for(const dark of [false,true]){
   const reference=解析主题色板('aurora',dark);
@@ -34,7 +41,7 @@ function harness(){
  const store={}, encodings=[];
  const api=loadPlatformModule('utils/AppearanceCustomizationStore.ets',
   '({loadAppearanceCustomization,saveCustomAccent,saveWallpaper,saveWallpaperMask,saveWallpaperOpacity})',{
-  ...config,AppStorage:{get:()=>({filesDir:'/files'}),setOrCreate:(key,value)=>published.set(key,value)},
+  ...config,themeDefinition,loadAppearanceElements:async()=>{},AppStorage:{get:()=>({filesDir:'/files'}),setOrCreate:(key,value)=>published.set(key,value)},
   preferences:{getPreferencesSync:()=>store},
   readLocalPreference:async(_s,key,fallback)=>data.get(key)??fallback,
   saveLocalPreference:async(_s,key,value,_fallback,expected)=>{
@@ -79,38 +86,50 @@ test('appearance interface reports real conditional controls and never exposes a
  let view;
  const pixels={},saved=[],released=[];
  const Control=loadComponentLogic('components/settings/AppearanceCustomizationDialog.ets','AppearanceCustomizationDialog',{
-  ...config, AppStorage:{get:()=> 'aurora',setOrCreate(){},delete(){}}, SeriesVisual:{isDark:()=>false}, 应用颜色主题(){}, IBestImageCropperController:class { async getResult(){return pixels;} },
+  ...config,themeDefinition, AppStorage:{get:()=> 'aurora',setOrCreate(){},delete(){}}, SeriesVisual:{isDark:()=>false}, 应用颜色主题(){}, IBestImageCropperController:class { async getResult(){return pixels;} },
   saveWallpaper:async(...args)=>saved.push(args),saveWallpaperMask:async()=>{},saveWallpaperOpacity:async()=>{},releaseDeckBackground:map=>{if(map)released.push(map);}, appInterface:{observe:v=>view=v,leave(){}},
   display:{getDefaultDisplaySync:()=>({width:1280,height:2832})}
  });
- const control=new Control();control.pane='wallpaper';control.aboutToAppear();
+ const control=new Control();control.pane='wallpaper';control.showSectionPicker=true;control.aboutToAppear();
+ assert.ok(view.items.some(x=>x.id==='appearance_section'));
  assert.ok(view.items.some(x=>x.id==='wallpaper_choose'));assert.ok(!view.items.some(x=>x.id==='wallpaper_remove'));
  control.wallpaper='/private/image.jpg';control.publishInterface();
  assert.ok(view.items.some(x=>x.id==='wallpaper_remove'));assert.ok(!JSON.stringify(view).includes('/private'));
  control.uri='provider://new';control.publishInterface();
- assert.deepEqual(view.items.map(x=>x.id),['wallpaper_crop_apply','wallpaper_crop_cancel']);
+ assert.deepEqual(view.items.map(x=>x.id),['wallpaper_crop_apply','wallpaper_save_lossless','wallpaper_save_compact','wallpaper_crop_cancel']);
+ assert.equal(view.items.find(x=>x.id==='wallpaper_save_compact').selected,true);
+ control.losslessWallpaper=true;
  await control.confirmCrop();control.publishInterface();
  assert.equal(control.uri,'');assert.equal(control.wallpaperDraft,pixels);assert.deepEqual(saved,[]);
  assert.equal(view.sectionId,'wallpaper');
  assert.ok(view.items.some(x=>x.id==='wallpaper_apply'));
- assert.equal(view.items.find(x=>x.id==='wallpaper_save_compact').selected,true);
- control.losslessWallpaper=true;control.publishInterface();
  assert.equal(view.items.find(x=>x.id==='wallpaper_save_lossless').selected,true);
  assert.equal(view.items.find(x=>x.id==='wallpaper_save_compact').selected,false);
  control.busy=true;control.publishInterface();assert.ok(view.items.every(x=>!x.enabled));
  control.busy=false;
  await control.applyWallpaper();assert.deepEqual(saved,[[pixels,true]]);
  control.aboutToDisappear();assert.deepEqual(released,[pixels]);
+ for (const lossless of [true,false]) {
+  const auto=new Control();auto.pane='wallpaper';auto.autoSave=true;auto.aboutToAppear();
+  auto.uri='provider://new';auto.losslessWallpaper=lossless;
+  const before=saved.length;
+  await auto.confirmCrop();
+  assert.equal(saved.length,before);
+  assert.ok(await auto.flushChanges());
+  assert.deepEqual(saved.at(-1),[pixels,lossless]);
+  assert.equal(auto.wallpaperDraft,null);
+  auto.aboutToDisappear();
+ }
 });
 
 test('standard appearance dialogs reject busy dismissal and cancel only the current crop before closing',()=>{
  let closes=0,guard;
  const Dialog=loadComponentLogic('components/settings/AppearanceCustomizationDialog.ets','AppearanceCustomizationDialog',{
-  ...config, AppStorage:{get:()=> 'aurora',setOrCreate(){},delete(){}}, SeriesVisual:{isDark:()=>false}, 应用颜色主题(){}, IBestImageCropperController:class {}, appInterface:{observe(){},leave(){}},
+  ...config,themeDefinition, AppStorage:{get:()=> 'aurora',setOrCreate(){},delete(){}}, SeriesVisual:{isDark:()=>false}, 应用颜色主题(){}, IBestImageCropperController:class {}, appInterface:{observe(){},leave(){}},
   display:{getDefaultDisplaySync:()=>({width:1280,height:2832})}
  });
  const dialog=new Dialog();dialog.onClose=()=>closes++;dialog.registerDismiss=g=>guard=g;
- dialog.pane='color';dialog.aboutToAppear();assert.equal(dialog.draft,config.DEFAULT_CUSTOM_ACCENT);
+ dialog.pane='color';dialog.aboutToAppear();assert.equal(dialog.draft,themeDefinition('aurora').seed);
  dialog.draft='#FF0000';dialog.busy=true;dialog.close();assert.equal(closes,0);assert.equal(guard(),false);
  dialog.busy=false;dialog.uri='provider://new';assert.equal(guard(),false);assert.equal(dialog.uri,'');
  assert.equal(dialog.savedAccent,config.DEFAULT_CUSTOM_ACCENT);dialog.close();assert.equal(closes,1);
@@ -129,9 +148,9 @@ function previewHarness(theme='iridescent',saveResult={saved:true,applied:true})
  const values=new Map([['colorTheme',theme],[config.CUSTOM_ACCENT_KEY,'#336699']]);
  const renders=[],saves=[];let closes=0;
  const Dialog=loadComponentLogic('components/settings/AppearanceCustomizationDialog.ets','AppearanceCustomizationDialog',{
-  ...config, AppStorage:{get:key=>values.get(key),setOrCreate:(key,value)=>values.set(key,value),delete:key=>values.delete(key)},
+  ...config,themeDefinition, AppStorage:{get:key=>values.get(key),setOrCreate:(key,value)=>values.set(key,value),delete:key=>values.delete(key)},
   SeriesVisual:{isDark:(mode,system)=>mode==='dark'||(mode!=='light'&&system)},
-  应用颜色主题:(id,dark)=>renders.push({id,dark,preview:values.get(config.PREVIEW_ACCENT_KEY)||'',saved:values.get(config.CUSTOM_ACCENT_KEY)}),
+  应用颜色主题:(id,dark)=>{values.set('colorTheme',id);renders.push({id,dark,preview:values.get(config.PREVIEW_ACCENT_KEY)||'',saved:values.get(config.CUSTOM_ACCENT_KEY)});},
   appThemeColorSession:{setColor:async(...args)=>{saves.push(args);if(saveResult.saved){values.set('colorTheme','custom');values.set(config.CUSTOM_ACCENT_KEY,args[2]);values.set(config.ACCENT_LIGHT_ADAPTATION_KEY,args[3].light);values.set(config.ACCENT_DARK_ADAPTATION_KEY,args[3].dark);}return saveResult;}},
   IBestImageCropperController:class {},appInterface:{observe(){},leave(){}},
   display:{getDefaultDisplaySync:()=>({width:1280,height:2832})}
@@ -139,31 +158,31 @@ function previewHarness(theme='iridescent',saveResult={saved:true,applied:true})
  const dialog=new Dialog();dialog.savedAccent='#336699';dialog.onClose=()=>closes++;dialog.aboutToAppear();
  return {dialog,values,renders,saves,closes:()=>closes};
 }
-test('RGB and HEX preview update global palette immediately without saving, cancel restores opening theme',()=>{
+test('color ring and HEX preview update global palette immediately without saving, cancel restores opening theme',()=>{
  for(const theme of ['iridescent','aurora','custom']){
-  const h=previewHarness(theme);h.dialog.changeChannel(0,255);
+  const h=previewHarness(theme);h.dialog.changeColor('#FF6699');
   assert.equal(h.values.get(config.PREVIEW_ACCENT_KEY),'#FF6699');assert.equal(h.renders.at(-1).id,'custom');
   assert.equal(h.values.get(config.CUSTOM_ACCENT_KEY),'#336699');assert.deepEqual(h.saves,[]);
-  h.dialog.draft='#00AA55';h.dialog.syncChannels();h.dialog.previewColor();assert.equal(h.renders.at(-1).preview,'#00AA55');
+  h.dialog.changeColor('#00AA55');assert.equal(h.renders.at(-1).preview,'#00AA55');
   h.dialog.close();assert.equal(h.renders.at(-1).id,theme);assert.equal(h.renders.at(-1).preview,'');
   assert.equal(h.closes(),1);assert.equal(h.values.get(config.CUSTOM_ACCENT_KEY),'#336699');
  }
 });
 test('native dismiss, destruction and invalid inputs preserve the last valid preview and never persist it',()=>{
- const h=previewHarness();h.dialog.changeChannel(1,255);const count=h.renders.length;
+ const h=previewHarness();h.dialog.changeColor('#5BFF8A');const count=h.renders.length;
  h.dialog.draft='#x';h.dialog.previewColor();assert.equal(h.renders.length,count);
  h.dialog.aboutToDisappear();assert.equal(h.renders.at(-1).id,'iridescent');assert.equal(h.renders.at(-1).preview,'');
  assert.deepEqual(h.saves,[]);
 });
 test('confirm persists the preview exactly once and does not roll back when its dialog is destroyed',async()=>{
- const h=previewHarness();h.dialog.changeChannel(2,255);await h.dialog.applyColor();
+ const h=previewHarness();h.dialog.changeColor('#3366FF');await h.dialog.applyColor();
  assert.deepEqual(h.saves,[['custom','iridescent','#3366FF',{light:100,dark:100}]]);assert.equal(h.closes(),1);
  h.dialog.aboutToDisappear();assert.equal(h.values.get(config.CUSTOM_ACCENT_KEY),'#3366FF');
  assert.equal(h.renders.at(-1).id,'custom');assert.equal(h.renders.at(-1).preview,'');
 });
 test('unconfirmed save failures keep the editor open and cancellation restores the original palette',async()=>{
  const h=previewHarness('aurora',{saved:false,applied:false,errorCode:'failed'});
- h.dialog.changeChannel(0,255);await h.dialog.applyColor();assert.equal(h.closes(),0);assert.equal(h.dialog.failed,true);
+ h.dialog.changeColor('#FF6699');await h.dialog.applyColor();assert.equal(h.closes(),0);assert.equal(h.dialog.failed,true);
  h.dialog.close();assert.equal(h.renders.at(-1).id,'aurora');assert.equal(h.values.get(config.CUSTOM_ACCENT_KEY),'#336699');
 });
 
@@ -208,7 +227,7 @@ test('the real color manager and editor swatches use the same saved and preview 
  const values=new Map([[config.CUSTOM_ACCENT_KEY,'#336699'],[config.ACCENT_LIGHT_ADAPTATION_KEY,0],
   [config.ACCENT_DARK_ADAPTATION_KEY,70]]);
  const apply=loadPlatformModule('utils/颜色主题管理器.ets','应用颜色主题',{
-  ...catalog,...config,...palette,
+  ...catalog,...config,themeDefinition,...palette,
   AppStorage:{get:key=>values.get(key),setOrCreate:(key,value)=>values.set(key,value)}
  });
  apply('custom',false);assert.equal(values.get(palette.颜色键.动作主色),'#336699');
@@ -223,11 +242,14 @@ test('the real color manager and editor swatches use the same saved and preview 
 test('JIDE observes the two real adaptation controls and their current drafts without gaining a write tool',()=>{
  let view;
  const Dialog=loadComponentLogic('components/settings/AppearanceCustomizationDialog.ets','AppearanceCustomizationDialog',{
-  ...config, AppStorage:{get:()=> 'aurora',setOrCreate(){},delete(){}},
+  ...config,themeDefinition, AppStorage:{get:()=> 'aurora',setOrCreate(){},delete(){}},
   SeriesVisual:{isDark:()=>false}, 应用颜色主题(){}, 解析主题色板, IBestImageCropperController:class {},
   appInterface:{observe:v=>view=v,leave(){}},display:{getDefaultDisplaySync:()=>({width:390,height:844})}
  });
  const dialog=new Dialog();dialog.savedLightAdaptation=35;dialog.savedDarkAdaptation=80;dialog.aboutToAppear();
+ assert.ok(!view.items.some(item=>item.id==='accent_light_adaptation'));
+ assert.ok(view.items.some(item=>item.id==='accent_advanced'&&!item.selected));
+ dialog.advancedColor=true;dialog.publishInterface();
  assert.ok(view.items.some(item=>item.id==='accent_light_adaptation'&&item.enabled));
  assert.ok(view.items.some(item=>item.id==='accent_dark_adaptation'&&item.enabled));
  const fields=()=>Object.fromEntries(view.values.map(item=>[item.id,item.value]));
@@ -235,4 +257,37 @@ test('JIDE observes the two real adaptation controls and their current drafts wi
  assert.equal(fields().preview_light_adaptation,'0');assert.equal(fields().accent_light_adaptation,'35');
  assert.equal(dialog.effectiveAccent(false),dialog.draft);dialog.busy=true;dialog.publishInterface();
  assert.ok(view.items.every(item=>!item.enabled));
+});
+
+test('automatic accent saving updates expected theme and preserves successive edits on close',async()=>{
+ const h=previewHarness('aurora');h.dialog.autoSave=true;
+ h.dialog.changeColor('#123456');assert.equal(await h.dialog.flushChanges(),true);
+ assert.equal(h.values.get(config.CUSTOM_ACCENT_KEY),'#123456');assert.equal(h.closes(),0);
+ h.dialog.changeColor('#654321');assert.equal(await h.dialog.flushChanges(),true);
+ assert.deepEqual(h.saves.map(args=>args.slice(0,3)),[['custom','aurora','#123456'],['custom','custom','#654321']]);
+ h.dialog.aboutToDisappear();assert.equal(h.values.get(config.CUSTOM_ACCENT_KEY),'#654321');
+ assert.equal(h.values.get(config.PREVIEW_ACCENT_KEY),'');
+});
+test('automatic accent failure retains the preview and prevents a successful leave',async()=>{
+ const h=previewHarness('aurora',{saved:false,applied:false,errorCode:'disk'});h.dialog.autoSave=true;
+ h.dialog.changeColor('#123456');assert.equal(await h.dialog.flushChanges(),false);
+ assert.equal(h.dialog.failed,true);assert.equal(h.dialog.dirty,true);assert.equal(h.closes(),0);
+ h.dialog.aboutToDisappear();
+});
+
+test('opening color customization inherits the active preset and unchanged callbacks do not preview or save',()=>{
+ for(const theme of ['aurora','forest','midnight','minimal_gray','custom']) {
+  const writes=[],previews=[];
+  const Dialog=loadComponentLogic('components/settings/AppearanceCustomizationDialog.ets','AppearanceCustomizationDialog',{
+   ...config,themeDefinition,AppStorage:{get:key=>key==='colorTheme'?theme:undefined,setOrCreate:(...args)=>writes.push(args),delete(){}},
+   SeriesVisual:{isDark:()=>false},应用颜色主题:(...args)=>previews.push(args),IBestImageCropperController:class {},
+   appInterface:{observe(){},leave(){}},display:{getDefaultDisplaySync:()=>({width:1000,height:700})}
+  });
+  const d=new Dialog();d.savedAccent='#ABCDEF';d.savedLightAdaptation=25;d.savedDarkAdaptation=40;d.aboutToAppear();
+  assert.equal(d.draft,theme==='custom'?'#ABCDEF':themeDefinition(theme).seed);
+  assert.equal(d.lightAdaptationDraft,theme==='custom'?25:100);
+  assert.equal(d.darkAdaptationDraft,theme==='custom'?40:100);
+  d.changeColor(d.draft);d.changeAdaptation(false,d.lightAdaptationDraft);d.changeAdaptation(true,d.darkAdaptationDraft);
+  assert.equal(d.dirty,false);assert.deepEqual(writes,[]);assert.deepEqual(previews,[]);
+ }
 });

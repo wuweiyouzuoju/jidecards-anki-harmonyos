@@ -45,7 +45,7 @@ function fixture() {
 
 test('FSRS schemas, runtime registration and risks agree in every mode',()=>{
  for(const mode of ['assistant','create','edit'])for(const definition of agentFsrsTools()){
-  assert.ok(agentFunctionTools(100,mode).some(tool=>tool.name===definition.name));
+  assert.ok(agentFunctionTools(mode).some(tool=>tool.name===definition.name));
   assert.doesNotThrow(()=>decodeAgentFsrsArguments(definition.name,definition.exampleArgumentsJson));
   assert.equal(toolRiskOf(definition.name),definition.name.startsWith('propose_')?'write':'read');
  }

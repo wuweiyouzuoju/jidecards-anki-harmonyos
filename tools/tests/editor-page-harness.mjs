@@ -32,7 +32,7 @@ export function editorPageHarness() {
       execute(context,write,effects){return super.execute(context,write,effects,scheduler,activity)}
     },
     NavPathStack:class{},PAGE_SURFACE_KEY:'surface',加载主题模式:async()=>'system',
-    CustomTransition:{getInstance:()=>({注册NavParam(){},注销NavParam(){}})}
+    CustomTransition:{getInstance:()=>({注册NavParam(){},registerPage(){},注销NavParam(){}})}
   });
   const page = new Page(); page.active=true; page.targetId=42; page.isNote=true;
   page.pathStack={pop:()=>pops.push(true)};

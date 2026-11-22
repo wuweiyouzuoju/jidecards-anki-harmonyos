@@ -44,12 +44,12 @@ test('entry packages the authoritative native bridge declarations', () => {
   assert.equal(read(localTypes), read('native/napi_bridge/index.d.ts'));
 });
 
-test('Harmony product targets API 23 with API 21 floor set by ibest-ui dependency', () => {
+test('Harmony product targets 26.0.0 with API 21 floor set by ibest-ui dependency', () => {
   const profile = read('build-profile.json5');
 
   // @ibestservices/ibest-ui 要求依赖方 compatibleSdkVersion >= 21，12 会导致 MergeProfile 00306004 构建失败
   assert.match(profile, /compatibleSdkVersion:\s*['"]6\.0\.1\(21\)['"]/);
-  assert.match(profile, /targetSdkVersion:\s*['"]6\.1\.0\(23\)['"]/);
+  assert.match(profile, /targetSdkVersion:\s*['"]26\.0\.0['"]/);
 });
 
 test('Harmony imports compact verbose note fields before crossing the native bridge', () => {

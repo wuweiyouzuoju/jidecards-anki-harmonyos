@@ -41,5 +41,5 @@ test('search headers keep one gap after their divider; selected row text has its
   assert.match(tree,/\}\.width\('100%'\)\.padding\(\{ left: 应用尺寸\.间距_12, right: 应用尺寸\.间距_12 \}\)\s*\}\.layoutWeight\(1\)\.height\(44\)\s*\.padding\(0\)/);
   const picker=readFileSync('entry/src/main/ets/components/links/NoteReferencePicker.ets','utf8');
   assert.match(picker,/SettingsActionRow\([\s\S]*?\.padding\(\{ left: 应用尺寸\.间距_12, right: 应用尺寸\.间距_12 \}\)\s*\.backgroundColor\(this\.selected/);
-  assert.match(picker,/showFooter: this\.selected !== null, footer: \(\) => \{ this\.footer\(\); \}/);
+  assert.match(picker,/showFooter: true, footer: \(\) => \{ this\.footer\(\); \}/);
 });

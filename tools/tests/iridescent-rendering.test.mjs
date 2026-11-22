@@ -7,6 +7,8 @@ import { inflateSync } from 'node:zlib';
 import { stripTypeScriptTypes } from 'node:module';
 import * as catalog from '../../entry/src/main/ets/model/ThemeCatalog.ts';
 import * as style from '../../entry/src/main/ets/model/ThemeBackgroundMotion.ts';
+import { loadPlatformModule } from './platform-module-harness.mjs';
+import { AppLog } from '../../entry/src/main/ets/model/AppLog.ts';
 import { motionApi, surfaceMotionApi } from './motion-harness.mjs';
 
 test('all cloud textures have fully transparent borders and contain no opaque rectangle', () => {
@@ -41,6 +43,9 @@ test('all cloud textures have fully transparent borders and contain no opaque re
 function createBackground() {
   let now = 10000;
   const animations = [];
+  const retention = [];
+  const invalidations = [];
+  let panelObserver;
   const context = { animateTo: (options, update) => { animations.push(options); update(); } };
   const source = readFileSync(new URL('../../entry/src/main/ets/components/common/ThemeBackground.ets', import.meta.url), 'utf8');
   const methods = source.slice(0, source.indexOf('  build() {'))
@@ -49,10 +54,15 @@ function createBackground() {
     .replace('export struct ThemeBackground', 'class ThemeBackground')
     .replace(/@(Prop|State|StorageProp|Watch)(?:\([^)]*\))?\s*/g, '');
   const js = stripTypeScriptTypes(methods + '\ngetUIContext() { return context; }\n}', { mode: 'transform' });
-  const values = { ...appearance, ...style, ...catalog, context, Curve: { EaseInOut: 'ease-in-out' }, Date: { now: () => now } };
+  const values = { ...appearance, ...style, ...catalog, context, AppLog,
+    invalidateSharedGlassSource: (_context, source) => invalidations.push(source),
+    currentGlassSource: () => 'page',
+    observeGlassPanelActivity: observer => { panelObserver = observer; observer(false, ''); return () => { panelObserver = undefined; }; },
+    setSharedGlassSourceRetention: (_context, source, retained, paused) => retention.push({ source, retained, paused }),
+    GLASS_BACKGROUND_SOURCE: 'root-background', Curve: { EaseInOut: 'ease-in-out' }, Date: { now: () => now } };
   const background = new Function(...Object.keys(values), js + '\nreturn new ThemeBackground();')(...Object.values(values));
   Object.assign(background, { material: 'glass', mounted: true, visible: true, visual: catalog.themeDefinition('iridescent'), foreground: true });
-  return { background, animations, advance: ms => { now += ms; } };
+  return { background, animations, retention, invalidations, panelActivity: (active, source) => panelObserver?.(active, source), advance: ms => { now += ms; } };
 }
 
 test('visibility notifications do not restart animations and stale completions cannot revive a paused background', () => {
@@ -99,6 +109,23 @@ test('each completed cycle submits only one new target, while disabling motion f
   assert.equal(animations.length, 3);
 });
 
+test('navigation and ambient motion reuse the root glass texture until the background changes', () => {
+  const { background, animations, retention, invalidations } = createBackground();
+  background.updatePlayback();
+  background.transitionActive = true;
+  background.updatePlayback();
+  assert.deepEqual(retention.at(-1), { source: 'root-background', retained: true, paused: true });
+  background.transitionActive = false;
+  background.updatePlayback();
+  assert.deepEqual(retention.at(-1), { source: 'root-background', retained: true, paused: false });
+  animations.at(-1).onFinish();
+  assert.deepEqual(invalidations, []);
+  background.updateBackground();
+  assert.deepEqual(invalidations, ['root-background']);
+  background.aboutToDisappear();
+  assert.deepEqual(retention.at(-1), { source: 'root-background', retained: false, paused: true });
+});
+
 test('theme configuration changes preserve elapsed position and adopt the next cycle duration', () => {
   const { background, animations, advance } = createBackground();
   background.updatePlayback();
@@ -117,21 +144,24 @@ test('theme configuration changes preserve elapsed position and adopt the next c
 });
 
 /** 执行首页实际转场协议，模拟 @Prop 的更新通知。 */
-function createNavigation(background, motionStyle = 'restrained') {
+function createNavigation(background, motionStyle = 'restrained', waitForFrame = () => Promise.resolve()) {
   const motion = surfaceMotionApi(motionStyle);
   const pages = new Map();
   const callbacks = new Map();
-  const registry = {
-    注册NavParam: (name, start, end) => callbacks.set(name, { start, end }),
-    取起点回调: name => callbacks.get(name)?.start ?? null,
-    取终点回调: name => callbacks.get(name)?.end ?? null,
-  };
+  const TransitionRegistry = loadPlatformModule('utils/自定义转场.ets', 'CustomTransition', { navigationEnterOffset: motion.navigationEnterOffset });
+  const registry = TransitionRegistry.getInstance();
+  const originalRegister = registry.注册NavParam.bind(registry);
+  registry.注册NavParam = (name, start, end, prepare) => { originalRegister(name, start, end, prepare); callbacks.set(name, { start, end, prepare }); };
   // 使用页面实际注册回调；这里只替换平台动画，不复制生产透明度规则。
-  for (const [file, name] of [['设置页', 'SettingsPage'], ['浏览页', 'BrowserPage'], ['学习页', 'StudyPage']]) {
+  for (const [file, name] of [['设置页', 'SettingsPage'], ['浏览页', 'BrowserPage'], ['学习页', 'StudyPage'],
+    ['添加笔记页', 'AddNotePage'], ['EditNotePage', 'EditNotePage']]) {
     const pageSource = readFileSync(new URL(`../../entry/src/main/ets/pages/${file}.ets`, import.meta.url), 'utf8');
-    const begin = pageSource.indexOf('CustomTransition.getInstance().注册NavParam(');
+    const begin = pageSource.search(/CustomTransition\.getInstance\(\)\.(?:注册NavParam|registerPage)\(/);
     const registration = pageSource.slice(begin, pageSource.indexOf('\n    );', begin) + 7);
-    const page = { 转场透明度: 1 };
+    const editor = name === 'AddNotePage' || name === 'EditNotePage';
+    const page = { 转场透明度: editor ? 0 : 1, opacityValue: 0, initialPreparation: Promise.resolve(),
+      wheelSession: {setPresentation() {}, setVisible() {}},
+      firstFrame: { wait: waitForFrame }, getUIContext: () => home.getUIContext() };
     const register = new Function('CustomTransition', 'navigationEnterOffset', stripTypeScriptTypes(registration, { mode: 'transform' }));
     register.call(page, { getInstance: () => registry }, motion.navigationEnterOffset);
     pages.set(name, page);
@@ -139,8 +169,10 @@ function createNavigation(background, motionStyle = 'restrained') {
   const source = readFileSync(new URL('../../entry/src/main/ets/utils/HomeNavigationTransition.ets', import.meta.url), 'utf8')
     .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
   const js = stripTypeScriptTypes(source, { mode: 'transform' });
+  const captureGates = [];
   const values = {
-    ...motion,
+    ...motion, AppLog,
+    setGlassNavigationActive: active => captureGates.push(active),
     NavigationOperation: { PUSH: 'push' },
     Curve: { EaseOut: 'ease-out' },
     CustomTransition: { getInstance: () => registry },
@@ -155,7 +187,7 @@ function createNavigation(background, motionStyle = 'restrained') {
   const fades = [];
   const finishes = [];
   const snapshot = () => Object.fromEntries([['Home', home.homeTransitionOpacity],
-    ...Array.from(pages, ([name, page]) => [name, page.转场透明度])]);
+    ...Array.from(pages, ([name, page]) => [name, name === 'EditNotePage' ? page.opacityValue : page.转场透明度])]);
   const frames = [];
   home.getUIContext = () => ({ animateTo: (options, update) => {
     fades.push(options);
@@ -172,10 +204,10 @@ function createNavigation(background, motionStyle = 'restrained') {
     protocol.transition({ finishTransition: () => { finishes.push(protocol); protocol.onTransitionEnd(true); } });
     return protocol;
   };
-  return { home, pages, fades, finishes, frames, snapshot, startTransition, transition };
+  return { home, pages, fades, finishes, frames, captureGates, snapshot, startTransition, transition, registry };
 }
 
-test('home and nested transparent destinations never crossfade old and new content in either motion style', () => {
+test('home and nested transparent destinations never crossfade old and new content in either motion style', async () => {
   for (const motionStyle of ['restrained','lively']) {
   for (const [operation, from, to] of [
     ['push', { index: -1 }, { name: 'StudyPage', index: 0 }],
@@ -198,6 +230,7 @@ test('home and nested transparent destinations never crossfade old and new conte
       nav.frames.push({start,end:nav.snapshot()}); nav.fades.push(options);
     }});
     nav.startTransition(operation, from, to);
+    await Promise.resolve();
     const source = from.index === -1 ? 'Home' : from.name;
     const destination = to.index === -1 ? 'Home' : to.name;
     assert.equal(nav.frames[0].start[source], 0, `${operation}: source hidden before animation`);
@@ -215,19 +248,30 @@ test('home and nested transparent destinations never crossfade old and new conte
     'bind home opacity to NavBar content, not Navigation or the shared background');
 });
 
-test('missing UI context still reveals the destination for page and home returns', () => {
+test('missing UI context still reveals the destination for page and home returns', async () => {
   for (const to of [{ name: 'SettingsPage', index: 0 }, { index: -1 }]) {
     const { background } = createBackground();
     const nav = createNavigation(background);
     nav.home.getUIContext = () => undefined;
     nav.startTransition('pop', { name: 'BrowserPage', index: 1 }, to);
+    await Promise.resolve();
     assert.equal(nav.snapshot().BrowserPage, 0);
     assert.equal(nav.snapshot()[to.index === -1 ? 'Home' : to.name], 1);
     assert.equal(background.transitionActive, false);
   }
 });
 
-test('push and pop freeze the current cloud pose and resume only after navigation completes', () => {
+test('a synchronous first-frame failure still opens the destination and releases the background', () => {
+  const { background } = createBackground();
+  const nav = createNavigation(background, 'restrained', () => { throw new Error('window closed'); });
+  nav.startTransition();
+  assert.equal(nav.snapshot().SettingsPage, 1);
+  nav.fades[0].onFinish();
+  assert.equal(nav.finishes.length, 1);
+  assert.equal(background.transitionActive, false);
+});
+
+test('push and pop freeze the current cloud pose and resume only after navigation completes', async () => {
   for (const operation of ['push', 'pop']) {
     const { background, animations, advance } = createBackground();
     const navigation = createNavigation(background);
@@ -237,6 +281,7 @@ test('push and pop freeze the current cloud pose and resume only after navigatio
     const to = background.toPoses;
     advance(2100);
     navigation.startTransition(operation);
+    await Promise.resolve();
     assert.equal(navigation.fades[0].expectedFrameRateRange.expected, 60, 'navigation retains its own frame budget');
     const frozen = style.sampleThemeBackgroundPoses(from, to, 2100);
     assert.equal(background.running, false);
@@ -254,12 +299,14 @@ test('push and pop freeze the current cloud pose and resume only after navigatio
   }
 });
 
-test('overlapping navigation ignores old completions and releases the pause on failure or timeout', () => {
+test('overlapping navigation ignores old completions and releases the pause on failure or timeout', async () => {
   const { background, animations } = createBackground();
   const { startTransition, fades, finishes } = createNavigation(background);
   background.updatePlayback();
   const first = startTransition();
+  await Promise.resolve();
   const second = startTransition('pop');
+  await Promise.resolve();
   first.onTransitionEnd(false);
   fades[0].onFinish();
   assert.equal(background.transitionActive, true);
@@ -273,13 +320,14 @@ test('overlapping navigation ignores old completions and releases the pause on f
   assert.equal(finishes.length, 0, 'ended navigation proxies cannot be finished by late animation callbacks');
 });
 
-test('navigation requests proxy completion once even before the system acknowledges it', () => {
+test('navigation requests proxy completion once even before the system acknowledges it', async () => {
   const { background } = createBackground();
   const nav = createNavigation(background);
   let finishCount = 0;
   const protocol = nav.transition.create({ index: -1 }, { name: 'SettingsPage', index: 0 }, 'push');
   // Delay system acknowledgement so the guard cannot rely only on onTransitionEnd.
   protocol.transition({ finishTransition: () => { finishCount++; } });
+  await Promise.resolve();
   nav.fades[0].onFinish();
   nav.fades[0].onFinish();
   assert.equal(finishCount, 1);
@@ -290,12 +338,14 @@ test('navigation requests proxy completion once even before the system acknowled
   assert.equal(background.transitionActive, false);
 });
 
-test('queued navigation updates cannot reveal an obsolete destination after cancellation or replacement', () => {
+test('queued navigation updates cannot reveal an obsolete destination after cancellation or replacement', async () => {
   const { background } = createBackground();
   const nav = createNavigation(background), queued = [];
   nav.home.getUIContext = () => ({ animateTo: (options, update) => queued.push({ options, update }) });
   const first = nav.startTransition();
+  await Promise.resolve();
   const second = nav.startTransition('push', { name: 'SettingsPage', index: 0 }, { name: 'BrowserPage', index: 1 });
+  await Promise.resolve();
   queued[0].update();
   assert.equal(nav.snapshot().SettingsPage, 0, 'an obsolete destination stays hidden');
   first.onTransitionEnd(false);
@@ -313,12 +363,13 @@ test('queued navigation updates cannot reveal an obsolete destination after canc
   assert.equal(background.transitionActive, false);
 });
 
-test('navigation completion respects background lifecycle, motion preference and missing UI context', () => {
+test('navigation completion respects background lifecycle, motion preference and missing UI context', async () => {
   for (const flag of ['foreground', 'motion', 'visible', 'mounted']) {
     const { background, animations } = createBackground();
     const { startTransition, fades } = createNavigation(background);
     background.updatePlayback();
     startTransition();
+    await Promise.resolve();
     background[flag] = false;
     background.updatePlayback();
     fades[0].onFinish();
@@ -330,6 +381,7 @@ test('navigation completion respects background lifecycle, motion preference and
   background.updatePlayback();
   home.getUIContext = () => undefined;
   startTransition();
+  await Promise.resolve();
   assert.equal(background.transitionActive, false);
   assert.equal(background.running, true);
 });
@@ -346,4 +398,86 @@ test('flat backgrounds disable every ambient layer for preset and custom colors 
  assert.equal(background.running,true);background.material='flat';background.updatePlayback();assert.equal(background.running,false);
  background.material='glass';assert.deepEqual(background.textures(),background.visual.backgroundTextures);
  background.wallpaper='/files/test.jpg';assert.deepEqual(background.textures(),[]);
+});
+
+
+test('editor waits for fields and then uses the common enter and return animation', async () => {
+  for (const [name, source] of [['AddNotePage', { index: -1 }], ['EditNotePage', { name: 'BrowserPage', index: 0 }]]) {
+    const { background } = createBackground();
+    const nav = createNavigation(background, 'lively');
+    const sourceName = source.name ?? 'Home';
+    let resolve;
+    const prepared = new Promise(done => { resolve = done; });
+    nav.pages.get(name).initialPreparation = prepared;
+    const editor = { name, index: source.index + 1 };
+    nav.startTransition('push', source, editor);
+    assert.equal(nav.snapshot()[sourceName], 1);
+    assert.equal(nav.snapshot()[name], 0);
+    assert.equal(nav.fades.length, 0);
+    assert.equal(nav.captureGates.at(-1), true);
+    resolve();
+    await prepared;
+    assert.equal(nav.frames[0].start[sourceName], 0);
+    assert.equal(nav.frames[0].start[name], 0);
+    assert.equal(nav.frames[0].end[name], 1);
+    assert.ok(nav.fades[0].duration > 0);
+    nav.fades[0].onFinish();
+    assert.equal(nav.captureGates.at(-1), false);
+    nav.startTransition('pop', editor, source);
+    assert.equal(nav.frames[1].start[name], 0);
+    assert.equal(nav.frames[1].end[sourceName], 1);
+    nav.fades[1].onFinish();
+    assert.equal(nav.finishes.length, 2);
+  }
+});
+
+test('canceling editor navigation keeps the source visible and ignores late preparation', async () => {
+  const { background } = createBackground();
+  const nav = createNavigation(background);
+  let resolve;
+  const prepared = new Promise(done => { resolve = done; });
+  nav.pages.get('AddNotePage').initialPreparation = prepared;
+  const protocol = nav.startTransition('push', { index: -1 }, { name: 'AddNotePage', index: 0 });
+  protocol.onTransitionEnd(false);
+  resolve();
+  await prepared;
+  assert.equal(nav.snapshot().Home, 1);
+  assert.equal(nav.snapshot().AddNotePage, 0);
+  assert.equal(nav.captureGates.at(-1), false);
+  assert.equal(nav.fades.length, 0);
+});
+
+test('settings and both editors share entry direction and offsets in both motion styles', () => {
+  for (const style of ['restrained', 'lively']) {
+    const { background } = createBackground();
+    const nav = createNavigation(background, style);
+    for (const forward of [true, false]) {
+      const states = [];
+      for (const name of ['SettingsPage', 'AddNotePage', 'EditNotePage']) {
+        nav.registry.取起点回调(name)(forward, false);
+        const page = nav.pages.get(name);
+        states.push([name === 'EditNotePage' ? page.opacityValue : page.转场透明度, page.navigationOffset]);
+      }
+      assert.deepEqual(states[1], states[0]);
+      assert.deepEqual(states[2], states[0]);
+      assert.equal(states[0][1], style === 'restrained' ? 0 : forward ? 16 : -16);
+    }
+  }
+});
+
+
+test('first panel freezes the visible ambient pose and invalidates its old sampling frame; last close resumes', () => {
+  const {background,animations,invalidations,advance,panelActivity}=createBackground();
+  background.mountBackground();
+  const from=background.fromPoses,to=background.toPoses;
+  advance(2100);panelActivity(true,'dialog');
+  assert.equal(background.running,false);
+  assert.deepEqual(background.poses,style.sampleThemeBackgroundPoses(from,to,2100));
+  assert.deepEqual(invalidations,['root-background','dialog','page']);
+  const count=animations.length;panelActivity(true,'dialog');
+  assert.equal(animations.length,count,'nested menu cannot restart or resample the paused background');
+  panelActivity(false,'dialog');assert.equal(background.running,true);
+  assert.equal(animations.length,count+1);
+  background.aboutToDisappear();panelActivity(true,'dialog');
+  assert.equal(animations.length,count+1,'unmounted background observer is removed');
 });

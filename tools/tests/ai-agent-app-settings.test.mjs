@@ -1,3 +1,5 @@
+import * as wheelPreferences from '../../entry/src/main/ets/model/EditorWheelPreferences.ts';
+import * as homeLayout from '../../entry/src/main/ets/model/HomeLayout.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -47,10 +49,12 @@ function fixture() {
   };
   const localDependencies = { ...localApi, AppStorage: localStorage,
     preferences: {getPreferencesSync: () => localStore},
-    CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize, ...deckAppearance, ...motionModel };
+    CARD_TEXT_SIZE_KEY, DEFAULT_CARD_TEXT_SIZE, normalizeCardTextSize, ...deckAppearance, ...motionModel, ...homeLayout };
   const saveCardTextSize = loadPlatformModule('utils/CardTextSizeStore.ets','saveCardTextSize',localDependencies);
   const { saveDeckListStyle, legacyDeckListStyle } = loadPlatformModule('utils/DeckListAppearanceStore.ets','({saveDeckListStyle, legacyDeckListStyle})',localDependencies);
   const saveStudyHaptics = loadPlatformModule('utils/StudyHaptics.ets','saveStudyHaptics',localDependencies);
+  const saveEditorWheelPreference = loadPlatformModule('utils/EditorWheelPreferencesStore.ets','saveEditorWheelPreference',{...localDependencies,...wheelPreferences});
+  const saveHomeLayout = loadPlatformModule('utils/HomeLayoutStore.ets','saveHomeLayout',localDependencies);
   const saveMotionStyle = loadPlatformModule('utils/MotionStyleStore.ets','saveMotionStyle',localDependencies);
   const readAgentPreference = loadPlatformModule('backend/agent/AgentPreferenceReader.ets','readAgentPreference', {
     ...localApi, agentPreferenceDefinitions, agentWritablePreferenceIds, decodeAgentPreference, legacyDeckListStyle,
@@ -72,7 +76,7 @@ function fixture() {
   const Registry = loadPlatformModule('backend/agent/AgentToolRegistry.ets', 'AgentToolRegistry', {
     toolRiskOf, parseAgentToolJsonObject, decodeAgentClarificationRequest, AgentApprovalRequired
   });
-  const Tools = loadPlatformModule('backend/agent/AgentAppSettingsTools.ets', 'AgentAppSettingsTools', {
+  const Tools = loadPlatformModule('backend/agent/AgentAppSettingsTools.ets', 'AgentAppSettingsTools', { ...deckAppearance, deviceInfo: {deviceType:'tablet'},
     buildAgentAppStructure, appInterface: views, themeDefinition,
     AI_AGENT_CHANNELS_APP_STORAGE_KEY: 'aiAgentChannelsEnabled', isCloudDeckAvailable: async () => false, APP_FOREGROUND_KEY: 'appForeground',
     agentSettingDefinitions, decodeSettingsArguments, requestedThemeMode, isAppThemeMode, AgentToolSchemaError,
@@ -102,10 +106,10 @@ function fixture() {
   const call = (name,args) => registry.execute({id:'call',name,argumentsJson:JSON.stringify(args)});
   const Executor = loadPlatformModule('backend/agent/AgentActionExecutor.ets', 'AgentActionExecutor', {
     牌组服务: class {}, 笔记类型服务: class {}, AgentActionLedger, decodeSettingChange, appThemeColorSession: colors,
-    LocalPreferenceWriteError: localApi.LocalPreferenceWriteError, saveCardTextSize, saveDeckListStyle, saveStudyHaptics, saveMotionStyle,
+    LocalPreferenceWriteError: localApi.LocalPreferenceWriteError, saveCardTextSize, saveDeckListStyle, saveHomeLayout, saveStudyHaptics, saveMotionStyle,
     saveAgentSettingValue: loadPlatformModule('backend/agent/AgentSettingCommands.ets','saveAgentSettingValue',{
       decodeWritablePreference, readAgentPreference,
-      saveCardTextSize,saveDeckListStyle,saveStudyHaptics,saveMotionStyle,AppStorage:localStorage
+      saveCardTextSize,saveDeckListStyle,saveHomeLayout,saveStudyHaptics,saveMotionStyle,saveEditorWheelPreference,...wheelPreferences,AppStorage:localStorage
     }),
     设置FSRS开启状态: async (enabled, expected) => {
       if (state.fsrs !== expected) throw Error('setting_changed_since_proposal');
@@ -118,7 +122,7 @@ function fixture() {
 }
 
 test('the registered app interface tool reads fresh UI mode, observations and actual turn tool capabilities without writes', async () => {
-  const f=fixture();f.tools.setInterfaceTools(agentFunctionTools(100,'assistant'),'deepseek');
+  const f=fixture();f.tools.setInterfaceTools(agentFunctionTools('assistant'),'deepseek');
   f.views.observe({surface:'home_more',sectionId:'',selectedId:'',optionIds:['settings'],optionLabels:['Settings'],busy:false});
   let view=JSON.parse((await f.call('get_app_structure',{surface:'settings',sectionId:'scheduler'})).outputJson);
   assert.equal(view.webAccess.provider,'deepseek');assert.equal(view.webAccess.available,true);
@@ -143,7 +147,7 @@ test('the registered app interface tool reads fresh UI mode, observations and ac
 });
 
 test('registered app structure supplies the deck operation teaching guide from current language resources without writes', async () => {
-  const f=fixture();f.tools.setInterfaceTools(agentFunctionTools(100,'assistant'));
+  const f=fixture();f.tools.setInterfaceTools(agentFunctionTools('assistant'));
   for(const locale of ['base','en_US']) {
     f.state.resourceLabels=new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`,import.meta.url))).string.map(item=>[item.name,item.value]));
     const catalog=JSON.parse((await f.call('get_app_structure',{})).outputJson);
@@ -163,7 +167,7 @@ test('registered app structure supplies the deck operation teaching guide from c
 });
 
 test('registered app structure reports current navigation readiness without caching runtime state or granting permission', async () => {
-  const f=fixture();f.tools.setInterfaceTools(agentFunctionTools(100,'assistant'));f.views.showPage('agent');
+  const f=fixture();f.tools.setInterfaceTools(agentFunctionTools('assistant'));f.views.showPage('agent');
   const host={busy:false,names:['AiCardPage']};
   const session=new AgentAppNavigationSession({context:()=>({simple:true,agent:true,cloudDeck:false,themeHasTextures:false}),
     canNavigate:()=>true,collectionBusy:()=>host.busy,pathNames:()=>host.names,
@@ -185,7 +189,7 @@ test('registered app structure reports current navigation readiness without cach
 
 test('both modes advertise executable setting tools with strict examples and explicit write classification', async () => {
   for (const mode of ['create','edit']) {
-    const catalog = agentFunctionTools(25, mode);
+    const catalog = agentFunctionTools(mode);
     for (const tool of agentSettingsFunctionTools()) {
       assert.ok(catalog.some(value => value.name === tool.name));
       assert.doesNotThrow(() => decodeSettingsArguments(tool.name, tool.exampleArgumentsJson));
@@ -203,7 +207,7 @@ test('both modes advertise executable setting tools with strict examples and exp
 });
 
 test('registered structure recommendations use the actual source page and current tools without acquiring write scope', async () => {
-  const f = fixture(); f.tools.setInterfaceTools(agentFunctionTools(100, 'assistant'));
+  const f = fixture(); f.tools.setInterfaceTools(agentFunctionTools('assistant'));
   f.views.showPage('browser');
   f.views.observe({surface:'browser', sectionId:'list', selectedId:'cards', optionIds:[], optionLabels:[], optionsTotal:0, busy:false});
   f.views.hidePage('browser'); f.views.showPage('agent');
@@ -394,7 +398,7 @@ test('partial application and write failures preserve a consumed action and neve
 
 test('local setting proposals execute real shared stores only after one exact confirmation in every mode', async () => {
   for (const mode of ['assistant','create','edit']) {
-    const tool = agentFunctionTools(25,mode).find(x => x.name === 'propose_set_setting');
+    const tool = agentFunctionTools(mode).find(x => x.name === 'propose_set_setting');
     assert.ok(tool); assert.equal(toolRiskOf(tool.name),'write');
     assert.deepEqual(JSON.parse(tool.parametersJson).properties.settingId.enum,agentWritablePreferenceIds());
   }
@@ -403,6 +407,8 @@ test('local setting proposals execute real shared stores only after one exact co
   for (const [settingId,value,key,stored] of [
     ['card_text_size','130',CARD_TEXT_SIZE_KEY,130],
     ['deck_list_style','double_narrow',DECK_LIST_STYLE_KEY,'double_narrow'],
+    ['home_layout','wheel',homeLayout.HOME_LAYOUT_KEY,'wheel'],
+    [wheelPreferences.WHEEL_GRIP_KEY,'false',wheelPreferences.WHEEL_GRIP_KEY,false],
     ['study_haptics','false','studyHapticsEnabled',false],
     ['motion_style','lively',motionModel.MOTION_STYLE_KEY,'lively']
   ]) {

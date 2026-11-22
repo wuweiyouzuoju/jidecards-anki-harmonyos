@@ -21,16 +21,16 @@ test('collection reopen and two interleaved browser sessions restore mode and co
   await cards.search(query,()=>true); h.reopen();
   assert.equal((await cards.search(query,()=>true)).rows[0].cells[0],'card:1');
   await notes.search({...query,notes:true},()=>true);
-  assert.equal((await cards.more(()=>true)).rows[200].cells[0],'card:201');
-  assert.equal((await notes.more(()=>true)).rows[200].cells[0],'note:201');
-  h.reopen(); assert.equal((await cards.more(()=>true)).rows.at(-1).cells[0],'card:303');
+  assert.equal((await cards.more(()=>true)).rows[20].cells[0],'card:21');
+  assert.equal((await notes.more(()=>true)).rows[20].cells[0],'note:21');
+  h.reopen(); assert.equal((await cards.more(()=>true)).rows.at(-1).cells[0],'card:220');
 });
 test('systemic row failure is visible and preserves pagination for retry', async () => {
   const h=sharedBackend(), session=new BrowserSearchSession(h.backend); await session.search(query,()=>true);
   const row=h.backend.row; h.backend.row=async()=>{throw Error('collection unavailable');};
   await assert.rejects(session.more(()=>true),/collection unavailable/);
   h.backend.row=row; const recovered=await session.more(()=>true);
-  assert.equal(recovered.consumed,300); assert.equal(recovered.rows[200].id,201);
+  assert.equal(recovered.consumed,120); assert.equal(recovered.rows[20].id,21);
 });
 test('accepted columns are frozen and refresh failure retains the old pagination context', async () => {
   const h=sharedBackend(), session=new BrowserSearchSession(h.backend), calls=[];

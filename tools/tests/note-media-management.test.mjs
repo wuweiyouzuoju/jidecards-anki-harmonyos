@@ -30,7 +30,7 @@ function fieldManagerHarness(initial = {}, failOpen = false, deferClose = false)
       open() {
         if (failOpen) throw Error('native open failed');
         this.visible = true;
-        const h = mediaDialogHarness(async () => [], this.options.builder);
+        const h = mediaDialogHarness(async () => [], { ...this.options.builder, directPick: false });
         this.dialog = h.dialog;
       }
       close() {
@@ -309,17 +309,18 @@ test('filled image actions consume the live theme button color', () => {
 test('audio operation rows keep recording status and exit actions available while the host is disabled', () => {
   const source = readFileSync(new URL('../../entry/src/main/ets/components/common/NoteAudioField.ets', import.meta.url), 'utf8');
   const controls = [...source.matchAll(/SettingsActionRow\((\{[\s\S]*?\})\)/g)].map(match =>
-    new Function('$r', 'localizedResourceText', stripTypeScriptTypes(`const props = ${match[1]};`, { mode: 'transform' }) + 'return props;'));
+    new Function('$r', 'localizedResourceText', 'NOTE_AUDIO_IMPORT_TITLE', 'NOTE_AUDIO_GENERATE_TITLE', stripTypeScriptTypes(`const props = ${match[1]};`, { mode: 'transform' }) + 'return props;'));
   const Row = loadComponentLogic('components/common/SettingsActionRow.ets', 'SettingsActionRow', { $r: key => key });
   const events = [], state = { disabled: false, working: false, paused: false, uiLanguage: 'zh-Hans', seconds: 14,
     getUIContext: () => ({}),
     pick: () => events.push('add'), record: () => events.push('record'),
+    foreground: true, onOpenSpeech: () => events.push('generate'),
     finishRecording: () => events.push('done'), togglePause: () => events.push('pause'), cancelRecording: () => events.push('cancel') };
-  const props = create => create.call(state, key => key, (_context, _locale, key, seconds) => `${key}:${seconds}`);
-  assert.equal(controls.length, 5);
+  const props = create => create.call(state, key => key, (_context, _locale, key, seconds) => `${key}:${seconds}`, 'note_audio_import', 'note_audio_generate_speech');
+  assert.equal(controls.length, 6);
   assert.deepEqual(controls.map(create => props(create).title), [
     'app.string.note_audio_record_done', 'app.string.note_audio_pause', 'app.string.note_audio_record_cancel',
-    'app.string.note_audio_add', 'app.string.note_audio_record'
+    'app.string.note_audio_import', 'app.string.note_audio_record', 'app.string.note_audio_generate_speech'
   ]);
   assert.equal(props(controls[0]).hint, 'app.string.note_audio_recording:14');
   state.seconds = 15;
@@ -343,37 +344,28 @@ test('audio operation rows keep recording status and exit actions available whil
   assert.equal(props(controls[0]).trailingIcon, 'app.media.ic_audio_recording');
   assert.equal(props(controls[1]).trailingIcon, 'app.media.ic_audio_pause');
   for (const create of controls) Object.assign(new Row(), props(create)).activate();
-  assert.deepEqual(events, ['done', 'pause', 'cancel', 'done', 'pause', 'cancel', 'add', 'record']);
+  assert.deepEqual(events, ['done', 'pause', 'cancel', 'done', 'pause', 'cancel', 'add', 'record', 'generate']);
 });
 
-test('audio playback uses the common button with current filename, theme, and disabled guard', () => {
+test('audio attachment playback uses the shared icon and reads the current filename', () => {
   const source = readFileSync(new URL('../../entry/src/main/ets/components/common/NoteAudioField.ets', import.meta.url), 'utf8');
-  const match = source.match(/按下态按钮\((\{[\s\S]*?\})\)/);
-  assert.ok(match);
-  const create = new Function('key', 'label', 'filename', 'uri', 'partIndex', '$r',
-    stripTypeScriptTypes(`const props = ${match[1]};`, { mode: 'transform' }) + 'return props;');
-  const Button = loadComponentLogic('components/common/按下态按钮.ets', '按下态按钮', {
-    $r: key => key, 应用尺寸: { 字号_按钮: 15 }, GLASS_HIGHLIGHT_COLORS: []
-  });
-  const events = [], state = { disabled: false, working: false, playingKey: '', buttonColor: '#7C3AED',
-    partLabel: () => '当前音频', partFilename: () => 'current.mp3', partUri: () => '/cache/current.mp3',
-    play: (...args) => events.push(args) };
-  const props = () => create.call(state, 'existing-1', 'old label', 'old.mp3', '/cache/old.mp3', 1, key => key);
-  for (const color of ['#7C3AED', '#16A34A', '#2F5FD0']) {
-    state.buttonColor = color; assert.equal(props().字色, color);
-  }
-  const button = Object.assign(new Button(), props());
-  assert.equal(button.文案, 'app.string.note_audio_play');
-  state.partFilename = () => 'latest.mp3'; button.activate();
-  assert.deepEqual(events, [['existing-1', 'latest.mp3', '/cache/current.mp3']]);
-  state.playingKey = 'existing-1'; assert.equal(props().文案, 'app.string.note_audio_stop');
-  state.disabled = true; Object.assign(new Button(), props()).activate(); assert.equal(events.length, 1);
-
-  const deletion = source.match(/IconActionButton\((\{[\s\S]*?\})\)/);
-  assert.ok(deletion);
+  const [playback, deletion] = [...source.matchAll(/IconActionButton\((\{[\s\S]*?\})\)/g)];
+  assert.ok(playback && deletion);
   const Icon = loadComponentLogic('components/common/IconActionButton.ets', 'IconActionButton', {
     Color: { Transparent: 'transparent' }, 应用尺寸: { 按钮高度: 44 }
   });
+  const createPlay = new Function('key', 'filename', 'uri', 'partIndex', '$r', 'NOTE_AUDIO_PLAY_ICON',
+    stripTypeScriptTypes(`const props = ${playback[1]};`, { mode: 'transform' }) + 'return props;');
+  const events = [], state = { disabled: false, working: false, partFilename: () => 'current.mp3',
+    partUri: () => '/cache/current.mp3', play: (...args) => events.push(args) };
+  const props = () => createPlay.call(state, 'existing-1', 'old.mp3', '/cache/old.mp3', 1, key => key, 'ic_audio_resume');
+  const button = Object.assign(new Icon(), props());
+  assert.equal(button.source, 'app.media.ic_audio_resume');
+  assert.equal(button.label, 'app.string.note_audio_play');
+  state.partFilename = () => 'latest.mp3'; button.activate();
+  assert.deepEqual(events, [['existing-1', 'latest.mp3', '/cache/current.mp3']]);
+  state.disabled = true; Object.assign(new Icon(), props()).activate(); assert.equal(events.length, 1);
+
   const createDelete = new Function('remove', '$r', stripTypeScriptTypes(`const props = ${deletion[1]};`, { mode: 'transform' }) + 'return props;');
   assert.equal(createDelete.call(state, () => {}, key => key).cornerAligned, true);
   state.recording = false;
@@ -428,4 +420,45 @@ test('newly mounted text blocks honor an in-flight source request and cannot for
  field.requestedSourceMode=true;assert.equal(field.partStartsInSource(2),true);
  field.requestedSourceMode=false;field.value='plain<img src="x.jpg"><table>kept</table>';
  assert.equal(field.partStartsInSource(2),true);
+});
+
+test('field layout parses each value and mode once, invalidating immediately for edits and switches',()=>{
+ let reads=0;
+ const Field=loadComponentLogic('components/editor/NoteFieldCard.ets','NoteFieldCard',{
+  NoteAudioPreview:class{},noteFieldDisplayParts:(...args)=>{reads++;return noteFieldDisplayParts(...args);}
+ });
+ const field=new Field();field.value='A<img src="one.jpg">B[sound:voice.mp3]C';
+ const first=field.displayParts();
+ for(let i=0;i<50;i++){assert.equal(field.displayParts(),first);assert.equal(field.part(1).filename,'one.jpg');}
+ assert.equal(reads,1);assert.equal(field.firstTextPart(),0);
+ field.value='new<img src="two.jpg">';assert.equal(field.part(1).filename,'two.jpg');assert.equal(reads,2);
+ field.fullSource=true;assert.deepEqual(field.displayParts().map(p=>p.text),[field.value]);assert.equal(reads,3);
+ field.fullSource=false;assert.equal(field.part(1).filename,'two.jpg');assert.equal(reads,4);
+ field.value='';assert.equal(field.displayParts()[0].text,'');assert.equal(reads,5);
+});
+
+test('browser input bodies mount on first visibility and remain mounted when scrolled away',()=>{
+ const Field=loadComponentLogic('components/editor/NoteFieldCard.ets','NoteFieldCard',{NoteAudioPreview:class{}});
+ const field=new Field();assert.equal(field.shouldRenderInput(),true);
+ field.deferInputUntilVisible=true;field.value='original';assert.equal(field.shouldRenderInput(),false);
+ field.inputVisible(false);assert.equal(field.shouldRenderInput(),false);
+ field.inputVisible(true);assert.equal(field.shouldRenderInput(),true);
+ field.inputVisible(false);assert.equal(field.shouldRenderInput(),true,'retain editor state and drafts after first appearance');
+ assert.equal(field.value,'original');
+ const shortcut=new Field();shortcut.deferInputUntilVisible=true;shortcut.focusRequest=1;shortcut.collapsed=true;
+ shortcut.focusRequested();assert.equal(shortcut.shouldRenderInput(),true);assert.equal(shortcut.collapsed,false);
+ const gone=new Field();gone.deferInputUntilVisible=true;gone.disposed=true;gone.inputVisible(true);
+ assert.equal(gone.shouldRenderInput(),false);
+});
+
+
+test('direct visual selection commits a selection and cancels without applying a draft', async()=>{
+ const selected=mediaDialogHarness(async()=>['photo://selected'],{directPick:true});
+ await new Promise(setImmediate);await new Promise(setImmediate);
+ assert.equal(selected.events.filter(e=>Array.isArray(e)&&e[0]==='apply').length,1);
+ assert.ok(selected.events.includes('closed'));
+ const cancelled=mediaDialogHarness(async()=>[],{directPick:true});
+ await new Promise(setImmediate);await new Promise(setImmediate);
+ assert.equal(cancelled.events.filter(e=>Array.isArray(e)&&e[0]==='apply').length,0);
+ assert.ok(cancelled.events.includes('closed'));
 });

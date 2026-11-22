@@ -9,7 +9,7 @@ import { deferMedia } from '../../hosting/assets/site-media.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = file => readFile(path.join(root, 'hosting', file), 'utf8');
-const pages = ['index.html', 'works/jidecards/index.html', 'guides/harmonyos-anki/index.html', 'releases/index.html', 'developers/index.html', 'about/index.html', '404.html'];
+const pages = ['index.html', 'works/jidecards/index.html', 'guides/harmonyos-anki/index.html', 'releases/index.html', 'developers/index.html', 'about/index.html', 'works/jidecards/technical/index.html', 'about/independent-development/index.html', '404.html'];
 const data = JSON.parse(await read('data/works.json'));
 const work = data.works[0];
 const mediaHash = createHash('sha256').update(await read('assets/site-media.mjs')).digest('hex').slice(0, 12);
@@ -39,7 +39,7 @@ test('public pages expose static content and structured data with only an option
 test('release facts stay consistent across human and machine entry points', async () => {
   for (const file of ['index.html', 'works/jidecards/index.html', 'llms.txt', 'llms-full.txt']) {
     const content = await read(file);
-    assert.ok(content.includes(work.sourceVersion), file);
+    assert.ok(content.includes(work.marketplace.version), file);
     assert.ok(content.includes(work.promotion.title), file);
     assert.ok(content.includes(data.author.name), file);
   }
@@ -52,28 +52,28 @@ test('source updates match application metadata and remain separate from marketp
   const { app } = JSON5.parse(await readFile(path.join(root, 'AppScope/app.json5'), 'utf8'));
   assert.equal(work.sourceVersion, app.versionName);
   assert.equal(work.sourceVersionCode, app.versionCode);
-  for (const file of ['index.html', 'works/jidecards/index.html', 'llms.txt', 'llms-full.txt']) {
-    assert.ok((await read(file)).includes(work.sourceVersion), file);
+  const { marketplace } = work;
+  assert.equal(marketplace.status, 'published');
+  for (const file of ['index.html', 'works/jidecards/index.html', 'llms.txt', 'llms-full.txt',
+    'content/home.md', 'content/product.md', 'content/releases.md']) {
+    assert.ok((await read(file)).includes(`${marketplace.version}`), file);
   }
   const product = await read('works/jidecards/index.html');
   const fullText = await read('llms-full.txt');
-  for (const change of work.sourceUpdate.changes) {
-    assert.ok(product.includes(change));
+  for (const change of marketplace.changes) {
     assert.ok(fullText.includes(change));
   }
   const graph = JSON.parse(product.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])['@graph'];
-  assert.equal(graph.find(item => item['@type'] === 'SoftwareApplication').softwareVersion, undefined);
+  assert.equal(graph.find(item => item['@type'] === 'SoftwareApplication').softwareVersion, marketplace.version);
   assert.equal(graph.find(item => item['@type'] === 'SoftwareSourceCode').version, work.sourceVersion);
-  assert.ok(product.includes(`源码 ${work.sourceVersion}`));
-  assert.equal(work.releaseVersion, undefined);
-  assert.ok(product.includes('下载版本以市场页面为准'));
-  assert.ok(product.includes('历史宣传图'));
-  assert.ok(product.includes(work.screenshots[0].releaseVersion));
-  assert.ok((await read('releases/index.html')).includes(`${work.sourceVersion} 源码更新说明`));
-  assert.ok((await read('releases.xml')).includes(`${work.sourceVersion} 源码更新`));
+  assert.ok(product.includes(`${marketplace.version} 已上架`));
+  assert.doesNotMatch(product, /历史宣传图|jidecards-2\.9\.22-/);
+  if (work.screenshots.length) assert.ok(product.includes(work.screenshots[0].releaseVersion));
+  assert.ok((await read('releases/index.html')).includes(`${marketplace.version} 更新说明`));
+  assert.ok((await read('releases.xml')).includes(`${marketplace.version} 更新`));
 });
 
-test('published HAP links match their release metadata across public download entry points', async () => {
+test('published HAP links are available in developer materials and outside the main download path', async () => {
   const sourcePackage = work.sourcePackage;
   const packageVersion = sourcePackage.tag.match(/^v(\d+\.\d+\.\d+(?:\.\d+)?)$/)?.[1];
   assert.ok(packageVersion);
@@ -81,15 +81,17 @@ test('published HAP links match their release metadata across public download en
   assert.equal(sourcePackage.releaseUrl, `${work.repository}/releases/tag/${sourcePackage.tag}`);
   assert.equal(sourcePackage.downloadUrl, `${work.repository}/releases/download/${sourcePackage.tag}/${sourcePackage.fileName}`);
   assert.equal(sourcePackage.checksumsUrl, `${work.repository}/releases/download/${sourcePackage.tag}/SHA256SUMS.txt`);
-  for (const file of ['index.html', 'works/jidecards/index.html', 'guides/harmonyos-anki/index.html',
-    'releases/index.html', 'llms.txt', 'llms-full.txt', 'content/home.md', 'content/product.md',
-    'content/developers.md', 'content/about.md', 'content/releases.md']) {
+  for (const file of ['developers/index.html', 'content/developers.md', 'llms-full.txt']) {
     const text = await read(file);
     assert.ok(text.includes(sourcePackage.downloadUrl), file);
     assert.ok(text.includes(sourcePackage.checksumsUrl), file);
     assert.ok(text.includes(sourcePackage.installNote), file);
-    assert.ok(!text.includes('牌组和媒体传输尚未接通'), file);
-    assert.ok(!text.includes('幻彩限时主题色'), file);
+  }
+  for (const file of ['index.html', 'works/jidecards/index.html', 'guides/harmonyos-anki/index.html',
+    'releases/index.html', 'llms.txt', 'content/home.md', 'content/product.md', 'content/releases.md']) {
+    const text = await read(file);
+    assert.ok(!text.includes(sourcePackage.downloadUrl), file);
+    assert.ok(text.includes(file.endsWith('.html') ? work.marketplace.url.replaceAll('&', '&amp;') : work.marketplace.url), file);
   }
   const readme = await readFile(path.join(root, 'README.md'), 'utf8');
   assert.ok(readme.includes(sourcePackage.downloadUrl));
@@ -166,9 +168,10 @@ test('guide and restored product details are discoverable with matching human an
   assert.ok((await read('index.html')).includes(`href="${guide.pathname}"`));
   assert.ok(!(await read('index.html')).includes(guide.intro), 'long guide must remain off the home body');
   assert.ok(product.includes(`href="${guide.pathname}"`));
+  const technical = await read('works/jidecards/technical/index.html');
   for (const section of [...work.detailSections, ...guide.sections]) {
     assert.ok(fullText.includes(section.title));
-    const html = work.detailSections.includes(section) ? product : article;
+    const html = work.detailSections.includes(section) ? technical : article;
     assert.ok(html.includes(`id="${section.id}"`));
     assert.ok(html.includes(section.title));
   }
@@ -195,7 +198,7 @@ test('every page resolves the same application, source, author and project ident
     assert.equal(app.name, work.name);
     assert.equal(app.alternateName, work.alternateName);
     assert.equal(app.url, work.url);
-    assert.equal(app.softwareVersion, undefined);
+    assert.equal(app.softwareVersion, work.marketplace.version);
     assert.deepEqual(app.sameAs, [work.marketplace.url]);
     assert.equal(app.subjectOf['@id'], source['@id']);
     assert.equal(source.targetProduct['@id'], app['@id']);
@@ -275,7 +278,7 @@ test('author-supplied media preserve version provenance and original bytes acros
 
 test('HTML, per-page Markdown, llms and JSON share complete crawlable content', async () => {
   const index = JSON.parse(await read('data/site-index.json'));
-  assert.equal(index.releaseVersion, undefined);
+  assert.deepEqual(index.marketplace, { version: work.marketplace.version, status: 'published', url: work.marketplace.url });
   assert.equal(index.sourceVersion, work.sourceVersion);
   assert.equal(index.sourceVersionCode, work.sourceVersionCode);
   assert.equal(index.contentLanguage, 'zh-CN');
@@ -295,7 +298,7 @@ test('HTML, per-page Markdown, llms and JSON share complete crawlable content', 
   for (const item of work.detailSections) {
     for (const paragraph of [...item.paragraphs, ...(item.availability ? [item.availability] : [])]) {
       assert.ok(full.includes(paragraph));
-      assert.ok((await read('content/product.md')).includes(paragraph));
+      assert.ok((await read('content/technical.md')).includes(paragraph));
     }
   }
   const guide = JSON.parse(await read('data/harmonyos-anki-guide.json'));
@@ -307,6 +310,23 @@ test('HTML, per-page Markdown, llms and JSON share complete crawlable content', 
   }
 });
 
+test('JIDE release status is shared and the full statement has a dedicated page', async () => {
+  const jide = work.detailSections.find(section => section.id === 'jide');
+  for (const file of ['developers/index.html', 'works/jidecards/technical/index.html',
+    'content/developers.md', 'content/technical.md', 'llms-full.txt']) {
+    assert.ok((await read(file)).includes(jide.availability), file);
+  }
+  for (const file of pages.filter(file => file !== 'about/independent-development/index.html')) {
+    const html = await read(file);
+    assert.ok(!html.includes(work.developmentStatement), file);
+    assert.ok(html.includes('href="/about/independent-development/"'), file);
+  }
+  assert.ok((await read('about/independent-development/index.html')).includes(work.developmentStatement));
+  const product = await read('works/jidecards/index.html');
+  assert.ok(product.includes('href="/works/jidecards/technical/#jide"'));
+  assert.ok(!product.includes(jide.availability));
+});
+
 test('release pages and Atom contain every numbered note and preserve the existing update anchor', async () => {
   const release = await read('releases/index.html');
   const markdown = await read('content/releases.md');
@@ -315,7 +335,7 @@ test('release pages and Atom contain every numbered note and preserve the existi
   assert.ok(product.includes('id="source-update"'));
   assert.match(release, /<ol class="release-list">/);
   assert.match(feed, /<feed xmlns="http:\/\/www\.w3\.org\/2005\/Atom">/);
-  for (const [index, change] of work.sourceUpdate.changes.entries()) {
+  for (const [index, change] of work.marketplace.changes.entries()) {
     assert.ok(release.includes(change));
     assert.ok(markdown.includes(`${index + 1}. ${change}`));
     assert.ok(feed.includes(change));

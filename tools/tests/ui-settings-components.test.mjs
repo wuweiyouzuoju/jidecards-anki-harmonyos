@@ -1,7 +1,9 @@
+import { compactLandscapeScale, isWideLandscapeWindow } from '../../entry/src/main/ets/model/AppLayoutState.ts';
 import {menuPresentation,loadSharedMenu,sharedSource} from './shared-menu-harness.mjs';
 import { glassFillHarness } from './glass-material-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
+import { componentMethods } from './sync-panel-harness.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { SETTINGS_ENTRIES } from '../../entry/src/main/ets/model/SettingsNavigation.ts';
@@ -181,5 +183,28 @@ test('directory and same-semantic setting entries have one row, icon and spacing
   }
   for (const name of ['外观分组','GeneralSettings','ReviewControlsSettings','布局分组','AIAgent设置分组','AgentWebSettingsSection']) {
     assert.match(read('components/settings/'+name+'.ets'), /Column\(\{ space: FormRowLayout\.rowGap \}\)/, name);
+  }
+});
+
+test('settings directory chooses columns and density before measuring any content', () => {
+  const Panel = componentMethods(read('components/设置面板.ets'),
+    ['wideSettings', 'settingsModuleGap', 'settingsEndInset', 'directoryScale', 'densityScale', 'toolbarTop', 'toolbarHeight'], { compactLandscapeScale, isWideLandscapeWindow,
+      SeriesVisual: { scrollShadowEndInset: (material, inset) => material === 'glass' ? Math.max(21, inset) : inset },
+      应用尺寸: { 页面内边距_水平: 16, 按钮高度: 44, 页面分组间距: () => 12, pageToolbarHeight: () => 64, pageToolbarTop: () => 20, 页面底部间距: () => 12 }
+    });
+  const open = (width, height) => Object.assign(new Panel(), {
+    windowSize: { width, height }, surfaceMaterial: 'glass', 导航条高度: 8, directoryEntries: () => Array(12).fill({})
+  });
+  const first = open(1200, 740);
+  const reopened = open(1200, 740);
+  assert.equal(first.wideSettings(), true);
+  assert.equal(first.settingsEndInset(), 29);
+  assert.ok(first.directoryScale() > 0.82 && first.directoryScale() < 1);
+  assert.equal(reopened.directoryScale(), first.directoryScale());
+  assert.equal(open(1200, 500).directoryScale(), 0.82);
+  assert.equal(open(600, 900).wideSettings(), false);
+  for (const [width, height, wide] of [[672,460,true],[940,664,true],[600,400,true],[599,400,false],[460,672,false],[664,940,false]]) {
+    assert.equal(open(width,height).wideSettings(),wide);
+    assert.ok(open(width,height).directoryScale() >= 0.82 * compactLandscapeScale(width,height));
   }
 });

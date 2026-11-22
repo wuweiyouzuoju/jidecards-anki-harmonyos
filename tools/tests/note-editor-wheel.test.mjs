@@ -1,3 +1,5 @@
+import { remainingHorizontalInset } from '../../entry/src/main/ets/model/WindowSafeLayout.ts';
+import { compactLandscapeScale, isWideLandscapeWindow } from '../../entry/src/main/ets/model/AppLayoutState.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { motionApi } from './motion-harness.mjs';
 import test from 'node:test';
@@ -83,10 +85,10 @@ test('JIDE observes current tools, hidden cloze, grip fallback and collapsed act
 });
 
 function wheelHarness(initialTool=''){
- const actions=[],longActions=[],resets=[],timers=new Map(),olive=[];let timerId=0;
+ const actions=[],longActions=[],resets=[],toasts=[],timers=new Map(),olive=[],tracker=new AppInterfaceTracker();let timerId=0;
  const Component=loadComponentLogic('components/editor/NoteEditorWheel.ets','NoteEditorWheel',{ ...motionApi(),
-  ...wheelModel,NOTE_EDITOR_ACTION_FLASH_MS,NOTE_FIELD_EDITING_SUPPORT,noteEditorTool,noteEditorFormatOptions,TouchType:{Down:0,Up:1,Cancel:3},StudyGripSensor:class{},StudyGripSession:class{setActive(){}dispose(){}setTouching(){}restoreSide(){}},
-  appInterface:new AppInterfaceTracker(),noteEditorWheelObservation,noteEditorFormatObservation,
+  ...wheelModel,compactLandscapeScale,isWideLandscapeWindow,remainingHorizontalInset,showToastSafely:(_ctx,options)=>toasts.push(options),NOTE_EDITOR_ACTION_FLASH_MS,NOTE_FIELD_EDITING_SUPPORT,noteEditorTool,noteEditorFormatOptions,TouchType:{Down:0,Up:1,Cancel:3},StudyGripSensor:class{},StudyGripSession:class{setActive(){}dispose(){}setTouching(){}restoreSide(){}},
+  appInterface:tracker,noteEditorWheelObservation,noteEditorFormatObservation,
   createOliveOilSession:()=>({transition:(expanded,reduce,navigation)=>{olive.push({kind:'transition',expanded,reduce,navigation});return true;},settle:()=>olive.push({kind:'settle'}),dispose:()=>olive.push({kind:'dispose'}),startSurface:()=>olive.push({kind:'surface'})}),
   oliveOilAnimation:()=>({}),prefersReducedMotion:()=>false,
   setTimeout:(callback,delay)=>{timers.set(++timerId,{callback,delay});return timerId;},clearTimeout:id=>timers.delete(id),
@@ -99,7 +101,7 @@ function wheelHarness(initialTool=''){
  instance.viewportWidth=377;instance.viewportHeight=720;instance.aboutToAppear();
  const flush=()=>{const pending=[...timers.values()];timers.clear();for(const timer of pending)timer.callback();};
  const axis=(action,value=0,scrollStep=1)=>instance.axisWheel({action,scrollStep,getVerticalAxisValue:()=>value});
- return {instance,actions,longActions,resets,timers,flush,axis,olive};
+ return {instance,actions,longActions,resets,timers,flush,axis,olive,tracker,toasts};
 }
 
 test('math tap and hold dispatch separate actions and never double-apply when release also sends a click',()=>{
@@ -255,11 +257,11 @@ test('wheel places each label below its symbol; gestures keep the handle separat
  assert.match(source,/buildNoteEditorWheel\(params:[\s\S]*?Column\(\) \{[\s\S]*?hitTestBehavior\(HitTestMode.Transparent\)/);
  assert.match(source,/GestureGroup\(GestureMode.Exclusive/);
  assert.match(source,/\.width\(this.itemWidth\(common\)\)\.height\(this.itemHeight\(common\)\)/);
- assert.match(source,/glyphSize: \(common \? 16 : 18\) \* this.contentScale\(\)/);
+ assert.match(source,/glyphSize: \(this.params.customTools !== undefined \? 20 : common \? 16 : 18\) \* this.contentScale\(\)/);
  assert.match(source,/\.fontSize\([\s\S]*?maxLines\(2\).*wordBreak/);
- assert.match(source,/private toolButton[\s\S]*?type\(ButtonType.Circle\)/);
+ assert.match(source,/private toolButton[\s\S]*?ButtonType.Normal : ButtonType.Circle/);
  assert.doesNotMatch(source,/emptyDock|emptyButton|note_editor_none/);
- assert.match(source,/viewportWidth - 28/);
+ assert.match(source,/this\.edgeX\(28\)/);
 });
 
 test('multiple formats highlight from current field state; reused entries and the last click cannot leave a disabled format lit',()=>{
@@ -456,4 +458,161 @@ test('the shared font size and heading overlay uses actual wheel geometry and ke
 test('轮盘开合保留原吸附和工具，未创建共享形变覆盖层',()=>{
  const source=readFileSync(new URL('../../entry/src/main/ets/components/editor/NoteEditorWheel.ets',import.meta.url),'utf8');
  assert.doesNotMatch(source,/OliveOil|oliveSession|startWheelMorph/);assert.match(source,/this.animateOpen\(open\)/);
+});
+
+test('home action wheels keep their own side, obey disabled actions and release their own observation',()=>{
+ for(const side of ['left','right']) {
+  const h=wheelHarness();h.instance.detach();
+  h.instance.title=tool=>tool.titleKey;
+  Object.assign(h.instance.params,{fixedSide:side,observationSurface:side==='left'?'home_action_wheel':'deck_action_wheel',
+   observationTitleKey:'home_interface_title',customTools:[
+    {id:'more',titleKey:'study_more',iconKey:'ic_home_more',editing:'both',active:false},
+    {id:'sync',titleKey:'home_sync',iconKey:'ic_home_sync',editing:'both',active:false,enabled:false}
+   ]});
+  h.instance.viewportWidth=400;h.instance.parametersChanged();
+  assert.equal(h.instance.side,side);assert.equal(h.instance.panelWidth(),120);assert.equal(h.instance.panelHeight(),48);
+  assert.equal(h.instance.circleSize(),40,'smaller rings retain readable control sizes');
+  h.instance.switchSide();assert.equal(h.instance.side,side);
+  h.instance.execute('sync');h.instance.execute('bold');h.instance.longPressTool('more');
+  assert.deepEqual(h.actions,[]);assert.deepEqual(h.longActions,[]);
+  h.instance.execute('more');assert.deepEqual(h.actions,['more']);
+  const observation=h.tracker.snapshot().find(item=>item.surface===h.instance.params.observationSurface);
+  assert.equal(observation.sectionId,side);assert.equal(observation.items.find(item=>item.id==='sync').enabled,false);
+  h.instance.toggleOpen();
+  assert.equal(h.tracker.snapshot().find(item=>item.surface===h.instance.params.observationSurface).items.length,0);
+  h.instance.aboutToDisappear();assert.equal(h.tracker.snapshot().some(item=>item.surface===h.instance.params.observationSurface),false);
+ }
+});
+
+test('compact side grids use square keys with one four-vp gap and a separate handle slot',()=>{
+ for(const count of [1,2,3,4,8,9])for(const right of [false,true]) {
+  const grid=wheelModel.compactActionGrid(count);assert.equal(grid.size,40);assert.equal(grid.gap,4);
+  for(let index=0;index<count;index++) {
+   const point=wheelModel.compactActionPosition(index,count,right);
+   assert.ok(point.x>=0&&point.x+40<=grid.width);assert.ok(point.y>=0&&point.y+40<=grid.height);
+   if(index%grid.columns>0)assert.equal(point.x-wheelModel.compactActionPosition(index-1,count,right).x,44);
+  }
+ }
+ assert.equal(wheelModel.compactActionGrid(8).height,180);
+ assert.equal(wheelModel.compactActionGrid(8).width,120);
+});
+
+test('the grip preference starts and stops detection only for the editing wheel',()=>{
+ const {instance:w,tracker}=wheelHarness();
+ const changes=[];
+ w.grip={setActive:active=>changes.push(active)};
+ w.gripEnabled=true;w.activityChanged();
+ w.gripEnabled=false;w.activityChanged();
+ assert.equal(tracker.snapshot()[0].values.find(item=>item.id==='grip_enabled').value,'false');
+ w.gripEnabled=true;w.activityChanged();
+ w.params.fixedSide='left';w.activityChanged();
+ assert.deepEqual(changes,[true,false,true,false]);
+});
+
+test('phone landscape reduces both wheel footprints and keeps the grid hit areas separated',()=>{
+ const {instance:w}=wheelHarness();
+ w.viewportWidth=744;w.viewportHeight=440;
+ const regularRadius=w.radius();
+ w.densityWindow={width:744,height:440};
+ assert.equal(w.radius(),regularRadius*.82);
+ w.side='right';w.safeRight=38;
+ assert.equal(w.edgeX(28),678);
+ w.viewportWidth=706;
+ assert.equal(w.edgeX(28),678,'the host and wheel share one camera inset');
+ for(const right of [true,false]) {
+  const grid=wheelModel.compactActionGrid(8,.82);
+  assert.equal(grid.size,40*.82);
+  for(let i=0;i<8;i++) {
+   const point=wheelModel.compactActionPosition(i,8,right,.82);
+   assert.ok(point.x>=0&&point.x+grid.size<=grid.width);
+   assert.ok(point.y>=0&&point.y+grid.size<=grid.height);
+   if(i%2===1) assert.ok(point.x-wheelModel.compactActionPosition(i-1,8,right,.82).x>grid.size);
+  }
+ }
+});
+
+test('long press names a side-wheel action and release cannot execute it',()=>{
+ const h=wheelHarness();Object.assign(h.instance.params,{customTools:[{id:'back',titleKey:'study_back',iconKey:'ic_common_arrow_left',editing:'action',active:false}],fixedSide:'left'});
+ h.instance.title=tool=>tool.titleKey;h.instance.parametersChanged();
+ h.instance.longPressTool('back');assert.deepEqual(h.toasts,[{message:'study_back',duration:2000}]);
+ h.instance.clickTool('back');assert.deepEqual(h.actions,[]);
+ h.instance.toolTouch('back',{type:1,touches:[],changedTouches:[]});assert.equal(h.toasts.length,1);
+ h.instance.toolTouch('back',{type:0,touches:[],changedTouches:[]});h.instance.clickTool('back');assert.deepEqual(h.actions,['back']);
+});
+
+test('remembered collapsed state initializes before reveal and failed persistence restores the last state',async()=>{
+ const h=wheelHarness();h.instance.initialized=false;
+ Object.assign(h.instance.params,{initialCollapsed:true,onExpandedChange:async()=>{throw Error('disk');}});
+ h.instance.parametersChanged();assert.equal(h.instance.collapsed,true);
+ h.instance.toggleOpen();assert.equal(h.instance.collapsed,false);
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(h.instance.collapsed,true);
+});
+
+test('side action names use the shared system toast without a custom label overlay',()=>{
+ const source=readFileSync(new URL('../../entry/src/main/ets/components/editor/NoteEditorWheel.ets',import.meta.url),'utf8');
+ assert.match(source,/showToastSafely\(this.getUIContext\(\), \{ message: this.title\(tool\), duration: 2000 \}\)/);
+ assert.doesNotMatch(source,/longLabelId|nameHintTimer|hintText|hintX|hintY/);
+ const h=wheelHarness();h.instance.title=tool=>tool.titleKey;
+ Object.assign(h.instance.params,{customTools:[{id:'back',titleKey:'study_back',iconKey:'ic_common_arrow_left',editing:'action',active:false}]});
+ h.instance.parametersChanged();h.instance.collapsed=true;h.instance.longPressTool('back');assert.equal(h.toasts.length,0);
+ h.instance.collapsed=false;h.instance.params.visible=false;h.instance.longPressTool('back');assert.equal(h.toasts.length,0);
+});
+
+test('page sidebars inherit shared vertical position while other toolbars remain independent',()=>{
+ const w=wheelHarness().instance;
+ w.params.customTools=[{id:'back',titleKey:'back',iconKey:'back',editing:'action',active:false}];
+ w.params.fixedSide='left';w.viewportHeight=800;w.sharedCenterFraction=0.6;w.centerY=200;
+ w.sharedPositionChanged();assert.equal(w.centerY,480);
+ w.viewportHeight=600;w.sharedPositionChanged();assert.equal(w.centerY,360);
+ w.moving=true;w.sharedCenterFraction=0.7;w.sharedPositionChanged();assert.equal(w.centerY,360);
+ w.moving=false;w.sharedPositionChanged();assert.equal(w.centerY,420);
+ w.params.fixedSide='right';w.sharedCenterFraction=0.2;w.sharedPositionChanged();assert.equal(w.centerY,420);
+ w.params.fixedSide='left';w.params.customTools=undefined;w.sharedPositionChanged();assert.equal(w.centerY,420);
+});
+
+
+test('field activation reveals the wheel at its final size without a second entrance animation', () => {
+ const h=wheelHarness();let animations=0;
+ h.instance.getUIContext=()=>({animateTo:()=>{animations++;}});
+ for(const visible of [false,true]) {
+  h.instance.params.visible=visible;
+  h.instance.parametersChanged();
+  assert.equal(h.instance.openProgress,visible?1:0);
+ }
+ assert.equal(animations,0);
+});
+
+test('page presentation updates the mounted wheel without transferring field ownership', () => {
+ const session = new NoteEditorWheelSession(), active = [], presentation = [];
+ session.setPresentation(0, 16);
+ session.register('first', true, value => active.push(value),
+   () => presentation.push([session.opacity, session.offset]));
+ assert.equal(session.opacity, 0);
+ session.setPresentation(1, 0);
+ assert.deepEqual(presentation, [[1, 0]]);
+ assert.deepEqual(active, [true]);
+ session.setPresentation(1, 0);
+ assert.equal(presentation.length, 1);
+ session.remove('first');
+ session.setPresentation(0, -16);
+ assert.equal(presentation.length, 1);
+});
+
+test('manual wheel expansion retains its collapsed frame until the animation applies', () => {
+ const h = wheelHarness(), wheel = h.instance, animations = [];
+ wheel.getUIContext = () => ({animateTo: (options, apply) => animations.push({options, apply})});
+ wheel.toggleOpen();
+ assert.equal(wheel.collapsed, true);
+ assert.equal(wheel.openProgress, 1);
+ assert.ok(animations[0].options.duration > 0);
+ animations.shift().apply();
+ assert.equal(wheel.openProgress, 0);
+ wheel.toggleOpen();
+ assert.equal(wheel.collapsed, false);
+ assert.equal(wheel.openProgress, 0, 'resetting formats must preserve the animation start');
+ wheel.parametersChanged();
+ assert.equal(wheel.openProgress, 0, 'a queued parameter refresh must preserve the animation start');
+ assert.ok(animations[0].options.duration > 0);
+ animations.shift().apply();
+ assert.equal(wheel.openProgress, 1);
 });

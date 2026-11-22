@@ -88,13 +88,13 @@ test('failed native construction or open releases ownership and still allows ret
 
 test('one native presentation owns geometry, mask policy and current motion parameters', () => {
   const motion = surfaceMotionApi(), Host = nativeDialogHostClass(motion), host = new Host();
-  for (const [style, duration] of [['restrained', 250], ['lively', 290]]) {
+  for (const style of ['restrained', 'lively']) {
     motion.setStyle(style); const options = host.presentation();
     assert.equal(options.width, '100%'); assert.equal(options.height, '100%');
     assert.equal(options.maskColor, 'transparent'); assert.equal(options.autoCancel, false);
     assert.equal(options.keyboardAvoidMode, 'none');
     assert.equal(options.customStyle, true); assert.equal(options.openAnimation.duration, 0, 'content owns preparation and entry');
-    assert.equal(options.closeAnimation.duration, duration);
+    assert.equal(options.closeAnimation.duration, 0);
   }
 });
 
@@ -133,12 +133,20 @@ test('all native factories retain a compiler field context and consume the commo
 
 test('native content uses the common frame directly or the existing help/gift adapter', () => {
   const root = new URL('../../entry/src/main/ets/', import.meta.url);
+  const nativeFrame = /(?:DialogFrame|字段帮助面板)\(\{[^{}]*\bnativeHost\s*:\s*true\b/;
   for (const path of readdirSync(root, {recursive:true}).filter(path => path.endsWith('.ets'))) {
     const source = readFileSync(new URL(path.replaceAll('\\','/'), root), 'utf8');
     for (const match of source.matchAll(/@CustomDialog\s+(?:export\s+)?struct\s+(\w+|[^\s{]+)\s*\{([\s\S]*?)^\}/gm)) {
       assert.doesNotMatch(match[2], /this\.controller\??\.(?:close|open)\(/,
         `${path}: factory builders do not receive an injected controller; use the window owner's callback`);
-      assert.match(match[2], /(?:DialogFrame|字段帮助面板)\(\{ nativeHost: true/, `${path}: ${match[1]}`);
+      if (match[1] === 'AppearanceCustomizationHubDialog') {
+        for (const child of ['AppearanceCustomizationDialog', 'AppearanceElementDialog', 'SurfaceMaterialDialog']) {
+          assert.match(match[2], new RegExp(child+'\\('));
+          assert.match(readFileSync(new URL('components/settings/'+child+'.ets', root),'utf8'), nativeFrame);
+        }
+        continue;
+      }
+      assert.match(match[2], nativeFrame, `${path}: ${match[1]}`);
       assert.doesNotMatch(match[2], /\.constraintSize\(\{ maxWidth: 480, maxHeight: '[\d]+%'/, path);
     }
   }

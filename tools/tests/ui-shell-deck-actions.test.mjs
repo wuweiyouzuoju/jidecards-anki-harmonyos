@@ -108,9 +108,9 @@ test('compact and wide Preview reuse one arrowless public surface and public men
   assert.match(shell, /private previewScopes\(\)[\s\S]*DeckPreviewScopeMenu\(\{/);
   const homeMenu = read('components/home/主页更多面板.ets');
   assert.equal((shell.match(/AnchoredMenu\(\{/g) ?? []).length, 1);
-  assert.match(shell, /menuWidth: Math.min\(应用尺寸.compactMenuWidth, this.actionAnchor.width\)/);
-  assert.match(shell, /toolbarBounds: this.actionAnchor/);
-  assert.match(shell, /if \(this.previewMenuOpen && this.actionAnchor.width > 0\)/);
+  assert.match(shell, /menuWidth: !this\.compact && this\.actionWheelEnabled \? 应用尺寸\.compactMenuWidth : Math\.min\(应用尺寸\.compactMenuWidth, this\.actionAnchor\.width\)/);
+  assert.match(shell, /toolbarBounds: !this\.compact && this\.actionWheelEnabled \? this\.sidebarPreviewAnchor : this\.actionAnchor/);
+  assert.match(shell, /if \(this\.previewMenuOpen && \(\(!this\.compact && this\.actionWheelEnabled\) \? this\.sidebarPreviewAnchor !== undefined : this\.actionAnchor\.width > 0\)\)/);
   const scopes = read('components/home/DeckPreviewScopeMenu.ets');
   assert.match(scopes, /ActionMenuList\(\{ items: this.menuItems/);
   assert.doesNotMatch(scopes, /\bRow\(|\bText\(|PressFeedback|\.padding\(|\.width\(/,
@@ -158,7 +158,7 @@ test('wide JIDE shares the left creation group and preview remains on the right 
   const row = headerSource(source);
   const action = source.slice(source.indexOf('  private creationAction('), source.indexOf('\n  }', source.indexOf('  private creationAction(')));
   assert.doesNotMatch(row, /Stack\(|Alignment.Center/);
-  assert.match(row, /Row\(\{ space: 应用尺寸.页面分组间距\(this.narrowDeckLayout\) \}\)/);
+  assert.match(row, /Row\(\{ space: 应用尺寸.页面分组间距\(this.narrowDeckLayout\) \* this\.densityScale\(\) \}\)/);
   assert.match(row, /'deck_details', 'add_note'[\s\S]*if \(this.Agent入口已启用\)[\s\S]*'deck_details', 'agent'[\s\S]*Blank\(\)[\s\S]*'deck_details', 'preview'/);
   assert.match(row, /'deck_details', 'preview'[\s\S]*this.预览\(\); \}, !this.previewBusy, true\)/,
     'the preview square keeps its busy guard while its public surface is owned by HomeDeckDetails');
@@ -184,18 +184,18 @@ test('wide detail toolbar and card edges follow the measured left header, includ
   const header=headerSource(detail),rowHeight=header.match(/\.height\((this\.headerActionHeight)\)/)[1];
   const rowGap=header.match(/\.margin\(\{ bottom: (应用尺寸\.[^}]+) \}\)/)[1];
   const evaluate=(expression,state)=>new Function('应用尺寸','return '+expression).call(state,dimensions);
-  assert.match(read('components/home/HomeDeckDetails.ets'),/headerActionHeight: this.headerActionHeight/);
+  assert.match(read('components/home/HomeDeckDetails.ets'),/headerActionHeight: !this\.compact && this\.actionWheelEnabled \? 0 : this\.headerActionHeight/);
   assert.match(read('components/home/HomeDeckDetails.ets'),/@Prop @Watch\('closePreviewMenu'\) headerActionHeight/,
     'resizing or hiding the measured action row releases its popup anchors');
   assert.match(page,/headerActionHeight: this.detailHeaderActionHeight\(\)/);
   assert.ok(detail.indexOf('this.headerActions()')<detail.indexOf('Scroll()'));
   assert.doesNotMatch(detail.slice(detail.indexOf('Scroll()')),/this.creationAction\(/,
     'card scrolling owns no second toolbar or toolbar padding');
-  for(const narrow of [false,true]) for(const width of [160,240,328,480,600]) for(const summary of [false,true]) for(const reorder of [false,true]) {
-    const host=new Host();Object.assign(host,{排序模式中:reorder,homeActionAnchor:{width},narrowDeckLayout:narrow,显示今日进度卡:summary});
-    const height=host.detailHeaderActionHeight(),state={showHeaderActions:true,headerActionHeight:height,narrowDeckLayout:narrow};
-    const left=homeHeaderGeometry(width,dimensions.页面分组间距(narrow),summary,dimensions.按钮高度);
-    const gap=dimensions.页面内容顶部间距(narrow);
+  for(const scale of [1,.82]) for(const narrow of [false,true]) for(const width of [160,240,328,480,600]) for(const summary of [false,true]) for(const reorder of [false,true]) {
+    const host=new Host();Object.assign(host,{排序模式中:reorder,homeActionAnchor:{width},narrowDeckLayout:narrow,显示今日进度卡:summary,densityScale:()=>scale});
+    const height=host.detailHeaderActionHeight(),state={showHeaderActions:true,headerActionHeight:height,narrowDeckLayout:narrow,densityScale:()=>scale};
+    const left=homeHeaderGeometry(width,dimensions.页面分组间距(narrow)*scale,summary,dimensions.按钮高度*scale);
+    const gap=dimensions.页面内容顶部间距(narrow)*scale;
     assert.equal(height,reorder?0:left.actionsHeight,'both columns reserve the same action height');
     const rightTop=evaluate(rootTop,state)+(height>0?evaluate(rowHeight,state)+evaluate(rowGap,state):0);
     const leftTop=reorder?gap:left.actionsHeight+gap;
@@ -237,10 +237,10 @@ test('detail AI route carries the current deck and retains configuration and syn
   const home = read('pages/首页.ets');
   const start = home.indexOf('  private async 打开AI制卡()');
   const code = home.slice(start, home.indexOf('\n  }', start) + 4);
-  const Host = new Function('牌组显示名', stripTypeScriptTypes(`class Host { ${code} }`, { mode: 'transform' }) + '; return Host;')(deck => deck.displayName);
+  const Host = new Function('牌组显示名', 'ensureHuaweiAIAccount', stripTypeScriptTypes(`class Host { ${code} }`, { mode: 'transform' }) + '; return Host;')(deck => deck.displayName, async () => true);
   const page = new Host(), pushes = [], settings = [];
   let deferred = false, configured = true;
-  Object.assign(page, { deferForSync: () => deferred, isAIConfigured: async () => configured,
+  Object.assign(page, { getUIContext: () => ({}), deferForSync: () => deferred, isAIConfigured: async () => configured,
     openAISettings: () => settings.push(true), 已选中牌组: () => true,
     选中的牌组ID: '42', 选中牌组: () => ({ displayName: '再说啊' }),
     添加笔记的牌组选项: () => [{ id: 42, name: '再说啊' }], 暂停主页官方公告检查: () => {},

@@ -38,7 +38,7 @@ const validJson = JSON.stringify({
 
 test('clarification schema is available in create and edit modes', () => {
   for (const mode of ['create', 'edit']) {
-    const tool = agentFunctionTools(100, mode)
+    const tool = agentFunctionTools(mode)
       .find((item) => item.name === 'request_clarification');
     assert.ok(tool);
     const schema = JSON.parse(tool.parametersJson);
@@ -170,7 +170,7 @@ test('task payload preserves stable capability while visible text omits IDs', ()
     mode: 'create', deckId: 11, deckName: '世界史', notetypeId: 22,
     notetypeName: '填空题', fieldNames: ['文字'], noteTypeKind: 1,
     clozeFieldOrds: [0], userText: '提取年份', localContext: '无预选卡片',
-    omittedMedia: true, batchLimit: 20,
+    omittedMedia: true,
   };
   const provider = buildAgentTaskProviderText(snapshot);
   assert.match(provider, /"deckId":11/);

@@ -131,8 +131,12 @@ test('empty suggestions mount only in an empty assistant conversation and use na
   const page = read('entry/src/main/ets/pages/AI制卡页.ets');
   assert.match(page, /if \(this\.pageMode === 'assistant' && this\.消息列表\.length === 0\) \{\s*AgentEmptySuggestions\(/);
   assert.match(page, /if \(this\.显示历史区\) \{\s*this\.历史区\(\)\s*\} else/);
-  assert.match(page, /onShown\(\(\): void => \{ this\.wheelSession\.setVisible\(true\); appInterface.showPage\('agent'\); this\.isAgentPageVisible = true; this\.publishInterface\(\); \}\)/);
-  assert.match(page, /onHidden\(\(\): void => \{[^\n]*this\.wheelSession\.setVisible\(false\); appInterface.hidePage\('agent'\); this\.isAgentPageVisible = false; this\.navigationSession\?\.cancel\(\); \}\)/);
+  const shown=page.slice(page.indexOf('.onShown('),page.indexOf('.onHidden('));
+  for(const effect of ['this.wheelSession.setVisible(true)', "appInterface.showPage('agent')",
+    'this.isAgentPageVisible = true', 'this.publishInterface()', 'this.resumeBackgroundTask()']) {
+    assert.ok(shown.includes(effect),effect);
+  }
+  assert.match(page, /onHidden\(\(\): void => \{[^\n]*this\.wheelSession\.setVisible\(false\); appInterface.hidePage\('agent'\); this\.isAgentPageVisible = false; this\.navigationSession\?\.cancel\(\); this\.stopDeepSeekMedia\(\);[^\n]*\}\)/);
   const component = read('entry/src/main/ets/components/agent/AgentEmptySuggestions.ets');
   assert.equal((component.match(/\bText\(/g) ?? []).length, 1);
   assert.match(component, /LongPressGesture\(\{ repeat: false, duration: 500 \}\)/);

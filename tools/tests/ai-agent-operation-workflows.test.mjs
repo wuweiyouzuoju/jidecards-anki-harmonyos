@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import test from 'node:test';
+import { WHEEL_GRIP_KEY } from '../../entry/src/main/ets/model/EditorWheelPreferences.ts';
 import assert from 'node:assert/strict';
 import { loadPlatformModule, loadPlatformSource } from './platform-module-harness.mjs';
 import { localPreferenceApi } from './local-preference-harness.mjs';
@@ -14,6 +15,7 @@ import { DEFAULT_IMPORT_ANKI_PACKAGE_OPTIONS } from '../../entry/src/main/ets/pr
 import { normalizeSyncServer } from '../../entry/src/main/ets/model/SyncSettings.ts';
 import { decodeWritablePreference, agentPreferenceDefinitions } from '../../entry/src/main/ets/model/agent/AgentPreferenceSettings.ts';
 import fs from 'node:fs';
+import { AppLog } from '../../entry/src/main/ets/model/AppLog.ts';
 const graphPreferencesSnapshot=loadPlatformModule('backend/GraphPreferencesCommands.ts','graphPreferencesSnapshot',{});
 
 function nativeFixture() {
@@ -21,7 +23,7 @@ function nativeFixture() {
   const hosts=new AgentOperationHosts();const storage={get:()=>({filesDir:'/private'}),setOrCreate:()=>{}};
   const store={getSync:(key,fallback)=>s.cache.has(key)?s.cache.get(key):fallback,
     get:async(key,fallback)=>store.getSync(key,fallback),putSync:(key,value)=>{s.cache.set(key,value);},
-    put:async(key,value)=>store.putSync(key,value),delete:async key=>s.cache.delete(key),has:async key=>s.cache.has(key),
+    put:async(key,value)=>store.putSync(key,value),deleteSync:key=>s.cache.delete(key),delete:async key=>s.cache.delete(key),has:async key=>s.cache.has(key),
     flush:async()=>{if(s.diskError)throw Error('disk full');s.disk=new Map(s.cache);}};
   const preferences={getPreferences:async()=>store,getPreferencesSync:()=>store};
   const reminder=loadPlatformModule('model/学习提醒存储.ets','({加载学习提醒设置,保存学习提醒设置,生成提醒项ID})',{
@@ -154,7 +156,7 @@ test('new setting dispatcher routes every supported setting and rejects stale va
   const values=new Map(agentPreferenceDefinitions().map(d=>[d.id,String(d.defaultValue)]));values.set('language','zh-Hans');values.set('study_quick_answer','0');
   values.set('graph_preferences','{"calendarFirstDayOfWeek":0,"cardCountsSeparateInactive":true,"futureDueShowBacklog":false}');
   const writes=[];const save=(id)=>(value)=>{writes.push(id);values.set(id,String(value));};
-  const dependencies={graphPreferencesSnapshot,decodeWritablePreference,readAgentPreference:async id=>({value:values.get(id)}),AppStorage:{get:()=>({}),setOrCreate:()=>{}},
+  const dependencies={WHEEL_GRIP_KEY,graphPreferencesSnapshot,decodeWritablePreference,readAgentPreference:async id=>({value:values.get(id)}),AppStorage:{get:()=>({}),setOrCreate:()=>{}},
     当前语言模式:()=>values.get('language'),设置语言模式:save('language'),readSavedStudyQuickAnswerMode:async()=>Number(values.get('study_quick_answer')),saveStudyQuickAnswerMode:save('study_quick_answer'),
     保存简洁模式:save('simple_mode'),保存显示今日进度卡:save('home_today_summary'),保存学习布局模式:save('study_layout'),保存小时分布窗口:save('stats_hours_range'),保存统计天数:save('stats_days_range'),
     saveAutoSyncEnabled:save('auto_sync'),saveMediaSyncEnabled:save('sync_media'),saveAutomaticBackup:async(_context,value)=>save('automatic_backups')(value),saveThemeMotion:save('theme_motion'),
@@ -223,7 +225,7 @@ test('production study host delegates the exact rating and rejects background, s
 
 test('confirmed replay propagates the actual audio failure; manual playback keeps its original local feedback',async()=>{
   const source=fs.readFileSync('entry/src/main/ets/pages/学习页.ets','utf8');
-  const Page=componentMethods(source,['playStudyAudio','isCurrentRequest'],{原始侧HTML:()=> 'audio',showToastSafely(){},$r:value=>value});const page=new Page();
+  const Page=componentMethods(source,['playStudyAudio','isCurrentRequest'],{AppLog,原始侧HTML:()=> 'audio',showToastSafely(){},$r:value=>value});const page=new Page();
   Object.assign(page,{已渲染:{},cardRenderPending:false,mounted:true,页面已显示:true,foreground:true,requestVersion:1,controllerReady:true,
     editingPageOpen:false,阶段:'question',studyOptions:{autoplay:true},reviewPreferences:{interruptAudioWhenAnswering:true},有音频:true,
     audioSession:{play:async()=>{throw Error('player failure');}},getUIContext:()=>({}),取文案:key=>key});

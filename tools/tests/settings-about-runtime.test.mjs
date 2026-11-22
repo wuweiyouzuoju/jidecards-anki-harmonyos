@@ -9,7 +9,9 @@ import { OFFICIAL_HELP_LINKS } from '../../entry/src/main/ets/model/OfficialComm
 test('About owns its feedback window, delegates rating and falls back to copying shared links', async () => {
   const source = readFileSync(new URL('../../entry/src/main/ets/components/settings/AboutSettings.ets', import.meta.url), 'utf8');
   const events = [];
-  const context = { async startAbility(want) { events.push(['open', want.uri]); throw Error('no browser'); } };
+  // 好评按当前运行应用的包名跳转；PC 产品是独立包名，不能写死原版包名。
+  const context = { abilityInfo: { bundleName: 'com.jide.kapian.pc' },
+    async startAbility(want) { events.push(['open', want.uri]); throw Error('no browser'); } };
   const openOfficialHelpLink = loadPlatformModule('utils/OfficialHelpActions.ets', 'openOfficialHelpLink', {
     pasteboard: { MIMETYPE_TEXT_PLAIN: 'text/plain', createData: (_type, value) => value,
       getSystemPasteboard: () => ({ async setData(value) { events.push(['copy', value]); } }) },
@@ -21,7 +23,6 @@ test('About owns its feedback window, delegates rating and falls back to copying
   });
   const about = Object.assign(new About(), {
     getUIContext: () => ({ getHostContext: () => context }),
-    本应用包名: 'com.jide.kapian',
     链接服务实例: { async 获取帮助页链接() { throw Error('offline'); } }
   });
   about.feedbackDialog.open(() => ({ open() {}, close: () => events.push('feedback closed') }));
@@ -31,6 +32,6 @@ test('About owns its feedback window, delegates rating and falls back to copying
   await about.openLink(decks);
   await about.openLink(docs);
   about.aboutToDisappear();
-  assert.deepEqual(events, ['com.jide.kapian', ['open', decks.url], ['copy', decks.url],
+  assert.deepEqual(events, ['com.jide.kapian.pc', ['open', decks.url], ['copy', decks.url],
     ['open', docs.url], ['copy', docs.url], 'feedback closed']);
 });

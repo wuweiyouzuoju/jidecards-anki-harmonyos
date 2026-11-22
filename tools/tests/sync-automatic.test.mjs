@@ -1,6 +1,8 @@
 import { initialTransferState } from '../../entry/src/main/ets/model/home/DataTransferSession.ts';
 import { componentMethods, panelHarness, settle } from './sync-panel-harness.mjs';
 import { surfaceMotionApi } from './motion-harness.mjs';
+import { cloudGenerationText } from '../../entry/src/main/ets/utils/CloudGenerationText.ts';
+import { cloudSyncFailureKey } from '../../entry/src/main/ets/model/cloud-sync/CloudCollectionSync.ts';
 import { decideHomeSync } from '../../entry/src/main/ets/model/HomeSyncPolicy.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { HomeStartupSequence } from '../../entry/src/main/ets/model/HomeStartupSequence.ts';
@@ -33,7 +35,17 @@ test('automatic lifecycle and manual settings requests share the root task host'
 function homeHarness() {
   const state = { enabled: true, ready: true, devices: [], auth: { hkey: 'test-key', endpoint: 'http://lan:8080/', username: 'u' }, timers: new Map(), seq: 0, navigation: [], toasts: 0 };
   const gate = new SyncActivity();
-  const Page = componentMethods(read('pages/首页.ets'), ['closeHomeActions', 'requestManualSync', 'startSyncFromMenu', 'startCloudSync', 'chooseSyncTarget', 'closeSyncChoice', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
+  const Page = componentMethods(read('pages/首页.ets'), ['closeHomeActions', 'requestManualSync', 'startSyncFromMenu', 'startHuaweiCloudSync', 'listHuaweiCloudDownloads', 'confirmHuaweiTransfer', 'startCloudSync', 'chooseSyncTarget', 'closeSyncChoice', 'updatePendingSyncStatus', 'homeActivity', 'requestAutoSync', 'scheduleAutoSyncCheck', 'isAutoSyncLocationSafe', 'stopAutoSyncTimer', 'tryAutoSync', 'syncForegroundChanged', '公告收件版本变化', 'onPageHide', 'onBackPress', 'deferForSync', 'flushSyncAction', 'autoSyncCollectionFinished', 'autoSyncStateChanged', '选择牌组', '开始学习', 'openCreateDeck', 'openSettings', 'openReminders', 'syncYielded', 'presentPendingSyncWarning'], {
+    DialogButtonDirection: { AUTO: 'auto' },
+    HOME_SYNC_CHOICES: [{id:"huawei_cloud_upload"},{id:"huawei_cloud_download"},{id:"cloud"},{id:"device"}],
+    hilog: { warn() {} }, cloudSyncFailureKey, cloudGenerationText, cloudGenerationDisplayText: (_context, value, locale) => cloudGenerationText(value, locale), showToastSafely: () => { state.toasts++; },
+    localizedNamedResourceText: (_, locale, name, ...args) => { state.localizedArgs = args; return name; },
+    huaweiCloudSync: { supports: () => state.huawei === true, isBusy: () => false,
+      async devices() { return state.readSources ? await state.readSources() : state.sources ?? []; },
+      async download(_, source) { state.downloads = [...(state.downloads ?? []), source]; },
+      async upload() { state.huaweiRuns = (state.huaweiRuns ?? 0) + 1; if (state.runHuawei) await state.runHuawei(); } },
+    hasHuaweiCloudSetup: () => state.huaweiSetup === true,
+    hasAnkiSyncSetup: () => state.auth !== null && state.ankiSetup !== false,
     DevicePairingStore: class { async hasPairedDevices() { return state.readPairings ? state.readPairings() : state.devices.length > 0; } },
     decideHomeSync, canStartHomeAutoSync, externalDeckOpens: { hasPending: () => state.externalDeckPending === true },
     AppStorage: { get() {}, setOrCreate() {} },
@@ -44,6 +56,7 @@ function homeHarness() {
     clearTimeout: id => state.timers.delete(id)
   });
   const page = new Page();
+  page.uiLanguage = 'zh-Hans';
   page.syncStatusController = new HomeSyncStatusController({
     auth: () => state.auth, canRead: () => false,
     read: async () => { assert.fail('task-only fixture must not read idle status'); },
@@ -74,7 +87,7 @@ function homeHarness() {
     页面栈: { size: () => 0, pushPath: path => state.navigation.push(path) }, 加载状态: 'ready', 显示同步面板: false,
     autoSyncCollectionBusy: false, autoSyncModal: false, deckMenuId: '', homeVisible: true,
     syncChoiceVisible: false, syncChoiceChecking: false, syncChoiceGeneration: 0,
-    syncDetailsRequest: 0, getUIContext: () => ({ getHostContext: () => ({ resourceManager: { getStringSync: key => key } }) }),
+    syncDetailsRequest: 0, getUIContext: () => ({ showAlertDialog: options => { state.alert = options; }, getHostContext: () => ({ resourceManager: { getStringSync: key => key } }) }),
     显示提示: () => { state.toasts++; }, 已选中牌组: () => true, 选中牌组: () => ({ id: 'deck', name: 'deck' }), 展开牌组路径() {}, 当前断点: 'xs',
     加载主页数据: async () => {}, 同步后检查FSRS: async () => {}, 暂停主页官方公告检查() {} });
   page.syncController = new HomeSyncController(page.syncScheduler, gate, syncHost, {
@@ -95,6 +108,7 @@ test('home menu starts the shared manual sync even when automatic sync is disabl
   page.显示更多菜单 = true;
   await page.startSyncFromMenu();
   assert.equal(page.显示更多菜单, false);
+  page.chooseSyncTarget('cloud');
   assert.equal(page.syncScheduler.isManualPending(), true);
   tick();
   assert.equal(page.显示同步面板, true);
@@ -119,29 +133,62 @@ test('home menu opens settings for login and reopens an existing task without a 
   assert.equal(page.syncScheduler.hasPending(), false);
 });
 
-test('paired devices offer cloud or device sync before any request, including without a cloud account', async () => {
-  for (const target of ['cloud', 'device']) {
-    const { page, state } = homeHarness();
-    state.devices = [{ id: 'paired-device' }];
-    state.auth = null;
-    await page.startSyncFromMenu();
-    assert.equal(page.syncChoiceVisible, true);
-    assert.equal(state.toasts, 0);
-    assert.deepEqual(state.navigation, []);
-    assert.equal(page.homeActivity().dialogOpen, true, 'choice blocks background automatic sync');
-    page.chooseSyncTarget(target); page.chooseSyncTarget(target);
-    assert.equal(page.syncChoiceVisible, false);
-    assert.equal(state.navigation.length, 1, 'a selection can only execute once');
-    assert.equal(state.navigation[0].param.sectionId, 'sync');
-    assert.equal(state.navigation[0].param.initialActionId, target === 'device' ? 'device_link' : '');
-    assert.equal(state.toasts, target === 'cloud' ? 1 : 0);
-    assert.equal(page.syncScheduler.hasPending(), false);
-  }
+test('paired devices remain available before AnkiWeb setup completes', async () => {
+  const { page, state } = homeHarness();
+  state.devices = [{ id: 'paired-device' }];
+  state.auth = null;
+  await page.startSyncFromMenu();
+  assert.deepEqual(page.syncChoices.map(item => item.id), ['device']);
+  assert.equal(page.homeActivity().dialogOpen, true);
+  page.chooseSyncTarget('cloud');
+  assert.equal(page.syncChoiceVisible, true);
+  page.chooseSyncTarget('device');
+  page.chooseSyncTarget('device');
+  assert.equal(page.syncChoiceVisible, false);
+  assert.equal(state.navigation.length, 1);
+  assert.equal(state.navigation[0].param.sectionId, 'sync');
+  assert.equal(state.navigation[0].param.initialActionId, 'device_link');
+  assert.equal(page.syncScheduler.hasPending(), false);
+});
+
+test('configured AnkiWeb starts sync without navigating again', async () => {
   const { page, state } = homeHarness();
   state.devices = [{}]; await page.startSyncFromMenu();
   page.页面栈.pop = () => {};
   page.chooseSyncTarget('cloud');
   assert.equal(page.syncScheduler.isManualPending(), true, 'cloud selection uses the original scheduler');
+  assert.equal(page.showManualSyncDetails, true, 'home requests the existing progress dialog when the queued task starts');
+});
+
+test('home confirms Huawei upload without AnkiWeb credentials or navigation', async () => {
+  const { page, state } = homeHarness();
+  state.auth = null;
+  state.huawei = true;
+  state.huaweiSetup = true;
+  const upload = Promise.withResolvers();
+  state.runHuawei = () => upload.promise;
+  await page.startSyncFromMenu();
+  assert.deepEqual(page.syncChoices.map(item => item.id), ['huawei_cloud_upload', 'huawei_cloud_download']);
+  page.chooseSyncTarget('cloud');
+  assert.equal(page.syncChoiceVisible, true);
+  page.chooseSyncTarget('huawei_cloud_upload');
+  assert.equal(state.huaweiRuns, undefined);
+  state.alert.buttons[0].action();
+  assert.equal(state.huaweiRuns, undefined);
+  await page.startSyncFromMenu();
+  page.chooseSyncTarget('huawei_cloud_upload');
+  state.alert.buttons[1].action();
+  assert.equal(page.huaweiDetailsVisible, true);
+  assert.equal(page.onBackPress(), true);
+  assert.equal(page.huaweiDetailsVisible, false);
+  await page.startSyncFromMenu();
+  assert.equal(page.huaweiDetailsVisible, true, 'a running upload can reopen its existing progress dialog');
+  upload.resolve();
+  await settle();
+  assert.equal(state.huaweiRuns, 1);
+  assert.deepEqual(state.navigation, []);
+  assert.equal(page.syncIndicator, 'done');
+  assert.equal(page.syncStatusText, 'huawei_cloud_uploaded');
 });
 
 test('sync choice cancels pending reads on Back, navigation and background; repeated clicks do not reread', async () => {
@@ -704,7 +751,7 @@ test('full conflicts block queued actions until dismissed and never silently ove
 });
 
 test('short background allowance is requested synchronously by Ability and returned on finish, foreground or expiry', async () => {
-  assert.match(read('entryability/EntryAbility.ets'), /onBackground\(\): void \{\s*syncActivity.continueInBackground\(\)/);
+  assert.match(read('entryability/EntryAbility.ets'), /onBackground\(\): void \{[\s\S]*?syncActivity.continueInBackground\(\)/);
   for (const end of ['finished', 'foreground', 'expiry', 'destroyed']) {
     const { panel, state, gate } = panelHarness({ media: true });
     panel.aboutToAppear(); await settle();
@@ -839,22 +886,26 @@ test('sync indicator distinguishes transfer, attention, waiting, completion and 
   assert.equal(state.status, 'app.string.sync_aborted');
 });
 
-test('sync status stays on the dedicated Sync button and preserves accessible details and error/conflict recovery', () => {
+test('home starts and reopens the existing sync dialog for both providers', () => {
   const home = read('pages/首页.ets'), panel = read('components/同步面板.ets');
   assert.ok(home.indexOf('同步面板({') > home.indexOf('.navDestination(this.页面映射)'));
   assert.match(panel, /HitTestMode.Transparent : HitTestMode.Default/);
   const header = read('components/home/HomeSummaryHeader.ets');
   assert.match(home, /syncStatusText: this.syncStatusText/);
   assert.match(home, /syncIndicator: this.syncIndicator/);
-  assert.match(home, /onSync:[\s\S]*?this.syncDetailsRequest\+\+/);
+  assert.match(home, /onSync:[\s\S]*?this.startSyncFromMenu\(\)/);
+  assert.match(home, /showOnStart: this.syncShowOnStart/);
+  assert.match(home, /cloudDisplay: true, cloudBusy:[\s\S]*?cloudProgress: this.huaweiUploadProgress/);
   assert.match(header, /source: \$r\('app.media.ic_home_sync'\), label: this\.syncLabel\(\)/);
   assert.match(header, /if \(this\.syncIndicator !== 'hidden' && this\.syncStatusText !== ''\) return this\.syncStatusText;/);
   assert.doesNotMatch(header, /\bText\(this.syncStatusText\)/);
-  assert.match(header, /feedback: this\.syncIndicator === 'syncing' \? 'busy' : this\.syncIndicator === 'done' \? 'success' :\s*this\.syncIndicator === 'failure' \? 'failure' : 'idle'/);
+  assert.match(panel, /cloudProgress >= 0[\s\S]*?Progress\(\{ value: this.cloudProgress/);
+  const syncButton = header.slice(header.indexOf('private syncButton()'), header.indexOf('private syncLabel()'));
+  assert.doesNotMatch(syncButton, /feedback:/, 'sync keeps its named glyph in progress, success and failure states');
   assert.match(header, /homeSyncIndicator\(this\.syncAccountState, this\.syncIndicator\) === 'attention'[\s\S]*?Text\('!'\)[\s\S]*?app.color.error_text/);
   assert.doesNotMatch(header, /Text\('⚠'\)/);
   assert.match(panel, /this\.statusChanged\(text, indicator\)/);
-  assert.match(panel, /if \(this.state.detailsVisible\)/);
+  assert.match(panel, /if \(this.cloudDisplay \|\| this.state.detailsVisible\)/);
 });
 
 
@@ -1008,4 +1059,89 @@ test('a sync setting warning waits until study has ended instead of interrupting
   await page.presentPendingSyncWarning();
   assert.equal(warnings, 1);
   assert.equal(page.pendingSyncFsrsWarning, false);
+});
+
+test('home Huawei sync keeps feedback visible and prevents duplicate runs', async () => {
+  const { page, state } = homeHarness();
+  const pending = Promise.withResolvers();
+  state.runHuawei = () => pending.promise;
+  const task = page.startHuaweiCloudSync();
+  assert.equal(page.syncIndicator, 'syncing');
+  await page.startHuaweiCloudSync();
+  assert.equal(state.huaweiRuns, 1);
+  pending.reject(new Error('huawei_cloud_start_22400003'));
+  await task;
+  assert.equal(page.syncIndicator, 'failure');
+  assert.equal(page.syncStatusText, 'huawei_cloud_low_battery');
+  assert.equal(page.huaweiSyncBusy, false);
+  assert.deepEqual(state.navigation, []);
+});
+
+test('home download lists own cloud version and writes only after confirmation without settings navigation', async () => {
+ const { page, state } = homeHarness();
+ const source = { device: 'a'.repeat(32), generation: 'b'.repeat(32), sequence: 1, uploadedAt: Date.UTC(2026, 10, 19, 14, 30) };
+ state.sources = [source];
+ await page.listHuaweiCloudDownloads();
+ assert.equal(page.huaweiDownloadChoices, true);
+ assert.equal(page.syncChoiceVisible, true);
+ page.chooseSyncTarget(source.device);
+ assert.equal(page.huaweiTransferConfirming, true);
+ assert.deepEqual(state.localizedArgs, [cloudGenerationText(source, page.uiLanguage)]);
+ assert.equal(state.downloads, undefined);
+ state.alert.buttons[0].action();
+ assert.equal(page.huaweiTransferConfirming, false);
+ assert.equal(state.downloads, undefined);
+ await page.listHuaweiCloudDownloads();
+ page.chooseSyncTarget(source.device);
+ state.alert.buttons[1].action();
+ await settle();
+ assert.deepEqual(state.downloads, [source]);
+ assert.equal(state.huaweiRuns, undefined);
+ assert.equal(page.syncStatusText, 'huawei_cloud_downloaded');
+ assert.deepEqual(state.navigation, []);
+});
+
+test('home download replaces choices in place and Back discards a late source listing', async () => {
+ const { page, state } = homeHarness();
+ const pending = Promise.withResolvers();
+ state.readSources = () => pending.promise;
+ page.syncChoiceVisible = true;
+ page.syncChoices = [{ id: 'huawei_cloud_download' }];
+ page.chooseSyncTarget('huawei_cloud_download');
+ assert.equal(page.syncChoiceVisible, true, 'source loading keeps the current dialog mounted');
+ page.closeSyncChoice();
+ pending.resolve([{ device: 'a'.repeat(32) }]);
+ await settle();
+ assert.equal(page.syncChoiceVisible, false);
+ assert.equal(page.huaweiSyncBusy, false);
+ assert.equal(state.downloads, undefined);
+});
+
+test('homepage routes first-time setup to Sync settings and waits for successful setup of each provider', async () => {
+  const { page, state } = homeHarness();
+  state.huawei = true;
+  state.ankiSetup = false;
+  await page.startSyncFromMenu();
+  assert.equal(page.syncChoiceVisible, false);
+  assert.deepEqual(page.syncChoices, []);
+  assert.equal(state.navigation[0].param.sectionId, 'sync');
+  assert.equal(page.syncScheduler.hasPending(), false);
+  state.ankiSetup = true;
+  await page.startSyncFromMenu();
+  assert.deepEqual(page.syncChoices.map(item => item.id), ['cloud']);
+  page.closeSyncChoice();
+  state.huaweiSetup = true;
+  await page.startSyncFromMenu();
+  assert.deepEqual(page.syncChoices.map(item => item.id), ['huawei_cloud_upload', 'huawei_cloud_download', 'cloud']);
+});
+
+
+test('visible Huawei transfer percentages never release the actual collection lease', () => {
+ const {page,gate}=homeHarness();
+ const owner={};
+ assert.equal(gate.acquire(owner),true);
+ page.huaweiSyncBusy=true;page.huaweiUploadProgress=50;page.云端牌组忙碌=false;
+ assert.equal(page.homeActivity().collectionBusy,true);
+ gate.release(owner,Date.now());
+ assert.equal(page.homeActivity().collectionBusy,false);
 });

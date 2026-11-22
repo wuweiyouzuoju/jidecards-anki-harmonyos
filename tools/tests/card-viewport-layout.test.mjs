@@ -5,6 +5,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 import { cardViewportWidth } from '../../entry/src/main/ets/model/CardViewportLayout.ts';
 import { 应用尺寸 } from '../../entry/src/main/ets/utils/应用尺寸.ets';
+import { materialHarness } from './surface-material-harness.mjs';
 
 test('card viewport fits phones, widens landscape windows and follows rotation', () => {
   assert.equal(cardViewportWidth(412, 892), 412);
@@ -29,8 +30,8 @@ test('study and preview share responsive widths and the same card surface', () =
     assert.doesNotMatch(source, /cardContentWidth/, 'no post-render width correction');
     assert.doesNotMatch(source, /CardViewport\([^\n]+\)\s*\.onAreaChange/,
       'toolbar bounds may observe the parent; card width remains owned by CardViewport measurement');
-    assert.match(source, /borderRadius\(应用尺寸\.圆角_卡片\)/);
-    assert.match(source, /border\(SurfaceBorder\.options\(\)\)/);
+    assert.match(source, /borderRadius\(appearanceElementRadius\(this.appearanceElements, 应用尺寸\.圆角_卡片\)\)/);
+    assert.match(source, /border\(SurfaceBorder\.options\( undefined, undefined, this.appearanceElements\)\)/);
     assert.doesNotMatch(source, /border\(\{ width: 1\.5, color: \$r\('app.color.border_input'\)/);
     assert.doesNotMatch(source, /shadow\(ShadowStyle\.OUTER_DEFAULT_XS\)/);
   }
@@ -40,6 +41,7 @@ test('both whiteboard engines keep header and review button edges aligned with t
   const study = readFileSync(new URL('../../entry/src/main/ets/pages/学习页.ets', import.meta.url), 'utf8');
   const review = study.slice(study.indexOf('private 答案条()'), study.indexOf('private cardViewportContent()'));
   const footerPadding = review.match(/\.padding\((\{[^]*?\})\)/)[1];
+  const { SeriesVisual } = materialHarness('flat', false);
   for (const file of ['学习手写白板层.ets', 'StudyLocalWhiteboard.ets']) {
     const source = readFileSync(new URL(`../../entry/src/main/ets/components/${file}`, import.meta.url), 'utf8');
     const update = source.match(/this\.toolbarContentWidth = cardViewportWidth\(Number\(area\.width\), Number\(area\.height\)\);/);
@@ -48,8 +50,8 @@ test('both whiteboard engines keep header and review button edges aligned with t
       `${file}: constrain both header and footer; the drawing canvas keeps its full width`);
     const headerPadding = source.match(/\.padding\((\{ left: 应用尺寸\.页面内边距_水平,[^]*?\})\)/)[1];
     const resize = new Function('cardViewportWidth', 'area', update[0]);
-    const evaluate = (expression, state) => new Function('应用尺寸', `return ${expression}`).call(state, 应用尺寸);
-    const state = {};
+    const evaluate = (expression, state) => new Function('应用尺寸', 'SeriesVisual', `return ${expression}`).call(state, 应用尺寸, SeriesVisual);
+    const state = { pageMaterial: 'flat' };
     for (const [width, height, contentWidth] of [[1000, 1600, 840], [1600, 1000, 1472], [412, 892, 412], [2560, 1440, 1600]]) {
       resize.call(state, cardViewportWidth, { width: String(width), height: String(height) });
       assert.equal(state.toolbarContentWidth, contentWidth);
@@ -128,7 +130,7 @@ test('full-screen preview covers its host using the shared background and consum
   const source = readFileSync(new URL('../../entry/src/main/ets/components/browser/卡片预览页.ets', import.meta.url), 'utf8');
   const build = source.slice(source.indexOf('\n  build()'));
   assert.match(build, /Stack\(\)\s*\{\s*\/\/[^\n]*\n\s*CapturedThemeBackground\(\)/);
-  const rootAttributes = build.slice(build.lastIndexOf(".backgroundColor(insetMaterialFill($r('app.color.surface_page')))"));
+  const rootAttributes = build.slice(build.lastIndexOf(".backgroundColor(insetMaterialFill("));
   assert.match(rootAttributes, /hitTestBehavior\(HitTestMode.Default\)/,
     'Default admits descendants; Block disables every button and the Web');
   assert.match(rootAttributes, /\.onClick\(\(\): void => \{\}\)/,

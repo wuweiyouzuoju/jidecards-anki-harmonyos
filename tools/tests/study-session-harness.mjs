@@ -1,3 +1,4 @@
+import { ContinuationSession } from '../../entry/src/main/ets/model/ContinuationSession.ts';
 import { noteLinkBridgeScript } from '../../entry/src/main/ets/model/NoteLinkBridge.ts';
 import { completeStudyGestures, activeStudyGestureInputs, studyGestureCommand, StudyShakeDetector } from '../../entry/src/main/ets/model/StudyGestureConfig.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
@@ -18,6 +19,8 @@ import { NativeDialogHost } from './platform-module-harness.mjs';
 import { StudyKeyboardSession } from '../../entry/src/main/ets/model/StudyKeyboard.ts';
 
 export function attachStudySession(page) {
+  page.gestureNoteAction ??= '';
+  page.releaseContinuation ??= () => {};
   page.voiceAudios ??= []; page.voiceOpen ??= false; page.infoCardId ??= 0; page.keyboardHelpOpen ??= false;
   page.shakeSensor ??= new (loadPlatformModule('backend/StudyShakeSensor.ets','StudyShakeSensor',{StudyShakeDetector,sensor:{SensorId:{ACCELEROMETER:1},on(){},off(){},getSingleSensorSync(){}}}))();
   page.keyboardSession ??= new StudyKeyboardSession();
@@ -62,9 +65,9 @@ export function attachStudySession(page) {
     if (start < 0) start = source.indexOf('  private async ' + name + '(');
     return source.slice(start, source.indexOf('\n  }', start) + 4);
   });
-  const TimingPage = new Function('noteLinkBridgeScript','completeStudyGestures','activeStudyGestureInputs','studyGestureCommand','showToastSafely','StudyAdvanceAction', 'BURY_SUSPEND_MODE_BURY_USER', '$r', 'buildStudyGestureScript', 'StudyQuickAnswerMode', 'validateStudyControls', 'resultUndoStatus',
+  const TimingPage = new Function('continuationSession','noteLinkBridgeScript','completeStudyGestures','activeStudyGestureInputs','studyGestureCommand','showToastSafely','StudyAdvanceAction', 'BURY_SUSPEND_MODE_BURY_USER', '$r', 'buildStudyGestureScript', 'StudyQuickAnswerMode', 'validateStudyControls', 'resultUndoStatus',
     stripTypeScriptTypes('class TimingPage {' + methods.join('\n') + '}', { mode: 'transform' }) + '; return TimingPage;')(
-    noteLinkBridgeScript, completeStudyGestures, activeStudyGestureInputs, studyGestureCommand, ()=>{}, StudyAdvanceAction, 2, key => key, buildStudyGestureScript, StudyQuickAnswerMode,validateStudyControls,resultUndoStatus);
+    new ContinuationSession(), noteLinkBridgeScript, completeStudyGestures, activeStudyGestureInputs, studyGestureCommand, ()=>{}, StudyAdvanceAction, 2, key => key, buildStudyGestureScript, StudyQuickAnswerMode,validateStudyControls,resultUndoStatus);
   for (const name of names) page[name] = TimingPage.prototype[name];
   page.timerHandles = new Map(); let nextTimer = 0;
   page.studyTimer = new StudyTimerController({ state: () => page.studyTimerState(),

@@ -103,5 +103,5 @@ test('history stores raw assistant output without appending the localized termin
     path.join(root, 'entry/src/main/ets/pages/AI制卡页.ets'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/model/agent/AgentConversationView.ts'), 'utf8') + fs.readFileSync(path.join(root, 'entry/src/main/ets/components/agent/AgentHistoryList.ets'), 'utf8');
   assert.match(page,
     /text:\s*message\.角色 === 'ai' && message\.providerText\.length > 0\s*\?\s*message\.providerText : message\.正文/);
-  assert.match(page, /message\.providerText = item\.text/);
+  assert.match(page, /message\.providerText = item\.hasProviderText === false \? '' : item\.text/);
 });

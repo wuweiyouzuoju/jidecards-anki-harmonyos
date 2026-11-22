@@ -1,3 +1,6 @@
+import { APPEARANCE_CUSTOMIZATION_ITEMS } from '../../entry/src/main/ets/model/AppearanceCustomization.ts';
+import * as colorPickerModel from '../../entry/src/main/ets/model/ColorPicker.ts';
+import * as appearanceElementsModel from '../../entry/src/main/ets/model/AppearanceElements.ts';
 import { deckDetailShortcuts } from '../../entry/src/main/ets/model/DeckDetailShortcut.ts';
 import { DEFAULT_MODULE_OPACITY, DEFAULT_BUTTON_OPACITY } from '../../entry/src/main/ets/model/SurfaceMaterial.ts';
 import { AiContentExportPolicy } from '../../entry/src/main/ets/model/AiContentExportPolicy.ts';
@@ -33,7 +36,7 @@ const SharedPressFeedback = new Function(stripTypeScriptTypes(sharedPressSource,
 // Public popup renderer is executed, not a test double.
 const popupCoreSource = readFileSync(new URL('../vendor/jide-foundation/src/core/PopupAppearance.ts', import.meta.url), 'utf8').replace(/^export /gm, '');
 const popupCore = new Function(stripTypeScriptTypes(popupCoreSource, {mode:'transform'}) + ';return {popupAppearance, dialogPanelFill};')();
-const surfaceSource = readFileSync(new URL('../vendor/jide-foundation/src/harmony/shared/Surface.ets', import.meta.url), 'utf8')
+const surfaceSource = readFileSync(new URL('../vendor/jide-foundation/src/harmony/shared/Surface.ets', import.meta.url), 'utf8').split('/** 背景层保留')[0]
   .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
 function popupSurfaceClass(dependencies) {
   return new Function(...Object.keys(popupCore), 'Color', 'BlurStyle', stripTypeScriptTypes(surfaceSource, {mode:'transform'}) + ';return SharedPopupSurface;')
@@ -43,7 +46,7 @@ function popupSurfaceClass(dependencies) {
 // 直接执行公共窗口管理器；只在调用方替换平台窗口。
 export function nativeDialogHostClass(dependencies = {}) {
   const source = readFileSync(new URL('../../entry/src/main/ets/components/common/NativeDialogHost.ets', import.meta.url), 'utf8')
-    .replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
+    .replace(/^import[^;]+;\s*/gm, '').replace(/^@Observed\s*$/gm, '').replace(/^export /gm, '');
   return new Function('SurfaceTransition', 'Color', 'DialogAlignment', 'KeyboardAvoidMode',
     stripTypeScriptTypes(source, { mode: 'transform' }) + ';return NativeDialogHost;')(
     dependencies.SurfaceTransition, dependencies.Color ?? { Transparent: 'transparent' },
@@ -65,9 +68,38 @@ export function nativeDialogMembers(source, excluded = []) {
   return fields.join('\n');
 }
 
+function appearanceDependencies(dependencies) {
+  const AppStorage=dependencies.AppStorage ?? {get:()=>undefined,setOrCreate(){},delete(){}};
+  const deps={...appearanceElementsModel,AppStorage,$r:key=>({id:key}),configureSharedGlassBlur:()=>{},...dependencies};
+  const execute=(path,exports)=>{
+    const source=readFileSync(new URL('../../entry/src/main/ets/'+path,import.meta.url),'utf8')
+      .replace(/^import[^;]+;\s*/gm,'').replace(/^export /gm,'');
+    return new Function(...Object.keys(deps),stripTypeScriptTypes(source,{mode:'transform'})+';return '+exports+';')(...Object.values(deps));
+  };
+  const helpers=execute('utils/AppearanceElements.ets','({activeElementStyle,publishElementStyle,appearanceElementColor,elementRadius,elementBorder,elementBlur,appearanceTextColor,appearanceElementRadius,appearanceModuleRadius,appearanceModuleBorder})');
+  const store=execute('utils/AppearanceElementStore.ets','({loadAppearanceElements,saveAppearanceElements})');
+  return {...appearanceElementsModel,...helpers,...store};
+}
+
+const pageToolbarSource = readFileSync(new URL('../../entry/src/main/ets/model/PageToolbarActions.ets', import.meta.url), 'utf8')
+  .replace(/^@Observed\s*/gm, '').replace(/^export /gm, '');
+const pageToolbarModel = new Function(stripTypeScriptTypes(pageToolbarSource, {mode:'transform'}) + ';return {PageToolbarActionScope,nextPageToolbarActionId,PAGE_TOOLBAR_SCOPE};')();
+
+const sharedMenuTypeSource = readFileSync(new URL('../vendor/jide-foundation/src/harmony/shared/MenuTypes.ets',import.meta.url),'utf8')
+  .replace(/^export /gm,'');
+const sharedGlassShadow = new Function(stripTypeScriptTypes(sharedMenuTypeSource,{mode:'transform'})+';return sharedGlassShadow;')();
+/** 与 model/AppLog.ts 同签名的测试替身：AppLog.warn(tag, message) -> sink.warn(message)。 */
+export function appLogFor(sink) {
+  const emit = level => (_tag, message) => (sink[level] ?? sink.info ?? (() => {})).call(sink, message);
+  return { debug: emit('debug'), info: emit('info'), warn: emit('warn'), error: emit('error') };
+}
 function localeDependencies(dependencies) {
+  const appearance=appearanceDependencies(dependencies);
   return {
-    DEFAULT_MODULE_OPACITY, DEFAULT_BUTTON_OPACITY, deckDetailShortcuts,
+    // AppLog 转发到测试注入的 console（未注入时用真实 console），保留原消息以便断言日志内容。
+    AppLog: appLogFor(dependencies.console ?? console), APP_LOG_DOMAIN: 0x4342, installHilogLogSink: () => {},
+    ensureHuaweiAIAccount: async () => true,
+    sharedGlassShadow, ...pageToolbarModel, DEFAULT_MODULE_OPACITY, DEFAULT_BUTTON_OPACITY, deckDetailShortcuts,
     SharedPressFeedback, SharedPopupSurface: popupSurfaceClass(dependencies), $r: key => key, noteLinkBridgeScript, NoteLinksProxy, ...appLocales, ...localeFormatting, SUMMARY_LABEL_KEYS, DialogButtonDirection: { AUTO: 'auto' },
     MenuHoldController, MenuSlideScope, menuSlideSession, keyboardViewportHeight, AgentTaskPlan, KeyboardPressSession, StudyKeyboardSession: KeyboardPressSession,
     NativeDialogHost: nativeDialogHostClass(dependencies), aiContentExportPolicy: memoryAiContentPolicy(),
@@ -77,6 +109,7 @@ function localeDependencies(dependencies) {
       (dependencies.resourceText ?? uiFeedback.resourceText)(context, resource, ...args),
     localizedNamedResourceText: (context, _locale, name, ...args) =>
       (dependencies.namedResourceText ?? uiFeedback.namedResourceText)(context, name, ...args),
+    ...appearance, ...colorPickerModel, APPEARANCE_CUSTOMIZATION_ITEMS,
     ...dependencies
   };
 }
@@ -87,7 +120,7 @@ export function loadPlatformSource(source, exportName, dependencies) {
   dependencies = localeDependencies(dependencies);
   if (/export const aiContentExportPolicy\b/.test(source)) delete dependencies.aiContentExportPolicy;
   if (/class SharedPopupSurface\b/.test(source)) delete dependencies.SharedPopupSurface;
-  source = source.replace(/^import[^;]+;\s*/gm, '').replace(/^export /gm, '');
+  source = source.replace(/^import[^;]+;\s*/gm, '').replace(/^@Builder\s*$/gm, '').replace(/^export /gm, '');
   return new Function(...Object.keys(dependencies), stripTypeScriptTypes(source, { mode: 'transform' }) + ';return ' + exportName + ';')(...Object.values(dependencies));
 }
 

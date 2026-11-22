@@ -33,6 +33,10 @@ test('click audit distinguishes nested child styles, strings, comments and event
   assert.match(targets[0].modifiers, /opacity/);
   assert.equal(clickFeedbackExemption('components/Test.ets', targets[0]), '');
   assert.match(clickFeedbackExemption('components/Test.ets', targets[1]), /barrier/);
+  const field = arkuiClickTargets(`TextInput({ text: this.value })
+      .onClick((): void => { this.markInteraction(); })`);
+  assert.equal(field.length, 1); assert.equal(field[0].kind, 'TextInput');
+  assert.match(clickFeedbackExemption('components/Test.ets', field[0]), /editable field/);
 });
 
 test('all app button and action-row click targets share one press owner', () => {

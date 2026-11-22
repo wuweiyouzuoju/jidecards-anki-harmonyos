@@ -7,7 +7,7 @@ import { agentFunctionTools } from '../../entry/src/main/ets/model/agent/AgentTo
 import { buildResponsesPayload } from '../../entry/src/main/ets/model/agent/ProviderProtocol.ts';
 
 test('every Agent tool exposes one parseable schema, template and forbidden-rules contract', () => {
-  const tools = agentFunctionTools(25, 'edit');
+  const tools = agentFunctionTools('edit');
   assert.ok(tools.length >= 10);
   for (const tool of tools) {
     const schema = JSON.parse(tool.parametersJson);
@@ -27,7 +27,7 @@ test('every Agent tool exposes one parseable schema, template and forbidden-rule
 });
 
 test('create-flashcards tool accepts only card content and keeps app-owned context out of model arguments', () => {
-  const tool = agentFunctionTools(5, 'create').find((item) => item.name === 'create_flashcards');
+  const tool = agentFunctionTools('create').find((item) => item.name === 'create_flashcards');
   assert.ok(tool);
   const schema = JSON.parse(tool.parametersJson);
   const example = JSON.parse(tool.exampleArgumentsJson);
@@ -41,7 +41,7 @@ test('create-flashcards tool accepts only card content and keeps app-owned conte
 });
 
 test('create mode no longer exposes propose_create_notes', () => {
-  const names = agentFunctionTools(5, 'create').map((item) => item.name);
+  const names = agentFunctionTools('create').map((item) => item.name);
   assert.ok(names.includes('create_flashcards'));
   assert.ok(!names.includes('propose_create_notes'));
 });
@@ -52,8 +52,8 @@ test('both modes expose complete semantic reads while only edit exposes write pr
     'list_decks', 'list_notetypes', 'list_tags', 'get_notetype_details',
     'get_card_statistics', 'search_images',
   ];
-  const createNames = agentFunctionTools(5, 'create').map((item) => item.name);
-  const editNames = agentFunctionTools(5, 'edit').map((item) => item.name);
+  const createNames = agentFunctionTools('create').map((item) => item.name);
+  const editNames = agentFunctionTools('edit').map((item) => item.name);
   for (const name of requiredReads) {
     assert.ok(createNames.includes(name), `create is missing ${name}`);
     assert.ok(editNames.includes(name), `edit is missing ${name}`);
@@ -66,7 +66,7 @@ test('both modes expose complete semantic reads while only edit exposes write pr
 });
 
 test('provider sends schema plus the standard template and rules without unsupported strict mode', () => {
-  const functionTools = agentFunctionTools(5, 'create');
+  const functionTools = agentFunctionTools('create');
   const payload = JSON.parse(buildResponsesPayload({
     apiKey: 'not-serialized', baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash',
     instructions: 'test', input: [], functionTools, searchMode: 'off',

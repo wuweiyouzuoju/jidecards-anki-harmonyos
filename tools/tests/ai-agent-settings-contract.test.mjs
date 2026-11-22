@@ -1,3 +1,4 @@
+import { AGENT_SEARCH_PROVIDERS } from '../../entry/src/main/ets/model/agent/AgentSearchProvider.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import assert from 'node:assert/strict';
@@ -5,7 +6,6 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 import { DEEPSEEK_PROVIDER, OPENAI_PROVIDER, normalizeDeepSeekModel } from '../../entry/src/main/ets/model/agent/ProviderCatalog.ts';
-import { normalizeBatchLimit } from '../../entry/src/main/ets/model/agent/AgentPolicy.ts';
 import { loadComponentLogic, loadPlatformModule } from './platform-module-harness.mjs';
 import { APP_INTERFACE_SURFACES, AppInterfaceTracker, agentSettingsControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { SETTINGS_GROUPS } from '../../entry/src/main/ets/model/SettingsStructure.ts';
@@ -30,9 +30,9 @@ test('settings load and save retire old DeepSeek models without altering other p
   const source = stripTypeScriptTypes(read('entry/src/main/ets/backend/agent/AgentSettingsStore.ets')
     .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, ''));
   const settingsApi = new Function('preferences', 'AppStorage', 'DEEPSEEK_PROVIDER', 'OPENAI_PROVIDER',
-    'normalizeDeepSeekModel', 'normalizeBatchLimit', `${source}\nreturn { loadAgentSettings, saveAgentSettings };`)(
+    'normalizeDeepSeekModel', `${source}\nreturn { loadAgentSettings, saveAgentSettings };`)(
     { getPreferences: async () => store }, { get: () => ({}) }, DEEPSEEK_PROVIDER, OPENAI_PROVIDER,
-    normalizeDeepSeekModel, normalizeBatchLimit);
+    normalizeDeepSeekModel);
   for (const oldModel of ['deepseek-v4-flash', 'deepseek-v4-flash-vision-exp', 'deepseek-chat', '']) {
     values.set('ai_agent_deepseek_model', oldModel);
     const loaded = await settingsApi.loadAgentSettings();
@@ -52,7 +52,7 @@ test('settings load and save retire old DeepSeek models without altering other p
   assert.equal(values.get('ai_agent_deepseek_model'), 'deepseek-v4-pro');
 });
 
-test('agent settings remember provider models, custom coordinates, and batch limit', () => {
+test('agent settings remember provider models, custom coordinates', () => {
   const store = read('entry/src/main/ets/backend/agent/AgentSettingsStore.ets');
   for (const key of [
     'ai_agent_provider',
@@ -60,14 +60,12 @@ test('agent settings remember provider models, custom coordinates, and batch lim
     'ai_agent_openai_model',
     'ai_agent_custom_base_url',
     'ai_agent_custom_model',
-    'ai_agent_batch_limit',
   ]) {
     assert.match(store, new RegExp(key));
   }
   assert.doesNotMatch(store, /PRIVACY_NOTICE|privacyNoticeAccepted|ai_agent_privacy_notice_accepted/);
   assert.doesNotMatch(store, /searchMode|SEARCH_MODE|ai_agent_search_mode/,
     'web search is permanently disabled: no search preference may be stored or loaded');
-  assert.match(store, /normalizeBatchLimit/);
   assert.match(store, /ProviderId/);
   assert.match(store, /isAgentProviderConfigured/);
   assert.match(store, /customBaseUrl\.trim\(\)\.startsWith\('https:\/\/'\)/);
@@ -82,24 +80,6 @@ test('provider secrets use Asset Store aliases and never Preferences', () => {
   assert.match(secretStore, /asset\.Accessibility\.DEVICE_FIRST_UNLOCKED/);
   assert.match(secretStore, /jidecards\.ai\.provider\./);
   assert.doesNotMatch(secretStore, /preferences|ArkData|console\.|hilog/);
-});
-
-test('legacy AI config migrates plaintext only after a successful Asset Store write', () => {
-  const legacy = read('entry/src/main/ets/model/AI制卡存储.ets');
-  assert.match(legacy, /saveAgentSecret/);
-  assert.match(legacy, /clearLegacyAgentSecret/);
-  assert.match(legacy, /await\s+saveAgentSecret[\s\S]*clearLegacyAgentSecret/);
-  assert.doesNotMatch(legacy, /put\(API密钥键/);
-  assert.doesNotMatch(legacy, /密钥明文存沙箱/);
-});
-
-test('legacy compatibility facade resolves built-in URLs from provider catalog', () => {
-  const legacy = read('entry/src/main/ets/model/AI制卡存储.ets');
-  assert.match(legacy, /DEEPSEEK_PROVIDER/);
-  assert.match(legacy, /OPENAI_PROVIDER/);
-  assert.match(legacy, /loadAgentSettings/);
-  assert.match(legacy, /loadAgentSecret/);
-  assert.match(legacy, /saveAgentSettings/);
 });
 
 test('detail settings use static sections and the data page keeps a single action list', () => {
@@ -132,7 +112,7 @@ test('detail settings use static sections and the data page keeps a single actio
 });
 
 const defaultSettings = () => ({ selectedProvider: 'deepseek', deepseekModel: DEEPSEEK_PROVIDER.defaultModel,
-  openaiModel: OPENAI_PROVIDER.defaultModel, customBaseUrl: '', customModel: '', customVisionEnabled: false, batchLimit: 100 });
+  openaiModel: OPENAI_PROVIDER.defaultModel, customBaseUrl: '', customModel: '', customVisionEnabled: false });
 const webReady = () => ({ ready: true, busy: false, dirty: false, webEnabled: false, searchProvider: 'doubao' });
 
 function formHarness(overrides = {}) {
@@ -143,6 +123,11 @@ function formHarness(overrides = {}) {
     $r: id => ({id}), AppStorage: { get: () => ({ resourceManager: { getStringSync: id => id } }) },
     loadAgentSettings: async strict => { state.strictReads.push(strict); return defaultSettings(); },
     loadAgentSecret: async provider => provider + '-PRIVATE_KEY',
+    loadAgentWebEnabled: async () => false, loadAgentSearchProvider: async () => 'deepseek',
+    loadAgentSearchSecret: async provider => provider + '-SEARCH_KEY',
+    saveAgentSearchSecret: async (secret, provider) => state.writes.push({searchSecret:secret, provider}),
+    saveAgentWebSettings: async (provider, enabled) => state.writes.push({web:enabled, provider}),
+    AGENT_SEARCH_PROVIDERS,
     saveAgentSettings: async settings => { if (state.gate) await state.gate; if (state.failSave) throw new Error('io'); state.writes.push(settings); },
     saveAgentSecret: async (provider, secret) => state.writes.push({provider, secret}), ...overrides
   });
@@ -153,9 +138,40 @@ function formHarness(overrides = {}) {
   component.getUIContext = () => ({ getPromptAction: () => ({ showDialog: async () => {
     state.prompts++; return {index: state.discard ? 1 : 0};
   } }) });
-  component.updateWebState(webReady());
   return { component, state, tracker };
 }
+
+test('official provider activates immediately without saving credentials or hidden web drafts', async () => {
+  const {component,state}=formHarness();
+  await component.aboutToAppear();
+  component.customModel='unsaved-custom-model';component.webEnabled=true;component.searchSecret='unsaved-search';
+  await component.switchProvider(2);
+  assert.equal(component.provider,'official');assert.equal(state.reloads,1);
+  assert.equal(state.writes.length,1);assert.equal(state.writes[0].selectedProvider,'official');
+  assert.equal(state.writes[0].customModel,'');assert.equal(component.hasChanges(),false);
+  await component.requestClose();assert.equal(state.closes,1);assert.equal(state.prompts,0);
+  assert.equal(agentSettingsControls({provider:'official',ready:true,busy:false,web:webReady()}).some(x=>x.id==='ai_save'),false);
+});
+
+test('failed immediate official activation preserves the existing provider and can retry', async () => {
+  const {component,state}=formHarness();await component.aboutToAppear();state.failSave=true;
+  await component.switchProvider(2);assert.equal(component.provider,'deepseek');assert.equal(state.reloads,0);
+  assert.equal(component.canEdit(),true);state.failSave=false;await component.switchProvider(2);
+  assert.equal(component.provider,'official');assert.equal(state.reloads,1);
+});
+
+test('missing provider preferences default to official and explicit personal providers remain selected', async () => {
+  const values=new Map();
+  const api=loadPlatformModule('backend/agent/AgentSettingsStore.ets','{loadAgentSettings,defaultAgentSettings}',{
+    AppStorage:{get:()=>({})},preferences:{getPreferences:async()=>({get:async(key,fallback)=>values.get(key)??fallback})},
+    DEEPSEEK_PROVIDER,OPENAI_PROVIDER,normalizeDeepSeekModel
+  });
+  assert.equal(api.defaultAgentSettings().selectedProvider,'official');
+  assert.equal((await api.loadAgentSettings(true)).selectedProvider,'official');
+  for(const provider of ['deepseek','custom','openai','official']){
+    values.set('ai_agent_provider',provider);assert.equal((await api.loadAgentSettings(true)).selectedProvider,provider);
+  }
+});
 
 test('JIDE settings reuse the global settings catalog and put memory under settings', () => {
   const items = APP_INTERFACE_SURFACES.find(x => x.id === 'agent_settings').items;
@@ -175,39 +191,93 @@ test('reused settings form saves through existing stores, blocks exits during sa
   const {component, state} = formHarness();
   await component.aboutToAppear();
   assert.deepEqual(state.strictReads,[true]);
-  component.batchLimit = 500; component.secret = 'new-PRIVATE_KEY';
+  component.secret = 'new-PRIVATE_KEY';
   let release;
   state.gate = new Promise(resolve => { release = resolve; });
   const saving = component.save();
   await component.requestClose(); await component.switchProvider(1);
   assert.equal(state.closes,0); assert.equal(state.prompts,0); assert.equal(component.provider,'deepseek');
   release(); await saving;
-  assert.equal(state.writes[0].batchLimit,500);
+  assert.equal(state.writes[0].selectedProvider,'deepseek');
   assert.deepEqual(state.writes[1],{provider:'deepseek',secret:'new-PRIVATE_KEY'});
   assert.equal(state.reloads,1);
   await component.requestClose();
   assert.equal(state.closes,1); assert.equal(state.prompts,0);
 });
 
+test('one save persists a new model credential and web opt-in and closes without a discard prompt', async () => {
+  const {component,state} = formHarness({loadAgentSecret: async () => ''});
+  await component.aboutToAppear();
+  component.secret = 'new-model-key';
+  component.webEnabled = true;
+  await component.save();
+  assert.deepEqual(state.writes.slice(1), [
+    {provider:'deepseek',secret:'new-model-key'},
+    {provider:'deepseek',web:true}
+  ]);
+  assert.equal(state.reloads,1);
+  await component.requestClose();
+  assert.equal(state.closes,1);
+  assert.equal(state.prompts,0);
+});
+
+test('combined save checks web credentials before writing either section', async () => {
+  const {component,state} = formHarness({loadAgentSecret: async () => ''});
+  await component.aboutToAppear();
+  component.secret = 'updated-model-key';
+  component.webEnabled = true;
+  component.searchProvider = 'doubao';
+  component.searchSecret = '';
+  await component.save();
+  assert.deepEqual(state.writes,[]);
+  assert.equal(component.message,'app.string.ai_web_key_required');
+  await component.requestClose();
+  assert.equal(state.closes,0);
+  assert.equal(state.prompts,1);
+});
+
+test('web failure preserves its unsaved draft and retries without rewriting the saved model', async () => {
+  let rejectWeb = true;
+  const {component,state} = formHarness({saveAgentWebSettings: async () => {
+    if (rejectWeb) throw new Error('io');
+  }});
+  await component.aboutToAppear();
+  component.secret = 'updated-model-key';
+  component.webEnabled = true;
+  await component.save();
+  assert.equal(state.writes.length,2);
+  assert.equal(component.message,'app.string.ai_card_save_failed');
+  await component.requestClose();
+  assert.equal(state.prompts,1);
+  rejectWeb = false;
+  await component.save();
+  assert.equal(state.writes.length,2);
+  await component.requestClose();
+  assert.equal(state.closes,1);
+  assert.equal(state.prompts,1);
+});
+
 test('failed settings saves and cancelled exits retain drafts, including while memory covers the form', async () => {
   const {component,state,tracker} = formHarness();
   await component.aboutToAppear();
-  component.customBaseUrl='https://PRIVATE_GATEWAY/v1';component.secret='draft-PRIVATE_KEY';component.batchLimit=250;
+  component.customBaseUrl='https://PRIVATE_GATEWAY/v1';component.secret='draft-PRIVATE_KEY';
   component.isCovered=true;component.publishState();assert.equal(tracker.snapshot().length,0);
-  component.isCovered=false;component.publishState();assert.equal(component.batchLimit,250);
+  component.isCovered=false;component.publishState();assert.equal(component.customBaseUrl,'https://PRIVATE_GATEWAY/v1');
   state.failSave=true;await component.save();
   assert.equal(component.message,'app.string.ai_card_save_failed');assert.equal(state.reloads,0);
   await component.requestClose();assert.equal(state.closes,0);assert.equal(component.secret,'draft-PRIVATE_KEY');
-  assert.equal(component.batchLimit,250);state.discard=true;await component.requestClose();assert.equal(state.closes,1);
+  assert.equal(component.customBaseUrl,'https://PRIVATE_GATEWAY/v1');state.discard=true;await component.requestClose();assert.equal(state.closes,1);
 });
 
 test('live JIDE settings expose current non-secret values and release observations when covered or disposed', async () => {
   const {component,tracker} = formHarness();
-  assert.deepEqual(tracker.snapshot()[0].values,[{id:'settings_ready',value:'false'},{id:'web_enabled',value:'false'},{id:'search_provider',value:'doubao'}]);
+  component.publishState();
+  assert.deepEqual(tracker.snapshot()[0].values,[{id:'settings_ready',value:'false'}]);
   await component.aboutToAppear();component.customBaseUrl='https://PRIVATE_GATEWAY/v1';component.publishState();
   const structure=buildAgentAppStructure({simple:false,agent:true,cloudDeck:false,themeHasTextures:false},
     'agent_settings','',key=>key,[],[],tracker.snapshot());
-  assert.equal(structure.observations[0].values.find(x=>x.id==='batch_limit').value,'100');
+  assert.equal(structure.observations[0].values.find(x=>x.id==='batch_limit'),undefined);
+  assert.ok(!structure.surfaces[0].items.some(x=>x.id==='ai_batch_limit'));
   assert.equal(structure.surfaces[0].items.find(x=>x.id==='ai_key').sensitive,true);
   assert.equal(structure.surfaces[0].items.find(x=>x.id==='ai_key').writeTool,'');
   assert.ok(!JSON.stringify(structure).includes('PRIVATE_'));
@@ -221,15 +291,15 @@ test('settings read errors disable saving and late reads cannot replace an unmou
   assert.equal(failed.component.message,'app.string.ai_agent_settings_load_failed');
   let release;
   const late=formHarness({loadAgentSettings:()=>new Promise(resolve=>{release=resolve;})});
-  const loading=late.component.aboutToAppear();late.component.aboutToDisappear();release({...defaultSettings(),batchLimit:1000});await loading;
-  assert.equal(late.component.batchLimit,100);assert.equal(late.tracker.snapshot().length,0);
+  const loading=late.component.aboutToAppear();late.component.aboutToDisappear();release({...defaultSettings(), selectedProvider:'custom'});await loading;
+  assert.equal(late.component.provider,'official');assert.equal(late.tracker.snapshot().length,0);
 });
 
 test('strict settings reads surface IO failures while legacy callers retain their fallback', async () => {
   const api=loadPlatformModule('backend/agent/AgentSettingsStore.ets','{loadAgentSettings}',{
     AppStorage:{get:()=>({})},preferences:{getPreferences:async()=>{throw new Error('io');}},
-    DEEPSEEK_PROVIDER,OPENAI_PROVIDER,normalizeBatchLimit,normalizeDeepSeekModel
+    DEEPSEEK_PROVIDER,OPENAI_PROVIDER,normalizeDeepSeekModel
   });
   await assert.rejects(()=>api.loadAgentSettings(true),/agent_settings_unavailable/);
-  assert.equal((await api.loadAgentSettings()).batchLimit,100);
+  assert.equal((await api.loadAgentSettings()).selectedProvider,'official');
 });

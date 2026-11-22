@@ -75,6 +75,22 @@ test('help scan rejects old resource, literal, escaped and alternative symbol co
   assert.equal(hasScatteredIcon('// ⓘ\nHelpLabel({ title: resource })'), false);
 });
 
+/** 按括号配对找到每个 HelpButton(...) 调用的结束位置，只检查紧跟其后的尺寸/位移修饰。 */
+function sizedHelpButtons(source) {
+  const found = [];
+  for (let start = source.indexOf('HelpButton({'); start >= 0; start = source.indexOf('HelpButton({', start + 1)) {
+    let depth = 0, end = start + 'HelpButton'.length;
+    for (; end < source.length; end++) {
+      if (source[end] === '(') depth++;
+      else if (source[end] === ')' && --depth === 0) break;
+    }
+    if (/^\s*\.(?:width|height|padding|margin|offset|scale)\(/.test(source.slice(end + 1))) {
+      found.push(source.slice(0, start).split('\n').length);
+    }
+  }
+  return found;
+}
+
 test('every ArkTS help entry shares the icon, and labelled help cannot float to the trailing edge', () => {
   let callers = 0;
   for (const path of readdirSync(root, { recursive: true }).filter(p => p.endsWith('.ets'))) {
@@ -83,7 +99,7 @@ test('every ArkTS help entry shares the icon, and labelled help cannot float to 
     if (source.includes('HelpButton({')) {
       assert.ok(['components/common/HelpLabel.ets', 'components/browser/卡片表格.ets'].includes(file),
         `${file}: labels must use HelpLabel; the card-info action alone belongs at the row end`);
-      assert.doesNotMatch(source, /HelpButton\(\{[\s\S]*?\}\)\s*\.(?:width|height|padding|margin|offset|scale)\(/);
+      assert.deepEqual(sizedHelpButtons(source), [], file);
     }
     if (source.includes('HelpLabel({')) callers++;
   }

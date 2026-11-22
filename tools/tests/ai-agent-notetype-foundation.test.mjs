@@ -142,7 +142,7 @@ test('agent instructions inspect real templates and support autonomous target sw
   assert.match(instructions, /确认执行成功得到真实 ID 后再继续生成/);
   assert.match(instructions, /不转换已有笔记/);
   assert.doesNotMatch(instructions, /\{\{type:答案\}\}/);
-  const payload = buildAgentTaskProviderText({...setup, userText: '做知识卡', localContext: '', omittedMedia: false, batchLimit: 20});
+  const payload = buildAgentTaskProviderText({...setup, userText: '做知识卡', localContext: '', omittedMedia: false});
   const configuration = JSON.parse(payload.split('\n')[0].slice('任务配置：'.length));
   assert.deepEqual(configuration.templatePreviews, setup.templatePreviews);
   assert.equal(configuration.templateCount, 1);

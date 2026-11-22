@@ -1,3 +1,4 @@
+import { loadPlatformModule } from './platform-module-harness.mjs';
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -33,11 +34,12 @@ function harness(mode = 'system', systemDark = false) {
   const context = { resourceManager: { getConfigurationSync() { throw Error('application configuration is not the system theme'); } } };
   store.set('abilityContext', context);
   const dependencies = { ...catalog, ...colors, ...appearance, AppStorage: storage,
+    publishElementStyle: loadPlatformModule('utils/AppearanceElements.ets','publishElementStyle',{AppStorage:storage,configureSharedGlassBlur:()=>{}}),
     应用系统栏样式: (_context, dark) => bars.push(dark) };
   const applyColors = new Function(...Object.keys(dependencies), managerJs + '\nreturn 应用颜色主题;')(...Object.values(dependencies));
   const resources = { ColorMode: { DARK: 0, LIGHT: 1 }, getSysResourceManager: () => systemResources };
   const readSystemDarkMode = new Function('resourceManager', controllerJs + '\nreturn readSystemDarkMode;')(resources);
-  const abilityDependencies = { ...dependencies, 应用颜色主题: applyColors, readSystemDarkMode, resolveAppLocale,
+  const abilityDependencies = { ...dependencies, startInstallationUsage: () => {}, 应用颜色主题: applyColors, readSystemDarkMode, resolveAppLocale,
     ConfigurationConstant: { ColorMode: { COLOR_MODE_DARK: 0, COLOR_MODE_LIGHT: 1, COLOR_MODE_NOT_SET: -1 } },
     i18n: { System: { getAppPreferredLanguage: () => reads.language ?? 'zh-Hans' } },
     刷新桌面卡片数据: async () => {}, hilog: { error() {} }, DOMAIN: 0, APP_FOREGROUND_KEY: 'appForeground' };
@@ -120,4 +122,20 @@ test('unspecified system resource colors preserve known mode instead of defaulti
   ability.onConfigurationUpdate({ colorMode: 1 });
   assert.equal(store.get('systemDarkMode'), true);
   assertPalette(store, bars, true);
+});
+
+test('custom actions follow the current mode background before a separate saved accent', () => {
+  const h = harness('light', false);
+  h.store.set('colorTheme', 'custom');
+  h.store.set(appearance.CUSTOM_ACCENT_KEY, '#7CAE4A');
+  const light = {text:'',moduleOutline:'',outline:'',background:'#FFCDE8',radius:-1,width:-1,moduleRadius:-1,moduleWidth:-1,blur:80};
+  const dark = {...light,background:'#351A2B'};
+  h.store.set('appearance_elements', JSON.stringify({light,dark}));
+  h.ability.refreshThemeColors();
+  assert.equal(h.store.get(colors.颜色键.动作主色), colors.解析主题色板('custom',false,light.background).动作主色);
+  assert.equal(h.store.get(colors.颜色键.页面底色微染),light.background);
+  h.store.set('themeMode','dark');
+  h.ability.refreshThemeColors();
+  assert.equal(h.store.get(colors.颜色键.动作主色), colors.解析主题色板('custom',true,dark.background).动作主色);
+  assert.equal(h.store.get(appearance.CUSTOM_ACCENT_KEY),'#7CAE4A');
 });

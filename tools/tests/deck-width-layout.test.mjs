@@ -61,6 +61,18 @@ test('four deck styles migrate old density, survive restart and preserve layout 
   assert.equal(app.get(DECK_LIST_STYLE_KEY), 'single_wide');
   app.delete('abilityContext');
   await assert.rejects(context.saveDeckListStyle('single_narrow'), /Ability context unavailable/);
+  app.set('abilityContext', {});
+  app.set(appearance.DESKTOP_HOME_LAYOUT_KEY, true);
+  cache.delete(DECK_LIST_STYLE_KEY);
+  context.initializeDeckListAppearance();
+  assert.equal(app.get(DECK_LIST_STYLE_KEY), 'double_wide');
+  await context.saveDeckListStyle('triple_wide', 'double_wide');
+  cache = new Map(disk);
+  context.initializeDeckListAppearance();
+  assert.equal(app.get(DECK_LIST_STYLE_KEY), 'triple_wide');
+  assert.equal(appearance.deckListColumnCount('triple_wide'), 3);
+  assert.equal(appearance.deckListColumnCount('triple_wide', false), 1);
+  assert.deepEqual(appearance.groupedDeckColumnHeights([2, 1, 3, 1], 20, 5, 3), [45, 45, 70]);
 });
 
 test('narrow rows keep symmetric padding, fit the expand target and share crop height', () => {
@@ -134,13 +146,17 @@ test('deck style selector exposes four localized options and saves each actual v
     const count = saves.length;
     control.style = 'double_narrow'; await control.selectWidth(3); await control.selectWidth(4);
     assert.equal(saves.length, count);
+    control.desktop = true;
+    assert.equal(control.options().at(-1).value, resources.get('deck_style_triple_wide'));
+    await control.selectWidth(4);
+    assert.equal(saves.at(-1), 'triple_wide');
     fail = true; await control.selectWidth(0);
     assert.equal(control.saveFailed, true); assert.equal(control.saving, false);
     assert.equal(control.style, 'double_narrow');
   }
   const list = read('components/home/主页牌组列表.ets');
-  assert.match(list, /\.columnsTemplate\('1fr 1fr'\)/);
-  assert.match(list, /hideStudyCounts: isDoubleColumnDeckListStyle\(this\.style\)/);
+  assert.match(list, /\.columnsTemplate\(this\.columnCount\(\) === 3 \? '1fr 1fr 1fr' : '1fr 1fr'\)/);
+  assert.match(list, /hideStudyCounts: deckListColumnCount\(this\.style\) > 1/);
   assert.match(read('components/牌组列表项.ets'), /if \(!this\.hideStudyCounts\) \{[\s\S]*deck_new_short[\s\S]*deck_learning_short[\s\S]*deck_review_short/);
 });
 

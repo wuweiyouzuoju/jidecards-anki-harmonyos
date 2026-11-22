@@ -64,11 +64,13 @@ test('JIDE more menu uses shared names/icons and reuses home menu surface/list; 
   const source=readFileSync(new URL('../../entry/src/main/ets/pages/AI制卡页.ets',import.meta.url),'utf8');
   const names=['closeMoreMenu','toggleMoreMenu','moreEntries','selectMore'];
   const methods=names.map(name=>source.match(new RegExp(`  private (?:async )?${name}\\([^]*?\\n  }`))[0]);
-  const Page=new Function('appInterface','visibleInterfaceItems','interfaceItemText','$r',
+  const Page=new Function('appInterface','visibleInterfaceItems','interfaceItemText','$r','deviceInfo',
     stripTypeScriptTypes(`class Page {${methods.join('\n')}}`,{mode:'transform'})+';return Page;')(
-    {leave(){}},visibleInterfaceItems,(_ui,_surface,id)=>id,value=>value);
-  const page=new Page();page.getUIContext=()=>({});page.interfaceEnabled=()=>true;page.uiLanguage='zh-Hans';
+    {leave(){}},visibleInterfaceItems,(_ui,_surface,id)=>id,value=>value,{deviceType:'2in1'});
+  const page=new Page();page.getUIContext=()=>({});page.interfaceEnabled=()=>true;page.uiLanguage='zh-Hans';page.pageMode='assistant';
   assert.deepEqual(page.moreEntries().map(item=>[item.id,item.icon]),[['settings','app.media.ic_home_settings'],['history','app.media.ic_common_history']]);
+  assert.equal(page.moreEntries().find(item=>item.id==='external'),undefined);
+  page.pageMode='edit';assert.equal(page.moreEntries().find(item=>item.id==='external'),undefined);page.pageMode='assistant';
   page.moreVisible=false;page.selectMore('settings');assert.equal(page.settingsVisible,undefined);
   page.moreVisible=true;page.selectMore('settings');assert.equal(page.settingsVisible,true);assert.equal(page.moreVisible,false);
   page.toggleMoreMenu();assert.equal(page.moreVisible,true);page.toggleMoreMenu();assert.equal(page.moreVisible,false);
@@ -83,10 +85,10 @@ test('removing the active history from settings resets conversation while preser
   const source=readFileSync(new URL('../../entry/src/main/ets/pages/AI制卡页.ets',import.meta.url),'utf8');
   const method=source.match(/  private 开始新会话\([^]*?\n  }/)[0];
   const Page=new Function(stripTypeScriptTypes(`class Page {${method}}`,{mode:'transform'})+';return Page;')();
-  const page=new Page();page.cardBatch={isRunning:()=>false};page.history={invalidateRestore(){},close(){}};
-  page.closeMoreMenu=()=>{page.moreVisible=false;};page.cancelPendingClarifications=()=>{};
+  const page=new Page();let stopped=0;page.stopExternalAgent=()=>{stopped++};page.attachExternalAgent=()=>{};page.externalRequests=new Map([['r',1]]);page.externalOutputs=new Map([[1,'{}']]);page.cardBatch={isRunning:()=>false};page.history={invalidateRestore(){},close(){}};
+  page.closeMoreMenu=()=>{page.moreVisible=false;};page.cancelPendingClarifications=()=>{};page.stopDeepSeekMedia=()=>{};
   page.pageMode='edit';page.settingsVisible=true;page.settingsBusy=true;page.conversationId='active';page.historyReadGeneration=0;
-  page.开始新会话(true);assert.equal(page.settingsVisible,true);assert.equal(page.settingsBusy,true);
+  page.开始新会话(true);assert.equal(stopped,1);assert.equal(page.externalRequests.size,0);assert.equal(page.externalOutputs.size,0);assert.equal(page.settingsVisible,true);assert.equal(page.settingsBusy,true);
   assert.notEqual(page.conversationId,'active');assert.deepEqual(page.消息列表,[]);
   page.开始新会话();assert.equal(page.settingsVisible,false);
   assert.match(source,/onHistoryRemoved:[^\n]*开始新会话\(true\)/);

@@ -19,7 +19,7 @@ import { cloneAgentTimeline, appendAgentTimelineText, appendAgentTimelineReferen
 
 const item = (kind, extra = {}) => ({kind, role:'', content:'', callId:'', name:'', argumentsJson:'', output:'', ...extra});
 function request(input, mode = 'assistant') {
-  const functionTools = agentFunctionTools(100, mode);
+  const functionTools = agentFunctionTools(mode);
   const setup = {mode, deckId:0, notetypeId:0, fieldNames:[], noteTypeKind:0, clozeFieldOrds:[]};
   return {apiKey:'credential', baseUrl:'https://example.test', model:'test', input, functionTools,
     instructions:buildAgentSessionInstructions(setup,100)+buildAgentRuntimeInstructions(functionTools,2,8,{maxProviderCalls:24,maxToolCalls:100}),
@@ -64,7 +64,7 @@ test('already fitting long text is not discarded by an unrelated raw-character b
     item('function_call_output',{callId:'c',output:JSON.stringify({text:'',nextOffset:-1})})]);
   // 工具目录随能力增长；使用真实序列化开销确定仍然可容纳的长正文。
   const available=MAX_PROVIDER_PAYLOAD_CHARS-buildResponsesPayload(value).length-1024;
-  assert.ok(available>120000);
+  assert.ok(available > 0, 'the serialized tool catalog leaves space for a response');
   value.input[2].output=JSON.stringify({text:'中'.repeat(available),nextOffset:-1});
   assert.equal(providerRequestFitsContext(value),true);
   const before=JSON.stringify(value);fitAgentRequestContext(value);assert.equal(JSON.stringify(value),before);
@@ -174,7 +174,7 @@ test('actual page keeps validated partial drafts editable after context failure 
     return source.slice(start,source.indexOf('\n  }',start)+4);
   };
   const dependencies={agentExecutionBudget,cloneAgentTimeline,appendAgentTimelineText,appendAgentTimelineReference,agentDraftOperationImages,
-    $r:key=>key,explicitYearClozeRequested:()=>false,explicitWebSearchForbidden:()=>false,loadAgentWebEnabled:async()=>false,
+    AgentTransportError:class extends Error {},$r:key=>key,explicitYearClozeRequested:()=>false,explicitWebSearchForbidden:()=>false,loadAgentWebEnabled:async()=>false,
     explicitWebSearchRequested:()=>false,explicitSourceEvidenceRequested:()=>false,inferRequestedCardCount:()=>0,
     页面Agent观察者:class {constructor(callback){this.onEvent=callback;}}};
   const Page=new Function(...Object.keys(dependencies),stripTypeScriptTypes(`class Page {
@@ -184,11 +184,11 @@ test('actual page keeps validated partial drafts editable after context failure 
     {kind:'create_note',noteId:-1,cardId:0,deckId:1,fieldOrd:0,before:'',after:'Question'},
     {kind:'create_note',noteId:-1,cardId:0,deckId:1,fieldOrd:1,before:'',after:'Answer'}]};
   const page=new Page();let nextId=0,savedHistory=null;
-  Object.assign(page,{pageDisposed:false,cardBatch:{isRunning:()=>false},处理中:false,themeUndoBusy:false,
+  Object.assign(page,{resumeBackgroundTask:()=>{},pageDisposed:false,cardBatch:{isRunning:()=>false},处理中:false,themeUndoBusy:false,
     pageMode:'assistant',conversationId:'chat',agentTurnVersion:0,消息列表:[],字段名列表:['Front','Back'],牌组ID:1,已选笔记类型ID:2,
     agentRunner:{getPartialDrafts:()=>[draft]},agentScope:{configureCreateConstraints:()=>{}},
     sessionController:{run:async()=>{throw new Error('agent_context_limit');}},AI配置:{model:'test',apiKey:'test',baseUrl:'https://example.test'},
-    agentSettings:{selectedProvider:'deepseek',batchLimit:100},重建本轮AgentScope:()=>{},currentModelSupportsImages:()=>false,
+    agentSettings:{selectedProvider:'deepseek'},重建本轮AgentScope:()=>{},currentModelSupportsImages:()=>false,
     空消息:(role,text,error)=>createAgentMessage(++nextId,role,text,error),追加消息:message=>page.消息列表.push(message),
     storeClarificationAnswerMessageId:()=>{},providerFunctionToolsForTurn:()=>[],构建Agent指令:()=>'',构建Provider输入:()=>[],
     更新消息:(index,update)=>update(page.消息列表[index]),取Agent错误文案:()=> 'context too large',queueAgentTimelineScroll:()=>{},

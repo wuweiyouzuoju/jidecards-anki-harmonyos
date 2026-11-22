@@ -16,19 +16,83 @@ const record = targets => serializeNoteLinks({v:1,guid:'a',targets,alias:''});
 const mirror = '<!--ml-mirror:start--><div>mirror</div><!--ml-mirror:end-->';
 const deferred = () => { let resolve; const promise = new Promise(r => {resolve=r}); return {promise,resolve}; };
 
+test('immediate link search opens the target card without writing and restores the query', async () => {
+  const writes = [], previews = [], observations = [], searches = [];
+  const snapshot = { noteId: 1, guid: 'source', view: { outgoing: [], incoming: [] } };
+  const target = { guid: 'target', title: 'A match', cardIds: [41, 42] };
+  const stale = deferred();
+  const Panel = loadComponentLogic('components/links/NoteLinksPanel.ets', 'NoteLinksPanel', {
+    NoteEditorWheelSession, NOTE_EDITOR_WHEEL_SESSION_KEY: 'wheel',
+    appInterface: { observe: value => observations.push(value), leave() {} },
+    noteLinksService: {
+      load: async () => snapshot,
+      search: async (query, guid) => {
+        searches.push([query, guid]);
+        if (query === 'older') return stale.promise;
+        return query === 'match' ? [target] : [];
+      },
+      change: async (_snapshot, guid, action) => { writes.push([guid, action]); }
+    },
+  });
+  const makePanel = () => Object.assign(new Panel(), {
+    noteId: 1, mounted: true, snapshot, onPreview: (...args) => previews.push(args)
+  });
+  const panel = makePanel();
+  panel.queryChanged('older');
+  const first = panel.search();
+  panel.queryChanged('no match');
+  assert.equal(panel.searching, true);
+  await panel.search();
+  stale.resolve([target]);
+  await first;
+  assert.deepEqual(panel.results, []);
+  assert.equal(panel.searching, false);
+
+  panel.queryChanged('match');
+  await panel.search();
+  panel.publishInterface();
+  assert.equal(observations.at(-1).sectionId, 'search');
+  assert.equal(observations.at(-1).values.find(value => value.id === 'result_count').value, '1');
+  assert.deepEqual(observations.at(-1).items.filter(item => item.enabled).map(item => item.id),
+    ['close', 'search', 'open_result', 'add_reference']);
+  const directory = APP_INTERFACE_SURFACES.find(surface => surface.id === 'note_links');
+  assert.ok(observations.at(-1).items.every(item => directory.items.some(entry =>
+    entry.id === item.id && entry.titleKey === item.titleKey)));
+  panel.preview(panel.results[0].cardIds);
+  assert.deepEqual(previews, [[[41, 42], 'match']]);
+  assert.deepEqual(writes, []);
+  assert.equal(panel.canAdd(target), true);
+  await panel.change(target.guid, 'add');
+  assert.deepEqual(writes, [['target', 'add']]);
+
+  const restored = makePanel();
+  restored.initialQuery = previews[0][1];
+  restored.aboutToAppear();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(searches.at(-1), ['match', 'source']);
+  assert.deepEqual(restored.results, [target]);
+  restored.queryChanged('');
+  await restored.search();
+  assert.deepEqual(restored.results, []);
+  assert.equal(restored.searching, false);
+});
+
 async function fixture() {
   const stored = {id:1,guid:'a',notetypeId:9,mtimeSecs:1,usn:0,tags:['tag'],fields:['Front','Back','user'+record([])]};
   const writes=[],visibility=[],observations=[];
   const session = new NoteEditorSession({note:async()=>structuredClone(stored),card:async()=>({noteId:1}),
     notetype:async()=>({fieldNames:['Front','Back','关联']})},()=>{});
   await session.open(1,true,()=>true);
-  const linkService={load:async()=>({view:{outgoing:[],incoming:[]}})};
+  const timers = new Map(); let timerId = 0;
+  const linkService={count:async()=>0};
   const Form=loadComponentLogic('components/browser/浏览编辑区.ets','浏览编辑区',{
     ...noteInterfaceDependencies(),noteDraftChanged,parseNoteTags,
     NoteAudioPreview:class {async stop(){} async dispose(){}},discardNoteRecordings:async()=>{},
     discardNoteDrawingImages:async()=>{},confirmNoteDiscard:async()=>false,
     resourceText:(_context,key)=>key,$r:key=>key,
     noteLinksService:linkService,
+    setTimeout: callback => { timers.set(++timerId, callback); return timerId; },
+    clearTimeout: id => timers.delete(id),
     appInterface:{observe:value=>observations.push(value),leave(){}},
   });
   const form=new Form();
@@ -40,7 +104,7 @@ async function fixture() {
       assertNoteEditorUnchanged(form.note,stored);writes.push(structuredClone(note));return true;
     })});
   form.aboutToAppear();
-  return {form,stored,writes,visibility,session,observations,linkService};
+  return {form,stored,writes,visibility,session,observations,linkService,timers};
 }
 
 test('editor projects only user content and restores managed bytes, including unknown/legacy payloads',()=>{
@@ -73,6 +137,9 @@ test('preview returns through the topmost overlay and underlying save/preview st
   f.openLinkedPreview([20,21]);f.linkedPreviewBack=()=>{back++;return true};
   await f.requestClose();assert.equal(back,1);assert.equal(closed,0);assert.equal(f.propertyBack,0);
   await f.提交();f.openPreview();assert.equal(h.writes.length,0);assert.equal(f.preview,null);
+  f.linkedPreviewBack=()=>false;await f.requestClose();
+  assert.deepEqual(f.linkedPreviewIds,[]);assert.equal(f.linkedPreviewBack,null);
+  assert.equal(f.propertyMode,'links');assert.equal(closed,0);
   f.linkedPreviewIds=[];await f.requestClose();assert.equal(f.propertyBack,1);assert.equal(closed,0);
   assert.deepEqual(f.fieldValues,['Front','Back','user']);
 });
@@ -86,9 +153,9 @@ test('external text/tags/type changes cannot be silently accepted by closing the
 });
 
 test('late counts and draft panel callbacks cannot revive a disposed editor',async()=>{
-  const h=await fixture(),count=deferred();h.linkService.load=()=>count.promise;
-  const read=h.form.loadLinkCount();h.form.aboutToDisappear();count.resolve({view:{outgoing:[{}],incoming:[]}});await read;
-  assert.equal(h.form.linkCount,0);h.form.updateLinkDraft(['late']);assert.equal(h.form.linkDraftTargets,null);
+  const h=await fixture(),count=deferred();h.linkService.count=()=>count.promise;
+  const before=h.form.linkCount;const read=h.form.loadLinkCount();h.form.aboutToDisappear();count.resolve(1);await read;
+  assert.equal(h.form.linkCount,before);h.form.updateLinkDraft(['late']);assert.equal(h.form.linkDraftTargets,null);
 });
 
 test('JIDE discovers the editor link entry and observes real blocking and counts without draft content',async()=>{
@@ -124,4 +191,14 @@ test('wide browser editor blocks sibling mutations while drafting links and canc
   pane.setLinksVisible(false);assert.equal(busy.at(-1),false);assert.equal(wheel.at(-1),true);
   pane.cancel();assert.equal(closes,1);assert.equal(refreshes,0);
   assert.equal(commits,0);assert.equal(refreshes,0);
+});
+
+test('rapid card switches cancel deferred counts before any graph read and settled forms load once',async()=>{
+  const h=await fixture();let calls=0;
+  h.linkService.count=async()=>{calls++;return 3;};
+  assert.equal(calls,0);assert.equal(h.timers.size,1);
+  h.form.aboutToDisappear();assert.equal(h.timers.size,0);assert.equal(calls,0);
+  const stable=await fixture();stable.linkService.count=async()=>{calls++;return 3;};
+  stable.timers.values().next().value();await new Promise(setImmediate);
+  assert.equal(calls,1);assert.equal(stable.form.linkCount,3);
 });

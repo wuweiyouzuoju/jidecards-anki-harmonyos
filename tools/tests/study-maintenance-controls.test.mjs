@@ -62,7 +62,8 @@ test('actual keyboard handler honors mappings, protected keys, modifiers and eve
    validateStudyControls,configuredStudyCommand,(event,ctrl)=>studyChord(event.keyCode,{ctrl:ctrl??false,shift:!!event.shift,alt:!!event.alt}),key=>key,{Down:0,Up:1},0,1,2,3,4,5);
  const page=Object.assign(Object.assign(new Host(), { recoveryMessage: '', resultMessage: '', resultUndo: null }),{keyboardSession:new StudyKeyboardSession(),阶段:'answer',Ctrl按下:false,timeboxNotice:null,
   controlsJson:JSON.stringify({...defaultStudyControls(),keys:[{input:'space',command:'easy'}]}),
-  评分:n=>calls.push(n),返回:()=>calls.push('back'),请求删除当前卡:()=>calls.push('delete'),撤销上次:()=>calls.push('undo')});
+  评分:n=>calls.push(n),返回:()=>calls.push('back'),请求删除当前卡:()=>calls.push('delete'),
+  撤销上次:()=>calls.push('undo'),openAddNote:()=>calls.push('add')});
  const key=(keyCode,type=0)=>{const result=page.处理按键({keyCode,type});if(type===0&&keyCode!=='control')page.处理按键({keyCode,type:1});return result;};
  key('space');assert.deepEqual(calls,[3]);calls.length=0;
  page.阶段='question';key('space');assert.deepEqual(calls,[]);
@@ -71,6 +72,15 @@ test('actual keyboard handler honors mappings, protected keys, modifiers and eve
  for(const field of ['cardRenderPending','editingPageOpen','answerInputFocused','webInputFocused','studyGuideVisible','autoAdvanceSettingsOpen']) {
   page[field]=true;key('space');assert.deepEqual(calls,[]);page[field]=false;
  }
+ page.noteLinksOpen=true;
+ for(const input of ['a','space','enter','1','back']) assert.equal(key(input),false);
+ assert.deepEqual(calls,[],'let the link panel and its preview receive typing without study commands');
+ assert.equal(key('escape'),true);
+ assert.deepEqual(calls,['back'],'Escape uses the same topmost back handler');
+ page.noteLinksOpen=false;
+ assert.equal(key('a'),true);
+ assert.deepEqual(calls,['back','add'],'closing the panel restores study shortcuts');
+ calls.length=0;
  key('control');key('space');assert.deepEqual(calls,[],'Ctrl+Space must not fall through to grading');calls.length=0;
  key('z');assert.deepEqual(calls,['undo']);calls.length=0;key('control',1);assert.equal(page.Ctrl按下,false);
  key('space',1);assert.deepEqual(calls,[]);key('escape');key('delete');assert.deepEqual(calls,['back'],'Delete has no AnkiDroid default');
@@ -108,7 +118,7 @@ test('actual lifecycle gate borrows the window only while the study page is moun
 test('legacy mapping whitelist stays compatible; rating mappings never grade an unseen answer',()=>{
  for(const input of ['escape','back','control','delete','z'])assert.throws(()=>validateStudyControls({...defaultStudyControls(),keys:[{input,command:'easy'}]}),/invalid/);
  const mappings=[{input:'double',command:'easy'}];
- assert.equal(mappedStudyCommand(mappings,'double','question','flip'),'none');
+ assert.equal(mappedStudyCommand(mappings,'double','question','flip'),'flip');
  assert.equal(mappedStudyCommand(mappings,'double','answer','none'),'easy');
  assert.equal(mappedStudyCommand(mappings,'double','loading','none'),'none');
  assert.equal(mappedStudyCommand([],'escape','error','back'),'back');

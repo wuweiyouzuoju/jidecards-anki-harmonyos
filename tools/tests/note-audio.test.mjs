@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { noteAudioParts, replaceNoteAudioPart, localNoteAudioPath, noteAudioExtension,
-  prepareNoteAudioFields, MAX_NOTE_AUDIO_BYTES } from '../../entry/src/main/ets/model/NoteAudioDraft.ts';
+  prepareNoteAudioFields, MAX_NOTE_AUDIO_BYTES, NOTE_AUDIO_GENERATE_TITLE } from '../../entry/src/main/ets/model/NoteAudioDraft.ts';
+import { pcm16Wav } from '../../entry/src/main/ets/model/PcmWave.ts';
 import { NoteCreationSession } from '../../entry/src/main/ets/model/NoteCreationSession.ts';
 import { expansionRevealDependencies, loadPlatformModule, loadComponentLogic } from './platform-module-harness.mjs';
 import { editorPageHarness } from './editor-page-harness.mjs';
@@ -209,6 +210,7 @@ function fieldHarness(overrides = {}) {
   const events = [], state = { stopped: 0, recording: false };
   const Field = loadComponentLogic('components/common/NoteAudioField.ets', 'NoteAudioField', {
     APP_FOREGROUND_KEY: 'foreground', NoteAudioPreview: class {},
+    NOTE_AUDIO_GENERATE_TITLE,
     NoteAudioRecorder: class { async start() { state.recording = true; return true; } async finish() { return '/cache/note-recording-1-1.m4a'; }
       async pause() { state.paused = true; } async resume() { state.paused = false; }
       failureCode() { return 0; } async cancel() { state.recording = false; } },
@@ -241,6 +243,114 @@ function managedAudioHarness(overrides = {}, initial = {}) {
   refresh(); audio.field.aboutToAppear();
   return { ...audio, ...h, refresh };
 }
+
+test('speech retries the default voice and encodes delayed PCM with optional or API26 channel metadata', async () => {
+  const staged = [], attempts = [], warnings = [];
+  let listener, stopped = 0, reportChannel = false;
+  const Speech = loadPlatformModule('backend/NoteSpeech.ets', 'NoteSpeech', {
+    pcm16Wav, MAX_NOTE_AUDIO_BYTES, 加载语音人物: async () => 21,
+    hilog: { info() {}, warn: (...args) => warnings.push(args) },
+    textToSpeech: { createEngine: async config => {
+      assert.equal(config.language, 'zh-CN');
+      assert.equal(config.online, 1);
+      attempts.push(config.person);
+      if (config.person === 21) throw Object.assign(Error('Voice unavailable'), { code: 1002300003 });
+      return {
+        setListener(value) { listener = value; },
+        speak(text, { requestId, extraParams }) {
+          assert.equal(text, '朗读');
+          assert.equal(extraParams.playType, 0);
+          if (reportChannel) listener.onStart(requestId, { audioType: 'pcm', sampleRate: 16000, sampleBit: 16, audioChannel: 3 });
+          listener.onData(requestId, Uint8Array.from([3, 4]).buffer, { sequence: 1, audioType: 'pcm' });
+          listener.onComplete(requestId, { type: 0 });
+          setImmediate(() => listener.onData(requestId, Uint8Array.from([1, 2]).buffer, { sequence: 0, audioType: 'pcm' }));
+        },
+        shutdown() { stopped++; }
+      };
+    } },
+    stageNoteAudioBytes: async (wav, cache) => { staged.push(wav); return cache + '/note-audio-1-1.wav'; }
+  });
+  assert.equal(await new Speech().generate('朗读', '/cache'), '/cache/note-audio-1-1.wav');
+  assert.equal(noteAudioExtension(staged[0]), 'wav');
+  assert.deepEqual([...staged[0].subarray(44)], [1, 2, 3, 4]);
+  assert.equal(new DataView(staged[0].buffer).getUint32(24, true), 16000);
+  assert.equal(new DataView(staged[0].buffer).getUint16(22, true), 1);
+  assert.deepEqual(attempts, [21, 13]);
+  assert.equal(warnings[0].includes(1002300003), true);
+  reportChannel = true;
+  assert.equal(await new Speech().generate('朗读', '/cache'), '/cache/note-audio-1-1.wav');
+  assert.equal(new DataView(staged[1].buffer).getUint16(22, true), 1);
+  assert.deepEqual([...staged[1].subarray(44)], [1, 2, 3, 4]);
+  assert.equal(stopped, 2);
+});
+
+test('speech cache failure is actionable and preserves editable text for retry', async () => {
+  const h = managedAudioHarness({}, { synthesizeSpeech: async () => { throw new Error('speech_cache_failed'); } });
+  await h.dialog.openSpeech();
+  h.dialog.changeSpeechText('Keep this');
+  await h.dialog.generateSpeech();
+  assert.equal(h.dialog.speechError, 'app.string.note_audio_speech_cache_failed');
+  assert.equal(h.dialog.speechText, 'Keep this');
+  assert.equal(h.dialog.canGenerateSpeech(), true);
+  assert.equal(h.dialog.speechReady(), false);
+  assert.equal(h.dialog.audios.length, 0);
+});
+
+test('the same speech window accepts text, previews a WAV and applies only the current field', async () => {
+  const path = '/cache/note-audio-2-1.wav';
+  const ready = managedAudioHarness({}, { initialValue: '', fieldIndex: 1,
+    synthesizeSpeech: async text => { assert.equal(text, '自定义朗读'); return path; } });
+  ready.field.onOpenSpeech();
+  assert.equal(ready.dialog.speechActive, true);
+  assert.equal(ready.dialog.canGenerateSpeech(), false);
+  ready.dialog.changeSpeechText(' 自定义朗读 ');
+  await ready.dialog.generateSpeech();
+  assert.equal(ready.dialog.speechReady(), true);
+  await ready.dialog.previewSpeech();
+  assert.equal(ready.dialog.audios.length, 0);
+  assert.ok(!JSON.stringify(ready.tracker.snapshot()).includes('自定义朗读'));
+  ready.dialog.changeSpeechText('另一个版本');
+  ready.dialog.endSpeech(true);
+  assert.equal(ready.events.some(event => event[0] === 'apply'), false);
+  ready.dialog.changeSpeechText('自定义朗读');
+  ready.dialog.endSpeech(true);
+  const apply = ready.events.find(event => event[0] === 'apply');
+  assert.equal(apply[1], '');
+  assert.equal(apply[3][0].uri, path);
+  assert.equal(apply[3][0].fieldIndex, 1);
+  assert.equal(apply[3][0].temporary, true);
+  assert.equal(ready.events.some(event => event[0] === 'cleanup' && event[1].includes(path)), false);
+});
+
+test('normal speech prefill yields to typing, cloze prefill stays empty, and late files are cleaned', async () => {
+  const prefill = deferred(), gate = deferred();
+  const h = managedAudioHarness({}, { initialValue: '<b>Original</b>', noteSpeechText: async () => prefill.promise,
+    synthesizeSpeech: async () => gate.promise });
+  const opening = h.dialog.openSpeech();
+  h.dialog.changeSpeechText('Typed before prefill');
+  prefill.resolve('Original');
+  await opening;
+  assert.equal(h.dialog.speechText, 'Typed before prefill');
+  const running = h.dialog.generateSpeech();
+  await turn();
+  assert.equal(h.dialog.speechWorking, true);
+  h.dialog.foreground = false;
+  h.dialog.speechForegroundChanged();
+  gate.resolve('/cache/note-audio-1-1.wav');
+  await running;
+  assert.equal(h.dialog.speechWorking, false);
+  assert.equal(h.dialog.speechPath, '');
+  assert.ok(h.events.some(event => event[0] === 'cleanup' && event[1].includes('/cache/note-audio-1-1.wav')));
+  const cloze = managedAudioHarness({}, { initialValue: '{{c1::answer}}',
+    noteSpeechText: async () => assert.fail('cloze must not be prefilled') });
+  await cloze.dialog.openSpeech();
+  assert.equal(cloze.dialog.speechText, '');
+  cloze.dialog.changeSpeechText('safe prompt');
+  assert.equal(cloze.dialog.canGenerateSpeech(), true);
+  cloze.dialog.close(false);
+  assert.equal(cloze.dialog.speechActive, false);
+  assert.equal(cloze.events.includes('close'), false);
+});
 
 test('audio manager unlocks after picker cancel or failure and commits or discards actual audio attachments', async () => {
   for (const result of ['cancel', 'failure', 'discard', 'commit']) {
@@ -338,7 +448,7 @@ test('audio field pauses the clock, resumes without a new file, and publishes no
   await h.field.togglePause(); await h.field.finishRecording();
   assert.equal(h.events.filter(e => e[0] === 'add').length, 1);
   assert.equal(h.field.paused, false); h.field.publishStatus();
-  assert.deepEqual(Object.keys(statuses[0]).sort(), ['attachments','disabled','hasError','paused','recording','seconds','working']);
+  assert.deepEqual(Object.keys(statuses[0]).sort(), ['attachments','disabled','hasError','paused','recording','seconds','speechEnabled','working']);
   assert.ok(!JSON.stringify(statuses).includes('/cache'));
 });
 

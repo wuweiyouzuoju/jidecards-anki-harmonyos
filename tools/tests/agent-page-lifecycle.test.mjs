@@ -21,9 +21,9 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 function harness() {
   const broadcasts = [], writes = [], gate = deferred();
   const tracker = new AppInterfaceTracker();
-  const Page = new Function('cloneAgentCard', '$r', 'AppStorage', '笔记字段校验错误', 'appInterface', 'agentInterfaceControls', 'agentInterfaceTitle', 'namedResourceText', stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + ';return Page;')(
+  const Page = new Function('cloneAgentCard', '$r', 'AppStorage', '笔记字段校验错误', 'appInterface', 'agentInterfaceControls', 'agentInterfaceTitle', 'namedResourceText', 'deviceInfo', stripTypeScriptTypes(`class Page { ${methods.join('\n')} }`, { mode: 'transform' }) + ';return Page;')(
     cloneAgentCard, value => value, { setOrCreate: (...args) => broadcasts.push(args) }, class extends Error {},
-    tracker, agentInterfaceControls, agentInterfaceTitle, (_, key) => key);
+    tracker, agentInterfaceControls, agentInterfaceTitle, (_, key) => key, {deviceType:'2in1'});
   const page = new Page(), scheduler = new AutoSyncScheduler();
   Object.assign(page, {
     pageDisposed: false, conversationId: 'original', cardBatch: new AgentCardBatch(scheduler, new SyncActivity()),

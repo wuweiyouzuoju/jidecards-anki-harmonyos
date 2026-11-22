@@ -16,7 +16,7 @@ function method(name) {
 const compile = source => stripTypeScriptTypes(source, { mode: 'transform' });
 
 test('destination renderer preserves route defaults, explicit parameters, snapshots and the host stack', () => {
-  const components = ['DeckOptionsPage', 'EditNotePage', 'NoteDraftPreviewPage', '学习页', '浏览页', '统计页', '添加笔记页', 'AI制卡页', '学习提醒页', '设置页'];
+  const components = ['DeckOptionsPage', 'EditNotePage', 'NoteDraftPreviewPage', '学习页', '浏览页', '统计页', 'StudyLeaderboardPage', '添加笔记页', 'AI制卡页', '学习提醒页', '设置页'];
   const calls = [];
   const source = read('pages/navigation/HomeDestinations.ets')
     .replace(/^import[^;]+;\s*/gm, '').replace(/^@Builder\s*/gm, '').replace(/^export /gm, '');
@@ -25,7 +25,7 @@ test('destination renderer preserves route defaults, explicit parameters, snapsh
   let synced = 0;
   const context = { pathStack: {}, onManualSync: () => synced++ };
   const cases = [
-    ['StudyPage', { pageDeckId: '', pageDeckName: '' }],
+    ['StudyPage', { pageDeckId: '', pageDeckName: '', pageContinuation: null }],
     ['BrowserPage', { pageDeckId: '', pageInitialSearch: '', pageInitialNotesMode: false, pageInitialPreviewCardId: 0, pageSelectForAgentEdit: false }],
     ['AddNotePage', { pageDeckId: '', pageDeckName: '', pageDeckOptions: [] }],
     ['AiCardPage', { pageMode: 'create', pageDeckId: '', pageDeckName: '', pageDeckOptions: [],
@@ -81,20 +81,21 @@ test('destination renderer preserves route defaults, explicit parameters, snapsh
 
 test('home binds its live navigation host and both detail layouts to the same actions', () => {
   let routeArgs, details, detailTransition;
-  const Page = new Function('HomeDestinations', 'HomeDeckDetails', 'homeHeaderGeometry', '应用尺寸', 'SurfaceTransition',
+  const Page = new Function('HomeDestinations', 'HomeDeckDetails', 'homeHeaderGeometry', '应用尺寸', 'SurfaceTransition', 'loadVisibleSyncAuth',
     compile(`class Page { ${method('页面映射')} ${method('deckDetails')} ${method('detailHeaderActionHeight')} }`) + ';return Page;')(
     (...args) => { routeArgs = args; }, props => { details = props;
       return { transition: effect => { detailTransition = effect; } }; }, homeHeaderGeometry,
-    { 页面分组间距: () => 12, 按钮高度: 44 }, { pageContent: (forward, enabled) => ({ forward, enabled }) });
+    { 页面分组间距: () => 12, 按钮高度: 44 }, { pageContent: (forward, enabled) => ({ forward, enabled }) }, () => ({ hkey: 'existing-auth' }));
   const page = new Page(), events = [];
   Object.assign(page, { 页面栈: {}, historyRefreshToken: 3, deckOptionsBusy: true,
-    是否深色: () => true, requestManualSync: () => events.push('sync'),
+    densityScale: () => 1, 是否深色: () => true, requestManualSync: () => events.push('sync'),
     加载主页数据: () => events.push('refresh'), 开始学习: () => events.push('study'),
     打开牌组预览: () => events.push('preview'), 打开添加笔记: () => events.push('add'),
     打开AI制卡: () => events.push('ai-create'),
     openDeckRename: id => events.push(['rename', id]), openDeckMenu: id => events.push(['menu',id]),
     openCreateDeck: id => events.push(['child', id]), openDeckExport: id => events.push(['export', id]),
     打开牌组选项: () => events.push('options'), homeActionAnchor: { width: 360 }, 显示今日进度卡: true });
+  page.sideWheelLayout = () => false;
   const params = {};
   page.页面映射('SettingsPage', params);
   assert.equal(routeArgs[0], 'SettingsPage');
@@ -119,7 +120,40 @@ test('home binds its live navigation host and both detail layouts to the same ac
     page.选中的牌组ID = '42';
     for (const action of ['onStudy', 'onPreview', 'onAddNote', 'onCreateWithAI', 'onMore', 'onBack']) details[action]();
     assert.deepEqual(events.splice(0), ['study', 'preview', 'add', 'ai-create', ['menu', '42'], 'refresh']);
+    const toolbar = { left: 16, top: 80, width: 408 };
+    details.onMore(toolbar);
+    assert.equal(page.deckMoreToolbarBounds, toolbar);
+    events.splice(0);
     assert.equal(page.显示牌组详情, false);
     page.historyRefreshToken++;
   }
+});
+
+
+test('home menus and detail preview dismiss each other without reopening on close notification', () => {
+  let details;
+  const Page = new Function('HomeDeckDetails', 'SurfaceTransition',
+    compile(`class Page { ${method('closeHomeActions')} ${method('deckDetails')} }`) + ';return Page;')(
+    props => { details = props; return { transition() {} }; }, { pageContent: () => ({}) });
+  const page = new Page();
+  Object.assign(page, { sideWheelLayout: () => false, 是否深色: () => false,
+    detailHeaderActionHeight: () => 44, deckPreviewDismissRequest: 0, deckPreviewMenuOpen: false,
+    显示更多菜单: true, 显示主页操作: true, deckMenuId: '42', deckMenuPoint: { x: 1, y: 2 } });
+  page.deckDetails(false);
+  details.onMenuStateChange(true);
+  assert.equal(page.deckPreviewMenuOpen, true);
+  assert.equal(page.显示更多菜单, false);
+  assert.equal(page.显示主页操作, false);
+  assert.equal(page.deckMenuId, '');
+  assert.equal(page.deckMenuPoint, undefined);
+  assert.equal(page.deckPreviewDismissRequest, 0, 'opening preview must not dismiss itself');
+  page.closeHomeActions();
+  page.显示主页操作 = true;
+  page.deckDetails(false);
+  assert.equal(details.menuDismissRequest, 1);
+  assert.equal(page.deckPreviewMenuOpen, false);
+  details.onMenuStateChange(false);
+  assert.equal(page.显示主页操作, true, 'old preview close must preserve newly opened home menu');
+  page.closeHomeActions();
+  assert.equal(page.deckPreviewDismissRequest, 1, 'idle close does not issue another dismissal');
 });

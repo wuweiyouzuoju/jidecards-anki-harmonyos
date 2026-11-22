@@ -79,12 +79,20 @@ async function replacement(fail='') {
   const run=loadPlatformModule('backend/数据迁移服务.ts','替换集合',{...deps,...recovery,withImportProgress:async(_op,fn)=>fn(),
     复制URI到沙箱:async()=>root+'/input.colpkg',静默删除:async p=>fsp.rm(p,{force:true}),
     后端会话:{获取实例:()=>session},服务号:{后端导入导出:39},导入导出方法:{导入集合包:0},encodeImportCollectionPackageRequest:x=>x});
-  return {root,events,recovery,run:()=>run(root,'provider://collection',true),read:async p=>fsp.readFile(root+'/'+p,'utf8')};
+  return {root,events,recovery,run:verify=>run(root,'provider://collection',true,undefined,null,verify),read:async p=>fsp.readFile(root+'/'+p,'utf8')};
 }
 test('failed import restores complete safety copy before reopening and preserves original error',async()=>{
  const h=await replacement('import');await assert.rejects(h.run(),/import failed/);
  assert.equal(await h.read('collection.anki2'),'original db');assert.equal(await h.read('collection.mdb'),'original media db');
  assert.equal(await h.read('collection.media/original'),'original media');await assert.rejects(h.read('collection.media/new'));
+ assert.equal(h.events.at(-1),'open');
+});
+test('failed post-restore validation rolls the collection and media back before accepting the backup',async()=>{
+ const h=await replacement();
+ await assert.rejects(h.run(async()=>{assert.equal(await h.read('collection.anki2'),'new db');throw Error('backup counts mismatch');}),/backup counts mismatch/);
+ assert.equal(await h.read('collection.anki2'),'original db');
+ assert.equal(await h.read('collection.media/original'),'original media');
+ await assert.rejects(h.read('collection.media/new'));
  assert.equal(h.events.at(-1),'open');
 });
 test('failed safety copy cleans partial backup, reopens original and never starts import',async()=>{

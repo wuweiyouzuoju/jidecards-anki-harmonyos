@@ -11,6 +11,8 @@ import { decodeAgentToolArguments } from '../../entry/src/main/ets/model/agent/A
 import { safeAgentSessionState, compactAgentToolOutputs } from '../../entry/src/main/ets/model/agent/AgentSessionState.ts';
 import { normalizeAgentDocumentText } from '../../entry/src/main/ets/model/agent/AgentDocumentText.ts';
 import { isSupportedAgentVideoFile } from '../../entry/src/main/ets/model/agent/AgentFileImport.ts';
+import { pagingDependencies } from './agent-text-paging-harness.mjs';
+import { AgentToolRegistry } from '../../entry/src/main/ets/backend/agent/AgentToolRegistry.ets';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 
 const info = (id='doc',extra={}) => ({id,name:'教材.pdf',extension:'.pdf',byteSize:3,pageCount:140,warningCode:'',...extra});
@@ -68,12 +70,13 @@ test('late page reads cannot authorize another conversation and cancellation all
 function nativeStoreHarness(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'jide-document-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  const events=[]; const nativeFs={OpenMode:{CREATE:fs.constants.O_CREAT,WRITE_ONLY:fs.constants.O_WRONLY,TRUNC:fs.constants.O_TRUNC},
+  const events=[]; const nativeFs={OpenMode:{CREATE:fs.constants.O_CREAT,WRITE_ONLY:fs.constants.O_WRONLY,TRUNC:fs.constants.O_TRUNC,READ_ONLY:fs.constants.O_RDONLY},
     accessSync:fs.existsSync,mkdirSync:(p,r)=>fs.mkdirSync(p,{recursive:r}),
     openSync:(p,flags)=>({fd:fs.openSync(p,flags),name:path.basename(p)}),closeSync:f=>fs.closeSync(typeof f==='number'?f:f.fd),fsyncSync:fs.fsyncSync,
     readSync:(fd,buf,o)=>fs.readSync(fd,new Uint8Array(buf),0,o.length,o.offset),
+    copyFile: async (fd,dest) => fs.promises.writeFile(dest,fs.readFileSync(fd)),
     writeSync:(fd,buf)=>fs.writeSync(fd,new Uint8Array(buf)),renameSync:fs.renameSync,readTextSync:p=>fs.readFileSync(p,'utf8'),
-    listFileSync:fs.readdirSync,rmdirSync:p=>fs.rmSync(p,{recursive:true}),statSync:fs.statSync};
+    unlinkSync:fs.unlinkSync,listFileSync:fs.readdirSync,rmdirSync:p=>fs.rmSync(p,{recursive:true}),statSync:fs.statSync};
   const pixel={async release(){events.push('pixel-release');}};
   const page={getGraphicsObjects(){events.push('graphics');return [{type:1,text:'JIDE reference text'}, {type:3,text:'not text'}];},
     getWidth:()=>600,getHeight:()=>800,getCustomPagePixelMap(){return pixel;},release(){events.push('page-release');}};
@@ -83,18 +86,18 @@ function nativeStoreHarness(t) {
   const textRecognition={async init(){events.push('ocr-init');return ocrReady;},async recognizeText(){events.push('ocr');return {value:'OCR scan 12345'};},async release(){events.push('ocr-release');}};
   const image={createImagePacker:()=>({async packToData(){return Uint8Array.from([1,2,3]).buffer;},async release(){events.push('packer-release');}})};
   const {AgentDocumentStore,agentPdfPageText}=loadPlatformModule('backend/agent/AgentDocumentStore.ets','{AgentDocumentStore,agentPdfPageText}',
-    {fs:nativeFs,pdfService,image,textRecognition,util:{Base64Helper:class {encodeToStringSync(bytes){return Buffer.from(bytes).toString('base64');}}},
+    {...pagingDependencies(nativeFs),fs:nativeFs,pdfService,image,textRecognition,util:{Base64Helper:class {encodeToStringSync(bytes){return Buffer.from(bytes).toString('base64');}}},
       normalizeAgentDocumentText,isSupportedAgentVideoFile,UTF8编码:text=>new TextEncoder().encode(text)});
   const store=new AgentDocumentStore({filesDir:root});
   const original=path.join(root,'input.pdf');fs.writeFileSync(original,'PDF');
   const source={fd:fs.openSync(original,'r')};
   t.after(()=>fs.closeSync(source.fd));
-  return {store,source,events,root,page,agentPdfPageText,setOcrReady:value=>{ocrReady=value;}};
+  return {store,source,events,root,page,nativeFs,agentPdfPageText,setOcrReady:value=>{ocrReady=value;}};
 }
 test('API 21 adapter imports and reads real persisted files without any API 23 method; images and OCR are independently available',async t=>{
   const {store,source,events,root,page,agentPdfPageText}=nativeStoreHarness(t);
   assert.equal(page.getTextContent,undefined);assert.equal(agentPdfPageText(page),'JIDE reference text');
-  const staged=store.stage('chat',source,info());assert.equal(staged.pageCount,140);assert.equal(store.list('chat').length,0);
+  const staged=await store.stage('chat',source,info());assert.equal(staged.pageCount,140);assert.equal(store.list('chat').length,0);
   store.submit('chat',['doc']);const text=await store.read('chat','doc',130,'text');assert.equal(text.text,'JIDE reference text');
   assert.ok(!events.includes('ocr'));assert.ok(events.includes('page-release'));
   const image=await store.read('chat','doc',130,'image');assert.match(image.image.imageUrl,/^data:image\/jpeg;base64,/);
@@ -107,7 +110,7 @@ test('API 21 adapter imports and reads real persisted files without any API 23 m
   store.removeConversation('chat');assert.deepEqual(store.list('chat'),[]);
 });
 test('OCR failure is visible, releases page resources and preserves original and cached text for another method',async t=>{
-  const {store,source,events,setOcrReady}=nativeStoreHarness(t);store.stage('chat',source,info());store.submit('chat',['doc']);
+  const {store,source,events,setOcrReady}=nativeStoreHarness(t);await store.stage('chat',source,info());store.submit('chat',['doc']);
   await store.read('chat','doc',1,'text');setOcrReady(false);
   await assert.rejects(()=>store.read('chat','doc',1,'ocr'),/ocr_unavailable/);
   assert.ok(events.includes('pixel-release'));assert.equal((await store.read('chat','doc',1,'text')).text,'JIDE reference text');
@@ -140,4 +143,70 @@ test('document source schema accepts real citations and rejects forged parameter
   }
   assert.deepEqual(agentDocumentTools().map(tool=>tool.name),
     ['list_documents','read_document_page','ocr_document_page','save_document_notes','read_video_frames']);
+});
+
+test('large local text is retained on disk and real registered tools can split-read its final page after restoration', async t => {
+  const {store,root,nativeFs} = nativeStoreHarness(t);
+  const text = ('本地材料😀\n').repeat(400000) + 'FINAL_SECTION_末尾';
+  const input = path.join(root,'large.txt'); fs.writeFileSync(input,text);
+  assert.ok(fs.statSync(input).size > 4*1024*1024);
+  const source = {fd:fs.openSync(input,'r')}; t.after(()=>fs.closeSync(source.fd));
+  const {streamAgentTextFile} = pagingDependencies(nativeFs);
+  const staged = await store.stage('chat',source,{id:'large',name:'large.txt',extension:'.txt',
+    byteSize:fs.statSync(input).size,pageCount:1,warningCode:''},'',async writer=>{
+      await streamAgentTextFile(source,fs.statSync(input).size,writer,text=>text.includes('\u0000'));
+      return '';
+    });
+  assert.ok(staged.pageCount > 200);
+  const folder=path.join(root,'agent-documents/chat/large');
+  const manifest=fs.readFileSync(path.join(folder,'manifest.json'),'utf8');
+  assert.ok(manifest.length < 1000);assert.ok(!manifest.includes('本地材料'));
+  assert.equal(fs.readFileSync(path.join(folder,'original'),'utf8'),text);
+  store.submit('chat',['large']);
+  const access=new AgentDocumentAccess(store);access.bind('chat',false,true);
+  const registry=new AgentToolRegistry();
+  const {registerAgentDocumentTools}=loadPlatformModule('backend/agent/AgentDocumentTools.ets',
+    '{registerAgentDocumentTools}',{agentDocumentTools});
+  registerAgentDocumentTools(registry,access);
+  const call=async(name,args)=>JSON.parse((await registry.execute({name,callId:name,argumentsJson:JSON.stringify(args)})).outputJson);
+  const listed=await call('list_documents',{});
+  assert.equal(listed.documents[0].pageCount,staged.pageCount);
+  const tail=await call('read_document_page',{documentId:'large',page:staged.pageCount});
+  assert.match(tail.text,/FINAL_SECTION_末尾$/);assert.equal(tail.nextPage,-1);
+  const first=await call('read_document_page',{documentId:'large',page:1,length:17});
+  assert.equal(first.text.length,17);assert.equal(first.nextOffset,17);assert.equal(first.nextPage,2);
+  const rest=await call('read_document_page',{documentId:'large',page:1,offset:first.nextOffset});
+  assert.equal(first.text+rest.text,fs.readFileSync(path.join(folder,'text-1.txt'),'utf8'));
+  const reconstructed=Array.from({length:staged.pageCount},(_,i)=>fs.readFileSync(path.join(folder,`text-${i+1}.txt`),'utf8')).join('');
+  assert.equal(reconstructed,text);
+});
+
+test('streaming decode retries late invalid UTF-8 without duplicate pages and preserves UTF-16 across chunk boundaries', async t => {
+  const {root,nativeFs} = nativeStoreHarness(t);
+  const {AgentTextPageWriter,streamAgentTextFile,ensureAgentDocumentSpace} = pagingDependencies(nativeFs);
+  for (const [name, bytes, expected] of [
+    ['gb',Buffer.concat([Buffer.from('a'.repeat(70000)),Buffer.from([0xD6,0xD0])]),'a'.repeat(70000)+'中'],
+    ['utf16',Buffer.concat([Buffer.from([0xFF,0xFE]),Buffer.from('x'.repeat(32766)+'😀后文','utf16le')]),'x'.repeat(32766)+'😀后文']
+  ]) {
+    const file=path.join(root,name);fs.writeFileSync(file,bytes);
+    const folder=path.join(root,name+'-pages');fs.mkdirSync(folder);
+    const source={fd:fs.openSync(file,'r')};
+    try {
+      const writer=new AgentTextPageWriter(folder);
+      await streamAgentTextFile(source,bytes.length,writer,text=>text.includes('\u0000'));
+      const count=writer.finish();
+      assert.equal(Array.from({length:count},(_,i)=>fs.readFileSync(path.join(folder,`text-${i+1}.txt`),'utf8')).join(''),expected);
+    } finally {fs.closeSync(source.fd);}
+  }
+  await ensureAgentDocumentSpace(root,100*1024*1024);
+  await assert.rejects(()=>pagingDependencies(nativeFs,10).ensureAgentDocumentSpace(root,100),/document_space_insufficient/);
+});
+
+test('failed paged extraction publishes no document and removes its original and partial pages', async t=>{
+  const {store,source,root}=nativeStoreHarness(t);
+  await assert.rejects(()=>store.stage('chat',source,{...info('broken'),extension:'.txt'},'',async writer=>{
+    writer.append('partial '.repeat(2000));throw Error('parser failed');
+  }),/parser failed/);
+  assert.deepEqual(store.list('chat'),[]);
+  assert.equal(fs.existsSync(path.join(root,'agent-documents/chat/broken')),false);
 });

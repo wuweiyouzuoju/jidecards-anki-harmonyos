@@ -27,22 +27,15 @@ test('supported rich text preserves combined styles, entities, line breaks, Chin
     '<script>alert(1)</script>', 'a&copy;b', '&#xD800;', '<b>x']) assert.equal(rich.parseNoteRichText(input),null,input);
 });
 
-test('native layout changes preserve the editor draft, controller, mode and selection', () => {
+test('standalone mode toggling preserves the field draft and input identity', () => {
   const h=editor('<b>保留草稿😀</b>');
-  h.instance.richReady(); h.instance.selectionStart=1; h.instance.selectionEnd=3;
-  const value=h.instance.value, controller=h.instance.richController, inputKey=h.instance.inputKey;
-  const Layout=loadComponentLogic('components/common/NoteFieldLayout.ets','NoteFieldLayout',{
-    NOTE_FIELD_EDITING_SUPPORT,应用尺寸:{间距_8:8,间距_5:5,按钮高度:44}});
-  const layout=new Layout();
-  const children=[44,44,112].map(height=>({measureResult:null,
-    measure(c){this.measureResult={width:c.maxWidth,height};return this.measureResult;},layout(){}}));
-  for(const width of [1600,320,479,480,800,360]) {
-    const constraint={maxWidth:width,maxHeight:Infinity};
-    const size=layout.onMeasureSize({width:0,height:0},children,constraint);
-    layout.onPlaceChildren(size,children,constraint);
-    assert.equal(h.instance.value,value);assert.equal(h.instance.richController,controller);
-    assert.equal(h.instance.inputKey,inputKey);assert.equal(h.instance.sourceMode,false);
-    assert.deepEqual([h.instance.selectionStart,h.instance.selectionEnd],[1,3]);
+  h.instance.richReady();
+  const value=h.instance.value, inputKey=h.instance.inputKey;
+  for(const mode of [true,false]) {
+    h.instance.requestMode(!h.instance.sourceMode);
+    assert.equal(h.instance.sourceMode,mode);
+    assert.equal(h.instance.value,value);
+    assert.equal(h.instance.inputKey,inputKey);
   }
   assert.deepEqual(h.changes,[]);
 });
@@ -103,6 +96,45 @@ function editor(html='',fieldConfig=null,wheelSession=null,uniqueId=123,wheelPre
   if(instance.ready)instance.loadRich(rich.parseNoteRichText(html));
   return {instance,controller,changes,seen,dialogs,patches,typing,selections,overlay,timers,focusRequests,sourceCarets,set spans(value){spans=value;}};
 }
+
+test('native candidate spans with incomplete styles keep the typed text and following formatting', () => {
+  const h = editor('<b>甲</b><u>乙</u>');
+  const [first, last] = h.controller.getSpans();
+  const candidate = '（5）—44😀';
+  h.spans = [first, { value: candidate }, last];
+  h.instance.richSelectionChanged({ start: 1 + candidate.length, end: 1 + candidate.length });
+  h.instance.richChanged({ start: 1, end: 1 }, { start: 1, end: 1 + candidate.length });
+  assert.equal(h.changes.at(-1), '<b>甲</b>' + candidate + '<u>乙</u>');
+
+  h.spans = [{ value: '字', textStyle: { fontFeature: { sups: 1 } } },
+    { value: '2', textStyle: { fontFeature: '"sups" 1' } },
+    { imageStyle: {} }, { value: 'symbol', symbolSpanStyle: {} }];
+  assert.equal(rich.serializeNoteRichText(h.instance.richRuns()), '字<sup>2</sup>');
+});
+
+test('native span read failure preserves the draft and retries the pending input', () => {
+  for (const fail of [() => undefined, () => { throw new Error('native snapshot unavailable'); }]) {
+    const h = editor('<b>甲</b>');
+    const spans = h.controller.getSpans();
+    h.controller.getSpans = fail;
+    h.instance.richSelectionChanged({ start: 1, end: 1 });
+    h.instance.richChanged({ start: 1, end: 1 }, { start: 1, end: 2 });
+    h.instance.switchMode();
+    assert.equal(h.instance.value, '<b>甲</b>');
+    assert.equal(h.instance.sourceMode, false);
+    assert.deepEqual(h.changes, []);
+
+    h.controller.getSpans = () => [...spans, { value: '乙' }];
+    const retry = [...h.timers.values()].find(timer => timer.delay === 16);
+    assert.ok(retry);
+    retry.callback();
+    assert.equal(h.changes.at(-1), '<b>甲</b>乙');
+
+    h.controller.getSpans = () => [];
+    h.instance.richChanged({ start: 0, end: 2 }, { start: 0, end: 0 });
+    assert.equal(h.changes.at(-1), '');
+  }
+});
 
 // Simulate the SDK splitting text spans at UTF-16 style boundaries, preserving other attributes.
 function enableNativeStyleUpdates(h) {
@@ -999,4 +1031,15 @@ test('parent HTML echoes after middle deletion preserve the native caret and do 
  h.instance.receiveValue();
  assert.equal(reloads,1);
  assert.equal(h.controller.getCaretOffset(),1);
+});
+
+test('browser wheel waits until input layout and yields before mounting, with late opening cancelled on disposal',()=>{
+ const h=editor('draft',null,null,123,{deferWheelUntilInputReady:true});
+ assert.equal(h.overlay.length,0);assert.equal(h.instance.wheelVisible,false);
+ h.instance.inputReady();assert.equal(h.overlay.length,0);
+ const opening=[...h.timers.values()].find(timer=>timer.delay===0);
+ assert.ok(opening);opening.callback();assert.equal(h.overlay.length,1);assert.equal(h.instance.wheelVisible,true);
+ const gone=editor('draft',null,null,124,{deferWheelUntilInputReady:true});gone.instance.inputReady();
+ const late=[...gone.timers.values()].find(timer=>timer.delay===0).callback;
+ gone.instance.aboutToDisappear();assert.equal(gone.timers.size,0);late();assert.equal(gone.overlay.length,0);
 });

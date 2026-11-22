@@ -10,7 +10,7 @@ test('refresh failure retains the previous pagination cursor while a new query c
   h.backend.open=async()=>{throw Error('offline');};
   await assert.rejects(h.session.search(query,()=>true,true),/offline/);
   h.backend.open=original;
-  assert.equal((await h.session.more(()=>true)).consumed,303);
+  assert.equal((await h.session.more(()=>true)).consumed,220);
   h.backend.open=async()=>{throw Error('offline');};
   await assert.rejects(h.session.search({...query,text:'new'},()=>true),/offline/);
   assert.equal(await h.session.more(()=>true),null);
@@ -26,7 +26,8 @@ function harness() {
 }
 test('failed rows consume IDs and repeated pagination never repeats successes', async () => {
   const h = harness(); await h.session.search(query, () => true);
-  const result = await h.session.more(() => true); assert.equal(result.consumed, 300); assert.equal(result.rows.length, 299);
+  const result = await h.session.more(() => true); assert.equal(result.consumed, 120); assert.equal(result.rows.length, 120);
+  const middle = await h.session.more(() => true); assert.equal(middle.consumed, 220); assert.equal(middle.rows.length, 219);
   const last = await h.session.more(() => true); assert.equal(last.consumed, 303); assert.equal(last.rows.length, 302);
   assert.equal(await h.session.more(() => true), null); assert.equal(new Set(h.calls).size, h.calls.length);
 });
@@ -37,10 +38,10 @@ test('a new search invalidates old pagination and old finally cannot unlock its 
   h.backend.row = async id => ({cells: [id], color: 0});
   const newer = h.session.search({...query, text: 'new'}, () => true);
   pending.resolve({cells: ['old'], color: 0}); assert.equal(await old, null);
-  const result = await newer; assert.equal(result.rows.length, 200); assert.deepEqual(result.rows[0].cells, [1]);
+  const result = await newer; assert.equal(result.rows.length, 20); assert.deepEqual(result.rows[0].cells, [1]);
   const load = deferred(); h.backend.row = async () => load.promise;
   const first = h.session.more(() => true); assert.equal(await h.session.more(() => true), null);
-  load.resolve({cells: [], color: 0}); assert.equal((await first).consumed, 300);
+  load.resolve({cells: [], color: 0}); assert.equal((await first).consumed, 120);
 });
 
 test('star is independent of flag and suspension, survives pagination and uses the selected ID mode', async () => {
@@ -51,9 +52,24 @@ test('star is independent of flag and suspension, survives pagination and uses t
   const first=await h.session.search({...query,notes:true},()=>true);
   assert.deepEqual(first.rows[0],{id:1,cells:[],color:9,hasSuspendedCards:true,marked:true});
   assert.equal(first.rows[1].marked,false);
+  await h.session.more(()=>true);
   const next=await h.session.more(()=>true);assert.equal(next.rows.find(x=>x.id===201).marked,true);
   const last=await h.session.more(()=>true);assert.equal(last.rows.find(x=>x.id===303).marked,true);
   assert.deepEqual(modes,[true]);
   h.backend.markedIds=async()=>{throw Error('marks unreadable');};
   await assert.rejects(h.session.search(query,()=>true),/marks unreadable/);
+});
+
+test('first screen does not wait for offscreen row reads and retains the full result order', async () => {
+  const h = harness();
+  const read = h.backend.row;
+  h.backend.row = id => { assert.ok(id <= 20, 'offscreen rows must wait for pagination'); return read(id); };
+  const first = await h.session.search(query, () => true);
+  assert.equal(first.ids.length, 303);
+  assert.equal(first.consumed, 20);
+  assert.deepEqual(first.rows.map(row => row.id), first.ids.slice(0, 20));
+  h.backend.row = read;
+  const more = await h.session.more(() => true);
+  assert.equal(more.consumed, 120);
+  assert.deepEqual(more.rows.map(row => row.id), first.ids.slice(0, 120));
 });

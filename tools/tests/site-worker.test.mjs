@@ -7,7 +7,7 @@ test('legacy and www domains permanently redirect matching paths and query strin
   const env = { ASSETS: { fetch() { assert.fail('redirects must run before assets'); } } };
   for (const host of ['jideyanggeqi.cn', 'www.jideyanggeqi.cn', 'www.jidecards.com']) {
     for (const protocol of ['http:', 'https:']) {
-      for (const pathname of ['/', '/works/jidecards/', '/assets/app-preview-01.png', '/announcement.json', '/googlef6dc96ac7f0bd137.html', '/missing/']) {
+      for (const pathname of ['/', '/works/jidecards/', '/assets/jidecards-logo.png', '/announcement.json', '/googlef6dc96ac7f0bd137.html', '/missing/']) {
         const response = await worker.fetch(new Request(`${protocol}//${host}${pathname}?source=old&tag=%E9%B8%BF%E8%92%99`), env);
         assert.equal(response.status, 301);
         assert.equal(response.headers.get('Location'), `https://jidecards.com${pathname}?source=old&tag=%E9%B8%BF%E8%92%99`);

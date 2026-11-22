@@ -277,7 +277,7 @@ test('glass presses preserve the backing and geometry, reset on release/disable,
       const a = target(), b = target();
       surface.applyNormalAttribute(a.node); surface.applyNormalAttribute(b.node);
       const normal = structuredClone(a.state);
-      assert.ok(normal.border.width > 0, 'primary and ordinary glass retain a visible outline');
+      assert.deepEqual(normal.border, SurfaceBorder.controlOptions('glass', false), 'primary and ordinary controls use the shared outline policy');
       // Rapid down/up/cancel cycles never remove the backing, alter geometry or affect another button.
       for (let cycle = 0; cycle < 6; cycle++) {
         surface.applyPressedAttribute(a.node);
@@ -297,12 +297,13 @@ test('glass presses preserve the backing and geometry, reset on release/disable,
   }
   const outline=SurfaceBorder.options(2,'#00ACC1');
   const choice=new GlassSurface('glass',GLASS_HIGHLIGHT_COLORS,'app.color.surface_card',outline);
-  const selected=target();
+  const selected=target(), backing=target();
+  new GlassSurface('glass',GLASS_HIGHLIGHT_COLORS).applyNormalAttribute(backing.node);
   for(const method of ['applyNormalAttribute','applyPressedAttribute','applyDisabledAttribute']) {
     choice[method](selected.node);
     assert.deepEqual(selected.state.border,outline,'pressing or disabling keeps the selected outline');
-    assert.equal(selected.state.backgroundColor,glassFillHarness()('app.color.surface_card'));
-    assert.equal(selected.state.backdropBlur,24);
+    assert.equal(selected.state.backgroundColor,backing.state.backgroundColor, 'selected outline must not replace the shared glass backing');
+    assert.equal(selected.state.backdropBlur,backing.state.backdropBlur, 'outline state must not add a second blur');
   }
   for (const path of ['utils/GlassSurface.ets', 'utils/PrimaryGlassSurface.ets']) {
     assert.doesNotMatch(read(path), /setTimeout|animateTo|\.animation\(/);

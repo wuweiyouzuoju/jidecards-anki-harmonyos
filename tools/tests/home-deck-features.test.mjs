@@ -21,17 +21,17 @@ function harness(name, commands) {
 test('creation rejects double submission, reports failure locally and can retry',async()=>{
   const gate=deferred();let calls=0;
   const h=harness('CreateDeckFeature',{create:async()=>{calls++;return gate.promise;}});
-  const first=h.feature.create('deck');await h.feature.create('again');assert.equal(calls,1);
+  const first=h.feature.createDeck('deck');await h.feature.createDeck('again');assert.equal(calls,1);
   gate.reject(new Error('write failed'));await first;
   assert.equal(h.feature.busy,false);assert.equal(h.feature.error,'write failed');assert.ok(!h.events.includes('close'));
-  h.feature.commands.create=async()=>123;await h.feature.create('retry');
+  h.feature.commands.create=async()=>123;await h.feature.createDeck('retry');
   assert.ok(h.events.includes('broadcast'));assert.deepEqual(h.events.find(Array.isArray),['created','123','retry']);
   assert.ok(h.events.includes('close'));
 });
 
 test('accepted creation completes after disposal and only broadcasts committed data',async()=>{
   const gate=deferred();const h=harness('CreateDeckFeature',{create:()=>gate.promise});
-  const pending=h.feature.create('deck');h.feature.aboutToDisappear();gate.resolve(4);await pending;
+  const pending=h.feature.createDeck('deck');h.feature.aboutToDisappear();gate.resolve(4);await pending;
   assert.deepEqual(h.events,['busy','broadcast']);
 });
 
@@ -59,7 +59,7 @@ test('post-commit refresh failure closes the form without inviting another write
   for (const name of ['CreateDeckFeature','DeckCustomizationFeature']) {
     const h=harness(name,{create:async()=>1,customize:async()=>true});
     h.feature.onCreated=h.feature.onSaved=async()=>{throw new Error('refresh failed');};
-    if(name==='CreateDeckFeature')await h.feature.create('deck');else await h.feature.save({新名:'alias'});
+    if(name==='CreateDeckFeature')await h.feature.createDeck('deck');else await h.feature.save({新名:'alias'});
     assert.ok(h.events.includes('refresh-error'));assert.ok(h.events.includes('close'));
     assert.equal(h.feature.error,'');
   }

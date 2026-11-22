@@ -6,7 +6,7 @@ import { HomeSyncStatusController, homeSyncIndicator, homeSyncLabelKey } from '.
 import { componentMethods } from './sync-panel-harness.mjs';
 import { AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { buildAgentAppStructure } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
-import { isDoubleColumnDeckListStyle } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import { deckListColumnCount } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 
 const read = path => readFileSync(new URL('../../entry/src/main/ets/' + path, import.meta.url), 'utf8');
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -26,8 +26,8 @@ test('AnkiDroid account/full-sync exclamations and ordinary changes use real Cor
   const h = harness(); h.state.auth = null;
   await h.controller.refresh();
   assert.equal(h.state.icon, 'not_logged_in'); assert.equal(h.state.calls.length, 0);
-  assert.equal(homeSyncIndicator(h.state.icon, 'hidden'), 'attention');
-  assert.equal(homeSyncLabelKey(h.state.icon, 'hidden'), 'home_sync_not_logged_in');
+  assert.equal(homeSyncIndicator(h.state.icon, 'hidden'), 'hidden');
+  assert.equal(homeSyncLabelKey(h.state.icon, 'hidden'), 'home_sync');
   h.state.auth = { hkey: 'new-key', endpoint: '', ioTimeoutSecs: 0 };
   for (const [required, icon, badge, label] of [
     [0, 'normal', 'hidden', 'home_sync'],
@@ -119,8 +119,8 @@ test('the real home eligibility gate skips foreground/navigation, collection and
 
 test('JIDE reads the live sync marker and the same localized button label as the header', () => {
   const tracker = new AppInterfaceTracker();
-  const Page = componentMethods(read('pages/首页.ets'), ['homeActionControls', 'publishHomeInterface'], {
-    appInterface: tracker, OFFICIAL_ANNOUNCEMENTS_ENABLED: false, isDoubleColumnDeckListStyle,
+  const Page = componentMethods(read('pages/首页.ets'), ['homeAnnouncementsEnabled','homeActionControls', 'publishHomeInterface'], {
+    appInterface: tracker, remoteAnnouncementsEnabled: () => true, OFFICIAL_ANNOUNCEMENTS_ENABLED: false, deckListColumnCount,
     homeSyncLabelKey, homeSyncIndicator
   });
   const Header = componentMethods(read('components/home/HomeSummaryHeader.ets'), ['syncLabel'], {
@@ -129,6 +129,7 @@ test('JIDE reads the live sync marker and the same localized button label as the
   const page = Object.assign(new Page(), { homeDisposed: false, 排序模式中: false, homeAgentEnabled: false,
     牌组数据源: { snapshotDecks: () => [] }, homeActivity: () => ({ collectionBusy: false }),
     deckListStyle: 'single_wide', 显示今日进度卡: true, syncIndicator: 'hidden', syncStatusText: '' });
+  page.sideWheelLayout = () => false;
   const header = Object.assign(new Header(), { syncIndicator: 'hidden', syncStatusText: '' });
   for (const locale of ['base', 'en_US']) {
     const labels = new Map(JSON.parse(readFileSync(new URL(`../../entry/src/main/resources/${locale}/element/string.json`, import.meta.url))).string.map(x => [x.name, x.value]));

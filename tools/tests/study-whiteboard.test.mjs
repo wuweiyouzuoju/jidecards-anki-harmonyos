@@ -1166,3 +1166,56 @@ test('floating toolbar also accepts sparse IDs, ignores other pointers and rolls
     assert.doesNotMatch(text, /fingerList\s*\[\s*0\s*\]/);
   }
 });
+
+test('whiteboard screenshot crops the composed window before opening the PNG picker', async () => {
+  const steps = [];
+  const bytes = new ArrayBuffer(3);
+  let targets = ['file://screenshot.png'];
+  const capture = loadPlatformModule('backend/StudyWhiteboardSnapshot.ets', 'saveStudyWhiteboardSnapshot', {
+    picker: {
+      DocumentSaveOptions: class {},
+      DocumentViewPicker: class {
+        save(options) {
+          steps.push('pick');
+          assert.deepEqual(options.fileSuffixChoices, ['.png']);
+          assert.match(options.newFileNames[0], /^jidecards-\d+\.png$/);
+          return targets;
+        }
+      }
+    },
+    image: { createImagePacker: () => ({
+      packToData(_pixels, options) {
+        steps.push('encode');
+        assert.equal(options.format, 'image/png');
+        return bytes;
+      },
+      release: () => steps.push('release packer')
+    }) },
+    fileIo: {
+      OpenMode: { WRITE_ONLY: 1, TRUNC: 2 },
+      open(uri) { steps.push('open'); assert.equal(uri, targets[0]); return { fd: 7 }; },
+      write(fd, data) { steps.push('write'); assert.equal(fd, 7); assert.equal(data, bytes); return bytes.byteLength; },
+      close: () => steps.push('close')
+    }
+  });
+  const pixels = {
+    getImageInfoSync: () => ({ size: { width: 240, height: 370 } }),
+    crop(region) {
+      steps.push('crop');
+      assert.deepEqual(region, { x: 3, y: 56, size: { width: 237, height: 299 } });
+    },
+    release: () => steps.push('release pixels')
+  };
+  const context = { windowStage: { getMainWindowSync: () => ({
+    snapshot() { steps.push('snapshot'); return pixels; }
+  }) } };
+  const ui = { getHostContext: () => context, vp2px: value => value * 2.5 };
+  const area = { globalPosition: { x: 1, y: 22.1 }, width: 100, height: 120 };
+  assert.equal(await capture(ui, area), true);
+  assert.deepEqual(steps, ['snapshot', 'crop', 'pick', 'encode', 'open', 'write', 'close', 'release packer', 'release pixels']);
+
+  targets = [];
+  steps.length = 0;
+  assert.equal(await capture(ui, area), false);
+  assert.deepEqual(steps, ['snapshot', 'crop', 'pick', 'release pixels']);
+});

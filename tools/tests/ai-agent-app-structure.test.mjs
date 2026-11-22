@@ -1,3 +1,5 @@
+import { isWideLandscapeWindow } from '../../entry/src/main/ets/model/AppLayoutState.ts';
+import { useHomeActionWheels, HOME_LANDSCAPE_ACTIONS, HOME_DIRECT_ACTION_IDS } from '../../entry/src/main/ets/model/HomeLayout.ts';
 import { deckDetailShortcut, deckDetailShortcuts } from '../../entry/src/main/ets/model/DeckDetailShortcut.ts';
 import { browserDisplayKeys } from '../../entry/src/main/ets/model/BrowserPreferences.ts';
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -12,7 +14,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { OFFICIAL_HELP_LINKS } from '../../entry/src/main/ets/model/OfficialCommunity.ts';
 import { SETTINGS_GROUPS, SOFTWARE_HELP_ITEMS, settingsItem, visibleSettingsGroups } from '../../entry/src/main/ets/model/SettingsStructure.ts';
 import { buildAgentAppStructure, agentInterfaceRevision } from '../../entry/src/main/ets/model/agent/AgentAppStructure.ts';
-import { isDoubleColumnDeckListStyle } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
+import { deckListColumnCount } from '../../entry/src/main/ets/model/DeckListAppearance.ts';
 import { homeSyncIndicator, homeSyncLabelKey } from '../../entry/src/main/ets/model/HomeSyncStatusController.ts';
 import { OFFICIAL_ANNOUNCEMENTS_ENABLED } from '../../entry/src/main/ets/model/官方公告配置.ts';
 import { agentSettingDefinitions, decodeSettingsArguments } from '../../entry/src/main/ets/model/agent/AgentSettingsTools.ts';
@@ -28,7 +30,7 @@ const strings = locale => new Map(JSON.parse(readFileSync(new URL(`../../entry/s
 const zh = strings('base'), en = strings('en_US');
 const context = {simple:true,agent:true,cloudDeck:false,themeHasTextures:false};
 const localize = key => { assert.ok(zh.has(key), 'missing UI resource: '+key); return zh.get(key); };
-const tools = agentFunctionTools(100,'assistant');
+const tools = agentFunctionTools('assistant');
 const structure = (state=context, surface='app', section='') => buildAgentAppStructure(state,surface,section,localize,agentSettingDefinitions(),tools,[]);
 
 test('JIDE web cognition includes DeepSeek shared credentials and the actual enabled provider',()=>{
@@ -143,13 +145,26 @@ test('the add-note template icon retains its localized action and editor destina
   }
 });
 
+test('settings publishes the effective column count to JIDE across compact and expanded landscape windows', () => {
+  const tracker = new AppInterfaceTracker();
+  const Settings = pageMethods('components/设置面板.ets', ['wideSettings', 'publishInterface'],
+    { isWideLandscapeWindow, appInterface: tracker, settingsHeaderControls });
+  const panel = new Settings();
+  Object.assign(panel, { activeSection: '', 简洁模式: true, 显示模式菜单: false });
+  for (const [width, height, columns] of [[672,460,'2'],[940,664,'2'],[600,400,'2'],[599,400,'1'],[460,672,'1'],[664,940,'1']]) {
+    panel.windowSize = { width, height };
+    panel.publishInterface();
+    assert.equal(tracker.snapshot()[0].values.find(item => item.id === 'directory_columns').value, columns);
+  }
+});
+
 test('icon controls retain names and current mode in shared UI and JIDE observations', () => {
   const uiIcons = loadPlatformModule('utils/AppInterfaceText.ets', 'interfaceControlIcon', { $r: key => key });
   for (const labels of [zh, en]) for (const simple of [true, false]) for (const menuOpen of [false, true]) {
     const tracker = new AppInterfaceTracker();
-    const Settings = pageMethods('components/设置面板.ets', ['publishInterface'], { appInterface: tracker, settingsHeaderControls });
+    const Settings = pageMethods('components/设置面板.ets', ['wideSettings', 'publishInterface'], { isWideLandscapeWindow, appInterface: tracker, settingsHeaderControls });
     const panel = new Settings();
-    Object.assign(panel, { activeSection: '', 简洁模式: simple, 显示模式菜单: menuOpen });
+    Object.assign(panel, { windowSize: { width: 400, height: 800 }, pageToolbarScope: {enabled:false}, activeSection: '', 简洁模式: simple, 显示模式菜单: menuOpen });
     panel.publishInterface();
     const snapshot = tracker.snapshot();
     const current = buildAgentAppStructure({ ...context, simple }, 'settings', '', key => labels.get(key),
@@ -213,8 +228,7 @@ test('JIDE reads current Core rendering ownership and the same supported TTS par
   assert.equal(editor.toolMenu.neutralControl,undefined);assert.equal(editor.toolMenu.mouseNotchesPerTool,2);
   assert.equal(editor.toolMenu.formatSelection,'independent_multiple_format_toggles');
   assert.equal(editor.toolMenu.foldingSelection,'collapse_preserves_formats_reopen_resets_formats');
-  assert.equal(editor.modeControlPlacement,'note_field_header_compact_current_mode_toggle; other_rich_inputs_keep_local_mode_controls');
-  assert.equal(editor.modeControlWideMinWidth,480); assert.equal(editor.modeControlRailWidth,96);
+  assert.equal(editor.modeControlPlacement,'single_compact_current_mode_toggle_at_field_header_or_above_standalone_editor');
   assert.equal(editor.expandControlPlacement,'inside_bottom_right_of_each_input');
   assert.deepEqual(editor.modeTools.map(tool=>[tool.id,zh.get(tool.titleKey),tool.editing]),[
     ['visual','可视编辑','visual_mode_preserving_html'],['source_edit','源码编辑','whole_field_source_including_media_references_preserving_html']]);
@@ -279,10 +293,10 @@ test('the real browser batch menu respects the current Agent capability gate', (
 
 test('settings card counts and item visibility use the UI mode and current theme, without inventing conditional states', () => {
   const simple=structure(context,'settings','scheduler');
-  assert.equal(simple.visibleSettingsSectionCount,10); assert.equal(simple.sections[0].cardCount,2);
+  assert.equal(simple.visibleSettingsSectionCount,11); assert.equal(simple.sections[0].cardCount,2);
   assert.equal(simple.sections[0].cards.find(x=>x.id==='algorithm').visible,false);
   const full=structure({...context,simple:false},'settings','scheduler');
-  assert.equal(full.visibleSettingsSectionCount,10); assert.equal(full.sections[0].cardCount,4);
+  assert.equal(full.visibleSettingsSectionCount,11); assert.equal(full.sections[0].cardCount,4);
   for(const state of [context,{...context,simple:false,agent:false}]) for(const section of structure(state).sections) {
     assert.equal(section.cardCount,visibleSettingsGroups(section.id,state.simple,state.agent).length);
   }
@@ -290,7 +304,9 @@ test('settings card counts and item visibility use the UI mode and current theme
   const appearance=structure(context,'settings','appearance').sections[0].cards[0].items;
   assert.equal(appearance.find(x=>x.id==='theme_motion').visibility,'hidden');
   assert.equal(structure({...context,themeHasTextures:true},'settings','appearance').sections[0].cards[0].items.find(x=>x.id==='theme_motion').visibility,'available_in_section');
-  const sync=structure(context,'settings','sync').sections[0].cards[0].items;
+  const syncCards=structure(context,'settings','sync').sections[0].cards;
+  assert.deepEqual(syncCards.slice(0,2).map(card=>card.id),['sync','huawei_cloud']);
+  const sync=syncCards.find(card=>card.id==='sync').items;
   assert.equal(sync.find(x=>x.id==='sync_account').visibility,'conditional');
   assert.ok(sync.find(x=>x.id==='sync_password').sensitive);
 });
@@ -322,7 +338,7 @@ test('setting knowledge and the current tool declarations remain separate from p
 
 test('real menu components enumerate the same options as JIDE and dispatch every callback exactly once', () => {
   for(const [file,name,surface,callbacks] of [
-    ['components/home/主页更多面板.ets','主页更多面板','home_more',{history:'onHistory',settings:'设置回调',stats:'统计回调',reminders:'提醒回调',software_help:'onSoftwareHelp',keyboard:'onKeyboard'}],
+    ['components/home/主页更多面板.ets','主页更多面板','home_more',{history:'onHistory',settings:'设置回调',stats:'统计回调',leaderboard:'onLeaderboard',reminders:'提醒回调',software_help:'onSoftwareHelp',keyboard:'onKeyboard'}],
     ['components/主页操作面板.ets','主页操作面板','home_create',{create_deck:'创建牌组回调',filtered_deck:'onCreateFilteredDeck',import:'导入牌组回调',cloud_deck:'获取直链牌组回调'}]
   ]) {
     const tracker=new AppInterfaceTracker();
@@ -330,7 +346,8 @@ test('real menu components enumerate the same options as JIDE and dispatch every
       DECK_LIST_NARROW_KEY:'deckListNarrow',AI_AGENT_CHANNELS_APP_STORAGE_KEY:'aiAgentChannelsEnabled',简洁模式AppStorage键:'simpleMode'});
     const menu=new Menu();menu.getUIContext=()=>({});const calls=[];
     for(const [id,callback] of Object.entries(callbacks)) menu[callback]=()=>calls.push(id);
-    for(const state of [context,{...context,simple:false,agent:false,cloudDeck:true}]){
+    for(const state of [context,{...context,simple:false,agent:false,cloudDeck:true,leaderboardHidden:true}]){
+      menu.leaderboardHidden=state.leaderboardHidden;
       menu.简洁模式=state.simple;menu.Agent入口已启用=state.agent;menu.显示获取直链牌组=state.cloudDeck;
       assert.deepEqual(menu.menuItems(),visibleInterfaceItems(surface,state));
       menu.aboutToAppear(); assert.deepEqual(tracker.snapshot()[0].optionIds,menu.menuItems().map(x=>x.id));
@@ -601,7 +618,7 @@ test('deck detail observations follow the real snapshot and point to the shared 
 
 test('home selection refreshes knowledge without waking unrelated collection work', () => {
   const tracker=new AppInterfaceTracker();
-  const Page=pageMethods('pages/首页.ets',['previewDeckChanged','homeActionControls','publishHomeInterface'],{appInterface:tracker,HOME_SYNC_CHOICES,OFFICIAL_ANNOUNCEMENTS_ENABLED,isDoubleColumnDeckListStyle,homeSyncIndicator,homeSyncLabelKey});
+  const Page=pageMethods('pages/首页.ets',['sideWheelLayout','previewDeckChanged','homeAnnouncementsEnabled','homeActionControls','publishHomeInterface'],{useHomeActionWheels,HOME_LANDSCAPE_ACTIONS,HOME_DIRECT_ACTION_IDS,appInterface:tracker,HOME_SYNC_CHOICES,remoteAnnouncementsEnabled: () => true, OFFICIAL_ANNOUNCEMENTS_ENABLED,deckListColumnCount,homeSyncIndicator,homeSyncLabelKey});
   const page=Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null });let invalidations=0;
   Object.assign(page,{homeDisposed:false,加载状态:'ready',当前断点:'xs',deckMenuId:'',deckListStyle:'single_wide',显示今日进度卡:true,homeAgentEnabled:true,syncAccountState:'normal',syncIndicator:'hidden',syncStatusText:'',选中的牌组ID:'d2',牌组数据源:{snapshotDecks:()=>[{id:'d1',name:'Visible'}]},
     homeActivity:()=>({collectionBusy:false}),deckPreviewSession:{invalidate:()=>invalidations++},
@@ -617,7 +634,7 @@ test('home selection refreshes knowledge without waking unrelated collection wor
   page.deckMenuId='';page.publishHomeInterface();assert.equal(highlightedId(),'');
   assert.equal(tracker.snapshot()[0].selectedId,'d2','visual dismissal retains the logical deck selection');
   const structure=buildAgentAppStructure(context,'home','',localize,[],[],tracker.snapshot());
-  assert.equal(structure.observations.find(v=>v.surface==='home').values.find(v=>v.id==='official_announcements_enabled').value,'false');
+  assert.equal(structure.observations.find(v=>v.surface==='home').values.find(v=>v.id==='official_announcements_enabled').value,'true');
   for (const style of ['single_wide','single_narrow','double_wide','double_narrow']) {
     page.deckListStyle=style; page.publishHomeInterface();
     const values=new Map(tracker.snapshot()[0].values.map(value=>[value.id,value.value]));
@@ -633,11 +650,13 @@ test('home selection refreshes knowledge without waking unrelated collection wor
     assert.equal(values.get('deck_list_columns'),style.startsWith('double')?'2':'1');
     assert.equal(values.get('deck_study_counts_visible'),String(!style.startsWith('double')));
   }
+  page.homeLayoutMode='wheel';page.homeViewportWidth=940;page.homeViewportHeight=660;
   for(const breakpoint of ['sm','md']) {
     page.当前断点=breakpoint;page.publishHomeInterface();
-    assert.equal(tracker.snapshot()[0].values.find(value=>value.id==='home_action_position').value,'above_summary');
+    assert.equal(tracker.snapshot()[0].values.find(value=>value.id==='home_action_position').value,'left_grid');
     assert.equal(highlightedId(),'d2');
   }
+  page.syncChoices = HOME_SYNC_CHOICES.filter(item => !item.id.startsWith('huawei_cloud_'));
   page.syncChoiceVisible = true; page.publishHomeInterface();
   const choice = tracker.snapshot().find(view => view.surface === 'home_sync_choice');
   assert.deepEqual(choice.items.map(item => item.id), ['cloud', 'device', 'close']);
@@ -645,7 +664,7 @@ test('home selection refreshes knowledge without waking unrelated collection wor
   for (const labels of [zh, en]) {
     const result = buildAgentAppStructure(context, 'home_sync_choice', '', key => labels.get(key), agentSettingDefinitions(), tools, tracker.snapshot());
     const surface = result.surfaces.find(item => item.id === 'home_sync_choice');
-    assert.deepEqual(surface.items.slice(0, 2).map(item => item.title), HOME_SYNC_CHOICES.map(item => labels.get(item.titleKey)));
+    assert.deepEqual(surface.items.filter(item => item.visibility === 'observed' && item.id !== 'close').map(item => item.title), page.syncChoices.map(item => labels.get(item.titleKey)));
   }
   page.syncChoiceVisible = false; page.publishHomeInterface();
   assert.equal(tracker.snapshot().some(view => view.surface === 'home_sync_choice'), false);
@@ -688,11 +707,11 @@ test('JIDE input and header share the actual history, parsing, stop and readines
 test('actual JIDE publisher exposes state without recursively including chat, imported body or credentials', () => {
   const tracker = new AppInterfaceTracker();
   const Page = pageMethods('pages/AI制卡页.ets',['interfaceControls','interfaceLabel','interfaceEnabled','publishInterface'],
-    {...textDependencies(tracker),agentInterfaceControls,agentInterfaceTitle});
+    {...textDependencies(tracker),agentInterfaceControls,agentInterfaceTitle,deviceInfo:{deviceType:'2in1'}});
   const page = Object.assign(new Page(), { recoveryMessage: '', resultMessage: '', resultUndo: null });
   Object.assign(page,{interfaceMounted:true,pageDisposed:false,pageMode:'assistant',显示历史区:false,处理中:false,
     文件解析中:false,cardBatch:{isRunning:()=>false},hasPendingClarification:()=>false,canSubmit:()=>true,
-    conversationId:'current',输入草稿:'PRIVATE_DRAFT',消息列表:[{正文:'PRIVATE_CHAT'}],targetSelectionMessage:-1,
+    externalRunning:true,externalToken:'PRIVATE_MCP_TOKEN',conversationId:'current',输入草稿:'PRIVATE_DRAFT',消息列表:[{正文:'PRIVATE_CHAT'}],targetSelectionMessage:-1,
     错误信息:'PRIVATE_ERROR',AI配置:{apiKey:'PRIVATE_KEY'},
     导入文件列表:[{id:'file1',name:'example.txt',text:'PRIVATE_FILE',path:'PRIVATE_PATH'}],getUIContext:()=>({})});
   page.publishInterface();
@@ -702,6 +721,7 @@ test('actual JIDE publisher exposes state without recursively including chat, im
   assert.equal(current.surfaces[0].items.find(x=>x.id==='new').visibility,'hidden');
   assert.equal(current.surfaces[0].items.find(x=>x.id==='submit').enabled,true);
   assert.ok(!JSON.stringify(current).includes('PRIVATE_'));
+  assert.ok(!current.observations[0].values.some(item=>item.id.startsWith('external_mcp_')));
   page.处理中=true;page.canSubmit=()=>false;page.publishInterface();
   current=buildAgentAppStructure(context,'agent','',key=>en.get(key),[],[],tracker.snapshot());
   assert.equal(current.surfaces[0].items.find(x=>x.id==='submit').title,en.get('ai_agent_cancel'));
@@ -783,10 +803,11 @@ test('reminder form shares its mode labels, actual time options, draft metadata 
   form.aboutToDisappear();form.publishInterface();assert.equal(tracker.snapshot().length,0);
 });
 
-test('home More opens the shared settings links while startup intro has no menu entry', () => {
+test('About lives in settings and is absent from home More', () => {
   const menu = APP_INTERFACE_SURFACES.find(surface => surface.id === 'home_more');
   assert.equal(menu.items.some(item => item.opens === 'intro'), false);
-  assert.equal(menu.items.find(item => item.id === 'software_help').opens, 'software_help');
+  assert.equal(menu.items.some(item => item.id === 'software_help'), false);
+  assert.equal(SETTINGS_GROUPS.find(group=>group.id==='about').titleKey,'settings_about_title');
   const help = APP_INTERFACE_SURFACES.find(surface => surface.id === 'software_help');
   assert.deepEqual(help.items.slice(0, -1).map(item => item.id), SOFTWARE_HELP_ITEMS.map(item => item.id));
   for (const link of OFFICIAL_HELP_LINKS) assert.equal(settingsItem(link.id).titleKey, link.titleKey);

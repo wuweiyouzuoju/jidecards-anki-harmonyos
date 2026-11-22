@@ -54,6 +54,7 @@ function createStore(initial = {}, options = {}) {
   const js = stripTypeScriptTypes(source, { mode: 'transform' });
   const injected = {
     ...protocol, ...catalog,
+    restoreRemoteEntitlements: options.restoreRemoteEntitlements ?? (async () => {}),
     REDEMPTION_PUBLIC_KEY: keys.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
     cryptoFramework,
     preferences: { getPreferencesSync: () => prefs },

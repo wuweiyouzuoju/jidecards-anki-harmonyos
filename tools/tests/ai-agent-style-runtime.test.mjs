@@ -46,7 +46,7 @@ const original = { id: 2, name: 'Shared * name', css: '.card { background: white
  type:0,sortf:0,latexPre:'preserve metadata' };
 function harness(mode = 'edit') {
  Object.assign(fixture,{json:JSON.stringify(original),count:2507,writes:[],queries:[],failure:false,ignoreWrite:false});
- const scope=new AgentScope();scope.registerReadableNotetypeIds([2]);scope.configureBatchLimit(1);
+ const scope=new AgentScope();scope.registerReadableNotetypeIds([2]);
  const registry=new AgentToolRegistry();new HighRiskAgentTools(scope).register(registry,mode);
  return {scope,registry};
 }
@@ -63,7 +63,7 @@ for(const mode of ['create','edit']) {
  test(`${mode}: declared style tools really draft and save shared CSS for 2507 cards without replacing templates`,async()=>{
   const {registry}=harness(mode);
   for(const name of ['propose_update_card_style','propose_update_note_type_templates']) {
-   assert.ok(agentFunctionTools(1,mode).some(t=>t.name===name));
+   assert.ok(agentFunctionTools(mode).some(t=>t.name===name));
   }
   const {draft,outputJson}=await registry.execute(call());
   assert.equal(JSON.parse(outputJson).affectedCardCount,2507);
@@ -106,14 +106,10 @@ test('bad templates fail before confirmation and do not consume draft ID',async(
  assert.equal(fixture.writes.length,0);
 });
 
-test('real template changes retain batch limits while omitted CSS is preserved',async()=>{
- const {registry,scope}=harness();const templates=[{...original.tmpls[0],qfmt:'<b>{{Front}}</b>'}];
- await assert.rejects(registry.execute(call('propose_update_note_type_templates',{templateJson:JSON.stringify(templates)})),
-  e=>e.code==='high_risk_batch_too_large');
- fixture.count=2;
- await assert.rejects(registry.execute(call('propose_update_note_type_templates',{templateJson:JSON.stringify(templates)})),/tool_batch_too_large/);
- scope.configureBatchLimit(2);
+test('template changes cover the entire affected collection and preserve omitted CSS',async()=>{
+ const {registry}=harness();const templates=[{...original.tmpls[0],qfmt:'<b>{{Front}}</b>'}];
  const {draft}=await registry.execute(call('propose_update_note_type_templates',{templateJson:JSON.stringify(templates)}));
+ assert.equal(draft.affectedCardIds.length, fixture.count);
  assert.equal(JSON.parse(draft.operations[0].after).css,original.css);
  assert.equal((await save(draft)).status,'completed');
  assert.deepEqual(JSON.parse(fixture.json).tmpls,templates);

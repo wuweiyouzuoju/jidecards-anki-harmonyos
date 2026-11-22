@@ -5,6 +5,7 @@ import {loadSharedMenu} from './shared-menu-harness.mjs';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { surfaceMotionApi } from './motion-harness.mjs';
+import { materialHarness } from './surface-material-harness.mjs';
 import { loadComponentLogic, loadPlatformModule, loadPlatformSource } from './platform-module-harness.mjs';
 import { ActionMenuPointerSide } from '../../entry/src/main/ets/components/common/ActionMenuLayout.ts';
 
@@ -119,10 +120,7 @@ test('popup trigger snapshots expire and can only be consumed once',()=>{
 test('stable popup buttons keep the same fill, gradient, opacity and scale on press and release',()=>{
  const Press=loadPlatformModule('utils/PressFeedback.ets','PressFeedback',surfaceMotionApi('lively'));
  const Surface=loadPlatformModule('utils/GlassSurface.ets','GlassSurface',{
-  PressFeedback:Press,Color:{Transparent:'transparent'},BlurStyle:{NONE:0},
-  usesGlassMaterial:()=>true,darkMaterial:()=>false,translucentGlassFill:()=> '#52FFFFFF',
-  themePressGradient:(_colors,pressed)=>[[pressed?'bright':'rest',0]],
-  SeriesVisual:{shadow:()=>({radius:8})},SurfaceBorder:{options:()=>({width:0})}
+  ...materialHarness('glass'), PressFeedback:Press
  });
  const paint=method=>{
   const state={},node=new Proxy({}, {get:(_t,key)=>(value)=>{state[key]=value;return node;}});

@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { loadComponentLogic } from './platform-module-harness.mjs';
+import { 文本中的填空编号 } from '../../entry/src/main/ets/model/填空解析器.ts';
 import { NoteMediaSession } from '../../entry/src/main/ets/model/NoteMediaSession.ts';
 import { noteMediaParts, noteImagePreviewSource } from '../../entry/src/main/ets/model/NoteMediaParts.ts';
-import { noteVisualInterfaceObservation, AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { NOTE_AUDIO_GENERATE_TITLE } from '../../entry/src/main/ets/model/NoteAudioDraft.ts';
+import { noteVisualInterfaceObservation, noteSpeechInterfaceObservation, AppInterfaceTracker } from '../../entry/src/main/ets/model/AppInterface.ts';
 
 export function mediaDialogHarness(select = async () => [], initial = {}, tracker = new AppInterfaceTracker()) {
   const events = [];
   const Dialog = loadComponentLogic('components/editor/NoteMediaDialog.ets', 'NoteMediaDialog', {
-    NoteMediaSession, noteMediaParts, noteImagePreviewSource, noteVisualInterfaceObservation,
+    NoteMediaSession, noteMediaParts, noteImagePreviewSource, noteVisualInterfaceObservation, 文本中的填空编号,
+    APP_FOREGROUND_KEY: 'foreground', NOTE_AUDIO_GENERATE_TITLE, noteSpeechInterfaceObservation,
+    noteSpeechText: initial.noteSpeechText ?? (async value => value),
+    NoteSpeech: class { cancel() {} async generate(text) { return initial.synthesizeSpeech?.(text); } },
     noteVisualKind: initial.noteVisualKind ?? (async () => 'image'),
     appInterface: {
       observe: value => { events.push(['observe', value]); return tracker.observe(value); },

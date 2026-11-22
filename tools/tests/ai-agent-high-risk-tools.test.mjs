@@ -40,10 +40,8 @@ test('proposal module performs no destructive or structural write', () => {
   assert.doesNotMatch(source, /\.更新笔记\(|\.添加笔记\(/);
 });
 
-test('high-risk drafts use real cards and refuse more than the hard ceiling', () => {
+test('high-risk drafts retain their confirmation baseline', () => {
   const source = fs.readFileSync(target, 'utf8');
-  assert.match(source, /MAX_BATCH_LIMIT/);
-  assert.match(source, /high_risk_batch_too_large/);
   assert.match(source, /baselineHash/);
   assert.match(source, /status:\s*'pending'/);
 });

@@ -161,3 +161,16 @@ test('the six declared pages include About and omit the start-choice page',async
   assert.equal(homeIntroTarget(5,false,true),1);
   assert.equal(homeIntroTarget(5,false,false),4);
 });
+
+test('reopening unfinished onboarding skips the appearance question after its reply was accepted', async () => {
+  const {loadComponentLogic}=await import('./platform-module-harness.mjs');
+  for(const pending of [true,false]) {
+    const Panel=loadComponentLogic('components/HomeIntroPanel.ets','HomeIntroPanel',{
+      GLASS_SUGGESTION_PENDING_KEY:'pending',AppStorage:{get:()=>pending}
+    });
+    const view=new Panel();let published=0;view.publishInterface=()=>{published++;};
+    view.aboutToAppear();
+    assert.equal(view.pageIndex,pending?0:1);
+    assert.equal(published,1);
+  }
+});

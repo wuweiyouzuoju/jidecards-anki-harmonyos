@@ -10,10 +10,12 @@ test('玻璃折射保持中心、边缘向内采样且左右对称', () => {
   assert.equal(glassDistance(20,0,200,80,20),0);
   assert.ok(glassDistance(0,0,200,80,20)>0);
 });
-test('圆角采样沿双轴平滑弯曲且过渡带内端无位移',()=>{
-  const p=glassSample(6,6,200,80,20,14,9);
+test('圆角折射沿双轴对称，过渡带内端平滑接续整面透镜',()=>{
+  const p=glassSample(6,6,200,200,20,14,9);
   assert.ok(p.x>6 && p.y>6); assert.ok(Math.abs(p.x-p.y)<1e-8);
-  assert.deepEqual(glassSample(14,40,200,80,20,14,9),{x:14,y:40});
+  const before=glassSample(13.999,40,200,80,20,14,9),after=glassSample(14.001,40,200,80,20,14,9);
+  assert.ok(Math.hypot(before.x-after.x,before.y-after.y)<.01);
+  assert.ok(after.x>14.001, 'the inner lens remains active after the rim displacement ends');
 });
 test('网格有界、三角形索引有效，极小尺寸不产生NaN',()=>{
   for(const [w,h,r] of [[200,80,20],[32,32,16],[1,1,20],[1200,2000,24]]) {

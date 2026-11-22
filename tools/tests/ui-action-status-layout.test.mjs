@@ -2,15 +2,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { stripTypeScriptTypes } from 'node:module';
 import { hasActionStatus } from '../../entry/src/main/ets/model/InteractionFeedback.ts';
-import { agentComposerLabelKeys, agentInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
+import { agentInterfaceControls } from '../../entry/src/main/ets/model/AppInterface.ts';
 import { loadPlatformModule } from './platform-module-harness.mjs';
 
 const root = new URL('../../entry/src/main/ets/', import.meta.url);
 const read = file => readFileSync(new URL(file, root), 'utf8').replaceAll('\r\n', '\n');
 const dimensions = loadPlatformModule('utils/应用尺寸.ets', '应用尺寸', {});
-const page = read('pages/AI制卡页.ets');
 const resources = locale => new Map(JSON.parse(readFileSync(new URL(
   `../../entry/src/main/resources/${locale}/element/string.json`, import.meta.url), 'utf8')).string
   .map(item => [item.name, item.value]));
@@ -40,14 +38,14 @@ test('status glyphs keep their slot and visual size independent of the body font
   const source = read('components/common/ActionStatus.ets');
   const build = source.match(/build\(\) \{\s*Stack\(\) \{([\s\S]*?)\n    }(\.[\s\S]*?)\n  }/);
   assert.ok(build);
-  const render = new Function('LoadingProgress', 'Text', 'TransitionEffect', 'motionAnimation',
+  const render = new Function('appearanceTextColor', 'LoadingProgress', 'Text', 'TransitionEffect', 'motionAnimation',
     'currentMotionProfile', build[1]);
   const apply = new Function('node', 'HitTestMode', 'return node' + build[2]);
   for (const glyphSize of [12, 18]) {
     for (const phase of ['idle', 'busy', 'success', 'failure']) {
       const host = { glyphSize, phase, tint: 'theme' }, glyphs = [];
       const glyph = () => { const captured = recorder(); glyphs.push(captured.attrs); return captured.node; };
-      render.call(host, glyph, glyph, { OPACITY: { animation: value => value } }, value => value, () => ({ statusMs: 120 }));
+      render.call(host, loadPlatformModule('utils/AppearanceElements.ets','appearanceTextColor',{}), glyph, glyph, { OPACITY: { animation: value => value } }, value => value, () => ({ statusMs: 120 }));
       const slot = recorder(); apply.call(host, slot.node, { None: 'none' });
       assert.equal(slot.attrs.width, glyphSize + 2); assert.equal(slot.attrs.height, glyphSize + 2);
       assert.equal(glyphs.length, phase === 'idle' ? 0 : 1);
@@ -65,7 +63,7 @@ test('icon buttons keep their real action icon for absent or unsupported feedbac
   for (const feedback of ['', 'idle', 'attention', 'unknown', 'busy', 'success', 'failure']) {
     const drawn = [];
     const host = { feedback, source: 'sync', controlGlyphSize: 24,
-      resolvedIconFill: () => 'clear', resolvedGlyphColor: () => 'theme' };
+      resolvedIconFill: () => 'clear', resolvedGlyphColor: () => 'theme', densityScale: () => 1 };
     render.call(host, () => drawn.push('icon'), () => drawn.push('status'), hasActionStatus);
     assert.deepEqual(drawn, [hasActionStatus(feedback) ? 'status' : 'icon']);
   }
@@ -89,74 +87,19 @@ test('cancelled sync results do not retain an empty leading status slot or claim
   }
 });
 
-test('composer width reserves every real import, parse, send and cancel label in both languages', () => {
-  const keys = agentComposerLabelKeys();
-  const builder = page.match(/private composerLabelWidth\(\) \{([\s\S]*?)\n  }/)?.[1];
-  assert.ok(builder);
-  assert.equal((page.match(/this\.composerLabelWidth\(\)/g) ?? []).length, 2, 'both buttons use the same measurement');
-  const render = new Function('ForEach', 'Text', 'agentComposerLabelKeys', 'localizedNamedResourceText', '应用尺寸',
-    stripTypeScriptTypes(builder, { mode: 'transform' }));
-  for (const [locale, folder] of [['zh-Hans', 'base'], ['en', 'en_US']]) {
-    const strings = resources(folder), measured = [], itemKeys = [];
-    render.call({ uiLanguage: locale, getUIContext: () => ({}) },
-      (items, draw, keyFor) => items.forEach(key => { itemKeys.push(keyFor(key)); draw(key); }),
-      label => { measured.push(label); return recorder().node; }, agentComposerLabelKeys,
-      (_context, _language, key) => strings.get(key), dimensions);
-    assert.deepEqual(measured, keys.map(key => strings.get(key)));
-    assert.ok(measured.every(label => typeof label === 'string' && label.length > 0));
-    assert.ok(itemKeys.every(key => key.startsWith(locale + '-')), 'language switches rebuild the measurement');
-    for (const processing of [false, true]) for (const parsing of [false, true]) {
-      const controls = agentInterfaceControls({ history: false, memory: false, processing, parsing,
-        batchRunning: false, pendingClarification: false, canSubmit: true });
-      for (const control of controls.filter(item => item.id === 'import' || item.id === 'submit')) {
-        assert.ok(keys.includes(control.titleKey), 'reserve actual state label: ' + control.titleKey);
-      }
+test('composer controls use the existing icons and localize their current action', () => {
+  for (const processing of [false, true]) for (const recording of [false, true]) {
+    const context = { history: false, processing, parsing: false, batchRunning: false,
+      pendingClarification: false, canSubmit: true, voiceAvailable: true,
+      voiceState: recording ? 'recording' : '' };
+    const controls = agentInterfaceControls(context);
+    const byId = id => controls.find(item => item.id === id);
+    assert.equal(byId('import').iconKey, 'ic_home_new');
+    assert.equal(byId('voice').iconKey, recording ? 'ic_audio_recording' : 'ic_audio_record_on');
+    assert.equal(byId('submit').iconKey, processing ? 'ic_common_close' : 'ic_common_arrow_up');
+    for (const folder of ['base','en_US']) {
+      const strings = resources(folder);
+      for (const id of ['import','voice','submit']) assert.ok(strings.get(byId(id).titleKey));
     }
   }
-});
-
-test('composer hides every busy spinner and retains only completed request feedback', () => {
-  const composer = page.slice(page.indexOf('private 输入区()'), page.indexOf('\n  build()'));
-  const branch = composer.match(/if \(!this\.处理中[\s\S]*?\n              }/)?.[0];
-  assert.ok(branch);
-  const render = new Function('ActionStatus', 'hasActionStatus', '应用尺寸', '$r', branch);
-  for (const processing of [false, true]) for (const requestFeedback of ['', 'idle', 'busy', 'success', 'failure', 'unknown']) {
-    const status = recorder(); let props;
-    render.call({ 处理中: processing, requestFeedback }, value => { props = value; return status.node; },
-      hasActionStatus, dimensions, key => key);
-    if (processing || !['success', 'failure'].includes(requestFeedback)) {
-      assert.equal(props, undefined, 'processing must never render a spinner, including stale completion feedback');
-      continue;
-    }
-    assert.equal(props.phase, requestFeedback);
-    const slotSize = props.glyphSize + 2;
-    const left = dimensions.卡片内边距 + status.attrs.position.x;
-    assert.ok(left >= 0); assert.ok(left + slotSize < dimensions.卡片内边距);
-    assert.equal(status.attrs.position.y, '50%'); assert.equal(status.attrs.markAnchor.y, slotSize / 2);
-  }
-});
-
-test('paired composer buttons have equal final widths including both padding and borders', () => {
-  const composer = page.slice(page.indexOf('private 输入区()'), page.indexOf('\n  build()'));
-  const styles = [...composer.matchAll(/\n          Button\(\) \{[\s\S]*?\n          }([\s\S]*?)(?=\n          Button\(\)|\n        }\n      })/g)];
-  assert.equal(styles.length, 2);
-  const SurfaceBorder = loadPlatformModule('utils/SurfaceBorder.ets', 'SurfaceBorder', {
-    应用尺寸: dimensions, $r: key => key
-  });
-  const frames = styles.map(match => {
-    const capture = recorder();
-    new Function('control', '应用尺寸', 'SurfaceBorder', 'PressFeedback', 'Color', '$r', 'insetMaterialFill',
-      stripTypeScriptTypes('function render() { return control' + match[1] + '; }', { mode: 'transform' }) +
-        '; return render.call(this);')
-      .call({ interfaceEnabled: () => true, 处理中: false }, capture.node, dimensions, SurfaceBorder,
-        class {}, { Transparent: 'transparent' }, key => key, value => value);
-    return capture.attrs;
-  });
-  for (const measuredLabelWidth of [30, 60, 96]) {
-    const finalWidths = frames.map(frame => measuredLabelWidth + frame.padding.left + frame.padding.right +
-      2 * (frame.border?.width ?? 0));
-    assert.equal(finalWidths[0], finalWidths[1], 'the outline also contributes to the intrinsic width');
-  }
-  assert.equal(frames[0].height, frames[1].height);
-  assert.equal(frames[1].border.color, 'transparent', 'primary fill keeps its original appearance');
 });

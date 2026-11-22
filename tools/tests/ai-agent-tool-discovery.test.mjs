@@ -13,7 +13,7 @@ const load = (discovery, requested) => JSON.parse(discovery.discover(JSON.string
 
 test('fresh requests expose only core schemas and exclude the host discovery flag from the wire', () => {
   for (const mode of ['assistant','create','edit']) {
-    const catalog=filterAgentWebTools(agentFunctionTools(100,mode),false);
+    const catalog=filterAgentWebTools(agentFunctionTools(mode),false);
     const discovery=new AgentToolDiscovery(catalog);
     assert.deepEqual(names(discovery),core);
     const base={model:'test',input:[],instructions:'',functionTools:discovery.definitions(),deferTools:true,
@@ -28,7 +28,7 @@ test('fresh requests expose only core schemas and exclude the host discovery fla
 });
 
 test('Chinese and English queries use the actual catalog and return paginated summaries without schemas', () => {
-  const catalog=agentFunctionTools(100,'assistant');
+  const catalog=agentFunctionTools('assistant');
   for (const query of ['搜索笔记','search_notes']) {
     const discovery=new AgentToolDiscovery(catalog);
     const result=JSON.parse(discovery.discover(JSON.stringify({query,limit:1})));
@@ -46,7 +46,7 @@ test('Chinese and English queries use the actual catalog and return paginated su
 });
 
 test('exact loading preserves original schemas and mode/platform/web filtering; invalid loads are atomic', () => {
-  const catalog=filterAgentWebTools(agentFunctionTools(100,'edit'),false).filter(tool=>tool.name!=='read_document_page');
+  const catalog=filterAgentWebTools(agentFunctionTools('edit'),false).filter(tool=>tool.name!=='read_document_page');
   const discovery=new AgentToolDiscovery(catalog);
   load(discovery,['search_notes','propose_update_notes']);
   assert.deepEqual(discovery.definitions().find(tool=>tool.name==='propose_update_notes'),catalog.find(tool=>tool.name==='propose_update_notes'));
@@ -64,7 +64,7 @@ test('exact loading preserves original schemas and mode/platform/web filtering; 
 });
 
 test('the definition window retains 12 recent domain tools and reloads evicted tools without changing capabilities', () => {
-  const catalog=agentFunctionTools(100,'assistant');
+  const catalog=agentFunctionTools('assistant');
   const domain=catalog.filter(tool=>!core.includes(tool.name)).slice(0,18).map(tool=>tool.name);
   const discovery=new AgentToolDiscovery(catalog);
   load(discovery,domain.slice(0,6));load(discovery,domain.slice(6,12));
