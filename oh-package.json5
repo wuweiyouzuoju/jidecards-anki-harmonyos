@@ -1,0 +1,10 @@
+{
+  "name": "jide_foundation",
+  "version": "0.2.18",
+  "description": "记得系列公共 UI 和纯规则",
+  "main": "Index.ets",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "libjide_glass_gpu.so": "file:./src/main/cpp/types/libjide_glass_gpu"
+  }
+}

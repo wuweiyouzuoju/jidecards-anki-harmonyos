@@ -1,0 +1,20 @@
+[
+  {
+    "id": "jide.commemorative.example.v1",
+    "version": "1",
+    "category": "commemorative",
+    "name": "纪念徽章（示例）",
+    "condition": "活动、周年或特定事件纪念；具体事件与领取条件待用户审查。",
+    "status": "draft",
+    "artwork": { "motif": "commemorative", "colorStep": 4 }
+  },
+  {
+    "id": "jide.contribution.special.v1",
+    "version": "1",
+    "category": "contribution",
+    "name": "特别贡献徽章",
+    "condition": "认可对记得系列的特别贡献；贡献证据及审核标准待用户审查。",
+    "status": "draft",
+    "artwork": { "motif": "contribution", "colorStep": 7 }
+  }
+]

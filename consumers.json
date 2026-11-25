@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "packageName": "jide_foundation",
+  "consumers": [
+    {
+      "project": "jidecube",
+      "packagePath": "entry/oh_modules/jide_foundation",
+      "adapters": [
+        "entry/src/main/ets/ui/ActionIcon.ets",
+        "entry/src/main/ets/ui/PressFeedback.ets",
+        "entry/src/main/ets/ui/CubeChevron.ets",
+        "entry/src/main/ets/ui/CubeIconButton.ets"
+      ],
+      "resourceNames": [
+        "ic_common_history",
+        "ic_common_arrow_left"
+      ]
+    },
+    {
+      "project": "jide-spatial",
+      "packagePath": "entry/oh_modules/jide_foundation",
+      "adapters": [
+        "entry/src/main/ets/components/ActionIcon.ets",
+        "entry/src/main/ets/utils/PressFeedback.ets",
+        "entry/src/main/ets/components/DisclosureChevron.ets",
+        "entry/src/main/ets/components/IconActionButton.ets"
+      ],
+      "resourceNames": [
+        "ic_common_history",
+        "ic_common_arrow_left"
+      ]
+    },
+    {
+      "project": "jidecards",
+      "packagePath": "entry/oh_modules/jide_foundation",
+      "adapters": [
+        "entry/src/main/ets/utils/SeriesVisual.ets"
+      ],
+      "resourceNames": []
+    }
+  ]
+}

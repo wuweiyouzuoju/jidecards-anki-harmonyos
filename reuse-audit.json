@@ -1,0 +1,2701 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-15T07:33:52.903Z",
+  "workspaceRoot": "D:/Projects",
+  "scope": {
+    "source": "jidecards",
+    "inspectedConsumers": [
+      "jidecube",
+      "jideschulte",
+      "jide-spatial",
+      "JideCalc",
+      "jideyanggeqi",
+      "GomokuEvolution",
+      "Sudoku",
+      "ThreeKingdomChess",
+      "yanggeqi"
+    ],
+    "limits": "Explicit provenance/comments/current UI mappings. No claim that undocumented reuse has been ruled out. No product runtime tests executed."
+  },
+  "capabilities": [
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "geometry",
+      "title": "尺寸、排版、页面留白与密度",
+      "sources": [
+        "jidecards/entry/src/main/ets/utils/应用尺寸.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeUi.ts",
+        "jideschulte/entry/src/main/ets/utils/tokens.ets",
+        "jide-spatial/entry/src/main/ets/utils/UiDimensions.ets"
+      ],
+      "coverage": "部分：UiTokens；页面密度仍归产品"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "colors",
+      "title": "明暗语义色与主题资源映射",
+      "sources": [
+        "jidecards/entry/src/main/resources/base/element/color.json",
+        "jidecards/entry/src/main/resources/dark/element/color.json"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/UiResource.ets",
+        "jideschulte/entry/src/main/ets/utils/theme.ets",
+        "jide-spatial/entry/src/main/resources/base/element/color.json"
+      ],
+      "coverage": "部分：六项语义色；完整主题未抽取"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "icons",
+      "title": "SVG 原始资源与明暗图标",
+      "sources": [
+        "jidecards/entry/src/main/resources/base/media/ic_common_history.svg"
+      ],
+      "consumers": [
+        "jidecube/docs/ui-icon-provenance.json",
+        "jideschulte/docs/ui-assets.json",
+        "jide-spatial/source-reuse.json"
+      ],
+      "coverage": "部分已接入公共 HAR：返回/历史两组明暗资源，两个产品移除八份本地副本"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "icon-render",
+      "title": "图标填色、描边和透明度保留",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/ActionIcon.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/ActionIcon.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchulteActionIcon.ets",
+        "jide-spatial/entry/src/main/ets/components/ActionIcon.ets"
+      ],
+      "coverage": "已提炼公共 HAR；魔方/空间真实消费，舒尔特仍为本地适配"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "icon-button",
+      "title": "导航图标按钮、热区与读屏",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/IconActionButton.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeIconButton.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchulteIconButton.ets",
+        "jide-spatial/entry/src/main/ets/components/IconActionButton.ets"
+      ],
+      "coverage": "原生按钮/热区/读屏/禁用/按压已入公共 HAR；魔方/空间保留主题、角标和动效差异"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "text-button",
+      "title": "普通文字按钮、禁用和持续选中",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/按下态按钮.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeStyles.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchulteActionButton.ets",
+        "jide-spatial/entry/src/main/ets/components/SecondaryActionButton.ets"
+      ],
+      "coverage": "部分：普通 ActionButton；选中/危险态未统一"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "primary-action",
+      "title": "主确认与学习/训练主动作",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/PrimaryActionButton.ets",
+        "jidecards/entry/src/main/ets/components/开始学习按钮.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeStyles.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchulteTrainingButton.ets",
+        "jide-spatial/entry/src/main/ets/components/PrimaryActionButton.ets"
+      ],
+      "coverage": "未抽取：52vp 主训练动作和实色主确认不能混为普通按钮"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "settings-action",
+      "title": "设置导航行、说明与动作槽位",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/SettingsActionRow.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeActionRow.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchulteSettingsActionRow.ets",
+        "jide-spatial/entry/src/main/ets/components/SettingsActionRow.ets"
+      ],
+      "coverage": "未抽取"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "settings-toggle",
+      "title": "设置开关行与动态说明",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/SettingsToggleRow.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeStyles.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchulteToggleRow.ets"
+      ],
+      "coverage": "未抽取"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "form-select",
+      "title": "表单选择行、原生下拉及行间距",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/FormSelectRow.ets",
+        "jidecards/entry/src/main/ets/utils/FormRowLayout.ets",
+        "jidecards/entry/src/main/ets/utils/SelectStyle.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeFormSelectRow.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchulteSelectRow.ets",
+        "jideschulte/entry/src/main/ets/utils/FormRowStyle.ets"
+      ],
+      "coverage": "未抽取"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "disclosure",
+      "title": "折叠箭头、方向和状态来源",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/DisclosureChevron.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeChevron.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchulteDisclosureChevron.ets",
+        "jide-spatial/entry/src/main/ets/components/DisclosureChevron.ets"
+      ],
+      "coverage": "几何已提炼公共 HAR；魔方/空间真实消费，旋转与动效仍归产品"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "help-entry",
+      "title": "独立帮助按钮、标题位置与点击隔离",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/HelpButton.ets",
+        "jidecards/entry/src/main/ets/components/common/HelpLabel.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeHelpButton.ets",
+        "jidecube/entry/src/main/ets/ui/CubeHelpLabel.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchulteSectionHeader.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchulteInfoText.ets"
+      ],
+      "coverage": "未抽取"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "help-dialog",
+      "title": "只读帮助/信息弹窗",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/字段帮助面板.ets",
+        "jidecards/entry/src/main/ets/components/common/DialogFrame.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeInfoDialog.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchultePanel.ets"
+      ],
+      "coverage": "仅有通用表面；完整帮助/嵌套返回未抽取"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "dialog-frame",
+      "title": "弹窗外壳、正文预算与安全区",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/DialogFrame.ets",
+        "jidecards/entry/src/main/ets/model/WindowSafeLayout.ts"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeDialogFrame.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchultePanel.ets"
+      ],
+      "coverage": "部分：几何和页面内 DialogSurface；不是完整原生窗口宿主"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "dialog-header",
+      "title": "弹窗标题、关闭/完成与对称槽位",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/DialogHeader.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeDialogHeader.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchultePanel.ets"
+      ],
+      "coverage": "未抽取完整标题契约"
+    },
+    {
+      "relation": "contract-adaptation",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "confirmation",
+      "title": "危险后果确认、取消与返回策略",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/DialogHeader.ets",
+        "jidecards/entry/src/main/ets/components/common/按下态按钮.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeConfirmDialog.ets",
+        "jideschulte/entry/src/main/ets/components/HistoryPanel.ets"
+      ],
+      "coverage": "语义适配；未提供业务确认组件"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "backdrop",
+      "title": "蒙层与表面开合责任",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/common/DialogBackdrop.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeBackdrop.ets",
+        "jideschulte/entry/src/main/ets/components/common/SchultePanel.ets"
+      ],
+      "coverage": "部分：基础蒙层；产品模糊策略有差异"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "transition",
+      "title": "页面/弹层转场与设备尺寸时长",
+      "sources": [
+        "jidecards/entry/src/main/ets/utils/SurfaceTransition.ets",
+        "jidecards/entry/src/main/ets/utils/AppMotion.ets",
+        "jidecards/entry/src/main/ets/utils/转场时长.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeStyles.ets",
+        "jideschulte/entry/src/main/ets/utils/SurfaceTransition.ets",
+        "jide-spatial/entry/src/main/ets/utils/AppMotion.ets"
+      ],
+      "coverage": "仅抽取参数；平台转场未迁入"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "surface-border",
+      "title": "表面、输入和分隔线描边",
+      "sources": [
+        "jidecards/entry/src/main/ets/utils/SurfaceBorder.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/GlassSurface.ets",
+        "jideschulte/entry/src/main/ets/utils/SurfaceBorder.ets"
+      ],
+      "coverage": "部分控件内使用边框；独立轮廓契约未抽取"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "press",
+      "title": "原生按压、恢复与动效档位",
+      "sources": [
+        "jidecards/entry/src/main/ets/utils/PressFeedback.ets",
+        "jidecards/entry/src/main/ets/model/MotionStyle.ts"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/PressFeedback.ets",
+        "jideschulte/entry/src/main/ets/utils/PressFeedback.ets",
+        "jide-spatial/entry/src/main/ets/utils/PressFeedback.ets"
+      ],
+      "coverage": "成熟按压实现已入公共 HAR；魔方/空间保留各自档位读取"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "primary-surface",
+      "title": "按钮表面色层、渐变与稳定底色",
+      "sources": [
+        "jidecards/entry/src/main/ets/utils/PrimaryGlassSurface.ets",
+        "jidecards/entry/src/main/ets/utils/GlassSurface.ets",
+        "jidecards/entry/src/main/ets/utils/ThemeVisuals.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/GlassSurface.ets",
+        "jideschulte/entry/src/main/ets/utils/SurfaceStyle.ets"
+      ],
+      "coverage": "未抽取；不能用缩放替代原色层行为"
+    },
+    {
+      "relation": "adapted-code",
+      "evidence": [
+        "jidecube/docs/UI_ALIGNMENT.md",
+        "jideschulte/docs/ui-guidelines.md",
+        "jide-spatial/docs/ui.md"
+      ],
+      "id": "expansion-reveal",
+      "title": "展开后显露内容与用户滚动取消",
+      "sources": [
+        "jidecards/entry/src/main/ets/utils/ExpansionReveal.ets"
+      ],
+      "consumers": [
+        "jidecube/entry/src/main/ets/ui/CubeScrollReveal.ets",
+        "jideschulte/entry/src/main/ets/utils/ScrollReveal.ets"
+      ],
+      "coverage": "未抽取；现有实现的布局与延迟策略已分化"
+    }
+  ],
+  "governance": [
+    {
+      "title": "Agent-first、当前入口与单一事实来源",
+      "sources": [
+        "jidecards/AGENTS.md",
+        "jidecards/PROJECT_CONTEXT.md"
+      ],
+      "consumers": [
+        "jidecube/AGENTS.md",
+        "jide-spatial/AGENTS.md"
+      ]
+    },
+    {
+      "title": "职责边界、状态拥有者和生产/消费方闭环",
+      "sources": [
+        "jidecards/docs/development/ownership.md",
+        "jidecards/docs/development/task-contract.md"
+      ],
+      "consumers": [
+        "jidecube/docs/development/ownership.md",
+        "jide-spatial/AGENTS.md"
+      ]
+    },
+    {
+      "title": "变更影响计划与分级验证",
+      "sources": [
+        "jidecards/tools/change-impact.mjs",
+        "jidecards/docs/development/verification.md"
+      ],
+      "consumers": [
+        "jidecube/tools/impact.mjs",
+        "jidecube/docs/development/verification.md"
+      ]
+    },
+    {
+      "title": "业务与平台隔离、可直接执行的纯规则",
+      "sources": [
+        "jidecards/AGENTS.md",
+        "jidecards/docs/development/ownership.md"
+      ],
+      "consumers": [
+        "jidecube/AGENTS.md",
+        "jide-spatial/AGENTS.md"
+      ]
+    },
+    {
+      "title": "来源哈希、许可证与实际改造记录",
+      "sources": [
+        "jidecards/LICENSE"
+      ],
+      "consumers": [
+        "jidecube/docs/ui-icon-provenance.json",
+        "jideschulte/docs/ui-assets.json",
+        "jide-spatial/source-reuse.json",
+        "jide-spatial/docs/ui.md"
+      ]
+    }
+  ],
+  "referenceOnly": [
+    {
+      "title": "五子棋：鸿蒙/C++ 工程和构建组织借鉴",
+      "sources": [
+        "jidecards/hvigorfile.ts"
+      ],
+      "consumers": [
+        "GomokuEvolution/hvigorfile.ts",
+        "GomokuEvolution/docs/workpacks/07-harmonyos-napi.md"
+      ],
+      "note": "结构参考，不声称复制代码或完整复用原生桥。"
+    },
+    {
+      "title": "五子棋：选图/裁切/PixelMap 路径处理",
+      "sources": [
+        "jidecards/entry/src/main/ets/components/home/DeckCustomizationFeature.ets"
+      ],
+      "consumers": [
+        "GomokuEvolution/entry/src/main/ets/services/AvatarService.ets"
+      ],
+      "note": "消费者注释引用历史 DeckCustomizePanel；仅记录机制借鉴，不冒充当前来源版本。"
+    },
+    {
+      "title": "五子棋：页面/Ability 结构",
+      "sources": [
+        "jidecards/entry/src/main/ets/entryability/EntryAbility.ets"
+      ],
+      "consumers": [
+        "GomokuEvolution/entry/src/main/ets/entryability/EntryAbility.ets",
+        "GomokuEvolution/entry/src/main/ets/pages/SettingsPage.ets"
+      ],
+      "note": "注释明确自研、未复制源代码；不能按代码迁入统计。"
+    },
+    {
+      "title": "数独：经舒尔特传递的设置参数组织",
+      "sources": [
+        "jideschulte/entry/src/main/ets/components/SettingsPanel.ets"
+      ],
+      "consumers": [
+        "Sudoku/entry/src/main/ets/rewrite/presentation/pages/SettingsPage.ets"
+      ],
+      "note": "间接借鉴舒尔特，不证明这部分直接来自闪卡。"
+    }
+  ],
+  "internalComponents": [
+    "jidecards/entry/src/main/ets/components/common/ActionIcon.ets",
+    "jidecards/entry/src/main/ets/components/common/ActionMenuLayout.ts",
+    "jidecards/entry/src/main/ets/components/common/ActionMenuList.ets",
+    "jidecards/entry/src/main/ets/components/common/ActionMenuTree.ts",
+    "jidecards/entry/src/main/ets/components/common/ActionStatus.ets",
+    "jidecards/entry/src/main/ets/components/common/AnchoredMenu.ets",
+    "jidecards/entry/src/main/ets/components/common/CardActionMenu.ets",
+    "jidecards/entry/src/main/ets/components/common/CardMarkingBadge.ets",
+    "jidecards/entry/src/main/ets/components/common/CardViewport.ets",
+    "jidecards/entry/src/main/ets/components/common/ChangingText.ets",
+    "jidecards/entry/src/main/ets/components/common/DelayedLoadingIndicator.ets",
+    "jidecards/entry/src/main/ets/components/common/DialogBackdrop.ets",
+    "jidecards/entry/src/main/ets/components/common/DialogFrame.ets",
+    "jidecards/entry/src/main/ets/components/common/DialogHeader.ets",
+    "jidecards/entry/src/main/ets/components/common/DirectorySelect.ets",
+    "jidecards/entry/src/main/ets/components/common/DirectorySelectDialog.ets",
+    "jidecards/entry/src/main/ets/components/common/DirectoryTree.ets",
+    "jidecards/entry/src/main/ets/components/common/DisclosureChevron.ets",
+    "jidecards/entry/src/main/ets/components/common/FlagMenuChoices.ets",
+    "jidecards/entry/src/main/ets/components/common/FormSelectRow.ets",
+    "jidecards/entry/src/main/ets/components/common/HelpButton.ets",
+    "jidecards/entry/src/main/ets/components/common/HelpLabel.ets",
+    "jidecards/entry/src/main/ets/components/common/IconActionButton.ets",
+    "jidecards/entry/src/main/ets/components/common/IridescentThemePreview.ets",
+    "jidecards/entry/src/main/ets/components/common/LabeledActionRow.ets",
+    "jidecards/entry/src/main/ets/components/common/MenuBubble.ets",
+    "jidecards/entry/src/main/ets/components/common/MenuBubbleSurface.ets",
+    "jidecards/entry/src/main/ets/components/common/MenuHoldGesture.ets",
+    "jidecards/entry/src/main/ets/components/common/MenuItem.ets",
+    "jidecards/entry/src/main/ets/components/common/MenuSurface.ets",
+    "jidecards/entry/src/main/ets/components/common/NativeDialogHost.ets",
+    "jidecards/entry/src/main/ets/components/common/NoteAudioField.ets",
+    "jidecards/entry/src/main/ets/components/common/NoteDraftPreview.ets",
+    "jidecards/entry/src/main/ets/components/common/NoteDuplicateDialog.ets",
+    "jidecards/entry/src/main/ets/components/common/NoteEditorHeader.ets",
+    "jidecards/entry/src/main/ets/components/common/NoteFieldEditor.ets",
+    "jidecards/entry/src/main/ets/components/common/NoteImagePreview.ets",
+    "jidecards/entry/src/main/ets/components/common/NoteLinkDialog.ets",
+    "jidecards/entry/src/main/ets/components/common/NoteTagsField.ets",
+    "jidecards/entry/src/main/ets/components/common/PrimaryActionButton.ets",
+    "jidecards/entry/src/main/ets/components/common/ResultNotice.ets",
+    "jidecards/entry/src/main/ets/components/common/SettingsActionRow.ets",
+    "jidecards/entry/src/main/ets/components/common/SettingsToggleRow.ets",
+    "jidecards/entry/src/main/ets/components/common/TagPicker.ets",
+    "jidecards/entry/src/main/ets/components/common/TagTreeList.ets",
+    "jidecards/entry/src/main/ets/components/common/ThemeBackground.ets",
+    "jidecards/entry/src/main/ets/components/common/ThemeText.ets",
+    "jidecards/entry/src/main/ets/components/common/按下态按钮.ets",
+    "jidecards/entry/src/main/ets/components/common/统一加载态.ets",
+    "jidecards/entry/src/main/ets/components/common/统一空态.ets",
+    "jidecards/entry/src/main/ets/components/common/统一错误态.ets"
+  ],
+  "manifestRecords": [
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_close.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_common_close.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_common_close.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "a5ae835a1194ed00421413f5ffa311baecd20c6eb3f3b7653ab3d17cf03b8039",
+      "currentSourceSha256": "a5ae835a1194ed00421413f5ffa311baecd20c6eb3f3b7653ab3d17cf03b8039",
+      "currentTargetSha256": "a5ae835a1194ed00421413f5ffa311baecd20c6eb3f3b7653ab3d17cf03b8039",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_confirm.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_common_confirm.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_common_confirm.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "bccaf3cf986bd5c4f049b42cfd9d3aa844232915dedea9a6941a0b1dd79b549c",
+      "currentSourceSha256": "bccaf3cf986bd5c4f049b42cfd9d3aa844232915dedea9a6941a0b1dd79b549c",
+      "currentTargetSha256": "bccaf3cf986bd5c4f049b42cfd9d3aa844232915dedea9a6941a0b1dd79b549c",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_history.svg",
+      "destination": "记得系列基础/src/main/resources/base/media/jide_ic_common_history.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_common_history.svg",
+      "delivery": "shared-har",
+      "recordedSourceSha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34",
+      "currentSourceSha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34",
+      "currentTargetSha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_home_settings.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_home_settings.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_home_settings.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "c7c32f5691d21dc7fa49e827a68e0cfd7a251cdc1e1fa763dd92594381108d9f",
+      "currentSourceSha256": "c7c32f5691d21dc7fa49e827a68e0cfd7a251cdc1e1fa763dd92594381108d9f",
+      "currentTargetSha256": "c7c32f5691d21dc7fa49e827a68e0cfd7a251cdc1e1fa763dd92594381108d9f",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_study_guide.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_study_guide.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_study_guide.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "a88bb8b3da2e5387fc73daa14324b1b03664c48b769bd0c2398ed367d916f8a1",
+      "currentSourceSha256": "a88bb8b3da2e5387fc73daa14324b1b03664c48b769bd0c2398ed367d916f8a1",
+      "currentTargetSha256": "a88bb8b3da2e5387fc73daa14324b1b03664c48b769bd0c2398ed367d916f8a1",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_study_undo.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_study_undo.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_study_undo.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "bcdd49d5a4ebf90e2a5210f69abc59f750e978a42db35db0f31ef31a62adcd8c",
+      "currentSourceSha256": "bcdd49d5a4ebf90e2a5210f69abc59f750e978a42db35db0f31ef31a62adcd8c",
+      "currentTargetSha256": "bcdd49d5a4ebf90e2a5210f69abc59f750e978a42db35db0f31ef31a62adcd8c",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+      "destination": "记得系列基础/src/main/resources/base/media/jide_ic_common_arrow_left.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+      "delivery": "shared-har",
+      "recordedSourceSha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402",
+      "currentSourceSha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402",
+      "currentTargetSha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_arrow_right.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_common_arrow_right.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_common_arrow_right.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "1d9a70f6313ef1e1a106a9ad9e2fadd9574cf3e4afdf5a9d290ff6dab33a05d6",
+      "currentSourceSha256": "1d9a70f6313ef1e1a106a9ad9e2fadd9574cf3e4afdf5a9d290ff6dab33a05d6",
+      "currentTargetSha256": "1d9a70f6313ef1e1a106a9ad9e2fadd9574cf3e4afdf5a9d290ff6dab33a05d6",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_about.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_settings_about.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_settings_about.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "c1b30116f75ecc972b1284e18ef1c15b34e909f58feb8e5ebb9d931941694db8",
+      "currentSourceSha256": "c1b30116f75ecc972b1284e18ef1c15b34e909f58feb8e5ebb9d931941694db8",
+      "currentTargetSha256": "c1b30116f75ecc972b1284e18ef1c15b34e909f58feb8e5ebb9d931941694db8",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_feedback.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_settings_feedback.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_settings_feedback.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "f467c2c88b9752387ae24586840e51f6f691abb6648dc3e8f2ab59e5fa577761",
+      "currentSourceSha256": "f467c2c88b9752387ae24586840e51f6f691abb6648dc3e8f2ab59e5fa577761",
+      "currentTargetSha256": "f467c2c88b9752387ae24586840e51f6f691abb6648dc3e8f2ab59e5fa577761",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_licenses.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_settings_licenses.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_settings_licenses.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "0f39750156d1e8c7bd4a055c7d1de3f84d8284cbab915e97920deb925e4cbc0e",
+      "currentSourceSha256": "0f39750156d1e8c7bd4a055c7d1de3f84d8284cbab915e97920deb925e4cbc0e",
+      "currentTargetSha256": "0f39750156d1e8c7bd4a055c7d1de3f84d8284cbab915e97920deb925e4cbc0e",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_rate.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_settings_rate.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_settings_rate.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "bcececb74ae55234a4c3ba931796b6947350313a3029e4d42363848dbb78c841",
+      "currentSourceSha256": "bcececb74ae55234a4c3ba931796b6947350313a3029e4d42363848dbb78c841",
+      "currentTargetSha256": "bcececb74ae55234a4c3ba931796b6947350313a3029e4d42363848dbb78c841",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_editor_image.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_editor_image.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_editor_image.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "fbbddb6171d8dd244feb2e7205e3dd95223c9ffbd05506165869aa9f1de45826",
+      "currentSourceSha256": "fbbddb6171d8dd244feb2e7205e3dd95223c9ffbd05506165869aa9f1de45826",
+      "currentTargetSha256": "fbbddb6171d8dd244feb2e7205e3dd95223c9ffbd05506165869aa9f1de45826",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_info.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_info.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_info.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "868bc6f885ea3647cbba460c91979f40a648acc85882dcbaa8f052e4f37d575f",
+      "currentSourceSha256": "868bc6f885ea3647cbba460c91979f40a648acc85882dcbaa8f052e4f37d575f",
+      "currentTargetSha256": "868bc6f885ea3647cbba460c91979f40a648acc85882dcbaa8f052e4f37d575f",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_common_close.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_common_close.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_common_close.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "a0c797629a8ec392f3b991609774c5f67ae8efaa9b8922a77b0d690f9e882c98",
+      "currentSourceSha256": "a0c797629a8ec392f3b991609774c5f67ae8efaa9b8922a77b0d690f9e882c98",
+      "currentTargetSha256": "a0c797629a8ec392f3b991609774c5f67ae8efaa9b8922a77b0d690f9e882c98",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_common_confirm.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_common_confirm.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_common_confirm.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "c2a0144f75242ec9b117457ce72be7223177c4decddb05765985b4a066dd04aa",
+      "currentSourceSha256": "c2a0144f75242ec9b117457ce72be7223177c4decddb05765985b4a066dd04aa",
+      "currentTargetSha256": "c2a0144f75242ec9b117457ce72be7223177c4decddb05765985b4a066dd04aa",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_common_history.svg",
+      "destination": "记得系列基础/src/main/resources/dark/media/jide_ic_common_history.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_common_history.svg",
+      "delivery": "shared-har",
+      "recordedSourceSha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b",
+      "currentSourceSha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b",
+      "currentTargetSha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_home_settings.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_home_settings.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_home_settings.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "4d00954fa4e3db31df19b1ac784368fa3bb1c19c8887226cdb78f773b7d9389f",
+      "currentSourceSha256": "4d00954fa4e3db31df19b1ac784368fa3bb1c19c8887226cdb78f773b7d9389f",
+      "currentTargetSha256": "4d00954fa4e3db31df19b1ac784368fa3bb1c19c8887226cdb78f773b7d9389f",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_study_guide.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_study_guide.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_study_guide.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "0133a1cbe488ac8946afaa2daac824f7db381acee996a9b4dce4650cae9e1020",
+      "currentSourceSha256": "0133a1cbe488ac8946afaa2daac824f7db381acee996a9b4dce4650cae9e1020",
+      "currentTargetSha256": "0133a1cbe488ac8946afaa2daac824f7db381acee996a9b4dce4650cae9e1020",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_study_undo.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_study_undo.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_study_undo.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "d7b70ad66eeba7cb88cc08d90d54a5b8e2e9d84a240356d24e5bfa517693f190",
+      "currentSourceSha256": "d7b70ad66eeba7cb88cc08d90d54a5b8e2e9d84a240356d24e5bfa517693f190",
+      "currentTargetSha256": "d7b70ad66eeba7cb88cc08d90d54a5b8e2e9d84a240356d24e5bfa517693f190",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_common_arrow_left.svg",
+      "destination": "记得系列基础/src/main/resources/dark/media/jide_ic_common_arrow_left.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_common_arrow_left.svg",
+      "delivery": "shared-har",
+      "recordedSourceSha256": "b05224f093f65f503c78af4fd19854f14500ff02ce882d39cbd3671da7e6a33e",
+      "currentSourceSha256": "b05224f093f65f503c78af4fd19854f14500ff02ce882d39cbd3671da7e6a33e",
+      "currentTargetSha256": "b05224f093f65f503c78af4fd19854f14500ff02ce882d39cbd3671da7e6a33e",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_common_arrow_right.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_common_arrow_right.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_common_arrow_right.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "f540612e99118b4e86e3141a7575efd11195d4c2f1110fdb0699ac116500c648",
+      "currentSourceSha256": "f540612e99118b4e86e3141a7575efd11195d4c2f1110fdb0699ac116500c648",
+      "currentTargetSha256": "f540612e99118b4e86e3141a7575efd11195d4c2f1110fdb0699ac116500c648",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_about.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_settings_about.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_settings_about.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "4f921a3efbd9b233ace4d351a3994e0e2543586ca01a1a6b42a59358413812ba",
+      "currentSourceSha256": "4f921a3efbd9b233ace4d351a3994e0e2543586ca01a1a6b42a59358413812ba",
+      "currentTargetSha256": "4f921a3efbd9b233ace4d351a3994e0e2543586ca01a1a6b42a59358413812ba",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_feedback.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_settings_feedback.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_settings_feedback.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "bbfd6623b2d8fa851c5dd647862804c628ddd3e679ea3e35117a668154d49863",
+      "currentSourceSha256": "bbfd6623b2d8fa851c5dd647862804c628ddd3e679ea3e35117a668154d49863",
+      "currentTargetSha256": "bbfd6623b2d8fa851c5dd647862804c628ddd3e679ea3e35117a668154d49863",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_licenses.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_settings_licenses.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_settings_licenses.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "463f143f92bec0d73cfaad9fd182bb1aa62245fb40febdce7ad6e7abca28f065",
+      "currentSourceSha256": "463f143f92bec0d73cfaad9fd182bb1aa62245fb40febdce7ad6e7abca28f065",
+      "currentTargetSha256": "463f143f92bec0d73cfaad9fd182bb1aa62245fb40febdce7ad6e7abca28f065",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_rate.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_settings_rate.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_settings_rate.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "99a3d2acb72960a582fafd54ddd31907a9eb12440fe3064e3abb2e96f9e74eb9",
+      "currentSourceSha256": "99a3d2acb72960a582fafd54ddd31907a9eb12440fe3064e3abb2e96f9e74eb9",
+      "currentTargetSha256": "99a3d2acb72960a582fafd54ddd31907a9eb12440fe3064e3abb2e96f9e74eb9",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_editor_image.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_editor_image.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_editor_image.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "dd71096d68df2562ae2401bcf8186e595025be0e7739bfbb30a06ff6377ba619",
+      "currentSourceSha256": "dd71096d68df2562ae2401bcf8186e595025be0e7739bfbb30a06ff6377ba619",
+      "currentTargetSha256": "dd71096d68df2562ae2401bcf8186e595025be0e7739bfbb30a06ff6377ba619",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_info.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_info.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_info.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "fca8f9c23a40760c9b123d516c56ce77e937666f272a2af9430f2f22ae3defa5",
+      "currentSourceSha256": "fca8f9c23a40760c9b123d516c56ce77e937666f272a2af9430f2f22ae3defa5",
+      "currentTargetSha256": "fca8f9c23a40760c9b123d516c56ce77e937666f272a2af9430f2f22ae3defa5",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_layout.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_settings_layout.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_settings_layout.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "eae575831fd0e0bdecc036b5ff909920ae7372023ce7a2eb5abb8811ea1ce57c",
+      "currentSourceSha256": "eae575831fd0e0bdecc036b5ff909920ae7372023ce7a2eb5abb8811ea1ce57c",
+      "currentTargetSha256": "eae575831fd0e0bdecc036b5ff909920ae7372023ce7a2eb5abb8811ea1ce57c",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_touch.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_settings_touch.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_settings_touch.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "bd69bc9a14d90952bc550991cf3a8e414c7de82d801397059d67986ead49e785",
+      "currentSourceSha256": "bd69bc9a14d90952bc550991cf3a8e414c7de82d801397059d67986ead49e785",
+      "currentTargetSha256": "bd69bc9a14d90952bc550991cf3a8e414c7de82d801397059d67986ead49e785",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_appearance.svg",
+      "destination": "jidecube/entry/src/main/resources/base/media/ic_settings_appearance.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/base/media/ic_settings_appearance.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "b0e7bce2188540e0de7b9c849aa716f8f31147d6b1f4ceb7072fa147f903f02e",
+      "currentSourceSha256": "b0e7bce2188540e0de7b9c849aa716f8f31147d6b1f4ceb7072fa147f903f02e",
+      "currentTargetSha256": "b0e7bce2188540e0de7b9c849aa716f8f31147d6b1f4ceb7072fa147f903f02e",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_layout.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_settings_layout.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_settings_layout.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "2194be0fd04764836de1475d6348964a78bf31f16b3a620ed1b4110407a418d5",
+      "currentSourceSha256": "2194be0fd04764836de1475d6348964a78bf31f16b3a620ed1b4110407a418d5",
+      "currentTargetSha256": "2194be0fd04764836de1475d6348964a78bf31f16b3a620ed1b4110407a418d5",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_touch.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_settings_touch.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_settings_touch.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "787feff4ece7729cec1231def0af097be6fec8396e6625f4bb22b72e80a63969",
+      "currentSourceSha256": "787feff4ece7729cec1231def0af097be6fec8396e6625f4bb22b72e80a63969",
+      "currentTargetSha256": "787feff4ece7729cec1231def0af097be6fec8396e6625f4bb22b72e80a63969",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jidecube",
+      "manifest": "jidecube/docs/ui-icon-provenance.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_appearance.svg",
+      "destination": "jidecube/entry/src/main/resources/dark/media/ic_settings_appearance.svg",
+      "consumerDeclaredPath": "jidecube/entry/src/main/resources/dark/media/ic_settings_appearance.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "9fc0175da64844cab54739e939ec2b7235d5c4d1864f600cd19491d7d69e3a31",
+      "currentSourceSha256": "9fc0175da64844cab54739e939ec2b7235d5c4d1864f600cd19491d7d69e3a31",
+      "currentTargetSha256": "9fc0175da64844cab54739e939ec2b7235d5c4d1864f600cd19491d7d69e3a31",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_close.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_common_close.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_common_close.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "a5ae835a1194ed00421413f5ffa311baecd20c6eb3f3b7653ab3d17cf03b8039",
+      "currentSourceSha256": "a5ae835a1194ed00421413f5ffa311baecd20c6eb3f3b7653ab3d17cf03b8039",
+      "currentTargetSha256": "a5ae835a1194ed00421413f5ffa311baecd20c6eb3f3b7653ab3d17cf03b8039",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_confirm.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_common_confirm.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_common_confirm.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "bccaf3cf986bd5c4f049b42cfd9d3aa844232915dedea9a6941a0b1dd79b549c",
+      "currentSourceSha256": "bccaf3cf986bd5c4f049b42cfd9d3aa844232915dedea9a6941a0b1dd79b549c",
+      "currentTargetSha256": "bccaf3cf986bd5c4f049b42cfd9d3aa844232915dedea9a6941a0b1dd79b549c",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_history.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_common_history.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_common_history.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34",
+      "currentSourceSha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34",
+      "currentTargetSha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_general.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_general.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_general.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "b09bbf1510b9b61a6769366e64bacb3c5754f40e817836f8f157fc039627b7a6",
+      "currentSourceSha256": "b09bbf1510b9b61a6769366e64bacb3c5754f40e817836f8f157fc039627b7a6",
+      "currentTargetSha256": "b09bbf1510b9b61a6769366e64bacb3c5754f40e817836f8f157fc039627b7a6",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_advanced.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_advanced.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_advanced.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "1df1f539127feff1c52c89854e78ce8098edf56628480c727923456a088facb0",
+      "currentSourceSha256": "1df1f539127feff1c52c89854e78ce8098edf56628480c727923456a088facb0",
+      "currentTargetSha256": "1df1f539127feff1c52c89854e78ce8098edf56628480c727923456a088facb0",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_about.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_about.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_about.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "c1b30116f75ecc972b1284e18ef1c15b34e909f58feb8e5ebb9d931941694db8",
+      "currentSourceSha256": "c1b30116f75ecc972b1284e18ef1c15b34e909f58feb8e5ebb9d931941694db8",
+      "currentTargetSha256": "c1b30116f75ecc972b1284e18ef1c15b34e909f58feb8e5ebb9d931941694db8",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_data.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_data.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_data.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "c3f1616d398b2c3636a7b579ed4ffe15b377d1b8244e797e452e6f02dbb610de",
+      "currentSourceSha256": "c3f1616d398b2c3636a7b579ed4ffe15b377d1b8244e797e452e6f02dbb610de",
+      "currentTargetSha256": "c3f1616d398b2c3636a7b579ed4ffe15b377d1b8244e797e452e6f02dbb610de",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_home_import.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_home_import.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_home_import.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "1576fd29539397a86223fa0bc233825c0d3209d7c458871808572b16cf44070b",
+      "currentSourceSha256": "1576fd29539397a86223fa0bc233825c0d3209d7c458871808572b16cf44070b",
+      "currentTargetSha256": "1576fd29539397a86223fa0bc233825c0d3209d7c458871808572b16cf44070b",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_export.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_export.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_export.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "d226a6be2ac714c9c6d67cef7a38ab46dd055adfceed540048af9ca13f7f9aee",
+      "currentSourceSha256": "d226a6be2ac714c9c6d67cef7a38ab46dd055adfceed540048af9ca13f7f9aee",
+      "currentTargetSha256": "d226a6be2ac714c9c6d67cef7a38ab46dd055adfceed540048af9ca13f7f9aee",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_home_sync.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_home_sync.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_home_sync.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "ca70b02b08e03df12a306d1c4a0a551da23a62ecd4d484bd4f44aac4a1946a90",
+      "currentSourceSha256": "ca70b02b08e03df12a306d1c4a0a551da23a62ecd4d484bd4f44aac4a1946a90",
+      "currentTargetSha256": "ca70b02b08e03df12a306d1c4a0a551da23a62ecd4d484bd4f44aac4a1946a90",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_rate.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_rate.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_rate.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "bcececb74ae55234a4c3ba931796b6947350313a3029e4d42363848dbb78c841",
+      "currentSourceSha256": "bcececb74ae55234a4c3ba931796b6947350313a3029e4d42363848dbb78c841",
+      "currentTargetSha256": "bcececb74ae55234a4c3ba931796b6947350313a3029e4d42363848dbb78c841",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_home_stats.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_home_stats.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_home_stats.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "000425708d540e7e726be1d7231ecb1a280ecde8ab5da0947fbb3c7461806a1b",
+      "currentSourceSha256": "000425708d540e7e726be1d7231ecb1a280ecde8ab5da0947fbb3c7461806a1b",
+      "currentTargetSha256": "000425708d540e7e726be1d7231ecb1a280ecde8ab5da0947fbb3c7461806a1b",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_settings_layout.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_layout.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_layout.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "eae575831fd0e0bdecc036b5ff909920ae7372023ce7a2eb5abb8811ea1ce57c",
+      "currentSourceSha256": "eae575831fd0e0bdecc036b5ff909920ae7372023ce7a2eb5abb8811ea1ce57c",
+      "currentTargetSha256": "eae575831fd0e0bdecc036b5ff909920ae7372023ce7a2eb5abb8811ea1ce57c",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_study_delete.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_study_delete.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_study_delete.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "6d6a73b0bea43fa93ede940ef3bd8932d74ca64c0f4ae76fb753918193e881fd",
+      "currentSourceSha256": "6d6a73b0bea43fa93ede940ef3bd8932d74ca64c0f4ae76fb753918193e881fd",
+      "currentTargetSha256": "6d6a73b0bea43fa93ede940ef3bd8932d74ca64c0f4ae76fb753918193e881fd",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_common_history.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_common_history_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_common_history_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b",
+      "currentSourceSha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b",
+      "currentTargetSha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_general.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_general_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_general_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "2ac46e7cacd4294f345ebca211fbde8d479d878faf19f6d7941ad56b9fa0d112",
+      "currentSourceSha256": "2ac46e7cacd4294f345ebca211fbde8d479d878faf19f6d7941ad56b9fa0d112",
+      "currentTargetSha256": "2ac46e7cacd4294f345ebca211fbde8d479d878faf19f6d7941ad56b9fa0d112",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_advanced.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_advanced_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_advanced_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "c0e2447720cc27e291981e5388da04b020039f49c08cd5fad38a79bd94357859",
+      "currentSourceSha256": "c0e2447720cc27e291981e5388da04b020039f49c08cd5fad38a79bd94357859",
+      "currentTargetSha256": "c0e2447720cc27e291981e5388da04b020039f49c08cd5fad38a79bd94357859",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_about.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_about_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_about_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "4f921a3efbd9b233ace4d351a3994e0e2543586ca01a1a6b42a59358413812ba",
+      "currentSourceSha256": "4f921a3efbd9b233ace4d351a3994e0e2543586ca01a1a6b42a59358413812ba",
+      "currentTargetSha256": "4f921a3efbd9b233ace4d351a3994e0e2543586ca01a1a6b42a59358413812ba",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_data.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_data_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_data_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "ccaa8b2069907a8f6ab79a324c8a8d15f6b038c0aa04f3e414b2012e79c32b16",
+      "currentSourceSha256": "ccaa8b2069907a8f6ab79a324c8a8d15f6b038c0aa04f3e414b2012e79c32b16",
+      "currentTargetSha256": "ccaa8b2069907a8f6ab79a324c8a8d15f6b038c0aa04f3e414b2012e79c32b16",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_home_import.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_home_import_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_home_import_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "9960d31596c5420b853d46fc4fef9a4de004e9c3d136ed9e2daba44dfc9620bd",
+      "currentSourceSha256": "9960d31596c5420b853d46fc4fef9a4de004e9c3d136ed9e2daba44dfc9620bd",
+      "currentTargetSha256": "9960d31596c5420b853d46fc4fef9a4de004e9c3d136ed9e2daba44dfc9620bd",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_export.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_export_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_export_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "49dfcdf125b9d0b6c32ded0bb6038ef67561c58a912125119fc27b92a151f6d6",
+      "currentSourceSha256": "49dfcdf125b9d0b6c32ded0bb6038ef67561c58a912125119fc27b92a151f6d6",
+      "currentTargetSha256": "49dfcdf125b9d0b6c32ded0bb6038ef67561c58a912125119fc27b92a151f6d6",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_home_sync.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_home_sync_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_home_sync_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "f82f14295c011dce78e984f92869ddbfbbc82121015d985b1aceea9549d15327",
+      "currentSourceSha256": "f82f14295c011dce78e984f92869ddbfbbc82121015d985b1aceea9549d15327",
+      "currentTargetSha256": "f82f14295c011dce78e984f92869ddbfbbc82121015d985b1aceea9549d15327",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_rate.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_rate_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_rate_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "99a3d2acb72960a582fafd54ddd31907a9eb12440fe3064e3abb2e96f9e74eb9",
+      "currentSourceSha256": "99a3d2acb72960a582fafd54ddd31907a9eb12440fe3064e3abb2e96f9e74eb9",
+      "currentTargetSha256": "99a3d2acb72960a582fafd54ddd31907a9eb12440fe3064e3abb2e96f9e74eb9",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_home_stats.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_home_stats_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_home_stats_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "faa34bd3022c5d80e019ba1b5c640a0f16e2499b71652ddbea4fdac0e7d031fd",
+      "currentSourceSha256": "faa34bd3022c5d80e019ba1b5c640a0f16e2499b71652ddbea4fdac0e7d031fd",
+      "currentTargetSha256": "faa34bd3022c5d80e019ba1b5c640a0f16e2499b71652ddbea4fdac0e7d031fd",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_settings_layout.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_settings_layout_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_settings_layout_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "2194be0fd04764836de1475d6348964a78bf31f16b3a620ed1b4110407a418d5",
+      "currentSourceSha256": "2194be0fd04764836de1475d6348964a78bf31f16b3a620ed1b4110407a418d5",
+      "currentTargetSha256": "2194be0fd04764836de1475d6348964a78bf31f16b3a620ed1b4110407a418d5",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_study_delete.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_study_delete_dark.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_study_delete_dark.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "4b7f33cc24254335f8fd17540fddace59ea3881dd19f7119f9fdef2c0a74236a",
+      "currentSourceSha256": "4b7f33cc24254335f8fd17540fddace59ea3881dd19f7119f9fdef2c0a74236a",
+      "currentTargetSha256": "4b7f33cc24254335f8fd17540fddace59ea3881dd19f7119f9fdef2c0a74236a",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jideschulte",
+      "manifest": "jideschulte/docs/ui-assets.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+      "destination": "jideschulte/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+      "consumerDeclaredPath": "jideschulte/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+      "delivery": "local-source",
+      "recordedSourceSha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402",
+      "currentSourceSha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402",
+      "currentTargetSha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jide-spatial",
+      "manifest": "jide-spatial/source-reuse.json",
+      "source": "jidecards/entry/src/main/ets/utils/PressFeedback.ets",
+      "destination": "jide-spatial/entry/src/main/ets/utils/PressFeedback.ets",
+      "consumerDeclaredPath": "jide-spatial/entry/src/main/ets/utils/PressFeedback.ets",
+      "delivery": "local-source",
+      "recordedSourceSha256": "bf615c98396f7533ff9987dfc77e2270949d1be933d168ee99fcc7d1fd41215b",
+      "currentSourceSha256": "ebba35550c24ce2b03c69b98e60280986490c18597c600fe5c7ace4d0d9fe038",
+      "currentTargetSha256": "74a99bcad2686af92fe52252797f1959dfdb028d68ac50c7a8dde150233a29c7",
+      "sourceTargetTextEqualIgnoringLineEndings": false,
+      "recordedModification": "Initially copied unchanged; later UI adaptations, if any, are documented in docs/ui.md.",
+      "sourceStatus": "changed-since-record",
+      "targetStatus": "differs-from-source-record"
+    },
+    {
+      "project": "jide-spatial",
+      "manifest": "jide-spatial/source-reuse.json",
+      "source": "jidecards/entry/src/main/ets/utils/AppMotion.ets",
+      "destination": "jide-spatial/entry/src/main/ets/utils/AppMotion.ets",
+      "consumerDeclaredPath": "jide-spatial/entry/src/main/ets/utils/AppMotion.ets",
+      "delivery": "local-source",
+      "recordedSourceSha256": "fa333454d2f86dbc26790d7f767b74a7b0e92bcfcd0a7d7e183d6e91a7bd2d99",
+      "currentSourceSha256": "fa333454d2f86dbc26790d7f767b74a7b0e92bcfcd0a7d7e183d6e91a7bd2d99",
+      "currentTargetSha256": "fa333454d2f86dbc26790d7f767b74a7b0e92bcfcd0a7d7e183d6e91a7bd2d99",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "Copied unchanged.",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jide-spatial",
+      "manifest": "jide-spatial/source-reuse.json",
+      "source": "jidecards/entry/src/main/ets/model/MotionStyle.ts",
+      "destination": "jide-spatial/entry/src/main/ets/model/MotionStyle.ts",
+      "consumerDeclaredPath": "jide-spatial/entry/src/main/ets/model/MotionStyle.ts",
+      "delivery": "local-source",
+      "recordedSourceSha256": "ce74322f55f2dcf19197296742e292360586e968417914d783a6ece4f31e891b",
+      "currentSourceSha256": "ce74322f55f2dcf19197296742e292360586e968417914d783a6ece4f31e891b",
+      "currentTargetSha256": "ce74322f55f2dcf19197296742e292360586e968417914d783a6ece4f31e891b",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "Copied unchanged.",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jide-spatial",
+      "manifest": "jide-spatial/source-reuse.json",
+      "source": "jidecards/entry/src/main/ets/components/common/PrimaryActionButton.ets",
+      "destination": "jide-spatial/entry/src/main/ets/components/PrimaryActionButton.ets",
+      "consumerDeclaredPath": "jide-spatial/entry/src/main/ets/components/PrimaryActionButton.ets",
+      "delivery": "local-source",
+      "recordedSourceSha256": "b862e972e69ff0ae96c9930a70bfa3c1a59b15119fa8a7dc341eadfa873fbabd",
+      "currentSourceSha256": "b862e972e69ff0ae96c9930a70bfa3c1a59b15119fa8a7dc341eadfa873fbabd",
+      "currentTargetSha256": "5fdf8a1fec69d6bcc69b25e1335b2737035299fd2bd72466d248310956632f3c",
+      "sourceTargetTextEqualIgnoringLineEndings": false,
+      "recordedModification": "Removed flashcard theme/localization/status dependencies; adapted to spatial resources, preserving action and feedback semantics. Later refinements: docs/ui.md.",
+      "sourceStatus": "record-matches",
+      "targetStatus": "differs-from-source-record"
+    },
+    {
+      "project": "jide-spatial",
+      "manifest": "jide-spatial/source-reuse.json",
+      "source": "jidecards/entry/src/main/resources/base/element/color.json",
+      "destination": "jide-spatial/entry/src/main/resources/base/element/color.json",
+      "consumerDeclaredPath": "jide-spatial/entry/src/main/resources/base/element/color.json",
+      "delivery": "local-source",
+      "recordedSourceSha256": "d52a1a820f8ab84262b7b8ad8848e17629886764dd3d5fd681bf43a703f9ad2b",
+      "currentSourceSha256": "d52a1a820f8ab84262b7b8ad8848e17629886764dd3d5fd681bf43a703f9ad2b",
+      "currentTargetSha256": "7d43ab5c18cf822a4aa40e0d4eb473a7e3f44f31885e2c6fe5f42d615e2e57cf",
+      "sourceTargetTextEqualIgnoringLineEndings": false,
+      "recordedModification": "Selected shared colors only; spatial-specific state/model colors may be added.",
+      "sourceStatus": "record-matches",
+      "targetStatus": "differs-from-source-record"
+    },
+    {
+      "project": "jide-spatial",
+      "manifest": "jide-spatial/source-reuse.json",
+      "source": "jidecards/entry/src/main/resources/dark/element/color.json",
+      "destination": "jide-spatial/entry/src/main/resources/dark/element/color.json",
+      "consumerDeclaredPath": "jide-spatial/entry/src/main/resources/dark/element/color.json",
+      "delivery": "local-source",
+      "recordedSourceSha256": "e4a1bc3bb8f3c1ae27efcc24f0a411ad5582538077b5a1fb4f1e2d471fb8917e",
+      "currentSourceSha256": "e4a1bc3bb8f3c1ae27efcc24f0a411ad5582538077b5a1fb4f1e2d471fb8917e",
+      "currentTargetSha256": "763b2d05a92e70bb13b3e0290d4d38076b1c1bfe9643ec6d2f2a011b70599343",
+      "sourceTargetTextEqualIgnoringLineEndings": false,
+      "recordedModification": "Selected corresponding dark colors only; no flashcard theme service.",
+      "sourceStatus": "record-matches",
+      "targetStatus": "differs-from-source-record"
+    },
+    {
+      "project": "jide-spatial",
+      "manifest": "jide-spatial/source-reuse.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+      "destination": "记得系列基础/src/main/resources/base/media/jide_ic_common_arrow_left.svg",
+      "consumerDeclaredPath": "jide-spatial/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+      "delivery": "shared-har",
+      "recordedSourceSha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402",
+      "currentSourceSha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402",
+      "currentTargetSha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "Copied unchanged.",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jide-spatial",
+      "manifest": "jide-spatial/source-reuse.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_common_arrow_left.svg",
+      "destination": "记得系列基础/src/main/resources/dark/media/jide_ic_common_arrow_left.svg",
+      "consumerDeclaredPath": "jide-spatial/entry/src/main/resources/dark/media/ic_common_arrow_left.svg",
+      "delivery": "shared-har",
+      "recordedSourceSha256": "b05224f093f65f503c78af4fd19854f14500ff02ce882d39cbd3671da7e6a33e",
+      "currentSourceSha256": "b05224f093f65f503c78af4fd19854f14500ff02ce882d39cbd3671da7e6a33e",
+      "currentTargetSha256": "b05224f093f65f503c78af4fd19854f14500ff02ce882d39cbd3671da7e6a33e",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "Copied unchanged.",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jide-spatial",
+      "manifest": "jide-spatial/source-reuse.json",
+      "source": "jidecards/entry/src/main/resources/base/media/ic_common_history.svg",
+      "destination": "记得系列基础/src/main/resources/base/media/jide_ic_common_history.svg",
+      "consumerDeclaredPath": "jide-spatial/entry/src/main/resources/base/media/ic_common_history.svg",
+      "delivery": "shared-har",
+      "recordedSourceSha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34",
+      "currentSourceSha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34",
+      "currentTargetSha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "Copied unchanged.",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    },
+    {
+      "project": "jide-spatial",
+      "manifest": "jide-spatial/source-reuse.json",
+      "source": "jidecards/entry/src/main/resources/dark/media/ic_common_history.svg",
+      "destination": "记得系列基础/src/main/resources/dark/media/jide_ic_common_history.svg",
+      "consumerDeclaredPath": "jide-spatial/entry/src/main/resources/dark/media/ic_common_history.svg",
+      "delivery": "shared-har",
+      "recordedSourceSha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b",
+      "currentSourceSha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b",
+      "currentTargetSha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b",
+      "sourceTargetTextEqualIgnoringLineEndings": true,
+      "recordedModification": "Copied unchanged.",
+      "sourceStatus": "record-matches",
+      "targetStatus": "record-matches"
+    }
+  ],
+  "snapshots": [
+    {
+      "path": "记得系列基础/src/main/resources/base/media/jide_ic_common_arrow_left.svg",
+      "sha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402"
+    },
+    {
+      "path": "记得系列基础/src/main/resources/base/media/jide_ic_common_history.svg",
+      "sha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34"
+    },
+    {
+      "path": "记得系列基础/src/main/resources/dark/media/jide_ic_common_arrow_left.svg",
+      "sha256": "b05224f093f65f503c78af4fd19854f14500ff02ce882d39cbd3671da7e6a33e"
+    },
+    {
+      "path": "记得系列基础/src/main/resources/dark/media/jide_ic_common_history.svg",
+      "sha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b"
+    },
+    {
+      "path": "GomokuEvolution/docs/workpacks/07-harmonyos-napi.md",
+      "sha256": "296c93cfa40d3410cba7e87bd07a948b2a5f17e144d192407d095e4598309eaf"
+    },
+    {
+      "path": "GomokuEvolution/entry/src/main/ets/entryability/EntryAbility.ets",
+      "sha256": "4251effa9023e266d881b4802457d2c903eb53193efd3242331de0719279d26e"
+    },
+    {
+      "path": "GomokuEvolution/entry/src/main/ets/pages/SettingsPage.ets",
+      "sha256": "bc2510037bb88fffdc011cb6c4e921ac9b612eccd586eb0cdd10cfa4125e991c"
+    },
+    {
+      "path": "GomokuEvolution/entry/src/main/ets/services/AvatarService.ets",
+      "sha256": "ca0fc01f8ce9bbd6bfba3ee122bbba6b559ec82d9b5935b4772300532f01371d"
+    },
+    {
+      "path": "GomokuEvolution/hvigorfile.ts",
+      "sha256": "2d9b6ff0a36243ee08cf7510d96bea3dc86a9390a749f1d958506343eeeac189"
+    },
+    {
+      "path": "jide-spatial/AGENTS.md",
+      "sha256": "cc435735e13b8edf255979248e2fb2682f53e6ef6aef4a2d706a51969a0c85b9"
+    },
+    {
+      "path": "jide-spatial/docs/ui.md",
+      "sha256": "417d901bf2b079fe4d26528cdca7007662182e32a2871618896674317a957d9d"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/components/ActionIcon.ets",
+      "sha256": "16cf99c0c78d8d68b1889496acd6d38a89366a117bc506f66bd8bbd75ddfa119"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/components/DisclosureChevron.ets",
+      "sha256": "f7bf51b6f8d370f68ac54f7ac09f17d55924cd0fabe9d5506665d3604e56d744"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/components/IconActionButton.ets",
+      "sha256": "6d7d69a878ebcca1b711d5052feb42aabf0a3028a595adbb5584d9ef76eefd27"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/components/PrimaryActionButton.ets",
+      "sha256": "5fdf8a1fec69d6bcc69b25e1335b2737035299fd2bd72466d248310956632f3c"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/components/SecondaryActionButton.ets",
+      "sha256": "236b4c064b9a5b57627a8344e6ad683ad6c91aa0d14caab6f24bb4a9028ec624"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/components/SettingsActionRow.ets",
+      "sha256": "6e8ae09eef1dcb90a9bb873dde82bae4b76245157c0ec30b15b0f30f7b5a4d97"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/model/MotionStyle.ts",
+      "sha256": "ce74322f55f2dcf19197296742e292360586e968417914d783a6ece4f31e891b"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/utils/AppMotion.ets",
+      "sha256": "fa333454d2f86dbc26790d7f767b74a7b0e92bcfcd0a7d7e183d6e91a7bd2d99"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/utils/PressFeedback.ets",
+      "sha256": "74a99bcad2686af92fe52252797f1959dfdb028d68ac50c7a8dde150233a29c7"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/utils/UiDimensions.ets",
+      "sha256": "9ab7010e81e7af12f8ad162e58cbf919f4b3bd1be46893ee70b821508db502d3"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/resources/base/element/color.json",
+      "sha256": "7d43ab5c18cf822a4aa40e0d4eb473a7e3f44f31885e2c6fe5f42d615e2e57cf"
+    },
+    {
+      "path": "jide-spatial/entry/src/main/resources/dark/element/color.json",
+      "sha256": "763b2d05a92e70bb13b3e0290d4d38076b1c1bfe9643ec6d2f2a011b70599343"
+    },
+    {
+      "path": "jide-spatial/source-reuse.json",
+      "sha256": "cd980086e2295ab54d4bb0b85a3cb8fff41ca37c7e2232e3eb84ea03e1fa216b"
+    },
+    {
+      "path": "jidecards/AGENTS.md",
+      "sha256": "61691a45359f13493977a7337ddc5cdb41ae8c91f518ba124848b635b8deda4b"
+    },
+    {
+      "path": "jidecards/docs/development/ownership.md",
+      "sha256": "3c16cd4aedc5e03e3d82de75fcfdd7640e1dc4295a4f5f911f9c2203420880bf"
+    },
+    {
+      "path": "jidecards/docs/development/task-contract.md",
+      "sha256": "7edf5258b4947edcdad6a037cd13ea8e94c8917f6ad7fbcf89c9f131ceb62141"
+    },
+    {
+      "path": "jidecards/docs/development/verification.md",
+      "sha256": "638c8cdcebfba8caa16fdcd6c68e3388341d51ade6a4539812598b91eb197eb7"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/开始学习按钮.ets",
+      "sha256": "702b33691e0ad9bc468f4ac825c4cb1e90d340b5848ea3998604c929512ed9f0"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/字段帮助面板.ets",
+      "sha256": "3502d699dde869aa0437e66e026f8391aa68cbe8374a3afd2e5a384950b19499"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/按下态按钮.ets",
+      "sha256": "6af936a3ebc48dea21791acd1ed5dc8e18825e8ac9ba83598ddd8f680bf3bb60"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/统一错误态.ets",
+      "sha256": "ab1072845085cbed14b39a1ce2867a145c9d1bc6eb96f230783523b98529b5d1"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/统一加载态.ets",
+      "sha256": "cc1b7a42d576fa2d1b96a665aa35b94b193841aabf8c23eb3fd6b6e2eee40a38"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/统一空态.ets",
+      "sha256": "845ca08aac5aead3f0f82950b23dc8c4d7f45db51e2642ffb79bfea7b217c3b9"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ActionIcon.ets",
+      "sha256": "ed143a00d5a6f1ccf19725d68ea213806ffecf8f7ceb05ee9fed2c4482be42c8"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ActionMenuLayout.ts",
+      "sha256": "1d7993fb04ace950091e65aa35846ed4b42d25c008207864317ea0ac52dd4254"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ActionMenuList.ets",
+      "sha256": "e09128e73be1ad77ec624e7fee6f420156fd4bfeaf92e3b58c8da8425802fbdc"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ActionMenuTree.ts",
+      "sha256": "a717ea6bc83ac08f0eef4642000bde9836d4afa24a083c12965088d771b3c821"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ActionStatus.ets",
+      "sha256": "39d4d80be49b0e4efca05e07e29586b4830e869bf45d11076c59257674bb1eff"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/AnchoredMenu.ets",
+      "sha256": "c832618948653a516b8eefef5a00d3253d7af806ff8b3b38bc9ef9cf532c1445"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/CardActionMenu.ets",
+      "sha256": "a9941890dca001efce33be59634aeb17fbc35a34cdc2bdfff96d5670a60094e3"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/CardMarkingBadge.ets",
+      "sha256": "8ab8b415b256597b3fde3bcd215bebfeee4806c95bdff5bc3c59ae6ee0ef6739"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/CardViewport.ets",
+      "sha256": "f916721cf436dd22d6fe00218feabb71adafa97034246c0329567143dd667322"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ChangingText.ets",
+      "sha256": "15a401d27c0ad24efaa51d1db11bcd21201b0bc734fe32154cde0676d04edcee"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/DelayedLoadingIndicator.ets",
+      "sha256": "7d9df93d2440cfd3a2341e27e41ae7920416bbce7dee3892649d12a3672bce1d"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/DialogBackdrop.ets",
+      "sha256": "928e5381ce95058efcc6544ef95631a6b134cec930f3d3b45b893ebd0f72c836"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/DialogFrame.ets",
+      "sha256": "c1b37a0452a02b6732351c05f5274e30f672b6dc580c9d634c7e7494e4628462"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/DialogHeader.ets",
+      "sha256": "8bda9030c2b5510473cf823b5d3868afbcb2fc66da9e21d16e3bf7254f5f32d5"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/DirectorySelect.ets",
+      "sha256": "823da93b42460110e721b71e5d86952e58db5ac94f64a0cda13a551eb7f83057"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/DirectorySelectDialog.ets",
+      "sha256": "82cb8e062cece7cbca986265f3c2efd26965fce8ca0cffd37c115bc52f7555b0"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/DirectoryTree.ets",
+      "sha256": "7110ac2a2f8a44ffa4694918d991415bebf0e1d57770f687fe7850a150e766e6"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/DisclosureChevron.ets",
+      "sha256": "8e6b4cd7d29bf35137710b9c16514a93cf8f332bb5f547915962fa1683e5284a"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/FlagMenuChoices.ets",
+      "sha256": "9a0684a25ecc62e5843f7a0fbfa78d6ae98cef822ada42f96df8f36aef2a5ec1"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/FormSelectRow.ets",
+      "sha256": "9839016f5b6186db49a11fbc9473aae6c3b550b18b62cf09a2123ae9ec95add7"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/HelpButton.ets",
+      "sha256": "11f3fc751921b0716b589502e06388b1e2789cdf39625a81d8b0a8f0f212b297"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/HelpLabel.ets",
+      "sha256": "7093b9afbe5bef4df0b9b96c79047624d3ee94ed6bbf21c1049a8561455345fe"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/IconActionButton.ets",
+      "sha256": "ead78095142a20e7029cb42c054270dd837546fce97c7917446d84616b912346"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/IridescentThemePreview.ets",
+      "sha256": "0d8ee4ebe62e5d85933ea8b47010dcec4b15c7fc9ada332135c45daf6e48b05b"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/LabeledActionRow.ets",
+      "sha256": "412a977e8a7845027a5c236b867f8499a38b2f1ecee11b98515847b7b0e46d04"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/MenuBubble.ets",
+      "sha256": "47714dca4b30467fd7666fc9329cd60ed50c6d39616a6fe5685f8fd264f5f13b"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/MenuBubbleSurface.ets",
+      "sha256": "1ff552949183f75e5e04d17a56563d252e057dd4e050c312708916688f7dce1b"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/MenuHoldGesture.ets",
+      "sha256": "450ce05cf18ed522e2be6c297511b78d6ca4f15c031fda1985a0e124473c86fa"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/MenuItem.ets",
+      "sha256": "154508381ba45821c5a2ecf1914e9914ac219a8f415a59a8c5d9b8f44fc4f130"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/MenuSurface.ets",
+      "sha256": "309dea4aee254d227780e3b38ae5ec382236154968d31a610a9a353743e2d8a9"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/NativeDialogHost.ets",
+      "sha256": "7b8cb454c7abe5c0baa21f2444f99f7acc5891cac2b167b1974905fdac893ea4"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/NoteAudioField.ets",
+      "sha256": "dc1fd227135c0b79f46fe01958039ecfbe3a2a7094b5f37c42202805ba137e70"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/NoteDraftPreview.ets",
+      "sha256": "ccb0f2abf969c78977b94cd0aee25bdd0a9475c72cd871aadae83fcf823d8159"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/NoteDuplicateDialog.ets",
+      "sha256": "5ec379338ca84d44bcb46fdeded51d2cb4a1241a3691fdd98165496410f2936f"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/NoteEditorHeader.ets",
+      "sha256": "b48e5a6ffa8777d57ea3616312af7f7ac854833c26e88c57c9055c8f45641c86"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/NoteFieldEditor.ets",
+      "sha256": "3bab14f146606946eb40c4f21cc2ef345e3262afda83bcc40f1debd43e76df9c"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/NoteImagePreview.ets",
+      "sha256": "dc7232e4b5462917f87f826f1810505ed33699d3695236c91330976f0c73a66a"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/NoteLinkDialog.ets",
+      "sha256": "a2a36a3f6689327959b841230a01605bbfb63b4dd4ed597457da636394c05011"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/NoteTagsField.ets",
+      "sha256": "b75b1e394a07ba11e8a0eb632f7afe7f1e862d56f15c0a5da4966d0aa000cb9e"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/PrimaryActionButton.ets",
+      "sha256": "b862e972e69ff0ae96c9930a70bfa3c1a59b15119fa8a7dc341eadfa873fbabd"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ResultNotice.ets",
+      "sha256": "f9cde96928fac6aa0abe263af059cc5bea32e2f1d0db87722f75159393cf2b8f"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/SettingsActionRow.ets",
+      "sha256": "ffc066297e9b5938f827aaed278e3d6006908bbfb236522916956c02f88af9df"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/SettingsToggleRow.ets",
+      "sha256": "24f9dac9f38c6abb9620a7edad37a9854358f0336932d3de6d7a8d430635ecc6"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/TagPicker.ets",
+      "sha256": "f806b605b10112493a3eeddc489ccff6688fb5a231b8801b9d8f41749a0736e6"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/TagTreeList.ets",
+      "sha256": "88e8ae6cdc71f1f79798bd4f8d754af22e06e55f1c471202e830f4c02fc79f82"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ThemeBackground.ets",
+      "sha256": "854dfff0135121a637495dc7a0bd458bb88b867774fdfbb43ba47bbcf89d21b4"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ThemeText.ets",
+      "sha256": "078ed21dfb22e530b96822018bc657f415ba4a6fe251b08f90bd5c060f763985"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/home/DeckCustomizationFeature.ets",
+      "sha256": "1abe9fd445ddbfa523bc622152be7c1dc04087453c593426e393632a4c76aaed"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/entryability/EntryAbility.ets",
+      "sha256": "82a7aaf28a555b5d23fde612e292e527dbd61970a898b3e63aa17a9578bc8e88"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/model/MotionStyle.ts",
+      "sha256": "ce74322f55f2dcf19197296742e292360586e968417914d783a6ece4f31e891b"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/model/WindowSafeLayout.ts",
+      "sha256": "f142bd10e0d482f9efc5238412b363aa33546c5a384542eff85a245c9a94861e"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/应用尺寸.ets",
+      "sha256": "d44ca4c000327f6558b32abf31b339dc745aef7ed61fc7be8783f65ecd6ab03e"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/转场时长.ets",
+      "sha256": "99f9de046b460dd4ad555eb30c0eb4dfcd79e47c349c359e20acbcbd6425103d"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/AppMotion.ets",
+      "sha256": "fa333454d2f86dbc26790d7f767b74a7b0e92bcfcd0a7d7e183d6e91a7bd2d99"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/ExpansionReveal.ets",
+      "sha256": "888c5c6509d65ffbd857d489558e1287ea44ea41a4981cf12da4a7300439d292"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/FormRowLayout.ets",
+      "sha256": "c50488fdb901618a14e4affafd7621d733a73ac3750ba8270bfe525f5619984d"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/GlassSurface.ets",
+      "sha256": "3d9ec664935b7a31ac8bf996f68dd50be2afbfdc7eb4de24d56e5544d501a0c8"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/PressFeedback.ets",
+      "sha256": "ebba35550c24ce2b03c69b98e60280986490c18597c600fe5c7ace4d0d9fe038"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/PrimaryGlassSurface.ets",
+      "sha256": "52989237eb57e02988c27996f0f3a5458a2f2b3c016eaa78af86d8e63d28b02d"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/SelectStyle.ets",
+      "sha256": "35878eb48627f8af220380097498f1054a3e8749b80b2b525922c754fafcb6b1"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/SurfaceBorder.ets",
+      "sha256": "30ba02ca968f5512225813224b7d2c4fd3cb9627fa6a2d405dbf3609449097b1"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/SurfaceTransition.ets",
+      "sha256": "b11bda9a67ecb07a167165cb2b93b24f8e7f3b60e5afcf59ed89a0dedff68aa6"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/ThemeVisuals.ets",
+      "sha256": "b54f00658709d17d1b28371c1780678ba501891a782f5cd4e7f763bb8eb8dbd5"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/element/color.json",
+      "sha256": "d52a1a820f8ab84262b7b8ad8848e17629886764dd3d5fd681bf43a703f9ad2b"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+      "sha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_common_arrow_right.svg",
+      "sha256": "1d9a70f6313ef1e1a106a9ad9e2fadd9574cf3e4afdf5a9d290ff6dab33a05d6"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_common_close.svg",
+      "sha256": "a5ae835a1194ed00421413f5ffa311baecd20c6eb3f3b7653ab3d17cf03b8039"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_common_confirm.svg",
+      "sha256": "bccaf3cf986bd5c4f049b42cfd9d3aa844232915dedea9a6941a0b1dd79b549c"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_common_history.svg",
+      "sha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_editor_image.svg",
+      "sha256": "fbbddb6171d8dd244feb2e7205e3dd95223c9ffbd05506165869aa9f1de45826"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_home_import.svg",
+      "sha256": "1576fd29539397a86223fa0bc233825c0d3209d7c458871808572b16cf44070b"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_home_settings.svg",
+      "sha256": "c7c32f5691d21dc7fa49e827a68e0cfd7a251cdc1e1fa763dd92594381108d9f"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_home_stats.svg",
+      "sha256": "000425708d540e7e726be1d7231ecb1a280ecde8ab5da0947fbb3c7461806a1b"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_home_sync.svg",
+      "sha256": "ca70b02b08e03df12a306d1c4a0a551da23a62ecd4d484bd4f44aac4a1946a90"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_info.svg",
+      "sha256": "868bc6f885ea3647cbba460c91979f40a648acc85882dcbaa8f052e4f37d575f"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_about.svg",
+      "sha256": "c1b30116f75ecc972b1284e18ef1c15b34e909f58feb8e5ebb9d931941694db8"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_advanced.svg",
+      "sha256": "1df1f539127feff1c52c89854e78ce8098edf56628480c727923456a088facb0"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_appearance.svg",
+      "sha256": "b0e7bce2188540e0de7b9c849aa716f8f31147d6b1f4ceb7072fa147f903f02e"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_data.svg",
+      "sha256": "c3f1616d398b2c3636a7b579ed4ffe15b377d1b8244e797e452e6f02dbb610de"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_export.svg",
+      "sha256": "d226a6be2ac714c9c6d67cef7a38ab46dd055adfceed540048af9ca13f7f9aee"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_feedback.svg",
+      "sha256": "f467c2c88b9752387ae24586840e51f6f691abb6648dc3e8f2ab59e5fa577761"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_general.svg",
+      "sha256": "b09bbf1510b9b61a6769366e64bacb3c5754f40e817836f8f157fc039627b7a6"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_layout.svg",
+      "sha256": "eae575831fd0e0bdecc036b5ff909920ae7372023ce7a2eb5abb8811ea1ce57c"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_licenses.svg",
+      "sha256": "0f39750156d1e8c7bd4a055c7d1de3f84d8284cbab915e97920deb925e4cbc0e"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_rate.svg",
+      "sha256": "bcececb74ae55234a4c3ba931796b6947350313a3029e4d42363848dbb78c841"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_settings_touch.svg",
+      "sha256": "bd69bc9a14d90952bc550991cf3a8e414c7de82d801397059d67986ead49e785"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_study_delete.svg",
+      "sha256": "6d6a73b0bea43fa93ede940ef3bd8932d74ca64c0f4ae76fb753918193e881fd"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_study_guide.svg",
+      "sha256": "a88bb8b3da2e5387fc73daa14324b1b03664c48b769bd0c2398ed367d916f8a1"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_study_undo.svg",
+      "sha256": "bcdd49d5a4ebf90e2a5210f69abc59f750e978a42db35db0f31ef31a62adcd8c"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/element/color.json",
+      "sha256": "e4a1bc3bb8f3c1ae27efcc24f0a411ad5582538077b5a1fb4f1e2d471fb8917e"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_common_arrow_left.svg",
+      "sha256": "b05224f093f65f503c78af4fd19854f14500ff02ce882d39cbd3671da7e6a33e"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_common_arrow_right.svg",
+      "sha256": "f540612e99118b4e86e3141a7575efd11195d4c2f1110fdb0699ac116500c648"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_common_close.svg",
+      "sha256": "a0c797629a8ec392f3b991609774c5f67ae8efaa9b8922a77b0d690f9e882c98"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_common_confirm.svg",
+      "sha256": "c2a0144f75242ec9b117457ce72be7223177c4decddb05765985b4a066dd04aa"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_common_history.svg",
+      "sha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_editor_image.svg",
+      "sha256": "dd71096d68df2562ae2401bcf8186e595025be0e7739bfbb30a06ff6377ba619"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_home_import.svg",
+      "sha256": "9960d31596c5420b853d46fc4fef9a4de004e9c3d136ed9e2daba44dfc9620bd"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_home_settings.svg",
+      "sha256": "4d00954fa4e3db31df19b1ac784368fa3bb1c19c8887226cdb78f773b7d9389f"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_home_stats.svg",
+      "sha256": "faa34bd3022c5d80e019ba1b5c640a0f16e2499b71652ddbea4fdac0e7d031fd"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_home_sync.svg",
+      "sha256": "f82f14295c011dce78e984f92869ddbfbbc82121015d985b1aceea9549d15327"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_info.svg",
+      "sha256": "fca8f9c23a40760c9b123d516c56ce77e937666f272a2af9430f2f22ae3defa5"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_about.svg",
+      "sha256": "4f921a3efbd9b233ace4d351a3994e0e2543586ca01a1a6b42a59358413812ba"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_advanced.svg",
+      "sha256": "c0e2447720cc27e291981e5388da04b020039f49c08cd5fad38a79bd94357859"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_appearance.svg",
+      "sha256": "9fc0175da64844cab54739e939ec2b7235d5c4d1864f600cd19491d7d69e3a31"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_data.svg",
+      "sha256": "ccaa8b2069907a8f6ab79a324c8a8d15f6b038c0aa04f3e414b2012e79c32b16"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_export.svg",
+      "sha256": "49dfcdf125b9d0b6c32ded0bb6038ef67561c58a912125119fc27b92a151f6d6"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_feedback.svg",
+      "sha256": "bbfd6623b2d8fa851c5dd647862804c628ddd3e679ea3e35117a668154d49863"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_general.svg",
+      "sha256": "2ac46e7cacd4294f345ebca211fbde8d479d878faf19f6d7941ad56b9fa0d112"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_layout.svg",
+      "sha256": "2194be0fd04764836de1475d6348964a78bf31f16b3a620ed1b4110407a418d5"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_licenses.svg",
+      "sha256": "463f143f92bec0d73cfaad9fd182bb1aa62245fb40febdce7ad6e7abca28f065"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_rate.svg",
+      "sha256": "99a3d2acb72960a582fafd54ddd31907a9eb12440fe3064e3abb2e96f9e74eb9"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_settings_touch.svg",
+      "sha256": "787feff4ece7729cec1231def0af097be6fec8396e6625f4bb22b72e80a63969"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_study_delete.svg",
+      "sha256": "4b7f33cc24254335f8fd17540fddace59ea3881dd19f7119f9fdef2c0a74236a"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_study_guide.svg",
+      "sha256": "0133a1cbe488ac8946afaa2daac824f7db381acee996a9b4dce4650cae9e1020"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_study_undo.svg",
+      "sha256": "d7b70ad66eeba7cb88cc08d90d54a5b8e2e9d84a240356d24e5bfa517693f190"
+    },
+    {
+      "path": "jidecards/hvigorfile.ts",
+      "sha256": "e3b1a22fa0a9365eb5ef81d0d93e56adad24636e7f8a66cf3d8504b0ee12623e"
+    },
+    {
+      "path": "jidecards/LICENSE",
+      "sha256": "e0eedba615d5cd1b986afb6c5b3a4b1ae33713e7e9dc74d19daec5e3221f9d2e"
+    },
+    {
+      "path": "jidecards/PROJECT_CONTEXT.md",
+      "sha256": "14670b4730c3634e19a0f09e906dd296a0591168104d03c65684ffd620701874"
+    },
+    {
+      "path": "jidecards/tools/change-impact.mjs",
+      "sha256": "d2aec21ab749b86730fe515f97576a33022222677227f06930d7dff436f3120d"
+    },
+    {
+      "path": "jidecube/AGENTS.md",
+      "sha256": "6e03e745b61b48f5f5e0ad073a2dc189012ef10197537a644d96626405ac0b01"
+    },
+    {
+      "path": "jidecube/docs/development/ownership.md",
+      "sha256": "fa988078ff540b54ea59d7d6fcfbd21bf432b86db97a77a027c3ec38226c428b"
+    },
+    {
+      "path": "jidecube/docs/development/verification.md",
+      "sha256": "91d927050fb3129317d64fa9830112e7cc61a273fe000a37db5f1d67b89a397f"
+    },
+    {
+      "path": "jidecube/docs/UI_ALIGNMENT.md",
+      "sha256": "8c6532f27794216a2aa2288a0f618799d8601d059440d1986b8f185f82276987"
+    },
+    {
+      "path": "jidecube/docs/ui-icon-provenance.json",
+      "sha256": "e28cf607b5b9e45f640324ed61af0c99bd14c2896b38d2cf6b6cdb9a074d6981"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/ActionIcon.ets",
+      "sha256": "ab83346ccafbbe71546808c55764a8db4f52e5cb6472530c39c911d55fa97ef9"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeActionRow.ets",
+      "sha256": "d2e7e3c320b1944fdf3b98f76dd7ac2651f9b2a5a80098bc0419d65f15ec0b33"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeBackdrop.ets",
+      "sha256": "7467dec228a819dc3d6dad24dd44a12b2e76536a4963142b06b0978de138acc1"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeChevron.ets",
+      "sha256": "e4d258e86429bf1ee1053910a75e404a026b18ab85d1cb8fb836357d587b9763"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeConfirmDialog.ets",
+      "sha256": "fcd726bfd174350ebd550b055e66f96996311c7db8e4ffca7bb35eec3e0682d0"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeDialogFrame.ets",
+      "sha256": "9a84312321012fcf5a11cb3f650570ab4a4ad368a6521428f749ccd48c6d1db5"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeDialogHeader.ets",
+      "sha256": "ad1cd6bd7ddd2c3e4f2d3eb1c472f847c9fa6d4b0ffc8cdeabe5ed815d2baca8"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeFormSelectRow.ets",
+      "sha256": "b34f7d593ac0092938411e08169cb88350f848167fe0609138f6211548583522"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeHelpButton.ets",
+      "sha256": "c4e413e0be37b0a5471c860b764fac29866b8548f57a9798a86963a624e36e90"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeHelpLabel.ets",
+      "sha256": "370cf2adee0b7e79c96abdede92e670fb0f26886c91e98a7014bbb3da386b8f4"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeIconButton.ets",
+      "sha256": "026fcffacad3e796b9a18156fbcd2f467237e4f53123a9f65ffccd331f5d594f"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeInfoDialog.ets",
+      "sha256": "7857d159391089bcbc987646e6cb6adf36af908e3479275427b35832f5b75419"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeScrollReveal.ets",
+      "sha256": "a85fb306385e945bb27d0eb45a2676fefc824cbe45b2c57900a448d08716fbc7"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeStyles.ets",
+      "sha256": "3ccc1eb3174adbdb2b593813d96fdbc58bebb4dea4fe556ed5b82c3768951d71"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeUi.ts",
+      "sha256": "aa0b3272425f7259de1a3d0b14921ba373aaced4b1f30274bd37a45dc2a3ebdd"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/GlassSurface.ets",
+      "sha256": "14436eaac82a4f2bc4084a6d0dc204412e8494e55f4da3968739ae54a9383ee7"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/PressFeedback.ets",
+      "sha256": "bec542de81b315ac8360e63c64521788e71d395c9ff55f3fc4502d92402c89c4"
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/UiResource.ets",
+      "sha256": "2f24ab11024eefdaa74205266c4ded33015533464edbf83ba8952b7efeeab2c1"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_common_arrow_right.svg",
+      "sha256": "1d9a70f6313ef1e1a106a9ad9e2fadd9574cf3e4afdf5a9d290ff6dab33a05d6"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_common_close.svg",
+      "sha256": "a5ae835a1194ed00421413f5ffa311baecd20c6eb3f3b7653ab3d17cf03b8039"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_common_confirm.svg",
+      "sha256": "bccaf3cf986bd5c4f049b42cfd9d3aa844232915dedea9a6941a0b1dd79b549c"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_editor_image.svg",
+      "sha256": "fbbddb6171d8dd244feb2e7205e3dd95223c9ffbd05506165869aa9f1de45826"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_home_settings.svg",
+      "sha256": "c7c32f5691d21dc7fa49e827a68e0cfd7a251cdc1e1fa763dd92594381108d9f"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_info.svg",
+      "sha256": "868bc6f885ea3647cbba460c91979f40a648acc85882dcbaa8f052e4f37d575f"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_settings_about.svg",
+      "sha256": "c1b30116f75ecc972b1284e18ef1c15b34e909f58feb8e5ebb9d931941694db8"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_settings_appearance.svg",
+      "sha256": "b0e7bce2188540e0de7b9c849aa716f8f31147d6b1f4ceb7072fa147f903f02e"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_settings_feedback.svg",
+      "sha256": "f467c2c88b9752387ae24586840e51f6f691abb6648dc3e8f2ab59e5fa577761"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_settings_layout.svg",
+      "sha256": "eae575831fd0e0bdecc036b5ff909920ae7372023ce7a2eb5abb8811ea1ce57c"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_settings_licenses.svg",
+      "sha256": "0f39750156d1e8c7bd4a055c7d1de3f84d8284cbab915e97920deb925e4cbc0e"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_settings_rate.svg",
+      "sha256": "bcececb74ae55234a4c3ba931796b6947350313a3029e4d42363848dbb78c841"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_settings_touch.svg",
+      "sha256": "bd69bc9a14d90952bc550991cf3a8e414c7de82d801397059d67986ead49e785"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_study_guide.svg",
+      "sha256": "a88bb8b3da2e5387fc73daa14324b1b03664c48b769bd0c2398ed367d916f8a1"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/base/media/ic_study_undo.svg",
+      "sha256": "bcdd49d5a4ebf90e2a5210f69abc59f750e978a42db35db0f31ef31a62adcd8c"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_common_arrow_right.svg",
+      "sha256": "f540612e99118b4e86e3141a7575efd11195d4c2f1110fdb0699ac116500c648"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_common_close.svg",
+      "sha256": "a0c797629a8ec392f3b991609774c5f67ae8efaa9b8922a77b0d690f9e882c98"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_common_confirm.svg",
+      "sha256": "c2a0144f75242ec9b117457ce72be7223177c4decddb05765985b4a066dd04aa"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_editor_image.svg",
+      "sha256": "dd71096d68df2562ae2401bcf8186e595025be0e7739bfbb30a06ff6377ba619"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_home_settings.svg",
+      "sha256": "4d00954fa4e3db31df19b1ac784368fa3bb1c19c8887226cdb78f773b7d9389f"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_info.svg",
+      "sha256": "fca8f9c23a40760c9b123d516c56ce77e937666f272a2af9430f2f22ae3defa5"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_settings_about.svg",
+      "sha256": "4f921a3efbd9b233ace4d351a3994e0e2543586ca01a1a6b42a59358413812ba"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_settings_appearance.svg",
+      "sha256": "9fc0175da64844cab54739e939ec2b7235d5c4d1864f600cd19491d7d69e3a31"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_settings_feedback.svg",
+      "sha256": "bbfd6623b2d8fa851c5dd647862804c628ddd3e679ea3e35117a668154d49863"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_settings_layout.svg",
+      "sha256": "2194be0fd04764836de1475d6348964a78bf31f16b3a620ed1b4110407a418d5"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_settings_licenses.svg",
+      "sha256": "463f143f92bec0d73cfaad9fd182bb1aa62245fb40febdce7ad6e7abca28f065"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_settings_rate.svg",
+      "sha256": "99a3d2acb72960a582fafd54ddd31907a9eb12440fe3064e3abb2e96f9e74eb9"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_settings_touch.svg",
+      "sha256": "787feff4ece7729cec1231def0af097be6fec8396e6625f4bb22b72e80a63969"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_study_guide.svg",
+      "sha256": "0133a1cbe488ac8946afaa2daac824f7db381acee996a9b4dce4650cae9e1020"
+    },
+    {
+      "path": "jidecube/entry/src/main/resources/dark/media/ic_study_undo.svg",
+      "sha256": "d7b70ad66eeba7cb88cc08d90d54a5b8e2e9d84a240356d24e5bfa517693f190"
+    },
+    {
+      "path": "jidecube/tools/impact.mjs",
+      "sha256": "6904be631da37dffe09f1ed0f19cad1d85ed97dd1b0eee035bf7514dd3731d04"
+    },
+    {
+      "path": "jideschulte/docs/ui-assets.json",
+      "sha256": "5d3db8c206a8e7eaa459f3c39e7ca51bed79d6be8898029fa83982377f840810"
+    },
+    {
+      "path": "jideschulte/docs/ui-guidelines.md",
+      "sha256": "03685dfd8259cea32fedbbb813b9dc4eb71badfe93f36b26b5f2d1892b2d82e3"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchulteActionButton.ets",
+      "sha256": "bac3618a868453cc5ba96c9b770979b057586d455fa059d63f75172063180a4a"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchulteActionIcon.ets",
+      "sha256": "7b2eb1eb06678b43a802004b15f2eb545d76d4d0745603c654d8236bf64dd3a1"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchulteDisclosureChevron.ets",
+      "sha256": "57d30049d629bf3d02846855c884692ae58a44f45e0494e28c19687cc38107c2"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchulteIconButton.ets",
+      "sha256": "407a27991108859ad7cc5d11c6b5385450ad4f66b48b169f1c9402ab6a7b5a04"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchulteInfoText.ets",
+      "sha256": "01e5fb7d9637b76291a949ebfa3a9cd0a5ab357bec1eb154cb1f6cc2b6a8488b"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchultePanel.ets",
+      "sha256": "3e24c0b908568dc9680127b2a1af1371e65b3b3198b0c0f37fcea2a41efdd787"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchulteSectionHeader.ets",
+      "sha256": "e8c2532623fba595119f4a7cad89d8efafefd801053efb06f6299169407299d4"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchulteSelectRow.ets",
+      "sha256": "3c51bb3eb843d1722a509f8d31014d80d1b8d4525ed7570072a1bcaff96b1985"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchulteSettingsActionRow.ets",
+      "sha256": "7e6e402214cc99593a0702159a98bcdc8fc40356f40a9ec9ef00050b1274a041"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchulteToggleRow.ets",
+      "sha256": "99034b47a5249e01a3b595d222965cfeb9055bee8e468e82f1f1b3bfb1058f2e"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/common/SchulteTrainingButton.ets",
+      "sha256": "fa3ee5fe8fb9a673bb50eb7d5edcc22c3a2eb4169fd0ef96e24b771039278a8d"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/HistoryPanel.ets",
+      "sha256": "5b509465a80f62e62818c83a4e73f19d6f772d0414d0ea9840ecfb94809653cc"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/components/SettingsPanel.ets",
+      "sha256": "8f2e55e3072c3cbfb0e2a9d57e00e5f556aca06bf2e11e72e32fd1b0a68dfef3"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/utils/FormRowStyle.ets",
+      "sha256": "2ab9694c5e5b1d8e8f8088535cb92532e84bfcb28671ab8199fe9fa9cefc4d03"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/utils/PressFeedback.ets",
+      "sha256": "87c86b83e979e1eddad2dc0a8babaf0a075e0bbc7404284e2238e1d88cfd09b5"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/utils/ScrollReveal.ets",
+      "sha256": "5dce139739449ddbb0cfce4760dfc1793e9790c43bf051a9f32046639b6a4742"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/utils/SurfaceBorder.ets",
+      "sha256": "dfded7cfb5f15898de983385b37e92047e17115b5d8d507e1896ebd62737b1e7"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/utils/SurfaceStyle.ets",
+      "sha256": "c2ffd38bc4247a549b89bcb3225aef9dd9b418aaaad238b523205a6ef568356a"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/utils/SurfaceTransition.ets",
+      "sha256": "5fd665938c92bf565a54f5419a4f373404e071e6349d487b5c87dbb7e9bbc0fb"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/utils/theme.ets",
+      "sha256": "74fc0cb600ffabe0b2a418fb9adb725db2f464b19e768d59ae2013ca22853d2b"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/utils/tokens.ets",
+      "sha256": "68b7e75286f5d0f3b526073e3551db908751607f187f6c8fd152050ec6a41fc4"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+      "sha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_common_close.svg",
+      "sha256": "a5ae835a1194ed00421413f5ffa311baecd20c6eb3f3b7653ab3d17cf03b8039"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_common_confirm.svg",
+      "sha256": "bccaf3cf986bd5c4f049b42cfd9d3aa844232915dedea9a6941a0b1dd79b549c"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_common_history_dark.svg",
+      "sha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_common_history.svg",
+      "sha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_home_import_dark.svg",
+      "sha256": "9960d31596c5420b853d46fc4fef9a4de004e9c3d136ed9e2daba44dfc9620bd"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_home_import.svg",
+      "sha256": "1576fd29539397a86223fa0bc233825c0d3209d7c458871808572b16cf44070b"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_home_stats_dark.svg",
+      "sha256": "faa34bd3022c5d80e019ba1b5c640a0f16e2499b71652ddbea4fdac0e7d031fd"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_home_stats.svg",
+      "sha256": "000425708d540e7e726be1d7231ecb1a280ecde8ab5da0947fbb3c7461806a1b"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_home_sync_dark.svg",
+      "sha256": "f82f14295c011dce78e984f92869ddbfbbc82121015d985b1aceea9549d15327"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_home_sync.svg",
+      "sha256": "ca70b02b08e03df12a306d1c4a0a551da23a62ecd4d484bd4f44aac4a1946a90"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_about_dark.svg",
+      "sha256": "4f921a3efbd9b233ace4d351a3994e0e2543586ca01a1a6b42a59358413812ba"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_about.svg",
+      "sha256": "c1b30116f75ecc972b1284e18ef1c15b34e909f58feb8e5ebb9d931941694db8"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_advanced_dark.svg",
+      "sha256": "c0e2447720cc27e291981e5388da04b020039f49c08cd5fad38a79bd94357859"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_advanced.svg",
+      "sha256": "1df1f539127feff1c52c89854e78ce8098edf56628480c727923456a088facb0"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_data_dark.svg",
+      "sha256": "ccaa8b2069907a8f6ab79a324c8a8d15f6b038c0aa04f3e414b2012e79c32b16"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_data.svg",
+      "sha256": "c3f1616d398b2c3636a7b579ed4ffe15b377d1b8244e797e452e6f02dbb610de"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_export_dark.svg",
+      "sha256": "49dfcdf125b9d0b6c32ded0bb6038ef67561c58a912125119fc27b92a151f6d6"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_export.svg",
+      "sha256": "d226a6be2ac714c9c6d67cef7a38ab46dd055adfceed540048af9ca13f7f9aee"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_general_dark.svg",
+      "sha256": "2ac46e7cacd4294f345ebca211fbde8d479d878faf19f6d7941ad56b9fa0d112"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_general.svg",
+      "sha256": "b09bbf1510b9b61a6769366e64bacb3c5754f40e817836f8f157fc039627b7a6"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_layout_dark.svg",
+      "sha256": "2194be0fd04764836de1475d6348964a78bf31f16b3a620ed1b4110407a418d5"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_layout.svg",
+      "sha256": "eae575831fd0e0bdecc036b5ff909920ae7372023ce7a2eb5abb8811ea1ce57c"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_rate_dark.svg",
+      "sha256": "99a3d2acb72960a582fafd54ddd31907a9eb12440fe3064e3abb2e96f9e74eb9"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_settings_rate.svg",
+      "sha256": "bcececb74ae55234a4c3ba931796b6947350313a3029e4d42363848dbb78c841"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_study_delete_dark.svg",
+      "sha256": "4b7f33cc24254335f8fd17540fddace59ea3881dd19f7119f9fdef2c0a74236a"
+    },
+    {
+      "path": "jideschulte/entry/src/main/resources/base/media/ic_study_delete.svg",
+      "sha256": "6d6a73b0bea43fa93ede940ef3bd8932d74ca64c0f4ae76fb753918193e881fd"
+    },
+    {
+      "path": "Sudoku/entry/src/main/ets/rewrite/presentation/pages/SettingsPage.ets",
+      "sha256": "034018df458fcf2554dc7fe98fdae3f9ab29a1e0a12f4abefe164ec7fb857d5a"
+    }
+  ]
+}

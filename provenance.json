@@ -1,0 +1,484 @@
+{
+  "schemaVersion": 1,
+  "referenceDate": "2026-10-15",
+  "capturedAt": "2026-10-15T14:29:08.3495233+08:00",
+  "workspaceRoot": "D:/Projects",
+  "license": "AGPL-3.0-or-later",
+  "basis": "Current product working-tree files, not legacy portable blocks. Hashes capture actual content including uncommitted changes. Selected mature UI is extracted into a HAR consumed by jidecube and jide-spatial; other candidates and norms have separate status.",
+  "assets": [
+    {
+      "id": "material-background",
+      "targets": ["src/harmony/shared/MaterialBackground.ets"],
+      "inputs": [],
+      "changes": "New optical background layer composing the shared glass backdrop while leaving host size, interaction, and accessibility ownership with the caller."
+    },
+    {
+      "id": "ui-tokens",
+      "targets": [
+        "src/core/UiTokens.ts"
+      ],
+      "inputs": [
+        "jidecards/entry/src/main/ets/utils/应用尺寸.ets",
+        "jidecube/entry/src/main/ets/ui/CubeUi.ts",
+        "jide-spatial/entry/src/main/ets/utils/UiDimensions.ets"
+      ],
+      "changes": "Select current shared geometry; omit business dimensions."
+    },
+    {
+      "id": "motion-action",
+      "targets": [
+        "src/core/Motion.ts",
+        "src/harmony/PressFeedback.ets",
+        "src/harmony/ActionButton.ets"
+      ],
+      "inputs": [
+        "jidecards/entry/src/main/ets/model/MotionStyle.ts",
+        "jidecards/entry/src/main/ets/utils/PressFeedback.ets",
+        "jidecards/entry/src/main/ets/components/common/按下态按钮.ets",
+        "jideschulte/entry/src/main/ets/utils/PressFeedback.ets"
+      ],
+      "changes": "Reimplement explicit profile and action guard; no global storage, input resources, or touch state."
+    },
+    {
+      "id": "theme",
+      "targets": [
+        "src/core/Theme.ts",
+        "src/harmony/SystemTheme.ets"
+      ],
+      "inputs": [
+        "jidecards/entry/src/main/resources/base/element/color.json",
+        "jidecards/entry/src/main/resources/dark/element/color.json",
+        "jidecards/entry/src/main/ets/utils/主题控制器.ets"
+      ],
+      "changes": "Select semantic color pairs; separate pure resolution from API20+ system reading, propagate failure."
+    },
+    {
+      "id": "surface",
+      "targets": [
+        "src/core/SurfaceLayout.ts",
+        "src/harmony/DialogSurface.ets"
+      ],
+      "inputs": [
+        "jidecards/entry/src/main/ets/model/WindowSafeLayout.ts",
+        "jidecards/entry/src/main/ets/components/common/DialogFrame.ets",
+        "jidecube/entry/src/main/ets/ui/CubeUi.ts"
+      ],
+      "changes": "Reimplement geometry and content surface with explicit viewport; omit product state, native window ownership, blur and shadow."
+    },
+    {
+      "id": "state-view",
+      "targets": [
+        "src/harmony/StateView.ets"
+      ],
+      "inputs": [
+        "jidecards/entry/src/main/ets/components/common/统一空态.ets",
+        "jidecards/entry/src/main/ets/components/common/统一错误态.ets"
+      ],
+      "changes": "Reimplement text/state/action composition without resource keys or theme services; hide non-actions."
+    },
+    {
+      "id": "calendar",
+      "targets": [
+        "src/core/CalendarDay.ts"
+      ],
+      "inputs": [],
+      "changes": "New implementation of strict Gregorian calendar-day operations, explicit local conversion and UTC day arithmetic; no legacy code copied."
+    },
+    {
+      "id": "haptics",
+      "targets": [
+        "src/core/Haptics.ts",
+        "src/harmony/SystemHaptics.ets"
+      ],
+      "inputs": [
+        "jideschulte/entry/src/main/ets/model/HapticFeedback.ets",
+        "jideschulte/entry/src/main/ets/utils/SystemHaptics.ets"
+      ],
+      "changes": "Reimplement current event patterns with explicit enabled/backend; final playback failures propagate."
+    },
+    {
+      "id": "shared-har-ui",
+      "targets": [
+        "Index.ets",
+        "src/core/IconColor.ts",
+        "src/harmony/shared/ActionIcon.ets",
+        "src/harmony/shared/DisclosureChevron.ets",
+        "src/harmony/shared/PressFeedback.ets",
+        "src/harmony/shared/IconResources.ets",
+        "src/main/resources/base/media/jide_ic_common_history.svg",
+        "src/main/resources/base/media/jide_ic_common_arrow_left.svg",
+        "src/main/resources/dark/media/jide_ic_common_history.svg",
+        "src/main/resources/dark/media/jide_ic_common_arrow_left.svg",
+        "src/harmony/shared/IconButton.ets"
+      ],
+      "inputs": [
+        "jidecards/entry/src/main/ets/components/common/ActionIcon.ets",
+        "jidecards/entry/src/main/ets/components/common/DisclosureChevron.ets",
+        "jidecards/entry/src/main/ets/utils/PressFeedback.ets",
+        "jidecards/entry/src/main/resources/base/media/ic_common_history.svg",
+        "jidecards/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+        "jidecards/entry/src/main/resources/dark/media/ic_common_history.svg",
+        "jidecards/entry/src/main/resources/dark/media/ic_common_arrow_left.svg",
+        "jidecards/entry/src/main/ets/components/common/IconActionButton.ets"
+      ],
+      "changes": "Extract mature drawing, native icon-button semantics, press and chevron. Product adapters retain theme, overlay/muted variants, motion preferences, labels and actions. Two paired SVG resources are delivered by the HAR. jidecube and jide-spatial consume the package."
+    },
+    {
+      "id": "shared-levels",
+      "targets": [
+        "Levels.ets",
+        "src/core/Levels.ts",
+        "src/core/Medals.ts",
+        "src/harmony/Levels.ets",
+        "src/harmony/Medals.ets",
+        "src/harmony/MedalIcon.ets",
+        "examples/LevelDemoStore.ts",
+        "examples/LevelShowcase.ets",
+        "examples/shared-levels.mjs",
+        "assets/medals/catalog.json",
+        "assets/medals/navigation.svg",
+        "assets/medals/review-definitions.json",
+        "assets/medals/drafts/commemorative.svg",
+        "assets/medals/drafts/contribution.svg",
+        "assets/medals/drafts/ordinal-1-dark.svg",
+        "assets/medals/drafts/ordinal-2-dark.svg",
+        "assets/medals/drafts/ordinal-8-dark.svg",
+        "assets/medals/drafts/ordinal-40-dark.svg",
+        "assets/medals/drafts/level-2.svg",
+        "assets/medals/drafts/level-4.svg",
+        "assets/medals/drafts/level-8.svg",
+        "assets/medals/drafts/level-16.svg",
+        "assets/medals/drafts/level-32.svg",
+        "assets/medals/drafts/level-64.svg",
+        "assets/medals/drafts/level-128.svg",
+        "assets/medals/drafts/level-256.svg"
+      ],
+      "inputs": [],
+      "changes": "New implementation from confirmed level-experience decisions on 2026-10-15: shared account transaction contract, contribution deduplication, warning/grace/demotion, historical peak, achievement milestones and host-driven UI. Composes existing foundation tokens, theme, buttons, state and dialog modules; no product level algorithm copied. Formula-driven doubling milestones, ordinary-to-special artwork and independent commemorative/contribution definitions share the series source entry. Pure award preparation preserves provenance and deduplicates ownership; trusted host owns eligibility and atomic persistence. Current artwork and Chinese uppercase ordinals accepted by user and enabled for spatial local level awards; specific independent event definitions remain under review. Additive owned-medal strip/detail components and pure owned-account wear selection, user-authorized on 2026-10-15. Product hosts persist optional wear preference and compose existing action buttons; no cloud sync or independent award eligibility added."
+    },
+    {
+      "id": "visual-chrome-20261029",
+      "targets": [
+        "src/core/VisualStyle.ts",
+        "src/harmony/shared/Surface.ets",
+        "src/harmony/shared/PageBackground.ets",
+        "src/harmony/shared/ActionButton.ets"
+      ],
+      "inputs": [
+        "/Users/chengrui/Developer/ios/jidecards/JideCards/UI/Theme/JideChrome.swift"
+      ],
+      "changes": "Reimplement the iOS visual direction in ArkUI: explicit semantic palette, opt-in glass/flat surface, static background, accessible training action; preserve existing consumers. Material differs by platform; no iOS morph navigation port."
+    },
+    {
+      "id": "olive-oil",
+      "targets": [
+        "src/core/OliveOil.ts",
+        "src/core/OliveOilSession.ts",
+        "src/harmony/shared/OliveOilSurface.ets",
+        "src/harmony/shared/OliveOilRuntime.ets"
+      ],
+      "inputs": [
+        "/Users/chengrui/Developer/ios/JideFoundation/Sources/JideFoundation/OliveOil"
+      ],
+      "changes": "Port timing, cluster/group/radial/ligament geometry and lifecycle to ArkTS and native per-frame Path. Cubic rounded corners approximate SwiftUI continuous corners; material remains platform-native."
+    },
+    {
+      "id": "popup-refractive-glass",
+      "targets": [
+        "src/core/GlassOptics.ts",
+        "src/harmony/shared/GlassBackdrop.ets",
+        "src/core/GlassCapture.ts"
+      ],
+      "inputs": [
+        "jidecards/entry/src/main/ets/model/GlassOptics.ts",
+        "jidecards/entry/src/main/ets/utils/GlassBackdrop.ets"
+      ],
+      "changes": "Extract user-accepted full-panel 5.5vp blur and continuous refraction; replace product storage with explicit active/dark/captureAllowed inputs. Product-wide adoption remains a separate task.",
+      "capturedAt": "2026-10-30",
+      "sourceHashes": {
+        "entry/src/main/ets/model/GlassOptics.ts": "f0db744d3cf0326b49cca6fdf94212e49f37e7255005e2000f642ffa1a2e6777",
+        "entry/src/main/ets/utils/GlassBackdrop.ets": "12ba8da66bf27de4cd96499b8cf4132030cb4e9098dc5d17f7baf9ff22c0c8fb"
+      }
+    },
+    {
+      "id": "glass-fusion",
+      "targets": [
+        "src/core/GlassFusion.ts"
+      ],
+      "inputs": [],
+      "changes": "Original bounded analytic smooth-union glass tessellation; shares existing capture and rendering owner."
+    },
+    {
+      "id": "glass-fusion-gpu",
+      "targets": [
+        "src/harmony/shared/GlassFusionGpu.ets",
+        "src/main/cpp/types/libjide_glass_gpu/Index.d.ts",
+        "src/harmony/shared/GlassBackdropTypes.ets"
+      ],
+      "inputs": [],
+      "changes": "Original opt-in EGL/OpenGLES3 SDF renderer experiment sharing the existing captured texture. No external source copied."
+    },
+    {
+      "id": "complete-popup-menu-presentation",
+      "targets": [
+        "src/core/MenuLayout.ts",
+        "src/core/PopupAppearance.ts",
+        "src/harmony/shared/ActionMenuList.ets",
+        "src/harmony/shared/AnchoredMenu.ets",
+        "src/harmony/shared/MenuBubble.ets",
+        "src/harmony/shared/MenuItem.ets",
+        "src/harmony/shared/MenuTypes.ets",
+        "src/harmony/shared/PopupPanel.ets"
+      ],
+      "inputs": [
+        "jidecards/entry/src/main/ets/components/common/ActionMenuLayout.ts",
+        "jidecards/entry/src/main/ets/components/common/PopupAppearance.ts",
+        "jidecards/entry/src/main/ets/components/common/ActionMenuList.ets",
+        "jidecards/entry/src/main/ets/components/common/AnchoredMenu.ets",
+        "jidecards/entry/src/main/ets/components/common/GlassBubblePanel.ets",
+        "jidecards/entry/src/main/ets/components/common/MenuItem.ets",
+        "jidecards/entry/src/main/ets/components/common/GlassPanel.ets",
+        "jidecards/entry/src/main/ets/model/WindowSafeLayout.ts"
+      ],
+      "changes": "Extract the complete current JideCards glass panel readiness/fusion lifecycle, toolbar and safe-area placement, bubble outline, menu row rendering, and current-item action validation. Products supply preferences, resources, source leases, motion and pointer router explicitly; both products consume the same implementation. Snapshot precedes conversion of product files to thin adapters (2026-11-04). SharedPopupSurface is extracted into the existing shared Surface owner."
+    },
+    {
+      "id": "file-transfer",
+      "targets": [
+        "src/core/FileTransfer.ts",
+        "src/harmony/FileTransfer.ets"
+      ],
+      "inputs": [
+        "jidecards/entry/src/main/ets/backend/DataTransferFiles.ts",
+        "jidecards/entry/src/main/ets/backend/数据迁移服务.ts",
+        "jidecards/entry/src/main/ets/utils/文件导入助手.ets",
+        "jidecards/entry/src/main/ets/model/ImportFile.ts"
+      ],
+      "changes": "Extract provider URI selection, async descriptor copy with short writes and save cancellation; add size limit, flush and filename sanitization. Product owns temporary files, archive format, confirmation and commits."
+    },
+    {
+      "id": "expanding-toolbar-search",
+      "targets": [
+        "src/harmony/shared/ExpandingSearch.ets"
+      ],
+      "inputs": [
+        "HarmonyOS TextInput focus/IME APIs",
+        "Current Jide series toolbar icon and press primitives"
+      ],
+      "changes": "Shared manual expansion capsule, caller-supplied theme/icon/motion, focus on animation completion, keyboard submit and icon submit collapse through the same guarded path. Add configurable SharedIconButton size with its prior default preserved."
+    }
+  ],
+  "sources": [
+    {
+      "path": "jide-spatial/docs/ui.md",
+      "sha256": "66c6e54a6b41e35d805ff5e785b833e27e6854165bff910a02580085b2388e03",
+      "historical": true,
+      "note": "Original extraction context; consumer documentation updated by the 2026-10-15 shared HAR migration. Original hash retained. Current audit captures the updated file."
+    },
+    {
+      "path": "jide-spatial/entry/src/main/ets/utils/UiDimensions.ets",
+      "sha256": "9ab7010e81e7af12f8ad162e58cbf919f4b3bd1be46893ee70b821508db502d3"
+    },
+    {
+      "path": "jidecards/AGENTS.md",
+      "sha256": "61691a45359f13493977a7337ddc5cdb41ae8c91f518ba124848b635b8deda4b"
+    },
+    {
+      "path": "jidecards/docs/development/appearance.md",
+      "sha256": "b8321b76d87314de4cbe5476ed21a0db386a0ad74ea5589e6ca9e2f3546537e9"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/按下态按钮.ets",
+      "sha256": "6af936a3ebc48dea21791acd1ed5dc8e18825e8ac9ba83598ddd8f680bf3bb60"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/统一错误态.ets",
+      "sha256": "ab1072845085cbed14b39a1ce2867a145c9d1bc6eb96f230783523b98529b5d1"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/统一空态.ets",
+      "sha256": "845ca08aac5aead3f0f82950b23dc8c4d7f45db51e2642ffb79bfea7b217c3b9"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/DialogFrame.ets",
+      "sha256": "c1b37a0452a02b6732351c05f5274e30f672b6dc580c9d634c7e7494e4628462"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/model/MotionStyle.ts",
+      "sha256": "ce74322f55f2dcf19197296742e292360586e968417914d783a6ece4f31e891b"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/model/WindowSafeLayout.ts",
+      "sha256": "f142bd10e0d482f9efc5238412b363aa33546c5a384542eff85a245c9a94861e",
+      "previousCaptures": [
+        {
+          "sha256": "f9d080ab06d9b634b395994c3990ac6106c2edbfd9999a1f35e5c0b2e645268a",
+          "reviewedAt": "2026-10-15T07:33:52.082Z",
+          "delta": "Only the documented WindowPoint interface was added; removing exactly those added lines reproduces the original SHA256. No geometry function changed."
+        }
+      ]
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/应用尺寸.ets",
+      "sha256": "d44ca4c000327f6558b32abf31b339dc745aef7ed61fc7be8783f65ecd6ab03e"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/主题控制器.ets",
+      "sha256": "01a0fb5484773c48f20026039bf1bb2649c1ccd3560d87c7f39f7971d5cdc44c"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/PressFeedback.ets",
+      "sha256": "ebba35550c24ce2b03c69b98e60280986490c18597c600fe5c7ace4d0d9fe038"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/element/color.json",
+      "sha256": "d52a1a820f8ab84262b7b8ad8848e17629886764dd3d5fd681bf43a703f9ad2b"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/element/color.json",
+      "sha256": "e4a1bc3bb8f3c1ae27efcc24f0a411ad5582538077b5a1fb4f1e2d471fb8917e"
+    },
+    {
+      "path": "jidecards/LICENSE",
+      "sha256": "e0eedba615d5cd1b986afb6c5b3a4b1ae33713e7e9dc74d19daec5e3221f9d2e"
+    },
+    {
+      "path": "jidecards/PROJECT_CONTEXT.md",
+      "sha256": "14670b4730c3634e19a0f09e906dd296a0591168104d03c65684ffd620701874"
+    },
+    {
+      "path": "jidecube/docs/UI_ALIGNMENT.md",
+      "sha256": "e2dbbbe63b4090a43cec745fc9b65c0cfbc9572295ded1494811ca5d18dadce5",
+      "historical": true,
+      "note": "Original extraction context; consumer documentation updated by the 2026-10-15 shared HAR migration. Original hash retained. Current audit captures the updated file."
+    },
+    {
+      "path": "jidecube/entry/src/main/ets/ui/CubeUi.ts",
+      "sha256": "aa0b3272425f7259de1a3d0b14921ba373aaced4b1f30274bd37a45dc2a3ebdd"
+    },
+    {
+      "path": "jideschulte/docs/ui-guidelines.md",
+      "sha256": "03685dfd8259cea32fedbbb813b9dc4eb71badfe93f36b26b5f2d1892b2d82e3"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/model/HapticFeedback.ets",
+      "sha256": "f23e8ff7640df17183b345cc2ddf2b5ab66da22fee63f8d88eddad97bc34fc94"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/utils/PressFeedback.ets",
+      "sha256": "87c86b83e979e1eddad2dc0a8babaf0a075e0bbc7404284e2238e1d88cfd09b5"
+    },
+    {
+      "path": "jideschulte/entry/src/main/ets/utils/SystemHaptics.ets",
+      "sha256": "563c485f5bf3ad4e6ab4d554400b7eb653b190e51e21f4146998336f6bf3e32f"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ActionIcon.ets",
+      "sha256": "ed143a00d5a6f1ccf19725d68ea213806ffecf8f7ceb05ee9fed2c4482be42c8"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/DisclosureChevron.ets",
+      "sha256": "8e6b4cd7d29bf35137710b9c16514a93cf8f332bb5f547915962fa1683e5284a"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_common_history.svg",
+      "sha256": "5327671ec4a408ac23d0924ad54a1145ccd2f7c43664ee11247e7faa1246ff34"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/base/media/ic_common_arrow_left.svg",
+      "sha256": "fed5f979fca9e0626c47674b97f17f00ed10e67ff38cfe367ecca00e18148402"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_common_history.svg",
+      "sha256": "89a446d369609459a1caf9335f34273baf94f4018b7320a2edcfaebc8753f59b"
+    },
+    {
+      "path": "jidecards/entry/src/main/resources/dark/media/ic_common_arrow_left.svg",
+      "sha256": "b05224f093f65f503c78af4fd19854f14500ff02ce882d39cbd3671da7e6a33e"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/IconActionButton.ets",
+      "sha256": "ead78095142a20e7029cb42c054270dd837546fce97c7917446d84616b912346"
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ActionMenuLayout.ts",
+      "sha256": "773a88fdd12c64e7f30ff82323c9118377e7caa664d6bec8b8fda36e010def8a",
+      "historical": true,
+      "note": "2026-11-04 current working-tree extraction snapshot before product adapter conversion; complete menu presentation now lives in shared HAR."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/PopupAppearance.ts",
+      "sha256": "cc32560e6b9e4626b01da98948afe13568bfaa4623e33aa4dc37f8c79029b7e8",
+      "historical": true,
+      "note": "2026-11-04 current working-tree extraction snapshot before product adapter conversion; complete menu presentation now lives in shared HAR."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/ActionMenuList.ets",
+      "sha256": "2367b8e774b7f56d475061418009ee91e5c30d21770fdc34439eb9de2b0c738d",
+      "historical": true,
+      "note": "2026-11-04 current working-tree extraction snapshot before product adapter conversion; complete menu presentation now lives in shared HAR."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/AnchoredMenu.ets",
+      "sha256": "4e2fe5a23b152a5c773e404be38f467b05eaed9cefb8b59e4bdc010a023f4236",
+      "historical": true,
+      "note": "2026-11-04 current working-tree extraction snapshot before product adapter conversion; complete menu presentation now lives in shared HAR."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/GlassBubblePanel.ets",
+      "sha256": "c045fe002af5c13b2ee231c883484f239ceb3aa71d833adf8ac2123c38020709",
+      "historical": true,
+      "note": "2026-11-04 current working-tree extraction snapshot before product adapter conversion; complete menu presentation now lives in shared HAR."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/MenuItem.ets",
+      "sha256": "851c8130037058656674fa6e9610da1bce0be920d75fa04830442f18ca16ad40",
+      "historical": true,
+      "note": "2026-11-04 current working-tree extraction snapshot before product adapter conversion; complete menu presentation now lives in shared HAR."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/components/common/GlassPanel.ets",
+      "sha256": "dc5901c7bb473342add3024be4b2bd5de7de0825ebac741ac198f3760e0057c6",
+      "historical": true,
+      "note": "2026-11-04 current working-tree extraction snapshot before product adapter conversion; complete menu presentation now lives in shared HAR."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/model/WindowSafeLayout.ts",
+      "sha256": "f142bd10e0d482f9efc5238412b363aa33546c5a384542eff85a245c9a94861e",
+      "historical": true,
+      "note": "2026-11-04 current working-tree extraction snapshot before product adapter conversion; complete menu presentation now lives in shared HAR."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/backend/DataTransferFiles.ts",
+      "sha256": "c806f24ce04d91d6132402cec1029304d035642e74e78066af7dc321f9c015eb",
+      "historical": true,
+      "note": "2026-11-05 current flashcard transfer extraction; Anki Core, recovery and format rules remain in product."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/backend/数据迁移服务.ts",
+      "sha256": "3fec328a47d44d7613c06f967c16c554dc4e255751b1f7ba2c078867b3cd1245",
+      "historical": true,
+      "note": "2026-11-05 current flashcard transfer extraction; Anki Core, recovery and format rules remain in product."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/utils/文件导入助手.ets",
+      "sha256": "00a3c9e0d0efcd44f5fdab11887426002134b5824f176989e8b005582e0f2de4",
+      "historical": true,
+      "note": "2026-11-05 current flashcard transfer extraction; Anki Core, recovery and format rules remain in product."
+    },
+    {
+      "path": "jidecards/entry/src/main/ets/model/ImportFile.ts",
+      "sha256": "74478cb81d173457c63447247d666d9d2715049d4f501c511fdf532d701e966c",
+      "historical": true,
+      "note": "2026-11-05 current flashcard transfer extraction; Anki Core, recovery and format rules remain in product."
+    }
+  ],
+  "visualReferences": [
+    {
+      "capturedAt": "2026-10-29",
+      "path": "/Users/chengrui/Developer/ios/jidecards/JideCards/UI/Theme/JideChrome.swift",
+      "sha256": "45d833daf55d9a47d7045270778957ff413a4b355ad6a3a9957fbfdf3e76085b",
+      "role": "Visual reference, not source-copy or pixel-equivalence claim"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "jide-foundation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node tools/check.mjs",
+    "build:harmony": "node tools/build-harmony.mjs",
+    "audit:reuse": "node tools/audit-reuse.mjs",
+    "check:consumers": "node tools/consumers.mjs",
+    "sync:consumers": "node tools/consumers.mjs --install"
+  }
+}

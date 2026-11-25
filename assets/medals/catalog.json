@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 3,
+  "scope": "jide-series",
+  "license": "AGPL-3.0-or-later",
+  "levelAwardRule": {
+    "status": "confirmed-2026-10-15",
+    "firstLevel": 2,
+    "multiplier": 2,
+    "businessCountLimit": null,
+    "idPrefix": "jide.level-doubling.v1."
+  },
+  "appearance": {
+    "status": "approved-2026-10-15",
+    "style": "progressive-color-round-medal-v5-bold-outline",
+    "numeral": "Chinese-financial-uppercase",
+    "colorDirection": "ordinary-to-special-confirmed-2026-10-15",
+    "colorSteps": [
+      "素灰",
+      "青绿",
+      "湛蓝",
+      "晶紫",
+      "鎏金",
+      "橙金",
+      "绯红",
+      "幻彩"
+    ],
+    "afterLastColor": "retain-prismatic-continue-ordinal",
+    "name": "成长徽章",
+    "generator": "../../src/core/Medals.ts#medalSvg"
+  },
+  "previewExamples": [
+    {
+      "id": "jide.level-doubling.v1.1",
+      "ordinal": 1,
+      "level": 2,
+      "color": "素灰",
+      "svg": "drafts/level-2.svg"
+    },
+    {
+      "id": "jide.level-doubling.v1.2",
+      "ordinal": 2,
+      "level": 4,
+      "color": "青绿",
+      "svg": "drafts/level-4.svg"
+    },
+    {
+      "id": "jide.level-doubling.v1.3",
+      "ordinal": 3,
+      "level": 8,
+      "color": "湛蓝",
+      "svg": "drafts/level-8.svg"
+    },
+    {
+      "id": "jide.level-doubling.v1.4",
+      "ordinal": 4,
+      "level": 16,
+      "color": "晶紫",
+      "svg": "drafts/level-16.svg"
+    },
+    {
+      "id": "jide.level-doubling.v1.5",
+      "ordinal": 5,
+      "level": 32,
+      "color": "鎏金",
+      "svg": "drafts/level-32.svg"
+    },
+    {
+      "id": "jide.level-doubling.v1.6",
+      "ordinal": 6,
+      "level": 64,
+      "color": "橙金",
+      "svg": "drafts/level-64.svg"
+    },
+    {
+      "id": "jide.level-doubling.v1.7",
+      "ordinal": 7,
+      "level": 128,
+      "color": "绯红",
+      "svg": "drafts/level-128.svg"
+    },
+    {
+      "id": "jide.level-doubling.v1.8",
+      "ordinal": 8,
+      "level": 256,
+      "color": "幻彩",
+      "svg": "drafts/level-256.svg"
+    }
+  ],
+  "specialExamples": [
+    {
+      "id": "jide.commemorative.example.v1",
+      "version": "1",
+      "category": "commemorative",
+      "name": "纪念徽章（示例）",
+      "condition": "活动、周年或特定事件纪念；具体事件与领取条件待用户审查。",
+      "status": "draft",
+      "artwork": {
+        "motif": "commemorative",
+        "colorStep": 4
+      },
+      "color": "晶紫",
+      "svg": "drafts/commemorative.svg"
+    },
+    {
+      "id": "jide.contribution.special.v1",
+      "version": "1",
+      "category": "contribution",
+      "name": "特别贡献徽章",
+      "condition": "认可对记得系列的特别贡献；贡献证据及审核标准待用户审查。",
+      "status": "draft",
+      "artwork": {
+        "motif": "contribution",
+        "colorStep": 7
+      },
+      "color": "绯红",
+      "svg": "drafts/contribution.svg"
+    }
+  ],
+  "darkExamples": [
+    {
+      "ordinal": 1,
+      "svg": "drafts/ordinal-1-dark.svg"
+    },
+    {
+      "ordinal": 2,
+      "svg": "drafts/ordinal-2-dark.svg"
+    },
+    {
+      "ordinal": 8,
+      "svg": "drafts/ordinal-8-dark.svg"
+    },
+    {
+      "ordinal": 40,
+      "svg": "drafts/ordinal-40-dark.svg"
+    }
+  ],
+  "note": "Artwork accepted for application on 2026-10-15; examples are not a finite catalog. Level awards double. Commemorative/contribution event definitions remain draft until their specific eligibility is reviewed. Shared host must verify eligibility and atomically persist awards."
+}
