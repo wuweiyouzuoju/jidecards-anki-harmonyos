@@ -31,10 +31,6 @@
 
 > 记得闪卡是独立开源项目，与 Ankitects、AnkiWeb 或 AnkiDroid 无关，也未获得其认可。
 
-## 独立开发声明
-
-截至目前，记得闪卡（jidecards）的开发与维护仍全程由可塑性天赋（wuweiyouzuoju）本人独立完成，不涉及团队协作或多人共同开发。任何声称“带领团队完成记得闪卡开发”，或将本项目归为团队开发成果的表述，均与事实不符。
-
 ## 目录
 
 - [应用截图](#应用截图)
@@ -195,7 +191,15 @@ git -C third_party/anki submodule update --init --depth 1 -- ftl/core-repo ftl/q
 
 ### 2. 准备公共 HAR 和签名
 
-将「记得系列基础」源码放在本仓库的同级目录，目录名为 `记得系列基础`。在基础库执行 `npm run build:harmony`，或从维护者取得与当前源码匹配的 `jide_foundation.har`，放到基础库的 `.local/packages/`。闪卡从 [模块依赖配置](entry/oh-package.json5) 引用该 HAR，从新检出开始时需先准备它，再执行 `ohpm install`。
+在闪卡仓库根目录运行以下命令，从公开源码构建所需的基础库 HAR。需要 Node.js 24+ 和 DevEco Studio。
+
+```bash
+git clone --single-branch --branch shared-foundation https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos.git "../记得系列基础"
+git -C "../记得系列基础" checkout --detach ed087ff920548a0b1bfb38bce0b123384932bb5b
+(cd "../记得系列基础" && npm run build:harmony)
+```
+
+构建生成 `../记得系列基础/.local/packages/jide_foundation.har`。闪卡的[模块依赖配置](entry/oh-package.json5)从该位置读取 HAR，随后可继续执行下方的 `ohpm install`。
 
 公共 [build-profile.json5](build-profile.json5) 不保存个人签名材料。复制 [config/signing.example.json](config/signing.example.json) 为 `.local/signing.json` 并填入本机签名，或用环境变量 `JIDECARDS_SIGNING_CONFIG` 指向外部 JSON。覆盖安装必须沿用原签名身份，详见[签名文档](docs/development/signing.md)。
 
@@ -275,3 +279,7 @@ ArkUI 页面 / 组件          entry/src/main/ets/pages、components
 ## 许可证与第三方声明
 
 本项目采用 [AGPL-3.0-or-later](LICENSE) 许可。Anki rslib 由 Ankitects Pty Ltd 及其贡献者提供，依据 AGPL-3.0-or-later 授权；MathJax、HarmonyOS 组件及其他依赖的版权与许可见 [NOTICE.md](NOTICE.md) 及各自源文件说明。
+
+## 独立开发声明
+
+截至目前，记得闪卡（jidecards）的开发与维护仍全程由可塑性天赋（wuweiyouzuoju）本人独立完成，不涉及团队协作或多人共同开发。任何声称“带领团队完成记得闪卡开发”，或将本项目归为团队开发成果的表述，均与事实不符。
