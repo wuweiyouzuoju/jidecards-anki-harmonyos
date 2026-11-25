@@ -194,8 +194,8 @@ git -C third_party/anki submodule update --init --depth 1 -- ftl/core-repo ftl/q
 在闪卡仓库根目录运行以下命令，从公开源码构建所需的基础库 HAR。需要 Node.js 24+ 和 DevEco Studio。
 
 ```bash
-git clone --single-branch --branch shared-foundation https://github.com/wuweiyouzuoju/jidecards-anki-harmonyos.git "../记得系列基础"
-git -C "../记得系列基础" checkout --detach ed087ff920548a0b1bfb38bce0b123384932bb5b
+git clone https://github.com/wuweiyouzuoju/jide-foundation.git "../记得系列基础"
+git -C "../记得系列基础" checkout --detach a265b67bf0bbb86f824b2409e4b02053da48120b
 (cd "../记得系列基础" && npm run build:harmony)
 ```
 
